@@ -15,6 +15,7 @@ import {
 import SunVisualization from './SunVisualization';
 import InfoPanel from './InfoPanel';
 import { toast } from '@/components/ui/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const SunTracker: React.FC = () => {
   const [date, setDate] = useState<Date>(new Date());
@@ -22,6 +23,23 @@ const SunTracker: React.FC = () => {
   const [sunPosition, setSunPosition] = useState<SunPosition>({ azimuth: 0, altitude: 0 });
   const [sunTimes, setSunTimes] = useState<SunTimes | null>(null);
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('midday');
+  const isMobile = useIsMobile();
+  const [isLandscape, setIsLandscape] = useState(true);
+
+  // Check device orientation
+  useEffect(() => {
+    const checkOrientation = () => {
+      setIsLandscape(window.innerWidth > window.innerHeight);
+    };
+    
+    // Check initially
+    checkOrientation();
+    
+    // Add event listener
+    window.addEventListener('resize', checkOrientation);
+    
+    return () => window.removeEventListener('resize', checkOrientation);
+  }, []);
 
   // Update current time
   useEffect(() => {
@@ -102,11 +120,13 @@ const SunTracker: React.FC = () => {
 
   return (
     <div className="relative h-screen w-screen force-landscape overflow-hidden" style={getBackgroundStyle()}>
-      {/* Portrait mode warning */}
-      <div className="landscape-message fixed inset-0 z-50 bg-black bg-opacity-80 text-white flex flex-col items-center justify-center p-8 text-center">
-        <h2 className="text-2xl mb-4">Please rotate your device</h2>
-        <p>This app works best in landscape mode</p>
-      </div>
+      {/* Portrait mode warning - only show if actually in portrait */}
+      {!isLandscape && (
+        <div className="landscape-message fixed inset-0 z-50 bg-black bg-opacity-80 text-white flex flex-col items-center justify-center p-8 text-center">
+          <h2 className="text-2xl mb-4">Please rotate your device</h2>
+          <p>This app works best in landscape mode</p>
+        </div>
+      )}
       
       {location.loaded ? (
         <>

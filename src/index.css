@@ -101,7 +101,7 @@
     overflow: hidden;
   }
 
-  /* Force landscape mode */
+  /* Force landscape mode only on portrait oriented devices */
   @media (orientation: portrait) {
     .force-landscape {
       transform: rotate(-90deg);
@@ -111,16 +111,6 @@
       position: absolute;
       top: 100%;
       left: 0;
-    }
-
-    .landscape-message {
-      display: flex;
-    }
-  }
-
-  @media (orientation: landscape) {
-    .landscape-message {
-      display: none;
     }
   }
 }
