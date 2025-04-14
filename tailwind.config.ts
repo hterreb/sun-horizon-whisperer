@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,6 +62,18 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				// Custom colors for sun app
+				dawn: '#FEC6A1',
+				sunrise: '#F97316',
+				day: '#0EA5E9',
+				sunset: '#ea384c',
+				dusk: '#E5DEFF',
+				night: '#1A1F2C',
+				twilight: {
+					civil: '#403E43',
+					nautical: '#221F26',
+					astronomical: '#0F0E11'
 				}
 			},
 			borderRadius: {
@@ -84,11 +97,26 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				'sun-rise': {
+					'0%': { transform: 'translateY(100%)' },
+					'100%': { transform: 'translateY(0)' }
+				},
+				'sun-set': {
+					'0%': { transform: 'translateY(0)' },
+					'100%': { transform: 'translateY(100%)' }
+				},
+				'glow': {
+					'0%, 100%': { opacity: '1' },
+					'50%': { opacity: '0.8' }
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'sun-rise': 'sun-rise 3s ease-out',
+				'sun-set': 'sun-set 3s ease-out',
+				'glow': 'glow 5s ease-in-out infinite'
 			}
 		}
 	},

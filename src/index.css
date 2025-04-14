@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -97,5 +98,29 @@
 
   body {
     @apply bg-background text-foreground;
+    overflow: hidden;
+  }
+
+  /* Force landscape mode */
+  @media (orientation: portrait) {
+    .force-landscape {
+      transform: rotate(-90deg);
+      transform-origin: left top;
+      width: 100vh;
+      height: 100vw;
+      position: absolute;
+      top: 100%;
+      left: 0;
+    }
+
+    .landscape-message {
+      display: flex;
+    }
+  }
+
+  @media (orientation: landscape) {
+    .landscape-message {
+      display: none;
+    }
   }
 }
