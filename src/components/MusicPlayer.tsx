@@ -3,11 +3,14 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Slider } from "@/components/ui/slider";
 import { Music, Volume2, VolumeX } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { toast } from '@/components/ui/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const MusicPlayer: React.FC = () => {
   const [isPlaying, setIsPlaying] = useState(true);
   const [volume, setVolume] = useState([0.5]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     audioRef.current = new Audio('https://cloudcity.link/lofi.mp3');
@@ -18,6 +21,11 @@ const MusicPlayer: React.FC = () => {
       audioRef.current.play().catch(error => {
         console.error('Audio playback failed:', error);
         setIsPlaying(false);
+        toast({
+          title: "Audio playback failed",
+          description: "There was an error playing the music. Please try again.",
+          variant: "destructive"
+        });
       });
     }
 
@@ -45,8 +53,13 @@ const MusicPlayer: React.FC = () => {
     }
   }, [isPlaying]);
 
+  const handleVolumeChange = (newVolume: number[]) => {
+    setVolume(newVolume);
+  };
+
   return (
-    <div className="fixed bottom-4 right-4 z-50 bg-black/30 backdrop-blur-lg rounded-full px-4 py-2 flex items-center gap-4">
+    <div className={`fixed z-50 bg-black/30 backdrop-blur-lg rounded-full px-3 py-2 flex items-center gap-2 
+      ${isMobile ? 'bottom-16 left-4' : 'bottom-4 right-4'}`}>
       <Switch
         checked={isPlaying}
         onCheckedChange={setIsPlaying}
@@ -59,9 +72,9 @@ const MusicPlayer: React.FC = () => {
         <Volume2 className="h-4 w-4 text-white" />
       )}
       <Slider
-        className="w-24"
+        className="w-16 sm:w-24"
         value={volume}
-        onValueChange={setVolume}
+        onValueChange={handleVolumeChange}
         max={1}
         step={0.1}
       />
