@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   getSunPosition, 
@@ -14,6 +13,8 @@ import {
 } from '../utils/sunUtils';
 import SunVisualization from './SunVisualization';
 import InfoPanel from './InfoPanel';
+import NightStars from './NightStars';
+import MusicPlayer from './MusicPlayer';
 import { toast } from '@/components/ui/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -26,22 +27,18 @@ const SunTracker: React.FC = () => {
   const isMobile = useIsMobile();
   const [isLandscape, setIsLandscape] = useState(true);
 
-  // Check device orientation
   useEffect(() => {
     const checkOrientation = () => {
       setIsLandscape(window.innerWidth > window.innerHeight);
     };
     
-    // Check initially
     checkOrientation();
     
-    // Add event listener
     window.addEventListener('resize', checkOrientation);
     
     return () => window.removeEventListener('resize', checkOrientation);
   }, []);
 
-  // Update current time
   useEffect(() => {
     const timer = setInterval(() => {
       setDate(new Date());
@@ -50,7 +47,6 @@ const SunTracker: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Get user's location
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -67,7 +63,6 @@ const SunTracker: React.FC = () => {
         },
         (error) => {
           console.error("Error getting location:", error);
-          // Default to New York City coordinates
           setLocation({
             latitude: 40.7128,
             longitude: -74.0060,
@@ -86,7 +81,6 @@ const SunTracker: React.FC = () => {
         description: "Your browser doesn't support geolocation. Using default location.",
         variant: "destructive"
       });
-      // Default to New York City coordinates
       setLocation({
         latitude: 40.7128,
         longitude: -74.0060,
@@ -95,7 +89,6 @@ const SunTracker: React.FC = () => {
     }
   }, []);
 
-  // Calculate sun position and times when location or time changes
   useEffect(() => {
     if (location.loaded) {
       const position = getSunPosition(date, location.latitude, location.longitude);
@@ -111,7 +104,6 @@ const SunTracker: React.FC = () => {
     }
   }, [date, location]);
 
-  // Get background style based on time of day
   const getBackgroundStyle = useCallback(() => {
     return {
       background: getBackgroundGradient(timeOfDay)
@@ -120,13 +112,15 @@ const SunTracker: React.FC = () => {
 
   return (
     <div className="relative h-screen w-screen force-landscape overflow-hidden" style={getBackgroundStyle()}>
-      {/* Portrait mode warning - only show if actually in portrait */}
       {!isLandscape && (
         <div className="landscape-message fixed inset-0 z-50 bg-black bg-opacity-80 text-white flex flex-col items-center justify-center p-8 text-center">
           <h2 className="text-2xl mb-4">Please rotate your device</h2>
           <p>This app works best in landscape mode</p>
         </div>
       )}
+      
+      <NightStars timeOfDay={timeOfDay} />
+      <MusicPlayer />
       
       {location.loaded ? (
         <>
