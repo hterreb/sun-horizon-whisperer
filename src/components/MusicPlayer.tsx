@@ -13,7 +13,12 @@ const MusicPlayer: React.FC = () => {
   const isMobile = useIsMobile();
 
   useEffect(() => {
-    audioRef.current = new Audio('https://cloudcity.link/lofi.mp3');
+    // Using Lo-Fi Girl YouTube stream audio
+    audioRef.current = new Audio('https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1');
+    // Fallback to a direct stream URL if available
+    if (!audioRef.current.canPlayType('application/x-mpegURL')) {
+      audioRef.current = new Audio('https://play.streamafrica.net/lofiradio');
+    }
     audioRef.current.loop = true;
     audioRef.current.volume = volume[0];
     
@@ -23,7 +28,7 @@ const MusicPlayer: React.FC = () => {
         setIsPlaying(false);
         toast({
           title: "Audio playback failed",
-          description: "There was an error playing the music. Please try again.",
+          description: "There was an error playing the music. Browser autoplay policies may be blocking playback.",
           variant: "destructive"
         });
       });
@@ -46,7 +51,14 @@ const MusicPlayer: React.FC = () => {
   useEffect(() => {
     if (audioRef.current) {
       if (isPlaying) {
-        audioRef.current.play().catch(console.error);
+        audioRef.current.play().catch(error => {
+          console.error('Audio playback failed:', error);
+          toast({
+            title: "Audio playback failed",
+            description: "There was an error playing the music. Try clicking anywhere on the page first.",
+            variant: "destructive"
+          });
+        });
       } else {
         audioRef.current.pause();
       }
@@ -59,7 +71,7 @@ const MusicPlayer: React.FC = () => {
 
   return (
     <div className={`fixed z-50 bg-black/30 backdrop-blur-lg rounded-full px-3 py-2 flex items-center gap-2 
-      ${isMobile ? 'bottom-16 left-4' : 'bottom-4 right-4'}`}>
+      ${isMobile ? 'bottom-16 left-4' : 'bottom-4 left-4'}`}>
       <Switch
         checked={isPlaying}
         onCheckedChange={setIsPlaying}
