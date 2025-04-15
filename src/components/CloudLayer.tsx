@@ -19,9 +19,10 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay }) => {
     }));
     setClouds(newClouds);
 
-    // Occasionally add birds for ambient movement
+    // Very occasionally add birds for minimal ambient movement
     const birdInterval = setInterval(() => {
-      if (Math.random() < 0.1) {
+      // Reduced probability for birds - much less frequent
+      if (Math.random() < 0.05) {
         const newBird = {
           id: Date.now(),
           x: -10,
@@ -29,19 +30,19 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay }) => {
         };
         setBirds(prev => [...prev, newBird]);
       }
-    }, 5000);
+    }, 10000); // Every 10 seconds chance to add a bird
 
-    // Animate birds only
+    // Very slow bird animation
     const birdAnimationInterval = setInterval(() => {
       setBirds(prevBirds => 
         prevBirds
           .map(bird => ({
             ...bird,
-            x: bird.x + 0.3
+            x: bird.x + 0.1 // Much slower movement
           }))
           .filter(bird => bird.x < 110)
       );
-    }, 50);
+    }, 200); // Slower update rate
 
     return () => {
       clearInterval(birdInterval);
@@ -98,7 +99,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay }) => {
       {birds.map((bird) => (
         <div
           key={bird.id}
-          className="absolute transition-transform duration-[3000ms]"
+          className="absolute transition-transform duration-[8000ms]"
           style={{
             left: `${bird.x}%`,
             top: `${bird.y}%`,
