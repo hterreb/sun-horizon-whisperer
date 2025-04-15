@@ -11,31 +11,31 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay }) => {
   const [birds, setBirds] = useState<Array<{id: number, x: number, y: number}>>([]);
 
   useEffect(() => {
-    // Generate random clouds
+    // Generate random clouds with very minimal movement
     const newClouds = Array.from({ length: 6 }, (_, i) => ({
       id: i,
-      x: Math.random() * 100,
+      x: Math.random() * 100, // Initial position, almost no movement
       scale: 0.5 + Math.random() * 1
     }));
     setClouds(newClouds);
 
-    // Animate clouds very slowly
+    // Very slow cloud movement - almost stationary
     const cloudInterval = setInterval(() => {
       setClouds(prevClouds => 
         prevClouds.map(cloud => ({
           ...cloud,
-          x: (cloud.x + 0.02) % 120 // Very slow movement, wraps around at 120%
+          x: (cloud.x + 0.005) % 120 // Extremely slow movement
         }))
       );
-    }, 100);
+    }, 500); // Longer interval between updates
 
-    // Occasionally add birds
+    // Occasionally add birds (kept from previous implementation)
     const birdInterval = setInterval(() => {
-      if (Math.random() < 0.1) { // 10% chance every 5 seconds
+      if (Math.random() < 0.1) {
         const newBird = {
           id: Date.now(),
-          x: -10, // Start from left
-          y: 20 + Math.random() * 30 // Random height in the sky
+          x: -10,
+          y: 20 + Math.random() * 30
         };
         setBirds(prev => [...prev, newBird]);
       }
@@ -47,9 +47,9 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay }) => {
         prevBirds
           .map(bird => ({
             ...bird,
-            x: bird.x + 0.3 // Birds move faster than clouds
+            x: bird.x + 0.3
           }))
-          .filter(bird => bird.x < 110) // Remove birds that have flown off screen
+          .filter(bird => bird.x < 110)
       );
     }, 50);
 
@@ -83,7 +83,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay }) => {
       {clouds.map((cloud) => (
         <div
           key={cloud.id}
-          className="absolute transition-all duration-[3000ms]"
+          className="absolute transition-all duration-[5000ms]" // Longer transition for smoother movement
           style={{
             left: `${cloud.x}%`,
             top: `${20 + Math.random() * 30}%`,
@@ -96,7 +96,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay }) => {
             height="60"
             viewBox="0 0 120 60"
             fill="none"
-            className="transition-colors duration-[3000ms]"
+            className="transition-colors duration-[5000ms]"
           >
             <path
               d="M20 40 Q30 20 45 35 Q60 10 75 30 Q90 20 100 35 Q110 45 95 50 Q85 60 60 55 Q35 60 25 50 Q15 45 20 40Z"
