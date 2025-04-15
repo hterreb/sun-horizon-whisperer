@@ -11,25 +11,15 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay }) => {
   const [birds, setBirds] = useState<Array<{id: number, x: number, y: number}>>([]);
 
   useEffect(() => {
-    // Generate random clouds with very minimal movement
+    // Generate static clouds with fixed positions
     const newClouds = Array.from({ length: 6 }, (_, i) => ({
       id: i,
-      x: Math.random() * 100, // Initial position, almost no movement
+      x: 15 + (i * 15), // Evenly distributed across the sky
       scale: 0.5 + Math.random() * 1
     }));
     setClouds(newClouds);
 
-    // Very slow cloud movement - almost stationary
-    const cloudInterval = setInterval(() => {
-      setClouds(prevClouds => 
-        prevClouds.map(cloud => ({
-          ...cloud,
-          x: (cloud.x + 0.005) % 120 // Extremely slow movement
-        }))
-      );
-    }, 500); // Longer interval between updates
-
-    // Occasionally add birds (kept from previous implementation)
+    // Occasionally add birds for ambient movement
     const birdInterval = setInterval(() => {
       if (Math.random() < 0.1) {
         const newBird = {
@@ -41,7 +31,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay }) => {
       }
     }, 5000);
 
-    // Animate birds
+    // Animate birds only
     const birdAnimationInterval = setInterval(() => {
       setBirds(prevBirds => 
         prevBirds
@@ -54,7 +44,6 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay }) => {
     }, 50);
 
     return () => {
-      clearInterval(cloudInterval);
       clearInterval(birdInterval);
       clearInterval(birdAnimationInterval);
     };
@@ -83,7 +72,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay }) => {
       {clouds.map((cloud) => (
         <div
           key={cloud.id}
-          className="absolute transition-all duration-[5000ms]" // Longer transition for smoother movement
+          className="absolute"
           style={{
             left: `${cloud.x}%`,
             top: `${20 + Math.random() * 30}%`,
