@@ -8,6 +8,7 @@ interface CloudLayerProps {
 
 const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay }) => {
   const [clouds, setClouds] = useState<Array<{id: number, x: number, scale: number}>>([]);
+  const [birds, setBirds] = useState<Array<{id: number, x: number, y: number}>>([]);
 
   useEffect(() => {
     // Generate random clouds
@@ -17,6 +18,46 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay }) => {
       scale: 0.5 + Math.random() * 1
     }));
     setClouds(newClouds);
+
+    // Animate clouds very slowly
+    const cloudInterval = setInterval(() => {
+      setClouds(prevClouds => 
+        prevClouds.map(cloud => ({
+          ...cloud,
+          x: (cloud.x + 0.02) % 120 // Very slow movement, wraps around at 120%
+        }))
+      );
+    }, 100);
+
+    // Occasionally add birds
+    const birdInterval = setInterval(() => {
+      if (Math.random() < 0.1) { // 10% chance every 5 seconds
+        const newBird = {
+          id: Date.now(),
+          x: -10, // Start from left
+          y: 20 + Math.random() * 30 // Random height in the sky
+        };
+        setBirds(prev => [...prev, newBird]);
+      }
+    }, 5000);
+
+    // Animate birds
+    const birdAnimationInterval = setInterval(() => {
+      setBirds(prevBirds => 
+        prevBirds
+          .map(bird => ({
+            ...bird,
+            x: bird.x + 0.3 // Birds move faster than clouds
+          }))
+          .filter(bird => bird.x < 110) // Remove birds that have flown off screen
+      );
+    }, 50);
+
+    return () => {
+      clearInterval(cloudInterval);
+      clearInterval(birdInterval);
+      clearInterval(birdAnimationInterval);
+    };
   }, []);
 
   const getCloudColor = () => {
@@ -42,7 +83,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay }) => {
       {clouds.map((cloud) => (
         <div
           key={cloud.id}
-          className="absolute transition-all duration-1000"
+          className="absolute transition-all duration-[3000ms]"
           style={{
             left: `${cloud.x}%`,
             top: `${20 + Math.random() * 30}%`,
@@ -55,11 +96,38 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay }) => {
             height="60"
             viewBox="0 0 120 60"
             fill="none"
-            className="transition-colors duration-1000"
+            className="transition-colors duration-[3000ms]"
           >
             <path
               d="M20 40 Q30 20 45 35 Q60 10 75 30 Q90 20 100 35 Q110 45 95 50 Q85 60 60 55 Q35 60 25 50 Q15 45 20 40Z"
               fill={getCloudColor()}
+            />
+          </svg>
+        </div>
+      ))}
+
+      {birds.map((bird) => (
+        <div
+          key={bird.id}
+          className="absolute transition-transform duration-[3000ms]"
+          style={{
+            left: `${bird.x}%`,
+            top: `${bird.y}%`,
+            transform: 'scale(0.7)'
+          }}
+        >
+          <svg
+            width="20"
+            height="12"
+            viewBox="0 0 20 12"
+            fill="none"
+            className="transition-colors duration-1000"
+          >
+            <path
+              d="M2 6 Q5 3 10 6 Q15 3 18 6 M10 6 L10 8"
+              stroke={timeOfDay === 'night' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
+              strokeWidth="2"
+              strokeLinecap="round"
             />
           </svg>
         </div>
