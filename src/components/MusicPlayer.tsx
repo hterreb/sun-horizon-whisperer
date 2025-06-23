@@ -3,39 +3,65 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Slider } from "@/components/ui/slider";
 import { Music, Volume2, VolumeX } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 const MusicPlayer: React.FC = () => {
-  const [isPlaying, setIsPlaying] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState([0.5]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const isMobile = useIsMobile();
 
   useEffect(() => {
-    // Using Lo-Fi Girl YouTube stream audio
-    audioRef.current = new Audio('https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1');
-    // Fallback to a direct stream URL if available
-    if (!audioRef.current.canPlayType('application/x-mpegURL')) {
-      audioRef.current = new Audio('https://play.streamafrica.net/lofiradio');
-    }
-    audioRef.current.loop = true;
-    audioRef.current.volume = volume[0];
+    // Create audio element with a working lo-fi stream
+    audioRef.current = new Audio();
+    audioRef.current.crossOrigin = "anonymous";
+    audioRef.current.preload = "none";
     
-    if (isPlaying) {
-      audioRef.current.play().catch(error => {
-        console.error('Audio playback failed:', error);
-        setIsPlaying(false);
+    // Try multiple lo-fi radio streams
+    const streams = [
+      'https://streams.ilovemusic.de/iloveradio17.mp3', // Lo-fi hip hop
+      'https://cast1.torontocast.com:1025/stream', // Chillout lounge
+      'https://streaming.radionomy.com/JamendoLounge' // Alternative stream
+    ];
+    
+    let currentStreamIndex = 0;
+    
+    const tryNextStream = () => {
+      if (currentStreamIndex < streams.length) {
+        audioRef.current!.src = streams[currentStreamIndex];
+        currentStreamIndex++;
+      } else {
+        console.error('All audio streams failed');
         toast({
-          title: "Audio playback failed",
-          description: "There was an error playing the music. Browser autoplay policies may be blocking playback.",
+          title: "Audio unavailable",
+          description: "Unable to load music streams. Please try again later.",
           variant: "destructive"
         });
-      });
-    }
-
+        setIsPlaying(false);
+      }
+    };
+    
+    // Set up error handling
+    const handleError = () => {
+      console.log(`Stream ${currentStreamIndex} failed, trying next...`);
+      tryNextStream();
+    };
+    
+    const handleCanPlay = () => {
+      console.log('Audio stream loaded successfully');
+    };
+    
+    audioRef.current.addEventListener('error', handleError);
+    audioRef.current.addEventListener('canplay', handleCanPlay);
+    
+    // Try first stream
+    tryNextStream();
+    
     return () => {
       if (audioRef.current) {
+        audioRef.current.removeEventListener('error', handleError);
+        audioRef.current.removeEventListener('canplay', handleCanPlay);
         audioRef.current.pause();
         audioRef.current = null;
       }
@@ -51,14 +77,18 @@ const MusicPlayer: React.FC = () => {
   useEffect(() => {
     if (audioRef.current) {
       if (isPlaying) {
-        audioRef.current.play().catch(error => {
-          console.error('Audio playback failed:', error);
-          toast({
-            title: "Audio playback failed",
-            description: "There was an error playing the music. Try clicking anywhere on the page first.",
-            variant: "destructive"
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.error('Audio playback failed:', error);
+            setIsPlaying(false);
+            toast({
+              title: "Playback failed",
+              description: "Click anywhere on the page first, then try again. Browser autoplay policies may be blocking audio.",
+              variant: "destructive"
+            });
           });
-        });
+        }
       } else {
         audioRef.current.pause();
       }
@@ -69,12 +99,16 @@ const MusicPlayer: React.FC = () => {
     setVolume(newVolume);
   };
 
+  const handlePlayToggle = (checked: boolean) => {
+    setIsPlaying(checked);
+  };
+
   return (
     <div className={`fixed z-50 bg-black/30 backdrop-blur-lg rounded-full px-3 py-2 flex items-center gap-2 
       ${isMobile ? 'bottom-16 left-4' : 'bottom-4 left-4'}`}>
       <Switch
         checked={isPlaying}
-        onCheckedChange={setIsPlaying}
+        onCheckedChange={handlePlayToggle}
         className="data-[state=checked]:bg-primary"
       />
       <Music className="h-4 w-4 text-white" />
@@ -88,7 +122,8 @@ const MusicPlayer: React.FC = () => {
         value={volume}
         onValueChange={handleVolumeChange}
         max={1}
-        step={0.1}
+        step={0.01}
+        min={0}
       />
     </div>
   );
