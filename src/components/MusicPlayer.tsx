@@ -13,16 +13,17 @@ const MusicPlayer: React.FC = () => {
   const isMobile = useIsMobile();
 
   useEffect(() => {
-    // Create audio element with a working lo-fi stream
+    // Create audio element with lo-fi streams
     audioRef.current = new Audio();
     audioRef.current.crossOrigin = "anonymous";
     audioRef.current.preload = "none";
     
-    // Try multiple lo-fi radio streams
+    // Lo-fi hip hop radio streams
     const streams = [
-      'https://streams.ilovemusic.de/iloveradio17.mp3', // Lo-fi hip hop
-      'https://cast1.torontocast.com:1025/stream', // Chillout lounge
-      'https://streaming.radionomy.com/JamendoLounge' // Alternative stream
+      'https://streams.ilovemusic.de/iloveradio17.mp3', // ILoveRadio Lo-Fi
+      'https://radio.lofihiphop.com/lofi', // Dedicated lo-fi stream
+      'https://streaming.radionomy.com/lofi-hip-hop', // Radionomy lo-fi
+      'https://cast1.torontocast.com:1025/stream' // Chillout backup
     ];
     
     let currentStreamIndex = 0;
@@ -32,10 +33,10 @@ const MusicPlayer: React.FC = () => {
         audioRef.current!.src = streams[currentStreamIndex];
         currentStreamIndex++;
       } else {
-        console.error('All audio streams failed');
+        console.error('All lo-fi streams failed');
         toast({
-          title: "Audio unavailable",
-          description: "Unable to load music streams. Please try again later.",
+          title: "Lo-fi music unavailable",
+          description: "Unable to load lo-fi streams. Please try again later.",
           variant: "destructive"
         });
         setIsPlaying(false);
@@ -44,12 +45,12 @@ const MusicPlayer: React.FC = () => {
     
     // Set up error handling
     const handleError = () => {
-      console.log(`Stream ${currentStreamIndex} failed, trying next...`);
+      console.log(`Lo-fi stream ${currentStreamIndex} failed, trying next...`);
       tryNextStream();
     };
     
     const handleCanPlay = () => {
-      console.log('Audio stream loaded successfully');
+      console.log('Lo-fi stream loaded successfully');
     };
     
     audioRef.current.addEventListener('error', handleError);
