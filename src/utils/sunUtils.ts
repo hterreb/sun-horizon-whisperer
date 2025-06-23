@@ -1,4 +1,3 @@
-
 import SunCalc from 'suncalc';
 import { format } from 'date-fns';
 
@@ -52,25 +51,39 @@ export const getSunPosition = (date: Date, latitude: number, longitude: number):
   };
 };
 
+const isValidDate = (date: Date | null | undefined): date is Date => {
+  return date instanceof Date && !isNaN(date.getTime());
+};
+
 export const getSunTimes = (date: Date, latitude: number, longitude: number): SunTimes => {
   const times = SunCalc.getTimes(date, latitude, longitude);
   
+  // Create fallback dates for invalid times
+  const fallbackDate = new Date(date);
+  fallbackDate.setHours(12, 0, 0, 0); // noon as fallback
+  
   return {
-    sunrise: times.sunrise,
-    sunset: times.sunset,
-    solarNoon: times.solarNoon,
-    dawn: times.dawn,
-    dusk: times.dusk,
-    nauticalDawn: times.nauticalDawn,
-    nauticalDusk: times.nauticalDusk,
-    astronomicalDawn: times.nauticalDawn,
-    astronomicalDusk: times.nightEnd,
+    sunrise: isValidDate(times.sunrise) ? times.sunrise : fallbackDate,
+    sunset: isValidDate(times.sunset) ? times.sunset : fallbackDate,
+    solarNoon: isValidDate(times.solarNoon) ? times.solarNoon : fallbackDate,
+    dawn: isValidDate(times.dawn) ? times.dawn : fallbackDate,
+    dusk: isValidDate(times.dusk) ? times.dusk : fallbackDate,
+    nauticalDawn: isValidDate(times.nauticalDawn) ? times.nauticalDawn : fallbackDate,
+    nauticalDusk: isValidDate(times.nauticalDusk) ? times.nauticalDusk : fallbackDate,
+    astronomicalDawn: isValidDate(times.astronomicalDawn) ? times.astronomicalDawn : fallbackDate,
+    astronomicalDusk: isValidDate(times.astronomicalDusk) ? times.astronomicalDusk : fallbackDate,
   };
 };
 
 export const formatTime = (date: Date | null): string => {
-  if (!date) return "Unknown";
-  return format(date, 'h:mm a');
+  if (!isValidDate(date)) return "Unknown";
+  
+  try {
+    return format(date, 'h:mm a');
+  } catch (error) {
+    console.error('Error formatting time:', error);
+    return "Unknown";
+  }
 };
 
 export const getTimeOfDay = (date: Date, sunTimes: SunTimes): TimeOfDay => {
