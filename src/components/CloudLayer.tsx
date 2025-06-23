@@ -7,15 +7,16 @@ interface CloudLayerProps {
 }
 
 const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay }) => {
-  const [clouds, setClouds] = useState<Array<{id: number, x: number, scale: number}>>([]);
+  const [clouds, setClouds] = useState<Array<{id: number, x: number, y: number, scale: number}>>([]);
   const [birds, setBirds] = useState<Array<{id: number, x: number, y: number}>>([]);
 
   useEffect(() => {
-    // Generate static clouds with fixed positions
+    // Generate static clouds with FIXED positions (including Y position)
     const newClouds = Array.from({ length: 6 }, (_, i) => ({
       id: i,
       x: 15 + (i * 15), // Evenly distributed across the sky
-      scale: 0.5 + Math.random() * 1
+      y: 20 + (i % 3) * 15, // Fixed Y positions that don't change
+      scale: 0.5 + (i * 0.2) // Deterministic scale based on index
     }));
     setClouds(newClouds);
 
@@ -73,10 +74,10 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay }) => {
       {clouds.map((cloud) => (
         <div
           key={cloud.id}
-          className="absolute"
+          className="absolute transition-colors duration-[5000ms]"
           style={{
             left: `${cloud.x}%`,
-            top: `${20 + Math.random() * 30}%`,
+            top: `${cloud.y}%`,
             transform: `scale(${cloud.scale})`,
             opacity: 0.8
           }}
@@ -86,11 +87,11 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay }) => {
             height="60"
             viewBox="0 0 120 60"
             fill="none"
-            className="transition-colors duration-[5000ms]"
           >
             <path
               d="M20 40 Q30 20 45 35 Q60 10 75 30 Q90 20 100 35 Q110 45 95 50 Q85 60 60 55 Q35 60 25 50 Q15 45 20 40Z"
               fill={getCloudColor()}
+              className="transition-colors duration-[5000ms]"
             />
           </svg>
         </div>
