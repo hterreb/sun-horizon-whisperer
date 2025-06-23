@@ -39,6 +39,7 @@ const SunTracker: React.FC = () => {
     return () => window.removeEventListener('resize', checkOrientation);
   }, []);
 
+  // Update time every second for smooth clock display
   useEffect(() => {
     const timer = setInterval(() => {
       setDate(new Date());
@@ -46,6 +47,56 @@ const SunTracker: React.FC = () => {
     
     return () => clearInterval(timer);
   }, []);
+
+  // Recalculate sun position every 30 seconds for real-time updates
+  useEffect(() => {
+    const sunUpdateTimer = setInterval(() => {
+      if (location.loaded) {
+        const currentDate = new Date();
+        const position = getSunPosition(currentDate, location.latitude, location.longitude);
+        const times = getSunTimes(currentDate, location.latitude, location.longitude);
+        
+        setSunPosition(position);
+        setSunTimes(times);
+        
+        if (times) {
+          const tod = getTimeOfDay(currentDate, times);
+          setTimeOfDay(tod);
+        }
+      }
+    }, 30000); // Update every 30 seconds
+    
+    return () => clearInterval(sunUpdateTimer);
+  }, [location]);
+
+  // Refresh sun times daily at midnight
+  useEffect(() => {
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    
+    const msUntilMidnight = tomorrow.getTime() - now.getTime();
+    
+    const midnightTimer = setTimeout(() => {
+      if (location.loaded) {
+        const times = getSunTimes(new Date(), location.latitude, location.longitude);
+        setSunTimes(times);
+      }
+      
+      // Set up daily refresh
+      const dailyTimer = setInterval(() => {
+        if (location.loaded) {
+          const times = getSunTimes(new Date(), location.latitude, location.longitude);
+          setSunTimes(times);
+        }
+      }, 24 * 60 * 60 * 1000); // Every 24 hours
+      
+      return () => clearInterval(dailyTimer);
+    }, msUntilMidnight);
+    
+    return () => clearTimeout(midnightTimer);
+  }, [location]);
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -89,6 +140,7 @@ const SunTracker: React.FC = () => {
     }
   }, []);
 
+  // Initial calculation when location is loaded
   useEffect(() => {
     if (location.loaded) {
       const position = getSunPosition(date, location.latitude, location.longitude);
@@ -102,7 +154,7 @@ const SunTracker: React.FC = () => {
         setTimeOfDay(tod);
       }
     }
-  }, [date, location]);
+  }, [location.loaded]);
 
   const getBackgroundStyle = useCallback(() => {
     return {
