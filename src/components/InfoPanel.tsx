@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Clock, Sunrise, Sunset, MapPin } from 'lucide-react';
 import { 
@@ -62,16 +63,16 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   if (!sunTimes) return null;
 
   return (
-    <div className="absolute top-0 right-0 p-4 w-[300px] bg-black bg-opacity-40 backdrop-blur-md text-white rounded-bl-lg">
+    <div className="absolute top-0 right-0 p-4 w-full max-w-[300px] sm:w-[300px] bg-black bg-opacity-40 backdrop-blur-md text-white rounded-bl-lg">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">{getTimeOfDayLabel(timeOfDay)}</h1>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">{getTimeOfDayLabel(timeOfDay)}</h1>
         <div className="flex items-start text-sm opacity-80 mt-1">
           <MapPin size={14} className="mr-1 mt-0.5 flex-shrink-0" />
-          <div className="flex flex-col">
+          <div className="flex flex-col min-w-0">
             {loadingLocation ? (
               <span>Loading location...</span>
             ) : (
-              locationName && <span className="mb-1">{locationName}</span>
+              locationName && <span className="mb-1 truncate">{locationName}</span>
             )}
             <span className="text-xs opacity-70">
               {location.latitude.toFixed(4)}°, {location.longitude.toFixed(4)}°
@@ -86,7 +87,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             <Clock size={18} className="mr-2" />
             <span className="text-sm">Current Time</span>
           </div>
-          <span className="font-semibold">{format(currentTime, 'h:mm:ss a')}</span>
+          <span className="font-semibold text-sm sm:text-base">{format(currentTime, 'h:mm:ss a')}</span>
         </div>
         
         <div className="flex justify-between items-center">
@@ -94,7 +95,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             <Sunrise size={18} className="mr-2" />
             <span className="text-sm">Sunrise</span>
           </div>
-          <span className="font-semibold">{formatTime(sunTimes.sunrise)}</span>
+          <span className="font-semibold text-sm sm:text-base">{formatTime(sunTimes.sunrise)}</span>
         </div>
         
         <div className="flex justify-between items-center">
@@ -102,13 +103,13 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             <Sunset size={18} className="mr-2" />
             <span className="text-sm">Sunset</span>
           </div>
-          <span className="font-semibold">{formatTime(sunTimes.sunset)}</span>
+          <span className="font-semibold text-sm sm:text-base">{formatTime(sunTimes.sunset)}</span>
         </div>
       </div>
       
       <div className="mt-6 pt-4 border-t border-white border-opacity-20">
         <h3 className="text-sm font-bold mb-2">Twilight Times</h3>
-        <div className="grid grid-cols-2 gap-2 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
           <div>
             <div className="font-semibold">Civil</div>
             <div className="opacity-80">{formatTime(sunTimes.dawn)} - {formatTime(sunTimes.dusk)}</div>
@@ -117,7 +118,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             <div className="font-semibold">Nautical</div>
             <div className="opacity-80">{formatTime(sunTimes.nauticalDawn)} - {formatTime(sunTimes.nauticalDusk)}</div>
           </div>
-          <div>
+          <div className="sm:col-span-2">
             <div className="font-semibold">Astronomical</div>
             <div className="opacity-80">{formatTime(sunTimes.astronomicalDawn)} - {formatTime(sunTimes.astronomicalDusk)}</div>
           </div>

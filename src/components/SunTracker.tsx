@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   getSunPosition, 
@@ -25,19 +26,6 @@ const SunTracker: React.FC = () => {
   const [sunTimes, setSunTimes] = useState<SunTimes | null>(null);
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('midday');
   const isMobile = useIsMobile();
-  const [isLandscape, setIsLandscape] = useState(true);
-
-  useEffect(() => {
-    const checkOrientation = () => {
-      setIsLandscape(window.innerWidth > window.innerHeight);
-    };
-    
-    checkOrientation();
-    
-    window.addEventListener('resize', checkOrientation);
-    
-    return () => window.removeEventListener('resize', checkOrientation);
-  }, []);
 
   // Update time every second for smooth clock display
   useEffect(() => {
@@ -163,14 +151,7 @@ const SunTracker: React.FC = () => {
   }, [timeOfDay]);
 
   return (
-    <div className="relative h-screen w-screen force-landscape overflow-hidden" style={getBackgroundStyle()}>
-      {!isLandscape && (
-        <div className="landscape-message fixed inset-0 z-50 bg-black bg-opacity-80 text-white flex flex-col items-center justify-center p-8 text-center">
-          <h2 className="text-2xl mb-4">Please rotate your device</h2>
-          <p>This app works best in landscape mode</p>
-        </div>
-      )}
-      
+    <div className="relative min-h-screen w-full overflow-hidden" style={getBackgroundStyle()}>
       <NightStars timeOfDay={timeOfDay} />
       <MusicPlayer />
       
@@ -189,7 +170,7 @@ const SunTracker: React.FC = () => {
           />
         </>
       ) : (
-        <div className="flex h-full items-center justify-center">
+        <div className="flex h-screen items-center justify-center">
           <div className="text-white text-center">
             <p className="mb-4">Detecting your location...</p>
             <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-white mx-auto"></div>
