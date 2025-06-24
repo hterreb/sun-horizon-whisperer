@@ -58,20 +58,40 @@ const isValidDate = (date: Date | null | undefined): date is Date => {
 export const getSunTimes = (date: Date, latitude: number, longitude: number): SunTimes => {
   const times = SunCalc.getTimes(date, latitude, longitude);
   
-  // Create fallback dates for invalid times
-  const fallbackDate = new Date(date);
-  fallbackDate.setHours(12, 0, 0, 0); // noon as fallback
+  // For astronomical times, calculate approximate values if invalid
+  const calculateApproximateAstronomicalTime = (baseTime: Date | null, isEarlyMorning: boolean): Date => {
+    if (isValidDate(baseTime)) return baseTime;
+    
+    // If astronomical time is invalid, estimate based on nautical time
+    const nauticalTime = isEarlyMorning ? times.nauticalDawn : times.nauticalDusk;
+    if (isValidDate(nauticalTime)) {
+      const offset = isEarlyMorning ? -60 : 60; // 1 hour before/after nautical
+      return new Date(nauticalTime.getTime() + offset * 60 * 1000);
+    }
+    
+    // Final fallback - estimate based on sunrise/sunset
+    const sunTime = isEarlyMorning ? times.sunrise : times.sunset;
+    if (isValidDate(sunTime)) {
+      const offset = isEarlyMorning ? -90 : 90; // 1.5 hours before/after sun
+      return new Date(sunTime.getTime() + offset * 60 * 1000);
+    }
+    
+    // Ultimate fallback
+    const fallback = new Date(date);
+    fallback.setHours(isEarlyMorning ? 5 : 19, 0, 0, 0);
+    return fallback;
+  };
   
   return {
-    sunrise: isValidDate(times.sunrise) ? times.sunrise : fallbackDate,
-    sunset: isValidDate(times.sunset) ? times.sunset : fallbackDate,
-    solarNoon: isValidDate(times.solarNoon) ? times.solarNoon : fallbackDate,
-    dawn: isValidDate(times.dawn) ? times.dawn : fallbackDate,
-    dusk: isValidDate(times.dusk) ? times.dusk : fallbackDate,
-    nauticalDawn: isValidDate(times.nauticalDawn) ? times.nauticalDawn : fallbackDate,
-    nauticalDusk: isValidDate(times.nauticalDusk) ? times.nauticalDusk : fallbackDate,
-    astronomicalDawn: isValidDate(times.astronomicalDawn) ? times.astronomicalDawn : fallbackDate,
-    astronomicalDusk: isValidDate(times.astronomicalDusk) ? times.astronomicalDusk : fallbackDate,
+    sunrise: isValidDate(times.sunrise) ? times.sunrise : new Date(date.setHours(6, 0, 0, 0)),
+    sunset: isValidDate(times.sunset) ? times.sunset : new Date(date.setHours(18, 0, 0, 0)),
+    solarNoon: isValidDate(times.solarNoon) ? times.solarNoon : new Date(date.setHours(12, 0, 0, 0)),
+    dawn: isValidDate(times.dawn) ? times.dawn : new Date(date.setHours(5, 30, 0, 0)),
+    dusk: isValidDate(times.dusk) ? times.dusk : new Date(date.setHours(18, 30, 0, 0)),
+    nauticalDawn: isValidDate(times.nauticalDawn) ? times.nauticalDawn : new Date(date.setHours(5, 0, 0, 0)),
+    nauticalDusk: isValidDate(times.nauticalDusk) ? times.nauticalDusk : new Date(date.setHours(19, 0, 0, 0)),
+    astronomicalDawn: calculateApproximateAstronomicalTime(times.astronomicalDawn, true),
+    astronomicalDusk: calculateApproximateAstronomicalTime(times.astronomicalDusk, false),
   };
 };
 
