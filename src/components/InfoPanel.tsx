@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Clock, Sunrise, Sunset, MapPin } from 'lucide-react';
 import { 
   type SunPosition, 
@@ -26,17 +25,58 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   timeOfDay,
   currentTime
 }) => {
+  const [locationName, setLocationName] = useState<string>('');
+  const [loadingLocation, setLoadingLocation] = useState(false);
+
+  useEffect(() => {
+    const fetchLocationName = async () => {
+      if (!location.loaded) return;
+      
+      setLoadingLocation(true);
+      try {
+        const response = await fetch(
+          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${location.latitude}&longitude=${location.longitude}&localityLanguage=en`
+        );
+        const data = await response.json();
+        
+        if (data.city && data.countryName) {
+          setLocationName(`${data.city}, ${data.countryName}`);
+        } else if (data.locality && data.countryName) {
+          setLocationName(`${data.locality}, ${data.countryName}`);
+        } else if (data.countryName) {
+          setLocationName(data.countryName);
+        } else {
+          setLocationName('Unknown Location');
+        }
+      } catch (error) {
+        console.error('Error fetching location name:', error);
+        setLocationName('Unknown Location');
+      } finally {
+        setLoadingLocation(false);
+      }
+    };
+
+    fetchLocationName();
+  }, [location.latitude, location.longitude, location.loaded]);
+
   if (!sunTimes) return null;
 
   return (
     <div className="absolute top-0 right-0 p-4 w-[300px] bg-black bg-opacity-40 backdrop-blur-md text-white rounded-bl-lg">
       <div className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight">{getTimeOfDayLabel(timeOfDay)}</h1>
-        <div className="flex items-center text-sm opacity-80 mt-1">
-          <MapPin size={14} className="mr-1" />
-          <span>
-            {location.latitude.toFixed(4)}°, {location.longitude.toFixed(4)}°
-          </span>
+        <div className="flex items-start text-sm opacity-80 mt-1">
+          <MapPin size={14} className="mr-1 mt-0.5 flex-shrink-0" />
+          <div className="flex flex-col">
+            {loadingLocation ? (
+              <span>Loading location...</span>
+            ) : (
+              locationName && <span className="mb-1">{locationName}</span>
+            )}
+            <span className="text-xs opacity-70">
+              {location.latitude.toFixed(4)}°, {location.longitude.toFixed(4)}°
+            </span>
+          </div>
         </div>
       </div>
       
