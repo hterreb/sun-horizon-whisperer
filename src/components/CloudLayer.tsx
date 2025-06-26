@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Bird, Fish } from 'lucide-react';
 import { type TimeOfDay } from '../utils/sunUtils';
@@ -85,7 +86,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
     // Birds only for clear and cloudy weather
     if (weatherType === 'clear' || weatherType === 'cloudy') {
       const birdSpawnInterval = setInterval(() => {
-        if (Math.random() < 0.3) { // Increased spawn rate
+        if (Math.random() < 0.4) { // Increased spawn rate
           const newBird = {
             id: Date.now() + Math.random(),
             x: -10,
@@ -93,18 +94,18 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
           };
           setBirds(prev => [...prev, newBird]);
         }
-      }, 8000); // Spawn every 8 seconds
+      }, 6000); // Spawn every 6 seconds
 
       const birdAnimationInterval = setInterval(() => {
         setBirds(prevBirds => 
           prevBirds
             .map(bird => ({
               ...bird,
-              x: bird.x + 0.2
+              x: bird.x + 0.5 // Increased movement speed
             }))
             .filter(bird => bird.x < 110)
         );
-      }, 100);
+      }, 50); // Faster animation updates
 
       return () => {
         clearInterval(birdSpawnInterval);
@@ -119,7 +120,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
     // Fish for clear weather (swimming in the horizon water)
     if (weatherType === 'clear') {
       const fishSpawnInterval = setInterval(() => {
-        if (Math.random() < 0.2) { // Less frequent than birds
+        if (Math.random() < 0.25) { // Slightly increased spawn rate
           const newFish = {
             id: Date.now() + Math.random(),
             x: -5,
@@ -127,18 +128,18 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
           };
           setFish(prev => [...prev, newFish]);
         }
-      }, 12000); // Spawn every 12 seconds
+      }, 10000); // Spawn every 10 seconds
 
       const fishAnimationInterval = setInterval(() => {
         setFish(prevFish => 
           prevFish
             .map(fish => ({
               ...fish,
-              x: fish.x + 0.15
+              x: fish.x + 0.3 // Slightly faster fish movement
             }))
             .filter(fish => fish.x < 105)
         );
-      }, 150);
+      }, 100);
 
       return () => {
         clearInterval(fishSpawnInterval);
@@ -289,11 +290,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
       {birds.map((bird) => (
         <div
           key={bird.id}
-          className="absolute transition-transform duration-200"
+          className="absolute"
           style={{
             left: `${bird.x}%`,
             top: `${bird.y}%`,
-            transform: 'scale(0.8)'
+            transform: 'scale(0.8)',
+            transition: 'none' // Remove transition to allow smooth manual animation
           }}
         >
           <Bird 
@@ -309,11 +311,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
       {fish.map((fishItem) => (
         <div
           key={fishItem.id}
-          className="absolute transition-transform duration-200"
+          className="absolute"
           style={{
             left: `${fishItem.x}%`,
             top: `${fishItem.y}%`,
-            transform: 'scale(0.6)'
+            transform: 'scale(0.6)',
+            transition: 'none' // Remove transition to allow smooth manual animation
           }}
         >
           <Fish 
