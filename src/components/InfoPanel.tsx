@@ -36,6 +36,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   const [locationName, setLocationName] = useState<string>('');
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMoonCollapsed, setIsMoonCollapsed] = useState(true);
 
   useEffect(() => {
     const fetchLocationName = async () => {
@@ -162,29 +163,43 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             </div>
           </div>
           
-          {/* Moon information */}
+          {/* Moon information - collapsible */}
           {moonPosition.visible && (
             <div className="mt-6 pt-4 border-t border-white border-opacity-20">
-              <h3 className="text-sm font-bold mb-2 flex items-center">
-                <Moon size={16} className="mr-2" />
-                Moon Information
-              </h3>
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between">
-                  <span>Phase:</span>
-                  <span className="font-mono">{getMoonPhaseLabel(moonPosition.phase)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Illumination:</span>
-                  <span className="font-mono">{(moonPosition.illumination * 100).toFixed(0)}%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Altitude:</span>
-                  <span className="font-mono">{moonPosition.altitude.toFixed(1)}°</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Azimuth:</span>
-                  <span className="font-mono">{moonPosition.azimuth.toFixed(1)}°</span>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-bold flex items-center">
+                  <Moon size={16} className="mr-2" />
+                  Moon Information
+                </h3>
+                <button
+                  onClick={() => setIsMoonCollapsed(!isMoonCollapsed)}
+                  className="p-1 rounded hover:bg-white hover:bg-opacity-10 transition-colors"
+                  aria-label={isMoonCollapsed ? "Expand moon info" : "Collapse moon info"}
+                >
+                  {isMoonCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                </button>
+              </div>
+              
+              <div className={`transition-all duration-300 ease-in-out ${
+                isMoonCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-32 opacity-100'
+              }`}>
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between">
+                    <span>Phase:</span>
+                    <span className="font-mono">{getMoonPhaseLabel(moonPosition.phase)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Illumination:</span>
+                    <span className="font-mono">{(moonPosition.illumination * 100).toFixed(0)}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Altitude:</span>
+                    <span className="font-mono">{moonPosition.altitude.toFixed(1)}°</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Azimuth:</span>
+                    <span className="font-mono">{moonPosition.azimuth.toFixed(1)}°</span>
+                  </div>
                 </div>
               </div>
             </div>
