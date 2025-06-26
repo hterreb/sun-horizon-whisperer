@@ -1,5 +1,5 @@
-
 import React, { useEffect, useState } from 'react';
+import { Bird, Fish } from 'lucide-react';
 import { type TimeOfDay } from '../utils/sunUtils';
 
 export type WeatherType = 'clear' | 'cloudy' | 'overcast' | 'rain' | 'storm' | 'snow';
@@ -12,6 +12,7 @@ interface CloudLayerProps {
 const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
   const [clouds, setClouds] = useState<Array<{id: number, x: number, y: number, scale: number}>>([]);
   const [birds, setBirds] = useState<Array<{id: number, x: number, y: number}>>([]);
+  const [fish, setFish] = useState<Array<{id: number, x: number, y: number}>>([]);
   const [raindrops, setRaindrops] = useState<Array<{id: number, x: number, y: number, delay: number}>>([]);
   const [snowflakes, setSnowflakes] = useState<Array<{id: number, x: number, y: number, size: number, delay: number}>>([]);
 
@@ -78,37 +79,73 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
     } else {
       setSnowflakes([]);
     }
+  }, [weatherType]);
 
+  useEffect(() => {
     // Birds only for clear and cloudy weather
     if (weatherType === 'clear' || weatherType === 'cloudy') {
-      const birdInterval = setInterval(() => {
-        if (Math.random() < 0.05) {
+      const birdSpawnInterval = setInterval(() => {
+        if (Math.random() < 0.3) { // Increased spawn rate
           const newBird = {
-            id: Date.now(),
+            id: Date.now() + Math.random(),
             x: -10,
             y: 20 + Math.random() * 30
           };
           setBirds(prev => [...prev, newBird]);
         }
-      }, 10000);
+      }, 8000); // Spawn every 8 seconds
 
       const birdAnimationInterval = setInterval(() => {
         setBirds(prevBirds => 
           prevBirds
             .map(bird => ({
               ...bird,
-              x: bird.x + 0.1
+              x: bird.x + 0.2
             }))
             .filter(bird => bird.x < 110)
         );
-      }, 200);
+      }, 100);
 
       return () => {
-        clearInterval(birdInterval);
+        clearInterval(birdSpawnInterval);
         clearInterval(birdAnimationInterval);
       };
     } else {
       setBirds([]);
+    }
+  }, [weatherType]);
+
+  useEffect(() => {
+    // Fish for clear weather (swimming in the horizon water)
+    if (weatherType === 'clear') {
+      const fishSpawnInterval = setInterval(() => {
+        if (Math.random() < 0.2) { // Less frequent than birds
+          const newFish = {
+            id: Date.now() + Math.random(),
+            x: -5,
+            y: 70 + Math.random() * 15 // Near the horizon water level
+          };
+          setFish(prev => [...prev, newFish]);
+        }
+      }, 12000); // Spawn every 12 seconds
+
+      const fishAnimationInterval = setInterval(() => {
+        setFish(prevFish => 
+          prevFish
+            .map(fish => ({
+              ...fish,
+              x: fish.x + 0.15
+            }))
+            .filter(fish => fish.x < 105)
+        );
+      }, 150);
+
+      return () => {
+        clearInterval(fishSpawnInterval);
+        clearInterval(fishAnimationInterval);
+      };
+    } else {
+      setFish([]);
     }
   }, [weatherType]);
 
@@ -252,27 +289,39 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
       {birds.map((bird) => (
         <div
           key={bird.id}
-          className="absolute transition-transform duration-[8000ms]"
+          className="absolute transition-transform duration-200"
           style={{
             left: `${bird.x}%`,
             top: `${bird.y}%`,
-            transform: 'scale(0.7)'
+            transform: 'scale(0.8)'
           }}
         >
-          <svg
-            width="20"
-            height="12"
-            viewBox="0 0 20 12"
-            fill="none"
-            className="transition-colors duration-1000"
-          >
-            <path
-              d="M2 6 Q5 3 10 6 Q15 3 18 6 M10 6 L10 8"
-              stroke={timeOfDay === 'night' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          </svg>
+          <Bird 
+            size={20} 
+            className={`transition-colors duration-1000 ${
+              timeOfDay === 'night' ? 'text-white text-opacity-40' : 'text-black text-opacity-60'
+            }`}
+          />
+        </div>
+      ))}
+
+      {/* Fish */}
+      {fish.map((fishItem) => (
+        <div
+          key={fishItem.id}
+          className="absolute transition-transform duration-200"
+          style={{
+            left: `${fishItem.x}%`,
+            top: `${fishItem.y}%`,
+            transform: 'scale(0.6)'
+          }}
+        >
+          <Fish 
+            size={18} 
+            className={`transition-colors duration-1000 ${
+              timeOfDay === 'night' ? 'text-blue-200 text-opacity-50' : 'text-blue-400 text-opacity-70'
+            }`}
+          />
         </div>
       ))}
 
