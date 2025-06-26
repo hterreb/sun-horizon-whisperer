@@ -12,6 +12,7 @@ import {
   type SunTimes,
   type TimeOfDay
 } from '../utils/sunUtils';
+import { getMoonPosition, type MoonPosition } from '../utils/moonUtils';
 import SunVisualization from './SunVisualization';
 import InfoPanel from './InfoPanel';
 import NightStars from './NightStars';
@@ -24,6 +25,13 @@ const SunTracker: React.FC = () => {
   const [date, setDate] = useState<Date>(new Date());
   const [location, setLocation] = useState<LocationData>({ latitude: 0, longitude: 0, loaded: false });
   const [sunPosition, setSunPosition] = useState<SunPosition>({ azimuth: 0, altitude: 0 });
+  const [moonPosition, setMoonPosition] = useState<MoonPosition>({ 
+    azimuth: 0, 
+    altitude: 0, 
+    phase: 0, 
+    illumination: 0, 
+    visible: false 
+  });
   const [sunTimes, setSunTimes] = useState<SunTimes | null>(null);
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('midday');
   const [weatherType, setWeatherType] = useState<WeatherType>('overcast');
@@ -42,10 +50,12 @@ const SunTracker: React.FC = () => {
     const sunUpdateTimer = setInterval(() => {
       if (location.loaded) {
         const currentDate = new Date();
-        const position = getSunPosition(currentDate, location.latitude, location.longitude);
+        const sunPos = getSunPosition(currentDate, location.latitude, location.longitude);
+        const moonPos = getMoonPosition(currentDate, location.latitude, location.longitude);
         const times = getSunTimes(currentDate, location.latitude, location.longitude);
         
-        setSunPosition(position);
+        setSunPosition(sunPos);
+        setMoonPosition(moonPos);
         setSunTimes(times);
         
         if (times) {
@@ -129,10 +139,12 @@ const SunTracker: React.FC = () => {
 
   useEffect(() => {
     if (location.loaded) {
-      const position = getSunPosition(date, location.latitude, location.longitude);
+      const sunPos = getSunPosition(date, location.latitude, location.longitude);
+      const moonPos = getMoonPosition(date, location.latitude, location.longitude);
       const times = getSunTimes(date, location.latitude, location.longitude);
       
-      setSunPosition(position);
+      setSunPosition(sunPos);
+      setMoonPosition(moonPos);
       setSunTimes(times);
       
       if (times) {
@@ -167,18 +179,20 @@ const SunTracker: React.FC = () => {
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden" style={getBackgroundStyle()}>
-      <NightStars timeOfDay={timeOfDay} />
+      <NightStars timeOfDay={timeOfDay} moonPosition={moonPosition} />
       <MusicPlayer />
       
       {location.loaded ? (
         <>
           <SunVisualization 
             sunPosition={sunPosition} 
+            moonPosition={moonPosition}
             timeOfDay={timeOfDay}
             weatherType={weatherType}
           />
           <InfoPanel 
             sunPosition={sunPosition}
+            moonPosition={moonPosition}
             sunTimes={sunTimes}
             location={location}
             timeOfDay={timeOfDay}

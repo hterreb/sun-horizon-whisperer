@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, CloudRain, CloudSnow, CloudSun, Sun, CloudLightning } from 'lucide-react';
+import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, CloudRain, CloudSnow, CloudSun, Sun, CloudLightning, Moon } from 'lucide-react';
 import { 
   type SunPosition, 
   type SunTimes, 
@@ -8,11 +8,13 @@ import {
   formatTime,
   getTimeOfDayLabel 
 } from '../utils/sunUtils';
+import { type MoonPosition, getMoonPhaseLabel } from '../utils/moonUtils';
 import { type WeatherType } from './CloudLayer';
 import { format } from 'date-fns';
 
 interface InfoPanelProps {
   sunPosition: SunPosition;
+  moonPosition: MoonPosition;
   sunTimes: SunTimes | null;
   location: LocationData;
   timeOfDay: TimeOfDay;
@@ -23,6 +25,7 @@ interface InfoPanelProps {
 
 const InfoPanel: React.FC<InfoPanelProps> = ({ 
   sunPosition, 
+  moonPosition,
   sunTimes, 
   location, 
   timeOfDay,
@@ -108,7 +111,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
       
       {/* Collapsible content */}
       <div className={`transition-all duration-300 ease-in-out ${
-        isCollapsed ? 'max-h-0 opacity-0' : 'max-h-[500px] opacity-100'
+        isCollapsed ? 'max-h-0 opacity-0' : 'max-h-[600px] opacity-100'
       }`}>
         <div className="px-4 pb-4">
           {/* Weather selector */}
@@ -158,6 +161,34 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               <span className="font-semibold text-sm sm:text-base">{formatTime(sunTimes.sunset)}</span>
             </div>
           </div>
+          
+          {/* Moon information */}
+          {moonPosition.visible && (
+            <div className="mt-6 pt-4 border-t border-white border-opacity-20">
+              <h3 className="text-sm font-bold mb-2 flex items-center">
+                <Moon size={16} className="mr-2" />
+                Moon Information
+              </h3>
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span>Phase:</span>
+                  <span className="font-mono">{getMoonPhaseLabel(moonPosition.phase)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Illumination:</span>
+                  <span className="font-mono">{(moonPosition.illumination * 100).toFixed(0)}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Altitude:</span>
+                  <span className="font-mono">{moonPosition.altitude.toFixed(1)}°</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Azimuth:</span>
+                  <span className="font-mono">{moonPosition.azimuth.toFixed(1)}°</span>
+                </div>
+              </div>
+            </div>
+          )}
           
           {/* Twilight times */}
           <div className="mt-6 pt-4 border-t border-white border-opacity-20">

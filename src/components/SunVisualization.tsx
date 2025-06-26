@@ -1,15 +1,22 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Sun, Moon } from 'lucide-react';
 import { type SunPosition, type TimeOfDay } from '../utils/sunUtils';
+import { type MoonPosition } from '../utils/moonUtils';
 import CloudLayer, { type WeatherType } from './CloudLayer';
 
 interface SunVisualizationProps {
   sunPosition: SunPosition;
+  moonPosition: MoonPosition;
   timeOfDay: TimeOfDay;
   weatherType: WeatherType;
 }
 
-const SunVisualization: React.FC<SunVisualizationProps> = ({ sunPosition, timeOfDay, weatherType }) => {
+const SunVisualization: React.FC<SunVisualizationProps> = ({ 
+  sunPosition, 
+  moonPosition,
+  timeOfDay, 
+  weatherType 
+}) => {
   const [svgPath, setSvgPath] = useState<string>('');
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerDimensions, setContainerDimensions] = useState({ width: 0, height: 0 });
@@ -73,7 +80,23 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({ sunPosition, timeOf
     return { x, y: Math.max(30, Math.min(height - 30, y)) };
   };
 
-  const { x, y } = getSunPosition();
+  const getMoonPosition = () => {
+    const { width, height } = containerDimensions;
+    if (width === 0 || height === 0) return { x: 0, y: 0 };
+
+    const horizonY = height * 0.65;
+    
+    const altitudeNormalized = (moonPosition.altitude + 30) / 120;
+    const y = horizonY - (altitudeNormalized * height * 0.8);
+    
+    const azimuthNormalized = moonPosition.azimuth / 360;
+    const x = width * azimuthNormalized;
+    
+    return { x, y: Math.max(30, Math.min(height - 30, y)) };
+  };
+
+  const { x: sunX, y: sunY } = getSunPosition();
+  const { x: moonX, y: moonY } = getMoonPosition();
   
   const getSunColor = () => {
     if (sunPosition.altitude > 10) {
@@ -120,10 +143,24 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({ sunPosition, timeOf
     return timeOfDay === 'night' ? 0.1 : 0.3;
   };
 
+  const getMoonPhaseIcon = () => {
+    const phase = moonPosition.phase;
+    if (phase < 0.1 || phase > 0.9) return '🌑'; // New moon
+    if (phase < 0.3) return '🌒'; // Waxing crescent
+    if (phase < 0.4) return '🌓'; // First quarter
+    if (phase < 0.6) return '🌔'; // Waxing gibbous
+    if (phase < 0.7) return '🌕'; // Full moon
+    if (phase < 0.8) return '🌖'; // Waning gibbous
+    if (phase < 0.9) return '🌗'; // Third quarter
+    return '🌘'; // Waning crescent
+  };
+
   const isSunVisible = sunPosition.altitude > -18 && weatherType !== 'storm';
-  const isMoonVisible = timeOfDay === 'night' || 
+  const isMoonVisible = moonPosition.visible && (
+    timeOfDay === 'night' || 
     timeOfDay === 'astronomical-twilight' || 
-    timeOfDay === 'nautical-twilight';
+    timeOfDay === 'nautical-twilight'
+  );
 
   return (
     <div ref={containerRef} className="w-full h-screen relative overflow-hidden">
@@ -133,8 +170,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({ sunPosition, timeOf
         <div 
           className={`absolute transition-transform duration-1000 ${getSunColor()} ${getGlowIntensity()} animate-glow`}
           style={{ 
-            left: `${x}px`, 
-            top: `${y}px`, 
+            left: `${sunX}px`, 
+            top: `${sunY}px`, 
             transform: 'translate(-50%, -50%)',
             opacity: weatherType === 'rain' ? 0.7 : 1
           }}
@@ -145,15 +182,19 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({ sunPosition, timeOf
       
       {isMoonVisible && (
         <div 
-          className="absolute text-gray-300 drop-shadow-[0_0_10px_rgba(255,255,255,0.4)] animate-glow"
+          className="absolute text-gray-300 transition-all duration-1000"
           style={{ 
-            right: '15%', 
-            top: '20%',
+            left: `${moonX}px`, 
+            top: `${moonY}px`,
             transform: 'translate(-50%, -50%)',
-            opacity: weatherType === 'storm' ? 0.3 : 1
+            opacity: weatherType === 'storm' ? 0.3 : moonPosition.illumination * 0.8 + 0.2,
+            filter: `drop-shadow(0 0 ${moonPosition.illumination * 15}px rgba(255,255,255,0.4))`
           }}
         >
-          <Moon size={36} strokeWidth={1} />
+          <Moon size={36 + moonPosition.illumination * 12} strokeWidth={1} />
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-xs pointer-events-none">
+            {getMoonPhaseIcon()}
+          </div>
         </div>
       )}
       
@@ -180,6 +221,15 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({ sunPosition, timeOf
           : `${sunPosition.altitude.toFixed(1)}°`
         }
       </div>
+      
+      {isMoonVisible && (
+        <div 
+          className="absolute left-1/2 transform -translate-x-1/2 bottom-1/4 -translate-y-12 
+                     bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-xs"
+        >
+          Moon: {moonPosition.altitude.toFixed(1)}° | {(moonPosition.illumination * 100).toFixed(0)}%
+        </div>
+      )}
     </div>
   );
 };
