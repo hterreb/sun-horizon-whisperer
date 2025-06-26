@@ -277,7 +277,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
       ))}
 
       {/* CSS animations for weather effects */}
-      <style jsx>{`
+      <style>{`
         @keyframes fall {
           to {
             transform: translateY(100vh);
