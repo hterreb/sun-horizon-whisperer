@@ -16,6 +16,7 @@ import SunVisualization from './SunVisualization';
 import InfoPanel from './InfoPanel';
 import NightStars from './NightStars';
 import MusicPlayer from './MusicPlayer';
+import { type WeatherType } from './CloudLayer';
 import { toast } from '@/components/ui/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -25,6 +26,7 @@ const SunTracker: React.FC = () => {
   const [sunPosition, setSunPosition] = useState<SunPosition>({ azimuth: 0, altitude: 0 });
   const [sunTimes, setSunTimes] = useState<SunTimes | null>(null);
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('midday');
+  const [weatherType, setWeatherType] = useState<WeatherType>('overcast');
   const isMobile = useIsMobile();
 
   // Update time every second for smooth clock display
@@ -36,7 +38,6 @@ const SunTracker: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Recalculate sun position every 30 seconds for real-time updates
   useEffect(() => {
     const sunUpdateTimer = setInterval(() => {
       if (location.loaded) {
@@ -52,12 +53,11 @@ const SunTracker: React.FC = () => {
           setTimeOfDay(tod);
         }
       }
-    }, 30000); // Update every 30 seconds
+    }, 30000);
     
     return () => clearInterval(sunUpdateTimer);
   }, [location]);
 
-  // Refresh sun times daily at midnight
   useEffect(() => {
     const now = new Date();
     const tomorrow = new Date(now);
@@ -72,13 +72,12 @@ const SunTracker: React.FC = () => {
         setSunTimes(times);
       }
       
-      // Set up daily refresh
       const dailyTimer = setInterval(() => {
         if (location.loaded) {
           const times = getSunTimes(new Date(), location.latitude, location.longitude);
           setSunTimes(times);
         }
-      }, 24 * 60 * 60 * 1000); // Every 24 hours
+      }, 24 * 60 * 60 * 1000);
       
       return () => clearInterval(dailyTimer);
     }, msUntilMidnight);
@@ -128,7 +127,6 @@ const SunTracker: React.FC = () => {
     }
   }, []);
 
-  // Initial calculation when location is loaded
   useEffect(() => {
     if (location.loaded) {
       const position = getSunPosition(date, location.latitude, location.longitude);
@@ -145,10 +143,27 @@ const SunTracker: React.FC = () => {
   }, [location.loaded]);
 
   const getBackgroundStyle = useCallback(() => {
-    return {
-      background: getBackgroundGradient(timeOfDay)
-    };
-  }, [timeOfDay]);
+    // Adjust background based on weather
+    let baseGradient = getBackgroundGradient(timeOfDay);
+    
+    if (weatherType === 'storm') {
+      baseGradient = baseGradient.replace(/rgb\(([^)]+)\)/g, (match, rgb) => {
+        const values = rgb.split(',').map((v: string) => Math.max(0, parseInt(v.trim()) - 40));
+        return `rgb(${values.join(',')})`;
+      });
+    } else if (weatherType === 'rain') {
+      baseGradient = baseGradient.replace(/rgb\(([^)]+)\)/g, (match, rgb) => {
+        const values = rgb.split(',').map((v: string) => Math.max(0, parseInt(v.trim()) - 20));
+        return `rgb(${values.join(',')})`;
+      });
+    }
+    
+    return { background: baseGradient };
+  }, [timeOfDay, weatherType]);
+
+  const handleWeatherChange = (newWeather: WeatherType) => {
+    setWeatherType(newWeather);
+  };
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden" style={getBackgroundStyle()}>
@@ -160,6 +175,7 @@ const SunTracker: React.FC = () => {
           <SunVisualization 
             sunPosition={sunPosition} 
             timeOfDay={timeOfDay}
+            weatherType={weatherType}
           />
           <InfoPanel 
             sunPosition={sunPosition}
@@ -167,6 +183,8 @@ const SunTracker: React.FC = () => {
             location={location}
             timeOfDay={timeOfDay}
             currentTime={date}
+            weatherType={weatherType}
+            onWeatherChange={handleWeatherChange}
           />
         </>
       ) : (

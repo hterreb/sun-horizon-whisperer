@@ -1,14 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Sun, Moon } from 'lucide-react';
 import { type SunPosition, type TimeOfDay } from '../utils/sunUtils';
-import CloudLayer from './CloudLayer';
+import CloudLayer, { type WeatherType } from './CloudLayer';
 
 interface SunVisualizationProps {
   sunPosition: SunPosition;
   timeOfDay: TimeOfDay;
+  weatherType: WeatherType;
 }
 
-const SunVisualization: React.FC<SunVisualizationProps> = ({ sunPosition, timeOfDay }) => {
+const SunVisualization: React.FC<SunVisualizationProps> = ({ sunPosition, timeOfDay, weatherType }) => {
   const [svgPath, setSvgPath] = useState<string>('');
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerDimensions, setContainerDimensions] = useState({ width: 0, height: 0 });
@@ -32,7 +33,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({ sunPosition, timeOf
     if (containerDimensions.width > 0 && containerDimensions.height > 0) {
       const width = containerDimensions.width;
       const height = containerDimensions.height;
-      const horizonY = height * 0.65; // Adjusted horizon line position
+      const horizonY = height * 0.65;
       
       let path = `M0,${horizonY} `;
       
@@ -61,9 +62,9 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({ sunPosition, timeOf
     const { width, height } = containerDimensions;
     if (width === 0 || height === 0) return { x: 0, y: 0 };
 
-    const horizonY = height * 0.65; // Same as in SVG path
+    const horizonY = height * 0.65;
     
-    const altitudeNormalized = (sunPosition.altitude + 30) / 120; // Normalize from -30 to 90 degrees to 0-1
+    const altitudeNormalized = (sunPosition.altitude + 30) / 120;
     const y = horizonY - (altitudeNormalized * height * 0.8);
     
     const azimuthNormalized = sunPosition.azimuth / 360;
@@ -85,12 +86,16 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({ sunPosition, timeOf
   };
 
   const getGlowIntensity = () => {
+    // Reduce glow intensity for stormy/rainy weather
+    const baseGlow = weatherType === 'storm' || weatherType === 'rain' ? 0.3 : 
+                     weatherType === 'snow' ? 0.5 : 1;
+    
     if (sunPosition.altitude > 10) {
-      return 'drop-shadow-[0_0_15px_rgba(255,255,0,0.8)]';
+      return `drop-shadow-[0_0_15px_rgba(255,255,0,${0.8 * baseGlow})]`;
     } else if (sunPosition.altitude > 0) {
-      return 'drop-shadow-[0_0_10px_rgba(255,165,0,0.6)]';
+      return `drop-shadow-[0_0_10px_rgba(255,165,0,${0.6 * baseGlow})]`;
     } else if (sunPosition.altitude > -10) {
-      return 'drop-shadow-[0_0_5px_rgba(255,99,71,0.4)]';
+      return `drop-shadow-[0_0_5px_rgba(255,99,71,${0.4 * baseGlow})]`;
     } 
     return '';
   };
@@ -115,14 +120,14 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({ sunPosition, timeOf
     return timeOfDay === 'night' ? 0.1 : 0.3;
   };
 
-  const isSunVisible = sunPosition.altitude > -18; // Sun is "visible" until astronomical twilight (-18 degrees)
+  const isSunVisible = sunPosition.altitude > -18 && weatherType !== 'storm';
   const isMoonVisible = timeOfDay === 'night' || 
     timeOfDay === 'astronomical-twilight' || 
     timeOfDay === 'nautical-twilight';
 
   return (
     <div ref={containerRef} className="w-full h-screen relative overflow-hidden">
-      <CloudLayer timeOfDay={timeOfDay} />
+      <CloudLayer timeOfDay={timeOfDay} weatherType={weatherType} />
       
       {isSunVisible && (
         <div 
@@ -130,7 +135,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({ sunPosition, timeOf
           style={{ 
             left: `${x}px`, 
             top: `${y}px`, 
-            transform: 'translate(-50%, -50%)'
+            transform: 'translate(-50%, -50%)',
+            opacity: weatherType === 'rain' ? 0.7 : 1
           }}
         >
           <Sun size={sunPosition.altitude > 0 ? 48 : 40} strokeWidth={1} />
@@ -143,7 +149,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({ sunPosition, timeOf
           style={{ 
             right: '15%', 
             top: '20%',
-            transform: 'translate(-50%, -50%)'
+            transform: 'translate(-50%, -50%)',
+            opacity: weatherType === 'storm' ? 0.3 : 1
           }}
         >
           <Moon size={36} strokeWidth={1} />

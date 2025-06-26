@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp } from 'lucide-react';
+import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, CloudRain, CloudSnow, CloudSun, Sun, CloudLightning } from 'lucide-react';
 import { 
   type SunPosition, 
   type SunTimes, 
@@ -8,6 +8,7 @@ import {
   formatTime,
   getTimeOfDayLabel 
 } from '../utils/sunUtils';
+import { type WeatherType } from './CloudLayer';
 import { format } from 'date-fns';
 
 interface InfoPanelProps {
@@ -16,6 +17,8 @@ interface InfoPanelProps {
   location: LocationData;
   timeOfDay: TimeOfDay;
   currentTime: Date;
+  weatherType: WeatherType;
+  onWeatherChange: (weather: WeatherType) => void;
 }
 
 const InfoPanel: React.FC<InfoPanelProps> = ({ 
@@ -23,7 +26,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   sunTimes, 
   location, 
   timeOfDay,
-  currentTime
+  currentTime,
+  weatherType,
+  onWeatherChange
 }) => {
   const [locationName, setLocationName] = useState<string>('');
   const [loadingLocation, setLoadingLocation] = useState(false);
@@ -62,6 +67,15 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
   if (!sunTimes) return null;
 
+  const weatherOptions: { type: WeatherType; label: string; icon: React.ReactNode }[] = [
+    { type: 'clear', label: 'Clear', icon: <Sun size={16} /> },
+    { type: 'cloudy', label: 'Cloudy', icon: <CloudSun size={16} /> },
+    { type: 'overcast', label: 'Overcast', icon: <CloudSun size={16} className="opacity-60" /> },
+    { type: 'rain', label: 'Rain', icon: <CloudRain size={16} /> },
+    { type: 'storm', label: 'Storm', icon: <CloudLightning size={16} /> },
+    { type: 'snow', label: 'Snow', icon: <CloudSnow size={16} /> },
+  ];
+
   return (
     <div className="absolute top-0 right-0 w-full max-w-[300px] sm:w-[300px] bg-black bg-opacity-40 backdrop-blur-md text-white rounded-bl-lg overflow-hidden">
       {/* Header with toggle button */}
@@ -97,6 +111,28 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
         isCollapsed ? 'max-h-0 opacity-0' : 'max-h-[500px] opacity-100'
       }`}>
         <div className="px-4 pb-4">
+          {/* Weather selector */}
+          <div className="mb-4 pt-2 border-t border-white border-opacity-20">
+            <h3 className="text-sm font-bold mb-2">Weather</h3>
+            <div className="grid grid-cols-3 gap-1">
+              {weatherOptions.map((option) => (
+                <button
+                  key={option.type}
+                  onClick={() => onWeatherChange(option.type)}
+                  className={`flex items-center justify-center p-2 rounded text-xs transition-colors ${
+                    weatherType === option.type
+                      ? 'bg-white bg-opacity-20 text-white'
+                      : 'bg-white bg-opacity-5 text-white opacity-60 hover:opacity-80'
+                  }`}
+                >
+                  <span className="mr-1">{option.icon}</span>
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Time information */}
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <div className="flex items-center">
@@ -123,6 +159,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             </div>
           </div>
           
+          {/* Twilight times */}
           <div className="mt-6 pt-4 border-t border-white border-opacity-20">
             <h3 className="text-sm font-bold mb-2">Twilight Times</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
@@ -141,6 +178,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             </div>
           </div>
           
+          {/* Sun position */}
           <div className="mt-6 pt-4 border-t border-white border-opacity-20">
             <h3 className="text-sm font-bold mb-1">Sun Position</h3>
             <div className="grid grid-cols-2 gap-1 text-xs">
