@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { Fish } from 'lucide-react';
 import { Ship } from 'lucide-react';
@@ -450,7 +449,6 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
             x="0px"
             y="0px"
             viewBox="0 0 300 60"
-            style={{ enableBackground: 'new 0 0 0 0' }}
             xmlSpace="preserve"
             width="300"
             height="60"
