@@ -3,17 +3,24 @@ import React, { useState, useEffect } from 'react';
 import { Fullscreen, Minimize } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-const FullscreenButton: React.FC = () => {
+interface FullscreenButtonProps {
+  onFullscreenChange?: (isFullscreen: boolean) => void;
+}
+
+const FullscreenButton: React.FC<FullscreenButtonProps> = ({ onFullscreenChange }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const fullscreenState = !!document.fullscreenElement;
+      setIsFullscreen(fullscreenState);
+      onFullscreenChange?.(fullscreenState);
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
+  }, [onFullscreenChange]);
 
   const toggleFullscreen = async () => {
     try {
@@ -27,12 +34,26 @@ const FullscreenButton: React.FC = () => {
     }
   };
 
+  const handleMouseEnter = () => {
+    setIsVisible(true);
+  };
+
+  const handleMouseLeave = () => {
+    if (isFullscreen) {
+      setIsVisible(false);
+    }
+  };
+
   return (
     <Button
       variant="ghost"
       size="icon"
       onClick={toggleFullscreen}
-      className="fixed top-4 right-4 z-40 bg-black/20 backdrop-blur-sm hover:bg-black/40 text-white border border-white/20 sm:right-[320px]"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      className={`fixed top-4 left-4 z-40 bg-black/20 backdrop-blur-sm hover:bg-black/40 text-white border border-white/20 transition-opacity duration-300 ${
+        isVisible ? 'opacity-100' : 'opacity-0'
+      }`}
       title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
     >
       {isFullscreen ? (

@@ -24,6 +24,7 @@ interface InfoPanelProps {
   weatherData: WeatherData | null;
   isLoadingWeather: boolean;
   useRealWeather: boolean;
+  isFullscreen?: boolean;
   onWeatherChange: (weather: WeatherType) => void;
   onWeatherModeToggle: (useReal: boolean) => void;
   onWeatherRefresh: () => void;
@@ -40,6 +41,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   weatherData,
   isLoadingWeather,
   useRealWeather,
+  isFullscreen = false,
   onWeatherChange,
   onWeatherModeToggle,
   onWeatherRefresh
@@ -50,6 +52,49 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   const [isMoonCollapsed, setIsMoonCollapsed] = useState(true);
   const [isTwilightCollapsed, setIsTwilightCollapsed] = useState(false);
   const [isSunPositionCollapsed, setIsSunPositionCollapsed] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
+  const fadeTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Handle fade out in fullscreen
+  useEffect(() => {
+    if (isFullscreen) {
+      // Clear any existing timeout
+      if (fadeTimeoutRef.current) {
+        clearTimeout(fadeTimeoutRef.current);
+      }
+      
+      // Set timeout to fade out after 10 seconds
+      fadeTimeoutRef.current = setTimeout(() => {
+        setIsVisible(false);
+      }, 10000);
+    } else {
+      // Always visible when not in fullscreen
+      setIsVisible(true);
+      if (fadeTimeoutRef.current) {
+        clearTimeout(fadeTimeoutRef.current);
+        fadeTimeoutRef.current = null;
+      }
+    }
+
+    return () => {
+      if (fadeTimeoutRef.current) {
+        clearTimeout(fadeTimeoutRef.current);
+      }
+    };
+  }, [isFullscreen]);
+
+  const handleMouseEnter = () => {
+    if (isFullscreen) {
+      setIsVisible(true);
+      // Reset the fade timer
+      if (fadeTimeoutRef.current) {
+        clearTimeout(fadeTimeoutRef.current);
+      }
+      fadeTimeoutRef.current = setTimeout(() => {
+        setIsVisible(false);
+      }, 10000);
+    }
+  };
 
   // Auto-adjust collapsed states based on time of day
   useEffect(() => {
@@ -116,7 +161,12 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   ];
 
   return (
-    <div className="absolute top-0 right-0 w-full max-w-[300px] sm:w-[300px] bg-black bg-opacity-40 backdrop-blur-md text-white rounded-bl-lg overflow-hidden">
+    <div 
+      className={`absolute top-0 right-0 w-full max-w-[300px] sm:w-[300px] bg-black bg-opacity-40 backdrop-blur-md text-white rounded-bl-lg overflow-hidden transition-opacity duration-300 ${
+        isVisible ? 'opacity-100' : 'opacity-0'
+      }`}
+      onMouseEnter={handleMouseEnter}
+    >
       {/* Header with toggle button */}
       <div className="p-4 pb-2 flex items-start justify-between">
         <div className="flex-1 min-w-0">

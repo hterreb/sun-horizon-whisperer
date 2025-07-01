@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { Slider } from "@/components/ui/slider";
 import { Music, Volume2, VolumeX } from "lucide-react";
@@ -6,11 +5,58 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 
-const MusicPlayer: React.FC = () => {
+interface MusicPlayerProps {
+  isFullscreen?: boolean;
+}
+
+const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState([0.5]);
+  const [isVisible, setIsVisible] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const fadeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMobile = useIsMobile();
+
+  // Handle fade out in fullscreen
+  useEffect(() => {
+    if (isFullscreen) {
+      // Clear any existing timeout
+      if (fadeTimeoutRef.current) {
+        clearTimeout(fadeTimeoutRef.current);
+      }
+      
+      // Set timeout to fade out after 10 seconds
+      fadeTimeoutRef.current = setTimeout(() => {
+        setIsVisible(false);
+      }, 10000);
+    } else {
+      // Always visible when not in fullscreen
+      setIsVisible(true);
+      if (fadeTimeoutRef.current) {
+        clearTimeout(fadeTimeoutRef.current);
+        fadeTimeoutRef.current = null;
+      }
+    }
+
+    return () => {
+      if (fadeTimeoutRef.current) {
+        clearTimeout(fadeTimeoutRef.current);
+      }
+    };
+  }, [isFullscreen]);
+
+  const handleMouseEnter = () => {
+    if (isFullscreen) {
+      setIsVisible(true);
+      // Reset the fade timer
+      if (fadeTimeoutRef.current) {
+        clearTimeout(fadeTimeoutRef.current);
+      }
+      fadeTimeoutRef.current = setTimeout(() => {
+        setIsVisible(false);
+      }, 10000);
+    }
+  };
 
   useEffect(() => {
     // Create audio element with lo-fi streams
@@ -105,8 +151,12 @@ const MusicPlayer: React.FC = () => {
   };
 
   return (
-    <div className={`fixed z-50 bg-black/30 backdrop-blur-lg rounded-full px-3 py-2 flex items-center gap-2 
-      ${isMobile ? 'bottom-16 left-4' : 'bottom-4 left-4'}`}>
+    <div 
+      className={`fixed z-50 bg-black/30 backdrop-blur-lg rounded-full px-3 py-2 flex items-center gap-2 transition-opacity duration-300 ${
+        isMobile ? 'bottom-16 left-4' : 'bottom-4 left-4'
+      } ${isVisible ? 'opacity-100' : 'opacity-0'}`}
+      onMouseEnter={handleMouseEnter}
+    >
       <Switch
         checked={isPlaying}
         onCheckedChange={handlePlayToggle}

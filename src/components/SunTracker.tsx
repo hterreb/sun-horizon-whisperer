@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   getSunPosition, 
@@ -39,6 +40,7 @@ const SunTracker: React.FC = () => {
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [isLoadingWeather, setIsLoadingWeather] = useState(false);
   const [useRealWeather, setUseRealWeather] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const isMobile = useIsMobile();
 
   // Debug logging for weather changes
@@ -260,11 +262,15 @@ const SunTracker: React.FC = () => {
     fetchWeatherData();
   };
 
+  const handleFullscreenChange = (fullscreenState: boolean) => {
+    setIsFullscreen(fullscreenState);
+  };
+
   return (
     <div className="relative min-h-screen w-full overflow-hidden" style={getBackgroundStyle()}>
       <NightStars timeOfDay={timeOfDay} moonPosition={moonPosition} />
-      <MusicPlayer />
-      <FullscreenButton />
+      <MusicPlayer isFullscreen={isFullscreen} />
+      <FullscreenButton onFullscreenChange={handleFullscreenChange} />
       
       {location.loaded ? (
         <>
@@ -285,6 +291,7 @@ const SunTracker: React.FC = () => {
             weatherData={weatherData}
             isLoadingWeather={isLoadingWeather}
             useRealWeather={useRealWeather}
+            isFullscreen={isFullscreen}
             onWeatherChange={handleWeatherChange}
             onWeatherModeToggle={handleWeatherModeToggle}
             onWeatherRefresh={handleWeatherRefresh}
