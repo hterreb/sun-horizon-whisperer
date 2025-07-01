@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Bird, Fish } from 'lucide-react';
+import { Bird, Fish, Bat } from 'lucide-react';
 import { type TimeOfDay } from '../utils/sunUtils';
 
 export type WeatherType = 'clear' | 'cloudy' | 'overcast' | 'rain' | 'storm' | 'snow';
@@ -303,6 +303,11 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
     );
   };
 
+  // Determine if it's night time (for showing bats instead of birds)
+  const isNightTime = timeOfDay === 'night' || 
+                      timeOfDay === 'astronomical-twilight' || 
+                      timeOfDay === 'nautical-twilight';
+
   debugLog(`Rendering - Birds: ${birds.length}, Fish: ${fish.length}, Clouds: ${clouds.length}`);
 
   return (
@@ -371,7 +376,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
         </div>
       ))}
 
-      {/* Birds */}
+      {/* Birds/Bats */}
       {birds.map((bird) => (
         <div
           key={bird.id}
@@ -383,12 +388,17 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
             zIndex: 10
           }}
         >
-          <Bird 
-            size={20} 
-            className={`transition-colors duration-1000 ${
-              timeOfDay === 'night' ? 'text-white text-opacity-40' : 'text-black text-opacity-60'
-            }`}
-          />
+          {isNightTime ? (
+            <Bat 
+              size={20} 
+              className="transition-colors duration-1000 text-white text-opacity-60"
+            />
+          ) : (
+            <Bird 
+              size={20} 
+              className="transition-colors duration-1000 text-black text-opacity-60"
+            />
+          )}
         </div>
       ))}
 
