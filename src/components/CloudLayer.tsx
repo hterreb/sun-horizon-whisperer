@@ -12,7 +12,7 @@ interface CloudLayerProps {
 
 const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
   const [clouds, setClouds] = useState<Array<{id: number, x: number, y: number, scale: number}>>([]);
-  const [birds, setBirds] = useState<Array<{id: number, x: number, y: number, type: number}>>([]);
+  const [birds, setBirds] = useState<Array<{id: number, x: number, y: number}>>([]);
   const [fish, setFish] = useState<Array<{id: number, x: number, y: number}>>([]);
   const [ships, setShips] = useState<Array<{id: number, x: number, y: number}>>([]);
   const [raindrops, setRaindrops] = useState<Array<{id: number, x: number, y: number, delay: number}>>([]);
@@ -22,10 +22,6 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
   const animationFrameRef = useRef<number>();
   const lastSpawnTimeRef = useRef({ birds: 0, fish: 0, ships: 0 });
   const lastUpdateTimeRef = useRef(0);
-
-  // Bird silhouettes for day and night
-  const dayBirdSilhouettes = ['🕊️', '🐦', '🦅', '🦆', '🐧'];
-  const nightBirdSilhouettes = ['🦇', '🦉'];
 
   // Debug function
   const debugLog = (message: string, data?: any) => {
@@ -132,8 +128,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
               const newBird = {
                 id: Date.now() + Math.random(),
                 x: -10,
-                y: 20 + Math.random() * 30,
-                type: Math.floor(Math.random() * 5) // Random bird type index
+                y: 20 + Math.random() * 30
               };
               debugLog('Spawning new bird', newBird);
               setBirds(prev => {
@@ -361,7 +356,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
     );
   };
 
-  // Determine if it's night time (for showing bats instead of birds)
+  // Determine if it's night time (for showing different colored birds)
   const isNightTime = timeOfDay === 'night' || 
                       timeOfDay === 'astronomical-twilight' || 
                       timeOfDay === 'nautical-twilight';
@@ -434,7 +429,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
         </div>
       ))}
 
-      {/* Birds/Bats */}
+      {/* Birds with wing SVG */}
       {birds.map((bird) => (
         <div
           key={bird.id}
@@ -446,18 +441,20 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
             zIndex: 10
           }}
         >
-          <span 
-            className="text-lg transition-colors duration-1000"
-            style={{ 
-              fontSize: '20px',
-              color: isNightTime ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'
-            }}
+          <svg
+            width="24"
+            height="16"
+            viewBox="0 0 24 16"
+            fill="none"
+            className="transition-colors duration-1000"
           >
-            {isNightTime 
-              ? nightBirdSilhouettes[bird.type % nightBirdSilhouettes.length]
-              : dayBirdSilhouettes[bird.type % dayBirdSilhouettes.length]
-            }
-          </span>
+            <path
+              d="M2 8C2 8 6 4 12 8C18 4 22 8 22 8C22 8 18 12 12 8C6 12 2 8 2 8Z"
+              fill={isNightTime ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'}
+              stroke={isNightTime ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)'}
+              strokeWidth="1"
+            />
+          </svg>
         </div>
       ))}
 
