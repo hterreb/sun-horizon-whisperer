@@ -108,9 +108,13 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
       if (deltaTime >= 16) {
         // Make birds and fish visible in more weather conditions
         const shouldShowBirds = weatherType === 'clear' || weatherType === 'cloudy' || weatherType === 'overcast';
-        const shouldShowFish = weatherType === 'clear' || weatherType === 'cloudy' || weatherType === 'overcast';
+        // Fish should not appear during night time periods
+        const shouldShowFish = (weatherType === 'clear' || weatherType === 'cloudy' || weatherType === 'overcast') &&
+                              timeOfDay !== 'night' && 
+                              timeOfDay !== 'astronomical-twilight' && 
+                              timeOfDay !== 'nautical-twilight';
 
-        debugLog(`Animation frame - Birds visible: ${shouldShowBirds}, Fish visible: ${shouldShowFish}, Weather: ${weatherType}`);
+        debugLog(`Animation frame - Birds visible: ${shouldShowBirds}, Fish visible: ${shouldShowFish}, Weather: ${weatherType}, Time: ${timeOfDay}`);
 
         // Bird spawning and movement
         if (shouldShowBirds) {
@@ -200,10 +204,10 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
             return updated;
           });
         } else {
-          // Clear fish if weather doesn't support them
+          // Clear fish if weather or time doesn't support them
           setFish(prev => {
             if (prev.length > 0) {
-              debugLog('Clearing fish due to weather change');
+              debugLog('Clearing fish due to weather or time change');
               return [];
             }
             return prev;
@@ -227,7 +231,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [weatherType]);
+  }, [weatherType, timeOfDay]);
 
   const getCloudColor = () => {
     switch(weatherType) {
