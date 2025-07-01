@@ -429,7 +429,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
         </div>
       ))}
 
-      {/* Birds with custom SVG */}
+      {/* Birds (or bats at night) */}
       {birds.map((bird) => (
         <div
           key={bird.id}
@@ -437,34 +437,38 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
           style={{
             left: `${bird.x}%`,
             top: `${bird.y}%`,
-            transform: 'scale(0.3)',
+            transform: isNightTime ? 'scale(2)' : 'scale(0.3)',
             zIndex: 10
           }}
         >
-          <svg
-            version="1.1"
-            id="Capa_1"
-            xmlns="http://www.w3.org/2000/svg"
-            xmlnsXlink="http://www.w3.org/1999/xlink"
-            x="0px"
-            y="0px"
-            viewBox="0 0 300 60"
-            xmlSpace="preserve"
-            width="300"
-            height="60"
-            className="transition-colors duration-1000"
-          >
-            <g>
-              <path
-                d="M94.51,37.677c0.606,0.254,1.313,0.05,1.702-0.492c7.256-10.366,20.402-13.103,34.655-10.466
-                c8.789,1.622,16.164,6.439,21.22,13.003c7.066-4.324,15.686-6.186,24.484-4.559c14.253,2.633,25.539,9.888,28.625,22.165
-                c0.159,0.643,0.747,1.086,1.403,1.06c0.657-0.019,1.215-0.497,1.334-1.149c3.503-18.931-9.008-37.12-27.939-40.618
-                c-8.798-1.623-17.407,0.233-24.475,4.558c-5.056-6.564-12.441-11.381-21.229-13.003c-18.941-3.499-37.125,9.012-40.629,27.948
-                C93.544,36.776,93.892,37.424,94.51,37.677z"
-                fill={isNightTime ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'}
-              />
-            </g>
-          </svg>
+          {isNightTime ? (
+            <div className="text-4xl">🦇</div>
+          ) : (
+            <svg
+              version="1.1"
+              id="Capa_1"
+              xmlns="http://www.w3.org/2000/svg"
+              xmlnsXlink="http://www.w3.org/1999/xlink"
+              x="0px"
+              y="0px"
+              viewBox="0 0 300 60"
+              xmlSpace="preserve"
+              width="300"
+              height="60"
+              className="transition-colors duration-1000"
+            >
+              <g>
+                <path
+                  d="M94.51,37.677c0.606,0.254,1.313,0.05,1.702-0.492c7.256-10.366,20.402-13.103,34.655-10.466
+                  c8.789,1.622,16.164,6.439,21.22,13.003c7.066-4.324,15.686-6.186,24.484-4.559c14.253,2.633,25.539,9.888,28.625,22.165
+                  c0.159,0.643,0.747,1.086,1.403,1.06c0.657-0.019,1.215-0.497,1.334-1.149c3.503-18.931-9.008-37.12-27.939-40.618
+                  c-8.798-1.623-17.407,0.233-24.475,4.558c-5.056-6.564-12.441-11.381-21.229-13.003c-18.941-3.499-37.125,9.012-40.629,27.948
+                  C93.544,36.776,93.892,37.424,94.51,37.677z"
+                  fill="rgba(0, 0, 0, 0.6)"
+                />
+              </g>
+            </svg>
+          )}
         </div>
       ))}
 
