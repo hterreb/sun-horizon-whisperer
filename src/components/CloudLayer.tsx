@@ -1,6 +1,5 @@
-
 import React, { useEffect, useState, useRef } from 'react';
-import { Bird as BirdWing, Fish } from 'lucide-react';
+import { Fish } from 'lucide-react';
 import { Ship } from 'lucide-react';
 import { type TimeOfDay } from '../utils/sunUtils';
 
@@ -13,7 +12,7 @@ interface CloudLayerProps {
 
 const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
   const [clouds, setClouds] = useState<Array<{id: number, x: number, y: number, scale: number}>>([]);
-  const [birds, setBirds] = useState<Array<{id: number, x: number, y: number}>>([]);
+  const [birds, setBirds] = useState<Array<{id: number, x: number, y: number, type: number}>>([]);
   const [fish, setFish] = useState<Array<{id: number, x: number, y: number}>>([]);
   const [ships, setShips] = useState<Array<{id: number, x: number, y: number}>>([]);
   const [raindrops, setRaindrops] = useState<Array<{id: number, x: number, y: number, delay: number}>>([]);
@@ -23,6 +22,10 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
   const animationFrameRef = useRef<number>();
   const lastSpawnTimeRef = useRef({ birds: 0, fish: 0, ships: 0 });
   const lastUpdateTimeRef = useRef(0);
+
+  // Bird silhouettes for day and night
+  const dayBirdSilhouettes = ['🕊️', '🐦', '🦅', '🦆', '🐧'];
+  const nightBirdSilhouettes = ['🦇', '🦉'];
 
   // Debug function
   const debugLog = (message: string, data?: any) => {
@@ -129,7 +132,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
               const newBird = {
                 id: Date.now() + Math.random(),
                 x: -10,
-                y: 20 + Math.random() * 30
+                y: 20 + Math.random() * 30,
+                type: Math.floor(Math.random() * 5) // Random bird type index
               };
               debugLog('Spawning new bird', newBird);
               setBirds(prev => {
@@ -438,23 +442,22 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
           style={{
             left: `${bird.x}%`,
             top: `${bird.y}%`,
-            transform: 'scale(0.8)', // Back to original smaller size
+            transform: 'scale(0.8)',
             zIndex: 10
           }}
         >
-          {isNightTime ? (
-            <span 
-              className="text-lg transition-colors duration-1000 text-white text-opacity-60"
-              style={{ fontSize: '16px' }}
-            >
-              🦇
-            </span>
-          ) : (
-            <BirdWing 
-              size={20} // Back to original smaller size
-              className="transition-colors duration-1000 text-black text-opacity-60"
-            />
-          )}
+          <span 
+            className="text-lg transition-colors duration-1000"
+            style={{ 
+              fontSize: '20px',
+              color: isNightTime ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'
+            }}
+          >
+            {isNightTime 
+              ? nightBirdSilhouettes[bird.type % nightBirdSilhouettes.length]
+              : dayBirdSilhouettes[bird.type % dayBirdSilhouettes.length]
+            }
+          </span>
         </div>
       ))}
 
@@ -466,12 +469,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
           style={{
             left: `${fishItem.x}%`,
             top: `${fishItem.y}%`,
-            transform: 'scale(1.2)', // Doubled from 0.6 to 1.2
+            transform: 'scale(1.2)',
             zIndex: 5
           }}
         >
           <Fish 
-            size={36} // Doubled from 18 to 36
+            size={36} 
             className={`transition-colors duration-1000 ${
               timeOfDay === 'night' ? 'text-blue-200 text-opacity-50' : 'text-blue-400 text-opacity-70'
             }`}
@@ -487,12 +490,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
           style={{
             left: `${ship.x}%`,
             top: `${ship.y}%`,
-            transform: 'scale(1.4)', // Doubled from 0.7 to 1.4
+            transform: 'scale(1.4)',
             zIndex: 6
           }}
         >
           <Ship 
-            size={48} // Doubled from 24 to 48
+            size={48} 
             className={`transition-colors duration-1000 ${
               timeOfDay === 'night' ? 'text-gray-300 text-opacity-60' : 'text-gray-600 text-opacity-80'
             }`}
