@@ -94,13 +94,25 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
     const horizonY = height * 0.65;
     
-    const altitudeNormalized = (sunPosition.altitude + 30) / 120;
-    const y = horizonY - (altitudeNormalized * height * 0.8);
+    // Map altitude to vertical position
+    // At 0° altitude, sun should be exactly at horizon
+    // At 90° altitude, sun should be at the top
+    // At -90° altitude, sun should be well below horizon (but clamp to screen)
+    const altitudeRadians = sunPosition.altitude * (Math.PI / 180);
+    const maxAltitudeHeight = horizonY - 30; // Leave some margin from top
+    const y = horizonY - (Math.sin(altitudeRadians) * maxAltitudeHeight);
     
+    // Map azimuth to horizontal position
+    // 0° = North (top of screen), 90° = East (right), 180° = South (bottom), 270° = West (left)
+    // But we want 0° at left edge, 180° at center, 360° at right edge for a typical sun path
+    // So we adjust: map azimuth directly to screen width
     const azimuthNormalized = sunPosition.azimuth / 360;
     const x = width * azimuthNormalized;
     
-    return { x, y: Math.max(30, Math.min(height - 30, y)) };
+    return { 
+      x: Math.max(30, Math.min(width - 30, x)), 
+      y: Math.max(30, Math.min(height - 30, y)) 
+    };
   };
 
   const getMoonPosition = () => {
@@ -109,18 +121,23 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
     const horizonY = height * 0.65;
     
-    const altitudeNormalized = (moonPosition.altitude + 30) / 120;
-    const y = horizonY - (altitudeNormalized * height * 0.8);
+    // Use same logic as sun for consistent positioning
+    const altitudeRadians = moonPosition.altitude * (Math.PI / 180);
+    const maxAltitudeHeight = horizonY - 30;
+    const y = horizonY - (Math.sin(altitudeRadians) * maxAltitudeHeight);
     
     const azimuthNormalized = moonPosition.azimuth / 360;
     const x = width * azimuthNormalized;
     
-    return { x, y: Math.max(30, Math.min(height - 30, y)) };
+    return { 
+      x: Math.max(30, Math.min(width - 30, x)), 
+      y: Math.max(30, Math.min(height - 30, y)) 
+    };
   };
 
   const { x: sunX, y: sunY } = getSunPosition();
   const { x: moonX, y: moonY } = getMoonPosition();
-  
+
   const getSunColor = () => {
     if (sunPosition.altitude > 10) {
       return 'text-yellow-300';
