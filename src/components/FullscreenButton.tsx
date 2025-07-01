@@ -32,7 +32,7 @@ const FullscreenButton: React.FC = () => {
       variant="ghost"
       size="icon"
       onClick={toggleFullscreen}
-      className="fixed top-4 right-4 z-50 bg-black/20 backdrop-blur-sm hover:bg-black/40 text-white border border-white/20"
+      className="fixed top-4 right-4 z-40 bg-black/20 backdrop-blur-sm hover:bg-black/40 text-white border border-white/20 sm:right-[320px]"
       title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
     >
       {isFullscreen ? (
