@@ -437,7 +437,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
           style={{
             left: `${bird.x}%`,
             top: `${bird.y}%`,
-            transform: isNightTime ? 'scale(1)' : 'scale(0.3)',
+            transform: isNightTime ? 'scale(0.5)' : 'scale(0.3)',
             zIndex: 10
           }}
         >
