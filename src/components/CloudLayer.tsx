@@ -1,5 +1,4 @@
-
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Bird, Fish } from 'lucide-react';
 import { type TimeOfDay } from '../utils/sunUtils';
 
@@ -17,7 +16,19 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
   const [raindrops, setRaindrops] = useState<Array<{id: number, x: number, y: number, delay: number}>>([]);
   const [snowflakes, setSnowflakes] = useState<Array<{id: number, x: number, y: number, size: number, delay: number}>>([]);
 
+  // Animation refs
+  const animationFrameRef = useRef<number>();
+  const lastSpawnTimeRef = useRef({ birds: 0, fish: 0 });
+  const lastUpdateTimeRef = useRef(0);
+
+  // Debug function
+  const debugLog = (message: string, data?: any) => {
+    console.log(`[CloudLayer Debug] ${message}`, data || '');
+  };
+
   useEffect(() => {
+    debugLog(`Weather changed to: ${weatherType}`);
+    
     // Generate clouds based on weather type
     let newClouds: Array<{id: number, x: number, y: number, scale: number}> = [];
     
@@ -82,72 +93,133 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
     }
   }, [weatherType]);
 
+  // Main animation loop
   useEffect(() => {
-    // Birds only for clear and cloudy weather
-    if (weatherType === 'clear' || weatherType === 'cloudy') {
-      const birdSpawnInterval = setInterval(() => {
-        if (Math.random() < 0.4) { // Increased spawn rate
-          const newBird = {
-            id: Date.now() + Math.random(),
-            x: -10,
-            y: 20 + Math.random() * 30
-          };
-          setBirds(prev => [...prev, newBird]);
+    const animate = (currentTime: number) => {
+      const deltaTime = currentTime - lastUpdateTimeRef.current;
+      
+      // Only update if enough time has passed (60fps throttle)
+      if (deltaTime >= 16) {
+        const shouldShowBirds = weatherType === 'clear' || weatherType === 'cloudy';
+        const shouldShowFish = weatherType === 'clear';
+
+        debugLog(`Animation frame - Birds visible: ${shouldShowBirds}, Fish visible: ${shouldShowFish}`);
+
+        // Bird spawning and movement
+        if (shouldShowBirds) {
+          // Spawn birds every 5-8 seconds
+          if (currentTime - lastSpawnTimeRef.current.birds > 5000 + Math.random() * 3000) {
+            if (Math.random() < 0.7) { // 70% chance to spawn
+              const newBird = {
+                id: Date.now() + Math.random(),
+                x: -10,
+                y: 20 + Math.random() * 30
+              };
+              debugLog('Spawning new bird', newBird);
+              setBirds(prev => {
+                const updated = [...prev, newBird];
+                debugLog(`Birds count after spawn: ${updated.length}`);
+                return updated;
+              });
+            }
+            lastSpawnTimeRef.current.birds = currentTime;
+          }
+
+          // Move birds
+          setBirds(prevBirds => {
+            const updated = prevBirds
+              .map(bird => ({
+                ...bird,
+                x: bird.x + 0.8 // Faster movement
+              }))
+              .filter(bird => {
+                const keep = bird.x < 110;
+                if (!keep) debugLog('Removing bird that went off screen', bird);
+                return keep;
+              });
+            
+            if (updated.length !== prevBirds.length) {
+              debugLog(`Birds count after movement: ${updated.length}`);
+            }
+            return updated;
+          });
+        } else {
+          // Clear birds if weather doesn't support them
+          setBirds(prev => {
+            if (prev.length > 0) {
+              debugLog('Clearing birds due to weather change');
+              return [];
+            }
+            return prev;
+          });
         }
-      }, 6000); // Spawn every 6 seconds
 
-      const birdAnimationInterval = setInterval(() => {
-        setBirds(prevBirds => 
-          prevBirds
-            .map(bird => ({
-              ...bird,
-              x: bird.x + 0.5 // Increased movement speed
-            }))
-            .filter(bird => bird.x < 110)
-        );
-      }, 50); // Faster animation updates
+        // Fish spawning and movement
+        if (shouldShowFish) {
+          // Spawn fish every 8-12 seconds
+          if (currentTime - lastSpawnTimeRef.current.fish > 8000 + Math.random() * 4000) {
+            if (Math.random() < 0.5) { // 50% chance to spawn
+              const newFish = {
+                id: Date.now() + Math.random(),
+                x: -5,
+                y: 70 + Math.random() * 15
+              };
+              debugLog('Spawning new fish', newFish);
+              setFish(prev => {
+                const updated = [...prev, newFish];
+                debugLog(`Fish count after spawn: ${updated.length}`);
+                return updated;
+              });
+            }
+            lastSpawnTimeRef.current.fish = currentTime;
+          }
 
-      return () => {
-        clearInterval(birdSpawnInterval);
-        clearInterval(birdAnimationInterval);
-      };
-    } else {
-      setBirds([]);
-    }
-  }, [weatherType]);
-
-  useEffect(() => {
-    // Fish for clear weather (swimming in the horizon water)
-    if (weatherType === 'clear') {
-      const fishSpawnInterval = setInterval(() => {
-        if (Math.random() < 0.25) { // Slightly increased spawn rate
-          const newFish = {
-            id: Date.now() + Math.random(),
-            x: -5,
-            y: 70 + Math.random() * 15 // Near the horizon water level
-          };
-          setFish(prev => [...prev, newFish]);
+          // Move fish
+          setFish(prevFish => {
+            const updated = prevFish
+              .map(fish => ({
+                ...fish,
+                x: fish.x + 0.4 // Moderate movement speed
+              }))
+              .filter(fish => {
+                const keep = fish.x < 105;
+                if (!keep) debugLog('Removing fish that went off screen', fish);
+                return keep;
+              });
+            
+            if (updated.length !== prevFish.length) {
+              debugLog(`Fish count after movement: ${updated.length}`);
+            }
+            return updated;
+          });
+        } else {
+          // Clear fish if weather doesn't support them
+          setFish(prev => {
+            if (prev.length > 0) {
+              debugLog('Clearing fish due to weather change');
+              return [];
+            }
+            return prev;
+          });
         }
-      }, 10000); // Spawn every 10 seconds
 
-      const fishAnimationInterval = setInterval(() => {
-        setFish(prevFish => 
-          prevFish
-            .map(fish => ({
-              ...fish,
-              x: fish.x + 0.3 // Slightly faster fish movement
-            }))
-            .filter(fish => fish.x < 105)
-        );
-      }, 100);
+        lastUpdateTimeRef.current = currentTime;
+      }
 
-      return () => {
-        clearInterval(fishSpawnInterval);
-        clearInterval(fishAnimationInterval);
-      };
-    } else {
-      setFish([]);
-    }
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    // Start animation loop
+    debugLog('Starting animation loop');
+    animationFrameRef.current = requestAnimationFrame(animate);
+
+    // Cleanup
+    return () => {
+      if (animationFrameRef.current) {
+        debugLog('Stopping animation loop');
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
   }, [weatherType]);
 
   const getCloudColor = () => {
@@ -219,6 +291,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
       />
     );
   };
+
+  debugLog(`Rendering - Birds: ${birds.length}, Fish: ${fish.length}`);
 
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -295,7 +369,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
             left: `${bird.x}%`,
             top: `${bird.y}%`,
             transform: 'scale(0.8)',
-            transition: 'none' // Remove transition to allow smooth manual animation
+            transition: 'none',
+            zIndex: 10
           }}
         >
           <Bird 
@@ -316,7 +391,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
             left: `${fishItem.x}%`,
             top: `${fishItem.y}%`,
             transform: 'scale(0.6)',
-            transition: 'none' // Remove transition to allow smooth manual animation
+            transition: 'none',
+            zIndex: 5
           }}
         >
           <Fish 
