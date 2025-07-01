@@ -18,9 +18,11 @@ import InfoPanel from './InfoPanel';
 import NightStars from './NightStars';
 import MusicPlayer from './MusicPlayer';
 import FullscreenButton from './FullscreenButton';
+import PWAInstallPrompt from './PWAInstallPrompt';
 import { type WeatherType } from './CloudLayer';
 import { toast } from '@/components/ui/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useWakeLock } from '@/hooks/useWakeLock';
 
 const SunTracker: React.FC = () => {
   const [date, setDate] = useState<Date>(new Date());
@@ -44,6 +46,9 @@ const SunTracker: React.FC = () => {
   const isMobile = useIsMobile();
 
   const cursorTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Use wake lock when in fullscreen mode
+  useWakeLock(isFullscreen);
 
   // Debug logging for weather changes
   console.log('[SunTracker Debug] Current weather type:', weatherType);
@@ -318,6 +323,7 @@ const SunTracker: React.FC = () => {
       <NightStars timeOfDay={timeOfDay} moonPosition={moonPosition} />
       <MusicPlayer isFullscreen={isFullscreen} />
       <FullscreenButton onFullscreenChange={handleFullscreenChange} />
+      <PWAInstallPrompt />
       
       {location.loaded ? (
         <>
