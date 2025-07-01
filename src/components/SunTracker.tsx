@@ -12,6 +12,7 @@ import {
   type TimeOfDay
 } from '../utils/sunUtils';
 import { getMoonPosition, type MoonPosition } from '../utils/moonUtils';
+import { fetchCurrentWeather, type WeatherData } from '../utils/weatherUtils';
 import SunVisualization from './SunVisualization';
 import InfoPanel from './InfoPanel';
 import NightStars from './NightStars';
@@ -33,13 +34,17 @@ const SunTracker: React.FC = () => {
   });
   const [sunTimes, setSunTimes] = useState<SunTimes | null>(null);
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('midday');
-  // Start with 'clear' weather instead of 'overcast' to allow birds/fish to spawn
   const [weatherType, setWeatherType] = useState<WeatherType>('clear');
+  const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
+  const [isLoadingWeather, setIsLoadingWeather] = useState(false);
+  const [useRealWeather, setUseRealWeather] = useState(true);
   const isMobile = useIsMobile();
 
   // Debug logging for weather changes
   console.log('[SunTracker Debug] Current weather type:', weatherType);
   console.log('[SunTracker Debug] Current time of day:', timeOfDay);
+  console.log('[SunTracker Debug] Weather data:', weatherData);
+  console.log('[SunTracker Debug] Using real weather:', useRealWeather);
 
   // Update time every second for smooth clock display
   useEffect(() => {
@@ -49,6 +54,63 @@ const SunTracker: React.FC = () => {
     
     return () => clearInterval(timer);
   }, []);
+
+  // Fetch weather data when location is available
+  useEffect(() => {
+    if (location.loaded && useRealWeather) {
+      fetchWeatherData();
+    }
+  }, [location.loaded, useRealWeather]);
+
+  // Auto-refresh weather every 30 minutes
+  useEffect(() => {
+    if (!location.loaded || !useRealWeather) return;
+
+    const weatherRefreshTimer = setInterval(() => {
+      console.log('[SunTracker Debug] Auto-refreshing weather data');
+      fetchWeatherData();
+    }, 30 * 60 * 1000); // 30 minutes
+
+    return () => clearInterval(weatherRefreshTimer);
+  }, [location.loaded, useRealWeather]);
+
+  const fetchWeatherData = async () => {
+    if (!location.loaded) return;
+
+    setIsLoadingWeather(true);
+    try {
+      console.log('[SunTracker Debug] Fetching weather data...');
+      const weather = await fetchCurrentWeather(location.latitude, location.longitude);
+      setWeatherData(weather);
+      
+      if (useRealWeather) {
+        setWeatherType(weather.weatherType);
+        console.log('[SunTracker Debug] Weather type updated to:', weather.weatherType);
+      }
+
+      if (weather.isRealWeather) {
+        toast({
+          title: "Weather updated",
+          description: `${weather.weatherDescription}, ${weather.temperature}°C`,
+        });
+      } else {
+        toast({
+          title: "Weather unavailable",
+          description: "Using default weather. Check your connection.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('[SunTracker Debug] Error fetching weather:', error);
+      toast({
+        title: "Weather fetch failed",
+        description: "Could not get current weather data.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingWeather(false);
+    }
+  };
 
   useEffect(() => {
     const sunUpdateTimer = setInterval(() => {
@@ -178,8 +240,23 @@ const SunTracker: React.FC = () => {
   }, [timeOfDay, weatherType]);
 
   const handleWeatherChange = (newWeather: WeatherType) => {
-    console.log('[SunTracker Debug] Weather changing from', weatherType, 'to', newWeather);
+    console.log('[SunTracker Debug] Manual weather change from', weatherType, 'to', newWeather);
     setWeatherType(newWeather);
+    setUseRealWeather(false); // Switch to manual mode when user selects weather
+  };
+
+  const handleWeatherModeToggle = (useReal: boolean) => {
+    console.log('[SunTracker Debug] Weather mode toggle:', useReal ? 'real' : 'manual');
+    setUseRealWeather(useReal);
+    
+    if (useReal && weatherData) {
+      setWeatherType(weatherData.weatherType);
+    }
+  };
+
+  const handleWeatherRefresh = () => {
+    console.log('[SunTracker Debug] Manual weather refresh requested');
+    fetchWeatherData();
   };
 
   return (
@@ -203,7 +280,12 @@ const SunTracker: React.FC = () => {
             timeOfDay={timeOfDay}
             currentTime={date}
             weatherType={weatherType}
+            weatherData={weatherData}
+            isLoadingWeather={isLoadingWeather}
+            useRealWeather={useRealWeather}
             onWeatherChange={handleWeatherChange}
+            onWeatherModeToggle={handleWeatherModeToggle}
+            onWeatherRefresh={handleWeatherRefresh}
           />
         </>
       ) : (

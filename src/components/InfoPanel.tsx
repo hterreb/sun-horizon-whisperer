@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, CloudRain, CloudSnow, CloudSun, Sun, CloudLightning, Moon } from 'lucide-react';
+import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, CloudRain, CloudSnow, CloudSun, Sun, CloudLightning, Moon, RefreshCw, Thermometer } from 'lucide-react';
 import { 
   type SunPosition, 
   type SunTimes, 
@@ -9,6 +9,7 @@ import {
   getTimeOfDayLabel 
 } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhaseLabel } from '../utils/moonUtils';
+import { type WeatherData } from '../utils/weatherUtils';
 import { type WeatherType } from './CloudLayer';
 import { format } from 'date-fns';
 
@@ -20,7 +21,12 @@ interface InfoPanelProps {
   timeOfDay: TimeOfDay;
   currentTime: Date;
   weatherType: WeatherType;
+  weatherData: WeatherData | null;
+  isLoadingWeather: boolean;
+  useRealWeather: boolean;
   onWeatherChange: (weather: WeatherType) => void;
+  onWeatherModeToggle: (useReal: boolean) => void;
+  onWeatherRefresh: () => void;
 }
 
 const InfoPanel: React.FC<InfoPanelProps> = ({ 
@@ -31,7 +37,12 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   timeOfDay,
   currentTime,
   weatherType,
-  onWeatherChange
+  weatherData,
+  isLoadingWeather,
+  useRealWeather,
+  onWeatherChange,
+  onWeatherModeToggle,
+  onWeatherRefresh
 }) => {
   const [locationName, setLocationName] = useState<string>('');
   const [loadingLocation, setLoadingLocation] = useState(false);
@@ -112,29 +123,101 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
       
       {/* Collapsible content */}
       <div className={`transition-all duration-300 ease-in-out ${
-        isCollapsed ? 'max-h-0 opacity-0' : 'max-h-[600px] opacity-100'
+        isCollapsed ? 'max-h-0 opacity-0' : 'max-h-[800px] opacity-100'
       }`}>
         <div className="px-4 pb-4">
-          {/* Weather selector */}
-          <div className="mb-4 pt-2 border-t border-white border-opacity-20">
-            <h3 className="text-sm font-bold mb-2">Weather</h3>
-            <div className="grid grid-cols-3 gap-1">
-              {weatherOptions.map((option) => (
+          {/* Current Weather Display */}
+          {weatherData && (
+            <div className="mb-4 pt-2 border-t border-white border-opacity-20">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-bold flex items-center">
+                  <Thermometer size={16} className="mr-2" />
+                  Current Weather
+                </h3>
                 <button
-                  key={option.type}
-                  onClick={() => onWeatherChange(option.type)}
-                  className={`flex items-center justify-center p-2 rounded text-xs transition-colors ${
-                    weatherType === option.type
+                  onClick={onWeatherRefresh}
+                  disabled={isLoadingWeather}
+                  className="p-1 rounded hover:bg-white hover:bg-opacity-10 transition-colors disabled:opacity-50"
+                  aria-label="Refresh weather"
+                >
+                  <RefreshCw size={14} className={isLoadingWeather ? 'animate-spin' : ''} />
+                </button>
+              </div>
+              
+              <div className="space-y-1 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="opacity-80">Temperature:</span>
+                  <span className="font-semibold">{weatherData.temperature}°C</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="opacity-80">Condition:</span>
+                  <span className="font-semibold">{weatherData.weatherDescription}</span>
+                </div>
+                {weatherData.isRealWeather && (
+                  <div className="text-xs opacity-60 mt-1">
+                    Updated: {format(weatherData.lastUpdated, 'HH:mm')}
+                  </div>
+                )}
+                {!weatherData.isRealWeather && (
+                  <div className="text-xs opacity-60 text-yellow-400 mt-1">
+                    Real weather unavailable
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Weather Mode Toggle */}
+          <div className="mb-4 pt-2 border-t border-white border-opacity-20">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-bold">Weather Mode</h3>
+              <div className="flex bg-white bg-opacity-10 rounded p-1">
+                <button
+                  onClick={() => onWeatherModeToggle(true)}
+                  className={`text-xs px-2 py-1 rounded transition-colors ${
+                    useRealWeather
                       ? 'bg-white bg-opacity-20 text-white'
-                      : 'bg-white bg-opacity-5 text-white opacity-60 hover:opacity-80'
+                      : 'text-white opacity-60'
                   }`}
                 >
-                  <span className="mr-1">{option.icon}</span>
-                  {option.label}
+                  Real
                 </button>
-              ))}
+                <button
+                  onClick={() => onWeatherModeToggle(false)}
+                  className={`text-xs px-2 py-1 rounded transition-colors ${
+                    !useRealWeather
+                      ? 'bg-white bg-opacity-20 text-white'
+                      : 'text-white opacity-60'
+                  }`}
+                >
+                  Manual
+                </button>
+              </div>
             </div>
           </div>
+
+          {/* Manual Weather Selector - only show when not using real weather */}
+          {!useRealWeather && (
+            <div className="mb-4 pt-2 border-t border-white border-opacity-20">
+              <h3 className="text-sm font-bold mb-2">Manual Weather</h3>
+              <div className="grid grid-cols-3 gap-1">
+                {weatherOptions.map((option) => (
+                  <button
+                    key={option.type}
+                    onClick={() => onWeatherChange(option.type)}
+                    className={`flex items-center justify-center p-2 rounded text-xs transition-colors ${
+                      weatherType === option.type
+                        ? 'bg-white bg-opacity-20 text-white'
+                        : 'bg-white bg-opacity-5 text-white opacity-60 hover:opacity-80'
+                    }`}
+                  >
+                    <span className="mr-1">{option.icon}</span>
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Time information */}
           <div className="space-y-4">
