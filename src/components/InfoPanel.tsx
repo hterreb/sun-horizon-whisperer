@@ -48,6 +48,30 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMoonCollapsed, setIsMoonCollapsed] = useState(true);
+  const [isTwilightCollapsed, setIsTwilightCollapsed] = useState(false);
+  const [isSunPositionCollapsed, setIsSunPositionCollapsed] = useState(false);
+
+  // Auto-adjust collapsed states based on time of day
+  useEffect(() => {
+    const isNightTime = timeOfDay === 'night' || 
+                       timeOfDay === 'astronomical-twilight' || 
+                       timeOfDay === 'nautical-twilight' || 
+                       timeOfDay === 'civil-twilight';
+    
+    if (isNightTime) {
+      // During night/twilight: collapse twilight times and sun position, expand moon
+      setIsTwilightCollapsed(true);
+      setIsSunPositionCollapsed(true);
+      if (moonPosition.visible) {
+        setIsMoonCollapsed(false);
+      }
+    } else {
+      // During day: expand twilight times and sun position, collapse moon
+      setIsTwilightCollapsed(false);
+      setIsSunPositionCollapsed(false);
+      setIsMoonCollapsed(true);
+    }
+  }, [timeOfDay, moonPosition.visible]);
 
   useEffect(() => {
     const fetchLocationName = async () => {
@@ -288,36 +312,64 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             </div>
           )}
           
-          {/* Twilight times */}
+          {/* Twilight times - collapsible */}
           <div className="mt-6 pt-4 border-t border-white border-opacity-20">
-            <h3 className="text-sm font-bold mb-2">Twilight Times</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-              <div>
-                <div className="font-semibold">Civil</div>
-                <div className="opacity-80">{formatTime(sunTimes.dawn)} - {formatTime(sunTimes.dusk)}</div>
-              </div>
-              <div>
-                <div className="font-semibold">Nautical</div>
-                <div className="opacity-80">{formatTime(sunTimes.nauticalDawn)} - {formatTime(sunTimes.nauticalDusk)}</div>
-              </div>
-              <div className="sm:col-span-2">
-                <div className="font-semibold">Astronomical</div>
-                <div className="opacity-80">{formatTime(sunTimes.astronomicalDawn)} - {formatTime(sunTimes.astronomicalDusk)}</div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-bold">Twilight Times</h3>
+              <button
+                onClick={() => setIsTwilightCollapsed(!isTwilightCollapsed)}
+                className="p-1 rounded hover:bg-white hover:bg-opacity-10 transition-colors"
+                aria-label={isTwilightCollapsed ? "Expand twilight times" : "Collapse twilight times"}
+              >
+                {isTwilightCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+              </button>
+            </div>
+            
+            <div className={`transition-all duration-300 ease-in-out ${
+              isTwilightCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-32 opacity-100'
+            }`}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <div>
+                  <div className="font-semibold">Civil</div>
+                  <div className="opacity-80">{formatTime(sunTimes.dawn)} - {formatTime(sunTimes.dusk)}</div>
+                </div>
+                <div>
+                  <div className="font-semibold">Nautical</div>
+                  <div className="opacity-80">{formatTime(sunTimes.nauticalDawn)} - {formatTime(sunTimes.nauticalDusk)}</div>
+                </div>
+                <div className="sm:col-span-2">
+                  <div className="font-semibold">Astronomical</div>
+                  <div className="opacity-80">{formatTime(sunTimes.astronomicalDawn)} - {formatTime(sunTimes.astronomicalDusk)}</div>
+                </div>
               </div>
             </div>
           </div>
           
-          {/* Sun position */}
+          {/* Sun position - collapsible */}
           <div className="mt-6 pt-4 border-t border-white border-opacity-20">
-            <h3 className="text-sm font-bold mb-1">Sun Position</h3>
-            <div className="grid grid-cols-2 gap-1 text-xs">
-              <div>
-                <span>Altitude: </span>
-                <span className="font-mono">{sunPosition.altitude.toFixed(2)}°</span>
-              </div>
-              <div>
-                <span>Azimuth: </span>
-                <span className="font-mono">{sunPosition.azimuth.toFixed(2)}°</span>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-bold">Sun Position</h3>
+              <button
+                onClick={() => setIsSunPositionCollapsed(!isSunPositionCollapsed)}
+                className="p-1 rounded hover:bg-white hover:bg-opacity-10 transition-colors"
+                aria-label={isSunPositionCollapsed ? "Expand sun position" : "Collapse sun position"}
+              >
+                {isSunPositionCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+              </button>
+            </div>
+            
+            <div className={`transition-all duration-300 ease-in-out ${
+              isSunPositionCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-16 opacity-100'
+            }`}>
+              <div className="grid grid-cols-2 gap-1 text-xs">
+                <div>
+                  <span>Altitude: </span>
+                  <span className="font-mono">{sunPosition.altitude.toFixed(2)}°</span>
+                </div>
+                <div>
+                  <span>Azimuth: </span>
+                  <span className="font-mono">{sunPosition.azimuth.toFixed(2)}°</span>
+                </div>
               </div>
             </div>
           </div>
