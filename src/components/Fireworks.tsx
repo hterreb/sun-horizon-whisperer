@@ -34,12 +34,12 @@ const Fireworks: React.FC<FireworksProps> = ({ trigger }) => {
     const x = Math.random() * 100;
     const y = 30 + Math.random() * 40; // Upper part of screen
     
-    const particleCount = 12 + Math.random() * 8;
+    const particleCount = 20 + Math.random() * 15; // More particles
     const particles: FireworkParticle[] = [];
     
     for (let i = 0; i < particleCount; i++) {
       const angle = (i / particleCount) * Math.PI * 2;
-      const speed = 2 + Math.random() * 3;
+      const speed = 3 + Math.random() * 4; // Faster initial speed
       
       particles.push({
         id: i,
@@ -48,8 +48,8 @@ const Fireworks: React.FC<FireworksProps> = ({ trigger }) => {
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         color: colors[Math.floor(Math.random() * colors.length)],
-        life: 60,
-        maxLife: 60
+        life: 120, // Much longer life
+        maxLife: 120
       });
     }
     
@@ -72,8 +72,8 @@ const Fireworks: React.FC<FireworksProps> = ({ trigger }) => {
               ...particle,
               x: particle.x + particle.vx,
               y: particle.y + particle.vy,
-              vy: particle.vy + 0.1, // gravity
-              vx: particle.vx * 0.99, // air resistance
+              vy: particle.vy + 0.08, // Reduced gravity for slower fall
+              vx: particle.vx * 0.995, // Less air resistance
               life: particle.life - 1
             }))
             .filter(particle => particle.life > 0)
@@ -84,12 +84,12 @@ const Fireworks: React.FC<FireworksProps> = ({ trigger }) => {
 
   useEffect(() => {
     if (trigger) {
-      // Create multiple fireworks when triggered
+      // Create more fireworks when triggered
       const newFireworks = [];
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 5; i++) { // More fireworks
         setTimeout(() => {
           setFireworks(prev => [...prev, createFirework()]);
-        }, i * 200);
+        }, i * 150);
       }
     }
   }, [trigger]);
@@ -119,14 +119,16 @@ const Fireworks: React.FC<FireworksProps> = ({ trigger }) => {
         firework.particles.map(particle => (
           <div
             key={`${firework.id}-${particle.id}`}
-            className="absolute w-1 h-1 rounded-full"
+            className="absolute rounded-full"
             style={{
               left: `${particle.x}%`,
               top: `${particle.y}%`,
               backgroundColor: particle.color,
               opacity: particle.life / particle.maxLife,
-              boxShadow: `0 0 6px ${particle.color}`,
-              transform: 'translate(-50%, -50%)'
+              boxShadow: `0 0 15px ${particle.color}, 0 0 30px ${particle.color}`, // Stronger glow
+              transform: 'translate(-50%, -50%)',
+              width: '4px', // Larger particles
+              height: '4px'
             }}
           />
         ))
