@@ -72,11 +72,11 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
 
     // Generate weather effects
     if (weatherType === 'rain' || weatherType === 'storm') {
-      const newRaindrops = Array.from({ length: 50 }, (_, i) => ({
+      const newRaindrops = Array.from({ length: 80 }, (_, i) => ({
         id: i,
         x: Math.random() * 100,
-        y: -10 - Math.random() * 50,
-        delay: Math.random() * 2
+        y: -10 - Math.random() * 100,
+        delay: Math.random() * 5
       }));
       setRaindrops(newRaindrops);
       debugLog(`Generated ${newRaindrops.length} raindrops`);
@@ -85,12 +85,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
     }
 
     if (weatherType === 'snow') {
-      const newSnowflakes = Array.from({ length: 30 }, (_, i) => ({
+      const newSnowflakes = Array.from({ length: 60 }, (_, i) => ({
         id: i,
         x: Math.random() * 100,
-        y: -10 - Math.random() * 50,
+        y: -10 - Math.random() * 100,
         size: 0.5 + Math.random() * 1.5,
-        delay: Math.random() * 3
+        delay: Math.random() * 8
       }));
       setSnowflakes(newSnowflakes);
       debugLog(`Generated ${newSnowflakes.length} snowflakes`);
@@ -343,13 +343,13 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
       {raindrops.map((drop) => (
         <div
           key={drop.id}
-          className="absolute w-0.5 bg-blue-300 opacity-60 animate-pulse"
+          className="absolute w-0.5 bg-blue-300 opacity-60"
           style={{
             left: `${drop.x}%`,
             top: `${drop.y}%`,
             height: weatherType === 'storm' ? '20px' : '15px',
             animationDelay: `${drop.delay}s`,
-            animation: `fall ${weatherType === 'storm' ? '0.5s' : '0.8s'} linear infinite`
+            animation: `fall ${weatherType === 'storm' ? '2s' : '2.5s'} linear infinite`
           }}
         />
       ))}
@@ -364,7 +364,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
             top: `${flake.y}%`,
             fontSize: `${flake.size}rem`,
             animationDelay: `${flake.delay}s`,
-            animation: 'snowfall 3s linear infinite'
+            animation: 'snowfall 6s linear infinite'
           }}
         >
           ❄
@@ -423,7 +423,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
         
         @keyframes snowfall {
           to {
-            transform: translateY(100vh) translateX(10px);
+            transform: translateY(100vh) translateX(20px);
           }
         }
       `}</style>
