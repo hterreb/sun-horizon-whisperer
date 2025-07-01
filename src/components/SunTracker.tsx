@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   getSunPosition, 
@@ -34,8 +33,13 @@ const SunTracker: React.FC = () => {
   });
   const [sunTimes, setSunTimes] = useState<SunTimes | null>(null);
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('midday');
-  const [weatherType, setWeatherType] = useState<WeatherType>('overcast');
+  // Start with 'clear' weather instead of 'overcast' to allow birds/fish to spawn
+  const [weatherType, setWeatherType] = useState<WeatherType>('clear');
   const isMobile = useIsMobile();
+
+  // Debug logging for weather changes
+  console.log('[SunTracker Debug] Current weather type:', weatherType);
+  console.log('[SunTracker Debug] Current time of day:', timeOfDay);
 
   // Update time every second for smooth clock display
   useEffect(() => {
@@ -174,6 +178,7 @@ const SunTracker: React.FC = () => {
   }, [timeOfDay, weatherType]);
 
   const handleWeatherChange = (newWeather: WeatherType) => {
+    console.log('[SunTracker Debug] Weather changing from', weatherType, 'to', newWeather);
     setWeatherType(newWeather);
   };
 

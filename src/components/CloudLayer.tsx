@@ -35,6 +35,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
     switch (weatherType) {
       case 'clear':
         newClouds = []; // No clouds for clear weather
+        debugLog('Clear weather - no clouds generated');
         break;
       case 'cloudy':
         newClouds = Array.from({ length: 6 }, (_, i) => ({
@@ -43,6 +44,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
           y: 20 + (i % 3) * 15,
           scale: 0.5 + (i * 0.2)
         }));
+        debugLog(`Cloudy weather - generated ${newClouds.length} clouds`);
         break;
       case 'overcast':
       case 'rain':
@@ -53,6 +55,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
           y: 10 + (i % 4) * 10,
           scale: 0.8 + (i * 0.1)
         }));
+        debugLog(`${weatherType} weather - generated ${newClouds.length} clouds`);
         break;
       case 'snow':
         newClouds = Array.from({ length: 8 }, (_, i) => ({
@@ -61,6 +64,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
           y: 15 + (i % 3) * 12,
           scale: 0.6 + (i * 0.15)
         }));
+        debugLog(`Snow weather - generated ${newClouds.length} clouds`);
         break;
     }
     
@@ -75,6 +79,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
         delay: Math.random() * 2
       }));
       setRaindrops(newRaindrops);
+      debugLog(`Generated ${newRaindrops.length} raindrops`);
     } else {
       setRaindrops([]);
     }
@@ -88,6 +93,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
         delay: Math.random() * 3
       }));
       setSnowflakes(newSnowflakes);
+      debugLog(`Generated ${newSnowflakes.length} snowflakes`);
     } else {
       setSnowflakes([]);
     }
@@ -100,16 +106,17 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
       
       // Only update if enough time has passed (60fps throttle)
       if (deltaTime >= 16) {
-        const shouldShowBirds = weatherType === 'clear' || weatherType === 'cloudy';
-        const shouldShowFish = weatherType === 'clear';
+        // Make birds and fish visible in more weather conditions
+        const shouldShowBirds = weatherType === 'clear' || weatherType === 'cloudy' || weatherType === 'overcast';
+        const shouldShowFish = weatherType === 'clear' || weatherType === 'cloudy';
 
-        debugLog(`Animation frame - Birds visible: ${shouldShowBirds}, Fish visible: ${shouldShowFish}`);
+        debugLog(`Animation frame - Birds visible: ${shouldShowBirds}, Fish visible: ${shouldShowFish}, Weather: ${weatherType}`);
 
         // Bird spawning and movement
         if (shouldShowBirds) {
-          // Spawn birds every 5-8 seconds
-          if (currentTime - lastSpawnTimeRef.current.birds > 5000 + Math.random() * 3000) {
-            if (Math.random() < 0.7) { // 70% chance to spawn
+          // Spawn birds every 3-5 seconds (reduced from 5-8)
+          if (currentTime - lastSpawnTimeRef.current.birds > 3000 + Math.random() * 2000) {
+            if (Math.random() < 0.8) { // 80% chance to spawn (increased from 70%)
               const newBird = {
                 id: Date.now() + Math.random(),
                 x: -10,
@@ -125,12 +132,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
             lastSpawnTimeRef.current.birds = currentTime;
           }
 
-          // Move birds
+          // Move birds (increased speed)
           setBirds(prevBirds => {
             const updated = prevBirds
               .map(bird => ({
                 ...bird,
-                x: bird.x + 0.8 // Faster movement
+                x: bird.x + 1.2 // Increased from 0.8
               }))
               .filter(bird => {
                 const keep = bird.x < 110;
@@ -156,9 +163,9 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
 
         // Fish spawning and movement
         if (shouldShowFish) {
-          // Spawn fish every 8-12 seconds
-          if (currentTime - lastSpawnTimeRef.current.fish > 8000 + Math.random() * 4000) {
-            if (Math.random() < 0.5) { // 50% chance to spawn
+          // Spawn fish every 5-8 seconds (reduced from 8-12)
+          if (currentTime - lastSpawnTimeRef.current.fish > 5000 + Math.random() * 3000) {
+            if (Math.random() < 0.7) { // 70% chance to spawn (increased from 50%)
               const newFish = {
                 id: Date.now() + Math.random(),
                 x: -5,
@@ -174,12 +181,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
             lastSpawnTimeRef.current.fish = currentTime;
           }
 
-          // Move fish
+          // Move fish (increased speed)
           setFish(prevFish => {
             const updated = prevFish
               .map(fish => ({
                 ...fish,
-                x: fish.x + 0.4 // Moderate movement speed
+                x: fish.x + 0.6 // Increased from 0.4
               }))
               .filter(fish => {
                 const keep = fish.x < 105;
@@ -292,7 +299,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
     );
   };
 
-  debugLog(`Rendering - Birds: ${birds.length}, Fish: ${fish.length}`);
+  debugLog(`Rendering - Birds: ${birds.length}, Fish: ${fish.length}, Clouds: ${clouds.length}`);
 
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -369,7 +376,6 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
             left: `${bird.x}%`,
             top: `${bird.y}%`,
             transform: 'scale(0.8)',
-            transition: 'none',
             zIndex: 10
           }}
         >
@@ -391,7 +397,6 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
             left: `${fishItem.x}%`,
             top: `${fishItem.y}%`,
             transform: 'scale(0.6)',
-            transition: 'none',
             zIndex: 5
           }}
         >
