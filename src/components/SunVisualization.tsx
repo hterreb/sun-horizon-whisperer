@@ -217,7 +217,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             opacity: weatherType === 'rain' ? 0.7 : 1
           }}
         >
-          <Sun size={sunPosition.altitude > 0 ? 48 : 40} strokeWidth={1} />
+          <Sun size={sunPosition.altitude > 0 ? 96 : 80} strokeWidth={1} />
         </div>
       )}
       
