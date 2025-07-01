@@ -17,6 +17,7 @@ import SunVisualization from './SunVisualization';
 import InfoPanel from './InfoPanel';
 import NightStars from './NightStars';
 import MusicPlayer from './MusicPlayer';
+import FullscreenButton from './FullscreenButton';
 import { type WeatherType } from './CloudLayer';
 import { toast } from '@/components/ui/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -263,6 +264,7 @@ const SunTracker: React.FC = () => {
     <div className="relative min-h-screen w-full overflow-hidden" style={getBackgroundStyle()}>
       <NightStars timeOfDay={timeOfDay} moonPosition={moonPosition} />
       <MusicPlayer />
+      <FullscreenButton />
       
       {location.loaded ? (
         <>
