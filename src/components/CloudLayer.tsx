@@ -1,6 +1,8 @@
 
+
 import React, { useEffect, useState, useRef } from 'react';
 import { Bird, Fish } from 'lucide-react';
+import { Ship } from 'lucide-react';
 import { type TimeOfDay } from '../utils/sunUtils';
 
 export type WeatherType = 'clear' | 'cloudy' | 'overcast' | 'rain' | 'storm' | 'snow';
@@ -14,12 +16,13 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
   const [clouds, setClouds] = useState<Array<{id: number, x: number, y: number, scale: number}>>([]);
   const [birds, setBirds] = useState<Array<{id: number, x: number, y: number}>>([]);
   const [fish, setFish] = useState<Array<{id: number, x: number, y: number}>>([]);
+  const [ships, setShips] = useState<Array<{id: number, x: number, y: number}>>([]);
   const [raindrops, setRaindrops] = useState<Array<{id: number, x: number, y: number, delay: number}>>([]);
   const [snowflakes, setSnowflakes] = useState<Array<{id: number, x: number, y: number, size: number, delay: number}>>([]);
 
   // Animation refs
   const animationFrameRef = useRef<number>();
-  const lastSpawnTimeRef = useRef({ birds: 0, fish: 0 });
+  const lastSpawnTimeRef = useRef({ birds: 0, fish: 0, ships: 0 });
   const lastUpdateTimeRef = useRef(0);
 
   // Debug function
@@ -114,8 +117,10 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
                               timeOfDay !== 'night' && 
                               timeOfDay !== 'astronomical-twilight' && 
                               timeOfDay !== 'nautical-twilight';
+        // Ships should be visible in most weather conditions except storms
+        const shouldShowShips = weatherType !== 'storm';
 
-        debugLog(`Animation frame - Birds visible: ${shouldShowBirds}, Fish visible: ${shouldShowFish}, Weather: ${weatherType}, Time: ${timeOfDay}`);
+        debugLog(`Animation frame - Birds visible: ${shouldShowBirds}, Fish visible: ${shouldShowFish}, Ships visible: ${shouldShowShips}, Weather: ${weatherType}, Time: ${timeOfDay}`);
 
         // Bird spawning and movement
         if (shouldShowBirds) {
@@ -209,6 +214,55 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
           setFish(prev => {
             if (prev.length > 0) {
               debugLog('Clearing fish due to weather or time change');
+              return [];
+            }
+            return prev;
+          });
+        }
+
+        // Ship spawning and movement
+        if (shouldShowShips) {
+          // Spawn ships every 2-4 minutes (120-240 seconds)
+          if (currentTime - lastSpawnTimeRef.current.ships > 120000 + Math.random() * 120000) {
+            if (Math.random() < 0.9) { // 90% chance to spawn
+              const newShip = {
+                id: Date.now() + Math.random(),
+                x: -8,
+                y: 65 + Math.random() * 5 // Ships sail on the water surface
+              };
+              debugLog('Spawning new ship', newShip);
+              setShips(prev => {
+                const updated = [...prev, newShip];
+                debugLog(`Ships count after spawn: ${updated.length}`);
+                return updated;
+              });
+            }
+            lastSpawnTimeRef.current.ships = currentTime;
+          }
+
+          // Move ships (slower than fish)
+          setShips(prevShips => {
+            const updated = prevShips
+              .map(ship => ({
+                ...ship,
+                x: ship.x + 0.08 // Slower than fish (0.08 vs 0.15)
+              }))
+              .filter(ship => {
+                const keep = ship.x < 108;
+                if (!keep) debugLog('Removing ship that went off screen', ship);
+                return keep;
+              });
+            
+            if (updated.length !== prevShips.length) {
+              debugLog(`Ships count after movement: ${updated.length}`);
+            }
+            return updated;
+          });
+        } else {
+          // Clear ships if weather doesn't support them
+          setShips(prev => {
+            if (prev.length > 0) {
+              debugLog('Clearing ships due to weather change');
               return [];
             }
             return prev;
@@ -309,7 +363,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
                       timeOfDay === 'astronomical-twilight' || 
                       timeOfDay === 'nautical-twilight';
 
-  debugLog(`Rendering - Birds: ${birds.length}, Fish: ${fish.length}, Clouds: ${clouds.length}`);
+  debugLog(`Rendering - Birds: ${birds.length}, Fish: ${fish.length}, Ships: ${ships.length}, Clouds: ${clouds.length}`);
 
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -426,6 +480,27 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
         </div>
       ))}
 
+      {/* Ships */}
+      {ships.map((ship) => (
+        <div
+          key={ship.id}
+          className="absolute"
+          style={{
+            left: `${ship.x}%`,
+            top: `${ship.y}%`,
+            transform: 'scale(0.7)',
+            zIndex: 6
+          }}
+        >
+          <Ship 
+            size={24} 
+            className={`transition-colors duration-1000 ${
+              timeOfDay === 'night' ? 'text-gray-300 text-opacity-60' : 'text-gray-600 text-opacity-80'
+            }`}
+          />
+        </div>
+      ))}
+
       {/* CSS animations for weather effects */}
       <style>{`
         @keyframes fall {
@@ -445,3 +520,4 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
 };
 
 export default CloudLayer;
+
