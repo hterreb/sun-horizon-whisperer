@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { Fish } from 'lucide-react';
 import { Ship } from 'lucide-react';
@@ -429,7 +430,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
         </div>
       ))}
 
-      {/* Birds with wing SVG */}
+      {/* Birds with custom SVG */}
       {birds.map((bird) => (
         <div
           key={bird.id}
@@ -437,23 +438,34 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
           style={{
             left: `${bird.x}%`,
             top: `${bird.y}%`,
-            transform: 'scale(0.8)',
+            transform: 'scale(0.3)',
             zIndex: 10
           }}
         >
           <svg
-            width="24"
-            height="16"
-            viewBox="0 0 24 16"
-            fill="none"
+            version="1.1"
+            id="Capa_1"
+            xmlns="http://www.w3.org/2000/svg"
+            xmlnsXlink="http://www.w3.org/1999/xlink"
+            x="0px"
+            y="0px"
+            viewBox="0 0 300 60"
+            style={{ enableBackground: 'new 0 0 0 0' }}
+            xmlSpace="preserve"
+            width="300"
+            height="60"
             className="transition-colors duration-1000"
           >
-            <path
-              d="M2 8C2 8 6 4 12 8C18 4 22 8 22 8C22 8 18 12 12 8C6 12 2 8 2 8Z"
-              fill={isNightTime ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'}
-              stroke={isNightTime ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)'}
-              strokeWidth="1"
-            />
+            <g>
+              <path
+                d="M94.51,37.677c0.606,0.254,1.313,0.05,1.702-0.492c7.256-10.366,20.402-13.103,34.655-10.466
+                c8.789,1.622,16.164,6.439,21.22,13.003c7.066-4.324,15.686-6.186,24.484-4.559c14.253,2.633,25.539,9.888,28.625,22.165
+                c0.159,0.643,0.747,1.086,1.403,1.06c0.657-0.019,1.215-0.497,1.334-1.149c3.503-18.931-9.008-37.12-27.939-40.618
+                c-8.798-1.623-17.407,0.233-24.475,4.558c-5.056-6.564-12.441-11.381-21.229-13.003c-18.941-3.499-37.125,9.012-40.629,27.948
+                C93.544,36.776,93.892,37.424,94.51,37.677z"
+                fill={isNightTime ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'}
+              />
+            </g>
           </svg>
         </div>
       ))}
