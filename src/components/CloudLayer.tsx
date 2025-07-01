@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Bird, Fish } from 'lucide-react';
+import { Bird, Fish, Bird as BirdWing } from 'lucide-react';
 import { Ship } from 'lucide-react';
 import { type TimeOfDay } from '../utils/sunUtils';
 
@@ -437,20 +437,18 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
           style={{
             left: `${bird.x}%`,
             top: `${bird.y}%`,
-            transform: 'scale(1.6)', // Doubled from 0.8 to 1.6
+            transform: 'scale(0.8)', // Back to original smaller size
             zIndex: 10
           }}
         >
           {isNightTime ? (
-            <span 
-              className="text-lg transition-colors duration-1000 text-white text-opacity-60"
-              style={{ fontSize: '32px' }} // Doubled from 16px to 32px
-            >
-              🦇
-            </span>
+            <BirdWing 
+              size={20} // Back to original smaller size
+              className="transition-colors duration-1000 text-white text-opacity-60"
+            />
           ) : (
             <Bird 
-              size={40} // Doubled from 20 to 40
+              size={20} // Back to original smaller size
               className="transition-colors duration-1000 text-black text-opacity-60"
             />
           )}
