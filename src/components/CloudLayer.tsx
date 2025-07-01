@@ -1,5 +1,6 @@
+
 import React, { useEffect, useState, useRef } from 'react';
-import { Bird, Fish, Bat } from 'lucide-react';
+import { Bird, Fish } from 'lucide-react';
 import { type TimeOfDay } from '../utils/sunUtils';
 
 export type WeatherType = 'clear' | 'cloudy' | 'overcast' | 'rain' | 'storm' | 'snow';
@@ -389,10 +390,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
           }}
         >
           {isNightTime ? (
-            <Bat 
-              size={20} 
-              className="transition-colors duration-1000 text-white text-opacity-60"
-            />
+            <span 
+              className="text-lg transition-colors duration-1000 text-white text-opacity-60"
+              style={{ fontSize: '16px' }}
+            >
+              🦇
+            </span>
           ) : (
             <Bird 
               size={20} 
