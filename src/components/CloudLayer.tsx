@@ -108,15 +108,15 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
       if (deltaTime >= 16) {
         // Make birds and fish visible in more weather conditions
         const shouldShowBirds = weatherType === 'clear' || weatherType === 'cloudy' || weatherType === 'overcast';
-        const shouldShowFish = weatherType === 'clear' || weatherType === 'cloudy';
+        const shouldShowFish = weatherType === 'clear' || weatherType === 'cloudy' || weatherType === 'overcast';
 
         debugLog(`Animation frame - Birds visible: ${shouldShowBirds}, Fish visible: ${shouldShowFish}, Weather: ${weatherType}`);
 
         // Bird spawning and movement
         if (shouldShowBirds) {
-          // Spawn birds every 3-5 seconds (reduced from 5-8)
+          // Spawn birds every 3-5 seconds
           if (currentTime - lastSpawnTimeRef.current.birds > 3000 + Math.random() * 2000) {
-            if (Math.random() < 0.8) { // 80% chance to spawn (increased from 70%)
+            if (Math.random() < 0.8) { // 80% chance to spawn
               const newBird = {
                 id: Date.now() + Math.random(),
                 x: -10,
@@ -132,12 +132,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
             lastSpawnTimeRef.current.birds = currentTime;
           }
 
-          // Move birds (increased speed)
+          // Move birds (slowed down by factor of 4)
           setBirds(prevBirds => {
             const updated = prevBirds
               .map(bird => ({
                 ...bird,
-                x: bird.x + 1.2 // Increased from 0.8
+                x: bird.x + 0.3 // Reduced from 1.2 (1.2 / 4 = 0.3)
               }))
               .filter(bird => {
                 const keep = bird.x < 110;
@@ -163,9 +163,9 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
 
         // Fish spawning and movement
         if (shouldShowFish) {
-          // Spawn fish every 5-8 seconds (reduced from 8-12)
+          // Spawn fish every 5-8 seconds
           if (currentTime - lastSpawnTimeRef.current.fish > 5000 + Math.random() * 3000) {
-            if (Math.random() < 0.7) { // 70% chance to spawn (increased from 50%)
+            if (Math.random() < 0.7) { // 70% chance to spawn
               const newFish = {
                 id: Date.now() + Math.random(),
                 x: -5,
@@ -181,12 +181,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
             lastSpawnTimeRef.current.fish = currentTime;
           }
 
-          // Move fish (increased speed)
+          // Move fish (slowed down by factor of 4)
           setFish(prevFish => {
             const updated = prevFish
               .map(fish => ({
                 ...fish,
-                x: fish.x + 0.6 // Increased from 0.4
+                x: fish.x + 0.15 // Reduced from 0.6 (0.6 / 4 = 0.15)
               }))
               .filter(fish => {
                 const keep = fish.x < 105;
