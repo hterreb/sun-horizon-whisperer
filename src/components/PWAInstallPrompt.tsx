@@ -122,7 +122,7 @@ const PWAInstallPrompt: React.FC = () => {
     <div className="fixed bottom-4 left-4 right-4 z-50 bg-black/90 backdrop-blur-sm text-white p-4 rounded-lg border border-white/20 shadow-lg">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
-          <h3 className="font-semibold text-sm mb-1">Install Sun Tracker</h3>
+          <h3 className="font-semibold text-sm mb-1">Install Sun Chaser</h3>
           <p className="text-xs text-gray-300">
             Add to your home screen for the best experience and offline access
           </p>
