@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   getSunPosition, 
@@ -41,13 +40,57 @@ const SunTracker: React.FC = () => {
   const [isLoadingWeather, setIsLoadingWeather] = useState(false);
   const [useRealWeather, setUseRealWeather] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showCursor, setShowCursor] = useState(true);
   const isMobile = useIsMobile();
+
+  const cursorTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   // Debug logging for weather changes
   console.log('[SunTracker Debug] Current weather type:', weatherType);
   console.log('[SunTracker Debug] Current time of day:', timeOfDay);
   console.log('[SunTracker Debug] Weather data:', weatherData);
   console.log('[SunTracker Debug] Using real weather:', useRealWeather);
+
+  // Handle cursor visibility in fullscreen
+  useEffect(() => {
+    if (isFullscreen) {
+      // Set initial timeout for cursor fade
+      if (cursorTimeoutRef.current) {
+        clearTimeout(cursorTimeoutRef.current);
+      }
+      
+      cursorTimeoutRef.current = setTimeout(() => {
+        setShowCursor(false);
+      }, 10000);
+
+      // Add mouse move listener to show cursor and reset timer
+      const handleMouseMove = () => {
+        setShowCursor(true);
+        if (cursorTimeoutRef.current) {
+          clearTimeout(cursorTimeoutRef.current);
+        }
+        cursorTimeoutRef.current = setTimeout(() => {
+          setShowCursor(false);
+        }, 10000);
+      };
+
+      document.addEventListener('mousemove', handleMouseMove);
+      
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        if (cursorTimeoutRef.current) {
+          clearTimeout(cursorTimeoutRef.current);
+        }
+      };
+    } else {
+      // Always show cursor when not in fullscreen
+      setShowCursor(true);
+      if (cursorTimeoutRef.current) {
+        clearTimeout(cursorTimeoutRef.current);
+        cursorTimeoutRef.current = null;
+      }
+    }
+  }, [isFullscreen]);
 
   // Update time every second for smooth clock display
   useEffect(() => {
@@ -224,7 +267,6 @@ const SunTracker: React.FC = () => {
   }, [location.loaded]);
 
   const getBackgroundStyle = useCallback(() => {
-    // Adjust background based on weather
     let baseGradient = getBackgroundGradient(timeOfDay);
     
     if (weatherType === 'storm') {
@@ -245,7 +287,7 @@ const SunTracker: React.FC = () => {
   const handleWeatherChange = (newWeather: WeatherType) => {
     console.log('[SunTracker Debug] Manual weather change from', weatherType, 'to', newWeather);
     setWeatherType(newWeather);
-    setUseRealWeather(false); // Switch to manual mode when user selects weather
+    setUseRealWeather(false);
   };
 
   const handleWeatherModeToggle = (useReal: boolean) => {
@@ -267,7 +309,12 @@ const SunTracker: React.FC = () => {
   };
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden" style={getBackgroundStyle()}>
+    <div 
+      className={`relative min-h-screen w-full overflow-hidden ${
+        isFullscreen && !showCursor ? 'cursor-none' : ''
+      }`} 
+      style={getBackgroundStyle()}
+    >
       <NightStars timeOfDay={timeOfDay} moonPosition={moonPosition} />
       <MusicPlayer isFullscreen={isFullscreen} />
       <FullscreenButton onFullscreenChange={handleFullscreenChange} />
