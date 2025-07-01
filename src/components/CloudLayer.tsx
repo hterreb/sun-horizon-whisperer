@@ -1,5 +1,3 @@
-
-
 import React, { useEffect, useState, useRef } from 'react';
 import { Bird, Fish } from 'lucide-react';
 import { Ship } from 'lucide-react';
@@ -142,12 +140,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
             lastSpawnTimeRef.current.birds = currentTime;
           }
 
-          // Move birds (slowed down by factor of 4)
+          // Move birds (reduced speed from 0.3 to 0.15)
           setBirds(prevBirds => {
             const updated = prevBirds
               .map(bird => ({
                 ...bird,
-                x: bird.x + 0.3 // Reduced from 1.2 (1.2 / 4 = 0.3)
+                x: bird.x + 0.15 // Reduced from 0.3 (half speed)
               }))
               .filter(bird => {
                 const keep = bird.x < 110;
@@ -191,12 +189,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
             lastSpawnTimeRef.current.fish = currentTime;
           }
 
-          // Move fish (slowed down by factor of 4)
+          // Move fish (reduced speed from 0.15 to 0.075)
           setFish(prevFish => {
             const updated = prevFish
               .map(fish => ({
                 ...fish,
-                x: fish.x + 0.15 // Reduced from 0.6 (0.6 / 4 = 0.15)
+                x: fish.x + 0.075 // Reduced from 0.15 (half speed)
               }))
               .filter(fish => {
                 const keep = fish.x < 105;
@@ -240,12 +238,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
             lastSpawnTimeRef.current.ships = currentTime;
           }
 
-          // Move ships (slower than fish)
+          // Move ships (reduced speed from 0.08 to 0.04)
           setShips(prevShips => {
             const updated = prevShips
               .map(ship => ({
                 ...ship,
-                x: ship.x + 0.08 // Slower than fish (0.08 vs 0.15)
+                x: ship.x + 0.04 // Reduced from 0.08 (half speed)
               }))
               .filter(ship => {
                 const keep = ship.x < 108;
@@ -439,20 +437,20 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
           style={{
             left: `${bird.x}%`,
             top: `${bird.y}%`,
-            transform: 'scale(0.8)',
+            transform: 'scale(1.6)', // Doubled from 0.8 to 1.6
             zIndex: 10
           }}
         >
           {isNightTime ? (
             <span 
               className="text-lg transition-colors duration-1000 text-white text-opacity-60"
-              style={{ fontSize: '16px' }}
+              style={{ fontSize: '32px' }} // Doubled from 16px to 32px
             >
               🦇
             </span>
           ) : (
             <Bird 
-              size={20} 
+              size={40} // Doubled from 20 to 40
               className="transition-colors duration-1000 text-black text-opacity-60"
             />
           )}
@@ -467,12 +465,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
           style={{
             left: `${fishItem.x}%`,
             top: `${fishItem.y}%`,
-            transform: 'scale(0.6)',
+            transform: 'scale(1.2)', // Doubled from 0.6 to 1.2
             zIndex: 5
           }}
         >
           <Fish 
-            size={18} 
+            size={36} // Doubled from 18 to 36
             className={`transition-colors duration-1000 ${
               timeOfDay === 'night' ? 'text-blue-200 text-opacity-50' : 'text-blue-400 text-opacity-70'
             }`}
@@ -488,12 +486,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
           style={{
             left: `${ship.x}%`,
             top: `${ship.y}%`,
-            transform: 'scale(0.7)',
+            transform: 'scale(1.4)', // Doubled from 0.7 to 1.4
             zIndex: 6
           }}
         >
           <Ship 
-            size={24} 
+            size={48} // Doubled from 24 to 48
             className={`transition-colors duration-1000 ${
               timeOfDay === 'night' ? 'text-gray-300 text-opacity-60' : 'text-gray-600 text-opacity-80'
             }`}
@@ -520,4 +518,3 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
 };
 
 export default CloudLayer;
-
