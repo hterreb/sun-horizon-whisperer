@@ -4,7 +4,7 @@
   "short_name": "Sun Tracker",
   "description": "Track the sun and moon positions with real-time weather",
   "start_url": "/",
-  "display": "fullscreen",
+  "display": "standalone",
   "background_color": "#0F0E11",
   "theme_color": "#33C3F0",
   "orientation": "any",
@@ -18,5 +18,6 @@
   ],
   "categories": ["weather", "utilities", "lifestyle"],
   "lang": "en",
-  "scope": "/"
+  "scope": "/",
+  "prefer_related_applications": false
 }
