@@ -3,6 +3,7 @@ import { Sun, Moon } from 'lucide-react';
 import { type SunPosition, type TimeOfDay } from '../utils/sunUtils';
 import { type MoonPosition } from '../utils/moonUtils';
 import CloudLayer, { type WeatherType } from './CloudLayer';
+import Fireworks from './Fireworks';
 
 interface SunVisualizationProps {
   sunPosition: SunPosition;
@@ -20,6 +21,28 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   const [svgPath, setSvgPath] = useState<string>('');
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerDimensions, setContainerDimensions] = useState({ width: 0, height: 0 });
+  const [showFireworks, setShowFireworks] = useState(false);
+  const prevAltitudeRef = useRef<number>(sunPosition.altitude);
+
+  // Check if sun crosses the horizon (0.0 degrees)
+  useEffect(() => {
+    const currentAltitude = Math.round(sunPosition.altitude * 10) / 10; // Round to 1 decimal place
+    const prevAltitude = Math.round(prevAltitudeRef.current * 10) / 10;
+    
+    // Trigger fireworks if sun crosses exactly 0.0 degrees (either direction)
+    if ((prevAltitude !== 0.0 && currentAltitude === 0.0) || 
+        (Math.abs(currentAltitude) < 0.05 && Math.abs(prevAltitude - currentAltitude) > 0.1)) {
+      console.log('Sun hit horizon! Triggering fireworks. Altitude:', currentAltitude);
+      setShowFireworks(true);
+      
+      // Reset fireworks trigger after a short delay
+      setTimeout(() => {
+        setShowFireworks(false);
+      }, 100);
+    }
+    
+    prevAltitudeRef.current = sunPosition.altitude;
+  }, [sunPosition.altitude]);
 
   useEffect(() => {
     const updateDimensions = () => {
@@ -165,6 +188,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   return (
     <div ref={containerRef} className="w-full h-screen relative overflow-hidden">
       <CloudLayer timeOfDay={timeOfDay} weatherType={weatherType} />
+      <Fireworks trigger={showFireworks} />
       
       {isSunVisible && (
         <div 
