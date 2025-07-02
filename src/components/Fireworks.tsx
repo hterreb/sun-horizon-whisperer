@@ -32,14 +32,14 @@ const Fireworks: React.FC<FireworksProps> = ({ trigger }) => {
 
   const createFirework = () => {
     const x = Math.random() * 100;
-    const y = 30 + Math.random() * 40; // Upper part of screen
+    const y = 20 + Math.random() * 30; // Higher in the sky
     
-    const particleCount = 20 + Math.random() * 15; // More particles
+    const particleCount = 30 + Math.random() * 20; // More particles
     const particles: FireworkParticle[] = [];
     
     for (let i = 0; i < particleCount; i++) {
       const angle = (i / particleCount) * Math.PI * 2;
-      const speed = 3 + Math.random() * 4; // Faster initial speed
+      const speed = 4 + Math.random() * 5; // Faster initial speed
       
       particles.push({
         id: i,
@@ -48,8 +48,8 @@ const Fireworks: React.FC<FireworksProps> = ({ trigger }) => {
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         color: colors[Math.floor(Math.random() * colors.length)],
-        life: 120, // Much longer life
-        maxLife: 120
+        life: 400 + Math.random() * 200, // 6-10 seconds at 60fps
+        maxLife: 400 + Math.random() * 200
       });
     }
     
@@ -84,12 +84,11 @@ const Fireworks: React.FC<FireworksProps> = ({ trigger }) => {
 
   useEffect(() => {
     if (trigger) {
-      // Create more fireworks when triggered
-      const newFireworks = [];
-      for (let i = 0; i < 5; i++) { // More fireworks
+      // Create more fireworks when triggered - spread them out over time
+      for (let i = 0; i < 8; i++) { // More fireworks
         setTimeout(() => {
           setFireworks(prev => [...prev, createFirework()]);
-        }, i * 150);
+        }, i * 300); // Longer delays between fireworks
       }
     }
   }, [trigger]);
@@ -124,11 +123,11 @@ const Fireworks: React.FC<FireworksProps> = ({ trigger }) => {
               left: `${particle.x}%`,
               top: `${particle.y}%`,
               backgroundColor: particle.color,
-              opacity: particle.life / particle.maxLife,
-              boxShadow: `0 0 15px ${particle.color}, 0 0 30px ${particle.color}`, // Stronger glow
+              opacity: Math.min(1, particle.life / particle.maxLife * 1.2), // Brighter particles
+              boxShadow: `0 0 25px ${particle.color}, 0 0 50px ${particle.color}, 0 0 75px ${particle.color}`, // Much stronger glow
               transform: 'translate(-50%, -50%)',
-              width: '4px', // Larger particles
-              height: '4px'
+              width: '6px', // Larger particles
+              height: '6px'
             }}
           />
         ))
