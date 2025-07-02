@@ -384,18 +384,37 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               isTwilightCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-32 opacity-100'
             }`}>
               <div className="space-y-2 text-xs">
-                <div className="flex justify-between">
-                  <span className="font-semibold">Astronomical {relevantTwilightTimes.type}:</span>
-                  <span className="font-mono">{formatTime(relevantTwilightTimes.astronomical)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-semibold">Nautical {relevantTwilightTimes.type}:</span>
-                  <span className="font-mono">{formatTime(relevantTwilightTimes.nautical)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-semibold">Civil {relevantTwilightTimes.type}:</span>
-                  <span className="font-mono">{formatTime(relevantTwilightTimes.civil)}</span>
-                </div>
+                {relevantTwilightTimes.type === 'dusk' ? (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="font-semibold">Civil:</span>
+                      <span className="font-mono">{formatTime(sunTimes.sunset)} - {formatTime(relevantTwilightTimes.civil)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-semibold">Nautical:</span>
+                      <span className="font-mono">{formatTime(relevantTwilightTimes.civil)} - {formatTime(relevantTwilightTimes.nautical)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-semibold">Astronomical:</span>
+                      <span className="font-mono">{formatTime(relevantTwilightTimes.nautical)} - {formatTime(relevantTwilightTimes.astronomical)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="font-semibold">Astronomical:</span>
+                      <span className="font-mono">{formatTime(relevantTwilightTimes.astronomical)} - {formatTime(relevantTwilightTimes.nautical)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-semibold">Nautical:</span>
+                      <span className="font-mono">{formatTime(relevantTwilightTimes.nautical)} - {formatTime(relevantTwilightTimes.civil)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-semibold">Civil:</span>
+                      <span className="font-mono">{formatTime(relevantTwilightTimes.civil)} - {formatTime(sunTimes.sunrise)}</span>
+                    </div>
+                  </>
+                )}
                 <div className="text-xs opacity-60 mt-2">
                   {relevantTwilightTimes.type === 'dawn' ? 
                     'Astronomical (-18°) → Nautical (-12°) → Civil (-6°) → Sunrise (0°)' :
