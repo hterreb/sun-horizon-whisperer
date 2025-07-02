@@ -86,12 +86,15 @@ export const getSunTimes = (date: Date, latitude: number, longitude: number): Su
     sunrise: isValidDate(times.sunrise) ? times.sunrise : new Date(date.setHours(6, 0, 0, 0)),
     sunset: isValidDate(times.sunset) ? times.sunset : new Date(date.setHours(18, 0, 0, 0)),
     solarNoon: isValidDate(times.solarNoon) ? times.solarNoon : new Date(date.setHours(12, 0, 0, 0)),
+    // SunCalc's "dawn" is civil dawn (-6°), "dusk" is civil dusk (-6°) - these are correct
     dawn: isValidDate(times.dawn) ? times.dawn : new Date(date.setHours(5, 30, 0, 0)),
     dusk: isValidDate(times.dusk) ? times.dusk : new Date(date.setHours(18, 30, 0, 0)),
+    // SunCalc's "nauticalDawn" is nautical dawn (-12°), "nauticalDusk" is nautical dusk (-12°) - these are correct
     nauticalDawn: isValidDate(times.nauticalDawn) ? times.nauticalDawn : new Date(date.setHours(5, 0, 0, 0)),
     nauticalDusk: isValidDate(times.nauticalDusk) ? times.nauticalDusk : new Date(date.setHours(19, 0, 0, 0)),
-    astronomicalDawn: calculateApproximateAstronomicalTime(times.astronomicalDawn, true),
-    astronomicalDusk: calculateApproximateAstronomicalTime(times.astronomicalDusk, false),
+    // SunCalc's "nightEnd" is astronomical dawn (-18°), "night" is astronomical dusk (-18°) 
+    astronomicalDawn: calculateApproximateAstronomicalTime(times.nightEnd, true),
+    astronomicalDusk: calculateApproximateAstronomicalTime(times.night, false),
   };
 };
 
