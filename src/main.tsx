@@ -6,14 +6,23 @@ import { registerSW } from 'virtual:pwa-register'
 
 createRoot(document.getElementById("root")!).render(<App />);
 
-// Register PWA service worker
+// Register PWA service worker with immediate updates
 const updateSW = registerSW({
+  immediate: true,
   onNeedRefresh() {
-    if (confirm('New content available. Reload?')) {
-      updateSW(true)
-    }
+    console.log('New content available, updating...')
+    updateSW(true)
   },
   onOfflineReady() {
     console.log('App ready to work offline')
+  },
+  onRegisteredSW(swUrl, r) {
+    console.log('SW registered: ' + swUrl)
+    if (r) {
+      // Force update check every 60 seconds
+      setInterval(() => {
+        r.update()
+      }, 60000)
+    }
   },
 })

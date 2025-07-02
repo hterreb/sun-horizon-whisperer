@@ -18,6 +18,9 @@ export default defineConfig(({ mode }) => ({
       registerType: 'autoUpdate',
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        cleanupOutdatedCaches: true,
+        skipWaiting: true,
+        clientsClaim: true,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/api\.open-meteo\.com\/.*/i,
@@ -30,10 +33,23 @@ export default defineConfig(({ mode }) => ({
               },
             },
           },
+          // Force icon cache invalidation
+          {
+            urlPattern: /\.(ico|png|svg)$/,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'icons-cache-v2',
+              expiration: {
+                maxEntries: 20,
+                maxAgeSeconds: 60 * 60 * 24, // 24 hours
+              },
+            },
+          },
         ],
       },
-      includeAssets: ['favicon.ico', 'icon-192.png', 'icon-512.png'],
+      includeAssets: ['favicon.ico', 'icon-192.png', 'icon-512.png', 'icon-144.png'],
       manifest: {
+        id: '/',
         name: 'Sun Chaser',
         short_name: 'Sun Chaser',
         description: 'Track the sun and moon positions with real-time weather',
@@ -42,28 +58,28 @@ export default defineConfig(({ mode }) => ({
         display: 'standalone',
         orientation: 'any',
         scope: '/',
-        start_url: '/',
+        start_url: '/?v=2.0',
         icons: [
           {
-            src: '/icon-192.png',
+            src: '/icon-192.png?v=2.0',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any'
           },
           {
-            src: '/icon-192.png',
+            src: '/icon-192.png?v=2.0',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'maskable'
           },
           {
-            src: '/icon-512.png',
+            src: '/icon-512.png?v=2.0',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any'
           },
           {
-            src: '/icon-512.png',
+            src: '/icon-512.png?v=2.0',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable'
