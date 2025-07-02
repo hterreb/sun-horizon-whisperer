@@ -6,7 +6,8 @@ import {
   type LocationData, 
   type TimeOfDay,
   formatTime,
-  getTimeOfDayLabel 
+  getTimeOfDayLabel,
+  getRelevantTwilightTimes 
 } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhaseLabel } from '../utils/moonUtils';
 import { type WeatherData } from '../utils/weatherUtils';
@@ -150,6 +151,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   }, [location.latitude, location.longitude, location.loaded]);
 
   if (!sunTimes) return null;
+
+  const relevantTwilightTimes = getRelevantTwilightTimes(currentTime, sunTimes);
 
   const weatherOptions: { type: WeatherType; label: string; icon: React.ReactNode }[] = [
     { type: 'clear', label: 'Clear', icon: <Sun size={16} /> },
@@ -362,10 +365,12 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             </div>
           )}
           
-          {/* Twilight times - collapsible */}
+          {/* Upcoming twilight times - collapsible */}
           <div className="mt-6 pt-4 border-t border-white border-opacity-20">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-bold">Twilight Times</h3>
+              <h3 className="text-sm font-bold">
+                Upcoming {relevantTwilightTimes.type === 'dawn' ? 'Dawn' : 'Dusk'} Times
+              </h3>
               <button
                 onClick={() => setIsTwilightCollapsed(!isTwilightCollapsed)}
                 className="p-1 rounded hover:bg-white hover:bg-opacity-10 transition-colors"
@@ -378,18 +383,24 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             <div className={`transition-all duration-300 ease-in-out ${
               isTwilightCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-32 opacity-100'
             }`}>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                <div>
-                  <div className="font-semibold">Civil</div>
-                  <div className="opacity-80">{formatTime(sunTimes.dawn)} - {formatTime(sunTimes.dusk)}</div>
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="font-semibold">Astronomical {relevantTwilightTimes.type}:</span>
+                  <span className="font-mono">{formatTime(relevantTwilightTimes.astronomical)}</span>
                 </div>
-                <div>
-                  <div className="font-semibold">Nautical</div>
-                  <div className="opacity-80">{formatTime(sunTimes.nauticalDawn)} - {formatTime(sunTimes.nauticalDusk)}</div>
+                <div className="flex justify-between">
+                  <span className="font-semibold">Nautical {relevantTwilightTimes.type}:</span>
+                  <span className="font-mono">{formatTime(relevantTwilightTimes.nautical)}</span>
                 </div>
-                <div className="sm:col-span-2">
-                  <div className="font-semibold">Astronomical</div>
-                  <div className="opacity-80">{formatTime(sunTimes.astronomicalDawn)} - {formatTime(sunTimes.astronomicalDusk)}</div>
+                <div className="flex justify-between">
+                  <span className="font-semibold">Civil {relevantTwilightTimes.type}:</span>
+                  <span className="font-mono">{formatTime(relevantTwilightTimes.civil)}</span>
+                </div>
+                <div className="text-xs opacity-60 mt-2">
+                  {relevantTwilightTimes.type === 'dawn' ? 
+                    'Astronomical (-18°) → Nautical (-12°) → Civil (-6°) → Sunrise (0°)' :
+                    'Sunset (0°) → Civil (-6°) → Nautical (-12°) → Astronomical (-18°)'
+                  }
                 </div>
               </div>
             </div>
