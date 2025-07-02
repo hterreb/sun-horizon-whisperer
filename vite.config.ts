@@ -39,7 +39,7 @@ export default defineConfig(({ mode }) => ({
         description: 'Track the sun and moon positions with real-time weather',
         theme_color: '#33C3F0',
         background_color: '#0F0E11',
-        display: 'fullscreen',
+        display: 'standalone',
         orientation: 'any',
         scope: '/',
         start_url: '/',
@@ -48,13 +48,25 @@ export default defineConfig(({ mode }) => ({
             src: '/icon-192.png',
             sizes: '192x192',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'any'
           },
           {
-            src: '/icon-512.png', 
+            src: '/icon-192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'maskable'
+          },
+          {
+            src: '/icon-512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'any'
+          },
+          {
+            src: '/icon-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
           }
         ],
         categories: ['weather', 'utilities', 'lifestyle'],
