@@ -66,6 +66,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
     
     // Lo-fi hip hop radio streams
     const streams = [
+      'https://fluxfm.streamabc.net/flx-chillhop-mp3-320-1595440',
       'https://streams.ilovemusic.de/iloveradio17.mp3', // ILoveRadio Lo-Fi
       'https://radio.lofihiphop.com/lofi', // Dedicated lo-fi stream
       'https://streaming.radionomy.com/lofi-hip-hop', // Radionomy lo-fi
