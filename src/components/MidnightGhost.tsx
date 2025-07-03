@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Ghost } from 'lucide-react';
 
 interface MidnightGhostProps {
   currentTime: Date;
@@ -15,10 +16,10 @@ const MidnightGhost: React.FC<MidnightGhostProps> = ({ currentTime }) => {
   useEffect(() => {
     if (isMidnight) {
       setIsVisible(true);
-      // Hide the ghost after 60 seconds
+      // Hide the ghost after 10 seconds
       const hideTimer = setTimeout(() => {
         setIsVisible(false);
-      }, 60000);
+      }, 10000);
 
       return () => clearTimeout(hideTimer);
     } else {
@@ -68,36 +69,15 @@ const MidnightGhost: React.FC<MidnightGhostProps> = ({ currentTime }) => {
         opacity: isVisible ? 0.8 : 0
       }}
     >
-      {/* Ghost SVG */}
+      {/* Ghost Icon with effects */}
       <div className="relative animate-pulse">
-        <svg
-          width="80"
-          height="100"
-          viewBox="0 0 80 100"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          className="drop-shadow-lg"
-        >
-          {/* Ghost body */}
-          <path
-            d="M40 10 C20 10, 10 25, 10 40 L10 75 C10 80, 15 85, 20 85 C25 80, 30 85, 35 85 C40 80, 45 85, 50 85 C55 80, 60 85, 65 85 C70 80, 70 75, 70 75 L70 40 C70 25, 60 10, 40 10 Z"
-            fill="rgba(255, 255, 255, 0.9)"
-            stroke="rgba(200, 200, 255, 0.3)"
-            strokeWidth="2"
-          />
-          
-          {/* Eyes */}
-          <circle cx="28" cy="35" r="4" fill="#000" />
-          <circle cx="52" cy="35" r="4" fill="#000" />
-          
-          {/* Eye highlights */}
-          <circle cx="29" cy="33" r="1.5" fill="rgba(255, 255, 255, 0.8)" />
-          <circle cx="53" cy="33" r="1.5" fill="rgba(255, 255, 255, 0.8)" />
-          
-          {/* Mouth */}
-          <ellipse cx="40" cy="50" rx="8" ry="6" fill="#000" />
-          <ellipse cx="40" cy="48" rx="6" ry="4" fill="rgba(255, 255, 255, 0.9)" />
-        </svg>
+        <Ghost 
+          size={64} 
+          className="text-white drop-shadow-lg"
+          style={{
+            filter: 'drop-shadow(0 0 20px rgba(255,255,255,0.6))'
+          }}
+        />
         
         {/* Spooky glow effect */}
         <div 
@@ -107,17 +87,6 @@ const MidnightGhost: React.FC<MidnightGhostProps> = ({ currentTime }) => {
             transform: 'scale(1.5)'
           }}
         />
-        
-        {/* Floating "BOO!" text */}
-        <div 
-          className="absolute -top-8 left-1/2 transform -translate-x-1/2 text-white text-lg font-bold animate-bounce"
-          style={{
-            textShadow: '2px 2px 4px rgba(0,0,0,0.5)',
-            animation: 'bounce 2s infinite'
-          }}
-        >
-          BOO!
-        </div>
       </div>
       
       {/* Floating particles around ghost */}
