@@ -19,6 +19,7 @@ import NightStars from './NightStars';
 import MusicPlayer from './MusicPlayer';
 import FullscreenButton from './FullscreenButton';
 import PWAInstallPrompt from './PWAInstallPrompt';
+import MidnightGhost from './MidnightGhost';
 import { type WeatherType } from './CloudLayer';
 import { toast } from '@/components/ui/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -324,6 +325,7 @@ const SunTracker: React.FC = () => {
       <MusicPlayer isFullscreen={isFullscreen} />
       <FullscreenButton onFullscreenChange={handleFullscreenChange} />
       <PWAInstallPrompt />
+      <MidnightGhost currentTime={date} />
       
       {location.loaded ? (
         <>
