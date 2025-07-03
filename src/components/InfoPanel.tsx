@@ -54,6 +54,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   const [isTwilightCollapsed, setIsTwilightCollapsed] = useState(false);
   const [isSunPositionCollapsed, setIsSunPositionCollapsed] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
+  const [showDegreeInfo, setShowDegreeInfo] = useState(false);
   const fadeTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   // Handle fade out in fullscreen
@@ -162,6 +163,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     { type: 'storm', label: 'Storm', icon: <CloudLightning size={16} /> },
     { type: 'snow', label: 'Snow', icon: <CloudSnow size={16} /> },
   ];
+
+  const handleDegreeInfoToggle = () => {
+    setShowDegreeInfo(!showDegreeInfo);
+  };
 
   return (
     <div 
@@ -415,11 +420,20 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                     </div>
                   </>
                 )}
-                <div className="text-xs opacity-60 mt-2">
-                  {relevantTwilightTimes.type === 'dawn' ? 
-                    'Astronomical (-18°) → Nautical (-12°) → Civil (-6°) → Sunrise (0°)' :
-                    'Sunset (0°) → Civil (-6°) → Nautical (-12°) → Astronomical (-18°)'
-                  }
+                <div 
+                  className="text-xs opacity-60 mt-2 cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={handleDegreeInfoToggle}
+                  onMouseEnter={() => setShowDegreeInfo(true)}
+                  onMouseLeave={() => setShowDegreeInfo(false)}
+                  title="Click or hover to show degree information"
+                >
+                  {showDegreeInfo ? (
+                    relevantTwilightTimes.type === 'dawn' ? 
+                      'Astronomical (-18°) → Nautical (-12°) → Civil (-6°) → Sunrise (0°)' :
+                      'Sunset (0°) → Civil (-6°) → Nautical (-12°) → Astronomical (-18°)'
+                  ) : (
+                    'Hover or click for degree information'
+                  )}
                 </div>
               </div>
             </div>
