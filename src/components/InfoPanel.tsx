@@ -54,7 +54,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   const [isTwilightCollapsed, setIsTwilightCollapsed] = useState(false);
   const [isSunPositionCollapsed, setIsSunPositionCollapsed] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
-  const [showDegreeInfo, setShowDegreeInfo] = useState(false);
+  const [hoveredTwilight, setHoveredTwilight] = useState<string | null>(null);
   const fadeTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   // Handle fade out in fullscreen
@@ -164,8 +164,30 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     { type: 'snow', label: 'Snow', icon: <CloudSnow size={16} /> },
   ];
 
-  const handleDegreeInfoToggle = () => {
-    setShowDegreeInfo(!showDegreeInfo);
+  const getDegreeInfo = (twilightType: string) => {
+    if (relevantTwilightTimes.type === 'dusk') {
+      switch (twilightType) {
+        case 'civil':
+          return 'Sunset (0°) → Civil (-6°)';
+        case 'nautical':
+          return 'Civil (-6°) → Nautical (-12°)';
+        case 'astronomical':
+          return 'Nautical (-12°) → Astronomical (-18°)';
+        default:
+          return '';
+      }
+    } else {
+      switch (twilightType) {
+        case 'astronomical':
+          return 'Astronomical (-18°) → Nautical (-12°)';
+        case 'nautical':
+          return 'Nautical (-12°) → Civil (-6°)';
+        case 'civil':
+          return 'Civil (-6°) → Sunrise (0°)';
+        default:
+          return '';
+      }
+    }
   };
 
   return (
@@ -392,49 +414,112 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 {relevantTwilightTimes.type === 'dusk' ? (
                   <>
                     <div className="flex justify-between">
-                      <span className="font-semibold">Civil:</span>
+                      <span 
+                        className="font-semibold cursor-pointer hover:opacity-80 transition-opacity"
+                        onMouseEnter={() => setHoveredTwilight('civil')}
+                        onMouseLeave={() => setHoveredTwilight(null)}
+                        onClick={() => setHoveredTwilight(hoveredTwilight === 'civil' ? null : 'civil')}
+                        title="Click or hover for degree information"
+                      >
+                        Civil:
+                      </span>
                       <span className="font-mono">{formatTime(sunTimes.sunset)} - {formatTime(relevantTwilightTimes.civil)}</span>
                     </div>
+                    {hoveredTwilight === 'civil' && (
+                      <div className="text-xs opacity-60 ml-2">
+                        {getDegreeInfo('civil')}
+                      </div>
+                    )}
                     <div className="flex justify-between">
-                      <span className="font-semibold">Nautical:</span>
+                      <span 
+                        className="font-semibold cursor-pointer hover:opacity-80 transition-opacity"
+                        onMouseEnter={() => setHoveredTwilight('nautical')}
+                        onMouseLeave={() => setHoveredTwilight(null)}
+                        onClick={() => setHoveredTwilight(hoveredTwilight === 'nautical' ? null : 'nautical')}
+                        title="Click or hover for degree information"
+                      >
+                        Nautical:
+                      </span>
                       <span className="font-mono">{formatTime(relevantTwilightTimes.civil)} - {formatTime(relevantTwilightTimes.nautical)}</span>
                     </div>
+                    {hoveredTwilight === 'nautical' && (
+                      <div className="text-xs opacity-60 ml-2">
+                        {getDegreeInfo('nautical')}
+                      </div>
+                    )}
                     <div className="flex justify-between">
-                      <span className="font-semibold">Astronomical:</span>
+                      <span 
+                        className="font-semibold cursor-pointer hover:opacity-80 transition-opacity"
+                        onMouseEnter={() => setHoveredTwilight('astronomical')}
+                        onMouseLeave={() => setHoveredTwilight(null)}
+                        onClick={() => setHoveredTwilight(hoveredTwilight === 'astronomical' ? null : 'astronomical')}
+                        title="Click or hover for degree information"
+                      >
+                        Astronomical:
+                      </span>
                       <span className="font-mono">{formatTime(relevantTwilightTimes.nautical)} - {formatTime(relevantTwilightTimes.astronomical)}</span>
                     </div>
+                    {hoveredTwilight === 'astronomical' && (
+                      <div className="text-xs opacity-60 ml-2">
+                        {getDegreeInfo('astronomical')}
+                      </div>
+                    )}
                   </>
                 ) : (
                   <>
                     <div className="flex justify-between">
-                      <span className="font-semibold">Astronomical:</span>
+                      <span 
+                        className="font-semibold cursor-pointer hover:opacity-80 transition-opacity"
+                        onMouseEnter={() => setHoveredTwilight('astronomical')}
+                        onMouseLeave={() => setHoveredTwilight(null)}
+                        onClick={() => setHoveredTwilight(hoveredTwilight === 'astronomical' ? null : 'astronomical')}
+                        title="Click or hover for degree information"
+                      >
+                        Astronomical:
+                      </span>
                       <span className="font-mono">{formatTime(relevantTwilightTimes.astronomical)} - {formatTime(relevantTwilightTimes.nautical)}</span>
                     </div>
+                    {hoveredTwilight === 'astronomical' && (
+                      <div className="text-xs opacity-60 ml-2">
+                        {getDegreeInfo('astronomical')}
+                      </div>
+                    )}
                     <div className="flex justify-between">
-                      <span className="font-semibold">Nautical:</span>
+                      <span 
+                        className="font-semibold cursor-pointer hover:opacity-80 transition-opacity"
+                        onMouseEnter={() => setHoveredTwilight('nautical')}
+                        onMouseLeave={() => setHoveredTwilight(null)}
+                        onClick={() => setHoveredTwilight(hoveredTwilight === 'nautical' ? null : 'nautical')}
+                        title="Click or hover for degree information"
+                      >
+                        Nautical:
+                      </span>
                       <span className="font-mono">{formatTime(relevantTwilightTimes.nautical)} - {formatTime(relevantTwilightTimes.civil)}</span>
                     </div>
+                    {hoveredTwilight === 'nautical' && (
+                      <div className="text-xs opacity-60 ml-2">
+                        {getDegreeInfo('nautical')}
+                      </div>
+                    )}
                     <div className="flex justify-between">
-                      <span className="font-semibold">Civil:</span>
+                      <span 
+                        className="font-semibold cursor-pointer hover:opacity-80 transition-opacity"
+                        onMouseEnter={() => setHoveredTwilight('civil')}
+                        onMouseLeave={() => setHoveredTwilight(null)}
+                        onClick={() => setHoveredTwilight(hoveredTwilight === 'civil' ? null : 'civil')}
+                        title="Click or hover for degree information"
+                      >
+                        Civil:
+                      </span>
                       <span className="font-mono">{formatTime(relevantTwilightTimes.civil)} - {formatTime(sunTimes.sunrise)}</span>
                     </div>
+                    {hoveredTwilight === 'civil' && (
+                      <div className="text-xs opacity-60 ml-2">
+                        {getDegreeInfo('civil')}
+                      </div>
+                    )}
                   </>
                 )}
-                <div 
-                  className="text-xs opacity-60 mt-2 cursor-pointer hover:opacity-80 transition-opacity"
-                  onClick={handleDegreeInfoToggle}
-                  onMouseEnter={() => setShowDegreeInfo(true)}
-                  onMouseLeave={() => setShowDegreeInfo(false)}
-                  title="Click or hover to show degree information"
-                >
-                  {showDegreeInfo ? (
-                    relevantTwilightTimes.type === 'dawn' ? 
-                      'Astronomical (-18°) → Nautical (-12°) → Civil (-6°) → Sunrise (0°)' :
-                      'Sunset (0°) → Civil (-6°) → Nautical (-12°) → Astronomical (-18°)'
-                  ) : (
-                    'Hover or click for degree information'
-                  )}
-                </div>
               </div>
             </div>
           </div>
