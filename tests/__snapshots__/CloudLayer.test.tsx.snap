@@ -1,0 +1,150 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`CloudLayer > shows fish during rain 1`] = `
+NodeList [
+  <svg
+    fill="none"
+    height="60"
+    viewBox="0 0 120 60"
+    width="120"
+  >
+    <path
+      class="transition-colors duration-[5000ms]"
+      d="M0 35 Q30 15 60 30 Q90 10 120 25 Q120 50 90 55 Q60 60 30 55 Q0 50 0 35Z"
+      fill="rgba(100, 100, 110, 0.85)"
+    />
+  </svg>,
+  <svg
+    fill="none"
+    height="60"
+    viewBox="0 0 120 60"
+    width="120"
+  >
+    <path
+      class="transition-colors duration-[5000ms]"
+      d="M0 35 Q30 15 60 30 Q90 10 120 25 Q120 50 90 55 Q60 60 30 55 Q0 50 0 35Z"
+      fill="rgba(100, 100, 110, 0.85)"
+    />
+  </svg>,
+  <svg
+    fill="none"
+    height="60"
+    viewBox="0 0 120 60"
+    width="120"
+  >
+    <path
+      class="transition-colors duration-[5000ms]"
+      d="M0 35 Q30 15 60 30 Q90 10 120 25 Q120 50 90 55 Q60 60 30 55 Q0 50 0 35Z"
+      fill="rgba(100, 100, 110, 0.85)"
+    />
+  </svg>,
+  <svg
+    fill="none"
+    height="60"
+    viewBox="0 0 120 60"
+    width="120"
+  >
+    <path
+      class="transition-colors duration-[5000ms]"
+      d="M0 35 Q30 15 60 30 Q90 10 120 25 Q120 50 90 55 Q60 60 30 55 Q0 50 0 35Z"
+      fill="rgba(100, 100, 110, 0.85)"
+    />
+  </svg>,
+  <svg
+    fill="none"
+    height="60"
+    viewBox="0 0 120 60"
+    width="120"
+  >
+    <path
+      class="transition-colors duration-[5000ms]"
+      d="M0 35 Q30 15 60 30 Q90 10 120 25 Q120 50 90 55 Q60 60 30 55 Q0 50 0 35Z"
+      fill="rgba(100, 100, 110, 0.85)"
+    />
+  </svg>,
+  <svg
+    fill="none"
+    height="60"
+    viewBox="0 0 120 60"
+    width="120"
+  >
+    <path
+      class="transition-colors duration-[5000ms]"
+      d="M0 35 Q30 15 60 30 Q90 10 120 25 Q120 50 90 55 Q60 60 30 55 Q0 50 0 35Z"
+      fill="rgba(100, 100, 110, 0.85)"
+    />
+  </svg>,
+  <svg
+    fill="none"
+    height="60"
+    viewBox="0 0 120 60"
+    width="120"
+  >
+    <path
+      class="transition-colors duration-[5000ms]"
+      d="M0 35 Q30 15 60 30 Q90 10 120 25 Q120 50 90 55 Q60 60 30 55 Q0 50 0 35Z"
+      fill="rgba(100, 100, 110, 0.85)"
+    />
+  </svg>,
+  <svg
+    fill="none"
+    height="60"
+    viewBox="0 0 120 60"
+    width="120"
+  >
+    <path
+      class="transition-colors duration-[5000ms]"
+      d="M0 35 Q30 15 60 30 Q90 10 120 25 Q120 50 90 55 Q60 60 30 55 Q0 50 0 35Z"
+      fill="rgba(100, 100, 110, 0.85)"
+    />
+  </svg>,
+  <svg
+    fill="none"
+    height="60"
+    viewBox="0 0 120 60"
+    width="120"
+  >
+    <path
+      class="transition-colors duration-[5000ms]"
+      d="M0 35 Q30 15 60 30 Q90 10 120 25 Q120 50 90 55 Q60 60 30 55 Q0 50 0 35Z"
+      fill="rgba(100, 100, 110, 0.85)"
+    />
+  </svg>,
+  <svg
+    fill="none"
+    height="60"
+    viewBox="0 0 120 60"
+    width="120"
+  >
+    <path
+      class="transition-colors duration-[5000ms]"
+      d="M0 35 Q30 15 60 30 Q90 10 120 25 Q120 50 90 55 Q60 60 30 55 Q0 50 0 35Z"
+      fill="rgba(100, 100, 110, 0.85)"
+    />
+  </svg>,
+  <svg
+    fill="none"
+    height="60"
+    viewBox="0 0 120 60"
+    width="120"
+  >
+    <path
+      class="transition-colors duration-[5000ms]"
+      d="M0 35 Q30 15 60 30 Q90 10 120 25 Q120 50 90 55 Q60 60 30 55 Q0 50 0 35Z"
+      fill="rgba(100, 100, 110, 0.85)"
+    />
+  </svg>,
+  <svg
+    fill="none"
+    height="60"
+    viewBox="0 0 120 60"
+    width="120"
+  >
+    <path
+      class="transition-colors duration-[5000ms]"
+      d="M0 35 Q30 15 60 30 Q90 10 120 25 Q120 50 90 55 Q60 60 30 55 Q0 50 0 35Z"
+      fill="rgba(100, 100, 110, 0.85)"
+    />
+  </svg>,
+]
+`;
