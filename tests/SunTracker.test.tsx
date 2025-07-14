@@ -39,7 +39,7 @@ describe('SunTracker', () => {
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 1, longitude: 2 } }) } });
     render(<SunTracker />);
     // Wait for InfoPanel and SunVisualization to appear
-    await waitFor(() => expect(screen.getByTestId('info-panel')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { name: /midday/i })).toBeInTheDocument());
     await waitFor(() => expect(screen.getByTestId('sun-visualization')).toBeInTheDocument());
   });
 
