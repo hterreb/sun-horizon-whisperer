@@ -191,18 +191,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   };
 
   return (
-    <div
-      data-testid="info-panel"
-      className={
-        `fixed bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-black/80 to-black/30 text-white p-4 sm:p-6 rounded-t-2xl shadow-2xl border-t border-white/10 transition-all duration-500 ${
-          isFullscreen ? 'opacity-90' : 'opacity-100'
-        } ${isVisible ? '' : 'opacity-0 pointer-events-none'}`
-      }
-      style={{
-        maxWidth: 600,
-        margin: '0 auto',
-        pointerEvents: isVisible ? 'auto' : 'none',
-      }}
+    <div 
+      className={`absolute top-0 right-0 w-full max-w-[300px] sm:w-[300px] bg-black bg-opacity-40 backdrop-blur-md text-white rounded-bl-lg overflow-hidden transition-opacity duration-300 ${
+        isVisible ? 'opacity-100' : 'opacity-0'
+      }`}
+      onMouseEnter={handleMouseEnter}
     >
       {/* Header with toggle button */}
       <div className="p-4 pb-2 flex items-start justify-between">
