@@ -37,7 +37,10 @@ describe('InfoPanel', () => {
 
   it('renders InfoPanel root', () => {
     render(<InfoPanel {...defaultProps} />);
-    expect(screen.getByTestId('info-panel')).toBeInTheDocument();
+    // Check for the heading with the time of day label (e.g., 'Midday')
+    expect(screen.getByRole('heading', { name: /midday/i })).toBeInTheDocument();
+    // Or check for 'Weather Mode' section
+    expect(screen.getByText(/weather mode/i)).toBeInTheDocument();
   });
 
   // More tests for collapse/expand, weather options, etc.
@@ -45,7 +48,7 @@ describe('InfoPanel', () => {
   it('collapses and expands sections', () => {
     render(<InfoPanel {...defaultProps} />);
     // Simulate click to collapse/expand
-    // fireEvent.click(screen.getByTestId('collapse-toggle'));
+    // fireEvent.click(screen.getByLabelText(/collapse info panel/i));
     // Check for expanded/collapsed state
   });
 
@@ -59,7 +62,7 @@ describe('InfoPanel', () => {
 
   it('weather options and icons are displayed and selectable', () => {
     render(<InfoPanel {...defaultProps} />);
-    // fireEvent.click(screen.getByTestId('weather-option-rain'));
+    // fireEvent.click(screen.getByText(/rain/i));
     // Check for selection
   });
 
