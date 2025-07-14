@@ -127,7 +127,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
             if (Math.random() < 0.8) { // 80% chance to spawn
               const newBird = {
                 id: Date.now() + Math.random(),
-                x: -10,
+                x: -30, // Changed from -10 to -30 to start fully off-screen
                 y: 20 + Math.random() * 30
               };
               debugLog('Spawning new bird', newBird);
@@ -145,7 +145,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
             const updated = prevBirds
               .map(bird => ({
                 ...bird,
-                x: bird.x + 0.15 // Reduced from 0.3 (half speed)
+                x: bird.x + 0.08 // Reduced for slower movement
               }))
               .filter(bird => {
                 const keep = bird.x < 110;
@@ -194,7 +194,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
             const updated = prevFish
               .map(fish => ({
                 ...fish,
-                x: fish.x + 0.075 // Reduced from 0.15 (half speed)
+                x: fish.x + 0.04 // Reduced for slower movement
               }))
               .filter(fish => {
                 const keep = fish.x < 105;
