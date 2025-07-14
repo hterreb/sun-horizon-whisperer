@@ -111,7 +111,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
         // Make birds and fish visible in more weather conditions
         const shouldShowBirds = weatherType === 'clear' || weatherType === 'cloudy' || weatherType === 'overcast';
         // Fish should not appear during night time periods
-        const shouldShowFish = (weatherType === 'clear' || weatherType === 'cloudy' || weatherType === 'overcast') &&
+        const shouldShowFish = (weatherType === 'clear' || weatherType === 'cloudy' || weatherType === 'overcast' || weatherType === 'rain') &&
                               timeOfDay !== 'night' && 
                               timeOfDay !== 'astronomical-twilight' && 
                               timeOfDay !== 'nautical-twilight';
