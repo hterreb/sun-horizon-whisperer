@@ -125,9 +125,16 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
           // Spawn birds every 3-5 seconds
           if (currentTime - lastSpawnTimeRef.current.birds > 3000 + Math.random() * 2000) {
             if (Math.random() < 0.8) { // 80% chance to spawn
+              // Dynamically calculate the off-screen start position for the bird
+              const birdSvgWidth = 300; // px
+              const birdScale = (timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight') ? 0.5 : 0.3;
+              const scaledBirdWidth = birdSvgWidth * birdScale;
+              const viewportWidth = window.innerWidth;
+              // Convert scaled width to percent of viewport
+              const offscreenPercent = -(scaledBirdWidth / viewportWidth) * 100;
               const newBird = {
                 id: Date.now() + Math.random(),
-                x: -30, // Changed from -10 to -30 to start fully off-screen
+                x: offscreenPercent, // Dynamically calculated to start fully off-screen
                 y: 20 + Math.random() * 30
               };
               debugLog('Spawning new bird', newBird);
@@ -437,7 +444,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
           style={{
             left: `${bird.x}%`,
             top: `${bird.y}%`,
-            transform: isNightTime ? 'scale(0.5)' : 'scale(0.3)',
+            transform: `${isNightTime ? 'scale(0.5)' : 'scale(0.3)'} translateX(-100%)`,
             zIndex: 10
           }}
         >
