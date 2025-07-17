@@ -372,6 +372,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
 
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <div data-testid="iceberg" />
       {getOvercastLayer()}
       
       {/* Clouds */}
@@ -509,7 +510,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
             left: `${ship.x}%`,
             top: `${ship.y}%`,
             transform: 'scale(1.4)',
-            zIndex: 6
+            zIndex: 7
           }}
         >
           <Ship 
