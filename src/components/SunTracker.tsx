@@ -20,6 +20,7 @@ import MusicPlayer from './MusicPlayer';
 import FullscreenButton from './FullscreenButton';
 import PWAInstallPrompt from './PWAInstallPrompt';
 import MidnightGhost from './MidnightGhost';
+import TemperatureIceberg from './TemperatureIceberg';
 import { type WeatherType } from './CloudLayer';
 import { toast } from '@/components/ui/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -326,6 +327,10 @@ const SunTracker: React.FC = () => {
       <FullscreenButton onFullscreenChange={handleFullscreenChange} />
       <PWAInstallPrompt />
       <MidnightGhost currentTime={date} />
+      <TemperatureIceberg 
+        temperature={weatherData?.temperature || 20} 
+        isVisible={location.loaded && weatherData !== null} 
+      />
       
       {location.loaded ? (
         <>
