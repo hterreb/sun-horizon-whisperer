@@ -231,6 +231,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
         <div className="flex-1 min-h-0">
           <ScrollArea className="max-h-[calc(100vh-120px)]">
             <div className="px-4 pb-4">
+          <ScrollArea className="max-h-[calc(100vh-120px)]">
+            <div className="px-4 pb-4">
           {/* Current Weather Display */}
           {weatherData && (
             <div className="mb-4 pt-2 border-t border-white border-opacity-20">
@@ -553,6 +555,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               </div>
             </div>
           </div>
+            </div>
+          </ScrollArea>
             </div>
           </ScrollArea>
         </div>
