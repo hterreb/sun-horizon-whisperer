@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, CloudRain, CloudSnow, CloudSun, Sun, CloudLightning, Moon, RefreshCw, Thermometer } from 'lucide-react';
+import { ScrollArea } from './ui/scroll-area';
 import { 
   type SunPosition, 
   type SunTimes, 
@@ -192,13 +193,13 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
   return (
     <div 
-      className={`absolute top-0 right-0 w-full max-w-[300px] sm:w-[300px] bg-black bg-opacity-40 backdrop-blur-md text-white rounded-bl-lg overflow-hidden transition-opacity duration-300 ${
+      className={`absolute top-0 right-0 w-full max-w-[300px] sm:w-[300px] bg-black bg-opacity-40 backdrop-blur-md text-white rounded-bl-lg overflow-hidden transition-opacity duration-300 max-h-screen ${
         isVisible ? 'opacity-100' : 'opacity-0'
       }`}
       onMouseEnter={handleMouseEnter}
     >
       {/* Header with toggle button */}
-      <div className="p-4 pb-2 flex items-start justify-between">
+      <div className="p-4 pb-2 flex items-start justify-between flex-shrink-0">
         <div className="flex-1 min-w-0">
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight">{getTimeOfDayLabel(timeOfDay)}</h1>
           <div className="flex items-start text-sm opacity-80 mt-1">
@@ -227,9 +228,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
       
       {/* Collapsible content */}
       <div className={`transition-all duration-300 ease-in-out ${
-        isCollapsed ? 'max-h-0 opacity-0' : 'max-h-[800px] opacity-100'
+        isCollapsed ? 'max-h-0 opacity-0' : 'max-h-[calc(100vh-120px)] opacity-100'
       }`}>
-        <div className="px-4 pb-4">
+        <ScrollArea className="h-full">
+          <div className="px-4 pb-4">
           {/* Current Weather Display */}
           {weatherData && (
             <div className="mb-4 pt-2 border-t border-white border-opacity-20">
@@ -553,6 +555,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             </div>
           </div>
         </div>
+        </ScrollArea>
       </div>
     </div>
   );
