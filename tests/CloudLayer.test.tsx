@@ -1,10 +1,11 @@
 import React from 'react';
 import { render } from '@testing-library/react';
 import CloudLayer, { WeatherType } from '../src/components/CloudLayer';
+import type { TimeOfDay } from '../src/utils/sunUtils';
 
 describe('CloudLayer', () => {
   const renderLayer = (weatherType: WeatherType, timeOfDay: string) =>
-    render(<CloudLayer weatherType={weatherType} timeOfDay={timeOfDay as any} />);
+    render(<CloudLayer weatherType={weatherType} timeOfDay={timeOfDay as TimeOfDay} />);
 
   it('shows fish during rain', () => {
     const { container } = renderLayer('rain', 'midday');

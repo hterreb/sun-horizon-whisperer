@@ -10,19 +10,16 @@ createRoot(document.getElementById("root")!).render(<App />);
 const updateSW = registerSW({
   immediate: true,
   onNeedRefresh() {
-    console.log('New content available, updating...')
     updateSW(true)
   },
   onOfflineReady() {
-    console.log('App ready to work offline')
   },
   onRegisteredSW(swUrl, r) {
-    console.log('SW registered: ' + swUrl)
     if (r) {
-      // Force update check every 60 seconds
+      // Force update check every hour
       setInterval(() => {
         r.update()
-      }, 60000)
+      }, 60 * 60 * 1000)
     }
   },
 })

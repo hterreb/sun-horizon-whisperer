@@ -6,22 +6,20 @@ interface TemperatureIcebergProps {
 }
 
 const TemperatureIceberg: React.FC<TemperatureIcebergProps> = ({ temperature, isVisible }) => {
-  const [position, setPosition] = useState({ x: -10, y: 75 }); // Start off-screen left
-  const [direction, setDirection] = useState(1);
+  const [position, setPosition] = useState({ x: -10, y: 75, direction: 1 }); // Start off-screen left
 
   useEffect(() => {
     if (!isVisible || temperature >= 0) {
       // Reset position when not visible
-      setPosition({ x: -10, y: 75 });
-      setDirection(1);
+      setPosition({ x: -10, y: 75, direction: 1 });
       return;
     }
 
     // Floating animation - slower than ships
     const floatInterval = setInterval(() => {
       setPosition(prev => {
-        let newX = prev.x + (direction * 0.02); // Much slower than ships (0.04)
-        let newDirection = direction;
+        let newX = prev.x + (prev.direction * 0.02); // Much slower than ships (0.04)
+        let newDirection = prev.direction;
 
         // Bounce off edges (with margins for the iceberg size)
         if (newX >= 85) {
@@ -32,17 +30,16 @@ const TemperatureIceberg: React.FC<TemperatureIcebergProps> = ({ temperature, is
           newDirection = 1;
         }
 
-        setDirection(newDirection);
-
         return {
           x: newX,
-          y: prev.y + Math.sin(Date.now() * 0.001) * 0.2 // Gentle vertical float
+          y: prev.y + Math.sin(Date.now() * 0.001) * 0.2, // Gentle vertical float
+          direction: newDirection
         };
       });
     }, 100);
 
     return () => clearInterval(floatInterval);
-  }, [isVisible, temperature, direction]);
+  }, [isVisible, temperature]);
 
   if (!isVisible || temperature >= 0) {
     return null;
@@ -50,7 +47,7 @@ const TemperatureIceberg: React.FC<TemperatureIcebergProps> = ({ temperature, is
 
   return (
     <div 
-      className="absolute pointer-events-none z-6 transition-all duration-1000"
+      className="absolute pointer-events-none z-[6] transition-all duration-1000"
       style={{
         left: `${position.x}%`,
         top: `${position.y}%`,

@@ -10,13 +10,27 @@ interface SunVisualizationProps {
   moonPosition: MoonPosition;
   timeOfDay: TimeOfDay;
   weatherType: WeatherType;
+  latitude: number;
 }
 
-const SunVisualization: React.FC<SunVisualizationProps> = ({ 
-  sunPosition, 
+// Maps an azimuth (0-360°, 0 = North) to a horizontal screen fraction (0-1).
+// North hemisphere: sun/moon culminate at 180° (South), which already sits at the
+// center of a linear 0->left/360->right mapping, so no shift is needed.
+// South hemisphere: culmination is at 0°/360° (North), which would otherwise land on
+// the screen edge and jump edge-to-edge at noon. Shifting by 180° before mapping
+// centers the culmination instead.
+// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
+export const getAzimuthScreenFraction = (azimuth: number, latitude: number): number => {
+  const adjusted = latitude < 0 ? (azimuth + 180) % 360 : azimuth;
+  return adjusted / 360;
+};
+
+const SunVisualization: React.FC<SunVisualizationProps> = ({
+  sunPosition,
   moonPosition,
-  timeOfDay, 
-  weatherType 
+  timeOfDay,
+  weatherType,
+  latitude
 }) => {
   const [svgPath, setSvgPath] = useState<string>('');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -105,9 +119,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     // Map azimuth to horizontal position
     // 0° = North (top of screen), 90° = East (right), 180° = South (bottom), 270° = West (left)
     // But we want 0° at left edge, 180° at center, 360° at right edge for a typical sun path
-    // So we adjust: map azimuth directly to screen width
-    const azimuthNormalized = sunPosition.azimuth / 360;
-    const x = width * azimuthNormalized;
+    // So we adjust: map azimuth directly to screen width (shifted for southern hemisphere)
+    const x = width * getAzimuthScreenFraction(sunPosition.azimuth, latitude);
     
     return { 
       x: Math.max(30, Math.min(width - 30, x)), 
@@ -126,8 +139,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     const maxAltitudeHeight = horizonY - 30;
     const y = horizonY - (Math.sin(altitudeRadians) * maxAltitudeHeight);
     
-    const azimuthNormalized = moonPosition.azimuth / 360;
-    const x = width * azimuthNormalized;
+    const x = width * getAzimuthScreenFraction(moonPosition.azimuth, latitude);
     
     return { 
       x: Math.max(30, Math.min(width - 30, x)), 

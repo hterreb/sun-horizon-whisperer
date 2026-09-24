@@ -154,7 +154,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
   if (!sunTimes) return null;
 
-  const relevantTwilightTimes = getRelevantTwilightTimes(currentTime, sunTimes);
+  const relevantTwilightTimes = getRelevantTwilightTimes(currentTime, sunTimes, location.latitude, location.longitude);
 
   const weatherOptions: { type: WeatherType; label: string; icon: React.ReactNode }[] = [
     { type: 'clear', label: 'Clear', icon: <Sun size={16} /> },

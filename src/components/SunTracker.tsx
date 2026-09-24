@@ -52,12 +52,6 @@ const SunTracker: React.FC = () => {
   // Use wake lock when in fullscreen mode
   useWakeLock(isFullscreen);
 
-  // Debug logging for weather changes
-  console.log('[SunTracker Debug] Current weather type:', weatherType);
-  console.log('[SunTracker Debug] Current time of day:', timeOfDay);
-  console.log('[SunTracker Debug] Weather data:', weatherData);
-  console.log('[SunTracker Debug] Using real weather:', useRealWeather);
-
   // Handle cursor visibility in fullscreen
   useEffect(() => {
     if (isFullscreen) {
@@ -108,37 +102,16 @@ const SunTracker: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch weather data when location is available
-  useEffect(() => {
-    if (location.loaded && useRealWeather) {
-      fetchWeatherData();
-    }
-  }, [location.loaded, useRealWeather]);
-
-  // Auto-refresh weather every 30 minutes
-  useEffect(() => {
-    if (!location.loaded || !useRealWeather) return;
-
-    const weatherRefreshTimer = setInterval(() => {
-      console.log('[SunTracker Debug] Auto-refreshing weather data');
-      fetchWeatherData();
-    }, 30 * 60 * 1000); // 30 minutes
-
-    return () => clearInterval(weatherRefreshTimer);
-  }, [location.loaded, useRealWeather]);
-
-  const fetchWeatherData = async () => {
+  const fetchWeatherData = useCallback(async () => {
     if (!location.loaded) return;
 
     setIsLoadingWeather(true);
     try {
-      console.log('[SunTracker Debug] Fetching weather data...');
       const weather = await fetchCurrentWeather(location.latitude, location.longitude);
       setWeatherData(weather);
-      
+
       if (useRealWeather) {
         setWeatherType(weather.weatherType);
-        console.log('[SunTracker Debug] Weather type updated to:', weather.weatherType);
       }
 
       if (weather.isRealWeather) {
@@ -163,7 +136,25 @@ const SunTracker: React.FC = () => {
     } finally {
       setIsLoadingWeather(false);
     }
-  };
+  }, [location.loaded, location.latitude, location.longitude, useRealWeather]);
+
+  // Fetch weather data when location is available
+  useEffect(() => {
+    if (location.loaded && useRealWeather) {
+      fetchWeatherData();
+    }
+  }, [location.loaded, useRealWeather, fetchWeatherData]);
+
+  // Auto-refresh weather every 30 minutes
+  useEffect(() => {
+    if (!location.loaded || !useRealWeather) return;
+
+    const weatherRefreshTimer = setInterval(() => {
+      fetchWeatherData();
+    }, 30 * 60 * 1000); // 30 minutes
+
+    return () => clearInterval(weatherRefreshTimer);
+  }, [location.loaded, useRealWeather, fetchWeatherData]);
 
   useEffect(() => {
     const sunUpdateTimer = setInterval(() => {
@@ -185,33 +176,6 @@ const SunTracker: React.FC = () => {
     }, 30000);
     
     return () => clearInterval(sunUpdateTimer);
-  }, [location]);
-
-  useEffect(() => {
-    const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
-    
-    const msUntilMidnight = tomorrow.getTime() - now.getTime();
-    
-    const midnightTimer = setTimeout(() => {
-      if (location.loaded) {
-        const times = getSunTimes(new Date(), location.latitude, location.longitude);
-        setSunTimes(times);
-      }
-      
-      const dailyTimer = setInterval(() => {
-        if (location.loaded) {
-          const times = getSunTimes(new Date(), location.latitude, location.longitude);
-          setSunTimes(times);
-        }
-      }, 24 * 60 * 60 * 1000);
-      
-      return () => clearInterval(dailyTimer);
-    }, msUntilMidnight);
-    
-    return () => clearTimeout(midnightTimer);
   }, [location]);
 
   useEffect(() => {
@@ -261,17 +225,22 @@ const SunTracker: React.FC = () => {
       const sunPos = getSunPosition(date, location.latitude, location.longitude);
       const moonPos = getMoonPosition(date, location.latitude, location.longitude);
       const times = getSunTimes(date, location.latitude, location.longitude);
-      
+
       setSunPosition(sunPos);
       setMoonPosition(moonPos);
       setSunTimes(times);
-      
+
       if (times) {
         const tod = getTimeOfDay(date, times);
         setTimeOfDay(tod);
       }
     }
-  }, [location.loaded]);
+    // `date` is intentionally excluded: this effect only needs to run once when
+    // location first becomes available (the 30s interval effect above keeps
+    // sun/moon position in sync afterwards) — including `date` would re-run it
+    // every second.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.loaded, location.latitude, location.longitude]);
 
   const getBackgroundStyle = useCallback(() => {
     let baseGradient = getBackgroundGradient(timeOfDay);
@@ -292,13 +261,11 @@ const SunTracker: React.FC = () => {
   }, [timeOfDay, weatherType]);
 
   const handleWeatherChange = (newWeather: WeatherType) => {
-    console.log('[SunTracker Debug] Manual weather change from', weatherType, 'to', newWeather);
     setWeatherType(newWeather);
     setUseRealWeather(false);
   };
 
   const handleWeatherModeToggle = (useReal: boolean) => {
-    console.log('[SunTracker Debug] Weather mode toggle:', useReal ? 'real' : 'manual');
     setUseRealWeather(useReal);
     
     if (useReal && weatherData) {
@@ -307,12 +274,7 @@ const SunTracker: React.FC = () => {
   };
 
   const handleWeatherRefresh = () => {
-    console.log('[SunTracker Debug] Manual weather refresh requested');
     fetchWeatherData();
-  };
-
-  const handleFullscreenChange = (fullscreenState: boolean) => {
-    setIsFullscreen(fullscreenState);
   };
 
   return (
@@ -324,7 +286,7 @@ const SunTracker: React.FC = () => {
     >
       <NightStars timeOfDay={timeOfDay} moonPosition={moonPosition} />
       <MusicPlayer isFullscreen={isFullscreen} />
-      <FullscreenButton onFullscreenChange={handleFullscreenChange} />
+      <FullscreenButton onFullscreenChange={setIsFullscreen} />
       <PWAInstallPrompt />
       <MidnightGhost currentTime={date} />
       <TemperatureIceberg 
@@ -334,11 +296,12 @@ const SunTracker: React.FC = () => {
       
       {location.loaded ? (
         <>
-          <SunVisualization 
-            sunPosition={sunPosition} 
+          <SunVisualization
+            sunPosition={sunPosition}
             moonPosition={moonPosition}
             timeOfDay={timeOfDay}
             weatherType={weatherType}
+            latitude={location.latitude}
           />
           <InfoPanel 
             sunPosition={sunPosition}

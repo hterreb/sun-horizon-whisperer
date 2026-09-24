@@ -44,6 +44,11 @@ const FullscreenButton: React.FC<FullscreenButtonProps> = ({ onFullscreenChange 
     }
   };
 
+  // iPhone Safari has no Fullscreen API; render nothing rather than a button that does nothing.
+  if (document.fullscreenEnabled === false) {
+    return null;
+  }
+
   return (
     <Button
       variant="ghost"

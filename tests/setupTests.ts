@@ -14,8 +14,10 @@ global.window.matchMedia = global.window.matchMedia || function(query) {
   };
 };
 
-// Mock HTMLCanvasElement.getContext to avoid jsdom errors in canvas-based components
-HTMLCanvasElement.prototype.getContext = HTMLCanvasElement.prototype.getContext || (() => {
+// Mock HTMLCanvasElement.getContext to avoid jsdom errors in canvas-based components.
+// jsdom already defines getContext (as a throwing "Not implemented" stub), so it must
+// be overridden unconditionally rather than via `||`.
+HTMLCanvasElement.prototype.getContext = (() => {
   // Return a minimal mock context
   return {
     fillRect: () => {},
@@ -47,6 +49,15 @@ HTMLCanvasElement.prototype.getContext = HTMLCanvasElement.prototype.getContext 
     // Add more methods if needed
   };
 });
+
+// Stub HTMLMediaElement play/pause: jsdom does not implement them, which
+// otherwise logs "Not implemented" errors whenever a component (e.g.
+// MusicPlayer) calls them. Individual tests may still override `play` with
+// their own vi.spyOn to assert on call counts.
+HTMLMediaElement.prototype.play = function () {
+  return Promise.resolve();
+};
+HTMLMediaElement.prototype.pause = function () {};
 
 // Mock ResizeObserver for jsdom
 global.ResizeObserver =

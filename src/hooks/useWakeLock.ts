@@ -6,7 +6,6 @@ export const useWakeLock = (isActive: boolean) => {
 
   useEffect(() => {
     if (!('wakeLock' in navigator)) {
-      console.log('Wake Lock API not supported');
       return;
     }
 
@@ -14,11 +13,14 @@ export const useWakeLock = (isActive: boolean) => {
       try {
         if (isActive && !wakeLockRef.current) {
           wakeLockRef.current = await navigator.wakeLock.request('screen');
-          console.log('Screen wake lock activated');
+          // The browser can release the lock on its own (e.g. tab hidden); null the ref
+          // so the visibilitychange handler below knows to re-acquire it.
+          wakeLockRef.current.addEventListener('release', () => {
+            wakeLockRef.current = null;
+          });
         } else if (!isActive && wakeLockRef.current) {
           await wakeLockRef.current.release();
           wakeLockRef.current = null;
-          console.log('Screen wake lock released');
         }
       } catch (error) {
         console.error('Wake lock error:', error);

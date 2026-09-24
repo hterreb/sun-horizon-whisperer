@@ -93,29 +93,24 @@ const cacheWeather = (data: WeatherData, latitude: number, longitude: number): v
 };
 
 export const fetchCurrentWeather = async (latitude: number, longitude: number): Promise<WeatherData> => {
-  console.log(`[Weather Debug] Fetching weather for lat: ${latitude}, lon: ${longitude}`);
-  
   // Check cache first
   const cachedWeather = getCachedWeather(latitude, longitude);
   if (cachedWeather) {
-    console.log('[Weather Debug] Using cached weather data');
     return cachedWeather;
   }
-  
+
   try {
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`;
-    console.log('[Weather Debug] Fetching from API:', url);
-    
+
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`Weather API error: ${response.status}`);
     }
-    
+
     const data: OpenMeteoResponse = await response.json();
-    console.log('[Weather Debug] API response:', data);
-    
+
     const weatherMapping = mapWeatherCode(data.current_weather.weathercode);
-    
+
     const weatherData: WeatherData = {
       temperature: Math.round(data.current_weather.temperature),
       weatherType: weatherMapping.type,
@@ -123,9 +118,7 @@ export const fetchCurrentWeather = async (latitude: number, longitude: number): 
       lastUpdated: new Date(),
       isRealWeather: true
     };
-    
-    console.log('[Weather Debug] Mapped weather data:', weatherData);
-    
+
     // Cache the result
     cacheWeather(weatherData, latitude, longitude);
     
@@ -147,7 +140,6 @@ export const fetchCurrentWeather = async (latitude: number, longitude: number): 
 export const clearWeatherCache = (): void => {
   try {
     localStorage.removeItem(CACHE_KEY);
-    console.log('[Weather Debug] Weather cache cleared');
   } catch (error) {
     console.error('Error clearing weather cache:', error);
   }
