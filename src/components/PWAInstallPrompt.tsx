@@ -22,69 +22,67 @@ const PWAInstallPrompt: React.FC = () => {
     setIsIOS(iOS);
 
     // Check if already installed
-    const standalone = window.matchMedia('(display-mode: standalone)').matches || 
-                     (window.navigator as any).standalone || 
+    const standalone = window.matchMedia('(display-mode: standalone)').matches ||
+                     (window.navigator as Navigator & { standalone?: boolean }).standalone ||
                      document.referrer.includes('android-app://');
     setIsStandalone(standalone);
-
-    console.log('[PWA Debug] iOS:', iOS, 'Standalone:', standalone, 'Mobile:', isMobile);
   }, [isMobile]);
 
   useEffect(() => {
     if (isStandalone) {
-      console.log('[PWA Debug] Already installed, not showing prompt');
       return;
     }
 
+    let showPromptTimeoutId: ReturnType<typeof setTimeout> | undefined;
+    let fallbackTimeoutId: ReturnType<typeof setTimeout> | undefined;
+
     const handler = (e: Event) => {
-      console.log('[PWA Debug] beforeinstallprompt event fired');
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
-      
+
       // Check if user dismissed recently
       const dismissed = localStorage.getItem('pwa-dismissed');
       if (dismissed) {
         const dismissTime = parseInt(dismissed);
         const dayInMs = 24 * 60 * 60 * 1000;
         if (Date.now() - dismissTime < dayInMs) {
-          console.log('[PWA Debug] Recently dismissed, not showing prompt');
           return;
         }
       }
-      
+
       // Show prompt after a delay
-      setTimeout(() => {
+      showPromptTimeoutId = setTimeout(() => {
         setShowPrompt(true);
       }, 3000);
     };
 
     window.addEventListener('beforeinstallprompt', handler);
-    
-    // For iOS or if no beforeinstallprompt, show manual install prompt
-    if ((isIOS || !deferredPrompt) && (isMobile || window.innerWidth <= 768)) {
+
+    // iOS has no beforeinstallprompt event, so it's the only platform that needs the
+    // manual fallback prompt (not just any narrow window).
+    if (isIOS) {
       const dismissed = localStorage.getItem('pwa-dismissed');
       if (!dismissed || (Date.now() - parseInt(dismissed)) > 24 * 60 * 60 * 1000) {
-        setTimeout(() => {
-          if (!showPrompt) {
-            console.log('[PWA Debug] Showing fallback install prompt');
-            setShowPrompt(true);
-          }
+        fallbackTimeoutId = setTimeout(() => {
+          setShowPrompt(true);
         }, 5000);
       }
     }
-    
-    return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, [isMobile, isIOS, isStandalone, deferredPrompt, showPrompt]);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+      if (showPromptTimeoutId) clearTimeout(showPromptTimeoutId);
+      if (fallbackTimeoutId) clearTimeout(fallbackTimeoutId);
+    };
+  }, [isIOS, isStandalone]);
 
   const handleInstall = async () => {
     if (deferredPrompt) {
-      console.log('[PWA Debug] Using native install prompt');
       try {
         deferredPrompt.prompt();
         const { outcome } = await deferredPrompt.userChoice;
-        
+
         if (outcome === 'accepted') {
-          console.log('[PWA Debug] User accepted install');
           setDeferredPrompt(null);
           setShowPrompt(false);
         }
@@ -98,8 +96,6 @@ const PWAInstallPrompt: React.FC = () => {
   };
 
   const showManualInstructions = () => {
-    console.log('[PWA Debug] Showing manual install instructions');
-    
     let message = 'To install Sun Chaser as an app:\n\n';
     
     if (isIOS) {
@@ -126,7 +122,6 @@ const PWAInstallPrompt: React.FC = () => {
   };
 
   const handleDismiss = () => {
-    console.log('[PWA Debug] User dismissed install prompt');
     setShowPrompt(false);
     localStorage.setItem('pwa-dismissed', Date.now().toString());
   };

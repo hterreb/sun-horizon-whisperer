@@ -1,15 +1,33 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
+const SITE_URL = Deno.env.get("SITE_URL");
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": SITE_URL ?? "",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Vary": "Origin",
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  if (!SITE_URL) {
+    console.error("[CREATE-CHECKOUT] SITE_URL is not set");
+    return new Response(JSON.stringify({ error: "Internal error" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
+  }
+
+  const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+  if (!stripeKey) {
+    console.error("[CREATE-CHECKOUT] STRIPE_SECRET_KEY is not set");
+    return new Response(JSON.stringify({ error: "Internal error" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
   }
 
   const supabaseClient = createClient(
@@ -18,17 +36,32 @@ serve(async (req) => {
   );
 
   try {
-    const authHeader = req.headers.get("Authorization")!;
-    const token = authHeader.replace("Bearer ", "");
-    const { data } = await supabaseClient.auth.getUser(token);
-    const user = data.user;
-    if (!user?.email) throw new Error("User not authenticated or email not available");
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { apiVersion: "2023-10-16" });
+    const token = authHeader.replace("Bearer ", "");
+    const { data, error: userError } = await supabaseClient.auth.getUser(token);
+    const user = data.user;
+    if (userError || !user?.email) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
+
+    const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     let customerId;
+    let hasHadSubscription = false;
     if (customers.data.length > 0) {
       customerId = customers.data[0].id;
+      const existingSubscriptions = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 1 });
+      hasHadSubscription = existingSubscriptions.data.length > 0;
     }
 
     const session = await stripe.checkout.sessions.create({
@@ -38,7 +71,7 @@ serve(async (req) => {
         {
           price_data: {
             currency: "usd",
-            product_data: { 
+            product_data: {
               name: "Sun Chaser Premium",
               description: "Line-of-sight sunrise/sunset analysis with terrain data"
             },
@@ -49,11 +82,10 @@ serve(async (req) => {
         },
       ],
       mode: "subscription",
-      subscription_data: {
-        trial_period_days: 7,
-      },
-      success_url: `${req.headers.get("origin")}/success`,
-      cancel_url: `${req.headers.get("origin")}/pricing`,
+      // Only new customers (never subscribed before) get the free trial.
+      ...(hasHadSubscription ? {} : { subscription_data: { trial_period_days: 7 } }),
+      success_url: `${SITE_URL}/?checkout=success`,
+      cancel_url: `${SITE_URL}/?checkout=cancel`,
     });
 
     return new Response(JSON.stringify({ url: session.url }), {
@@ -61,7 +93,9 @@ serve(async (req) => {
       status: 200,
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[CREATE-CHECKOUT] ERROR: ${errorMessage}`);
+    return new Response(JSON.stringify({ error: "Internal error" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     });

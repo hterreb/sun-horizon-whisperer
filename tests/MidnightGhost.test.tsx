@@ -15,4 +15,42 @@ describe('MidnightGhost', () => {
   it('ghost floats and bounces within bounds', () => {
     // Simulate animation and check position stays within bounds
   });
+
+  it('creates the float interval only once per visibility, even as direction changes (P-4)', () => {
+    vi.useFakeTimers();
+    const setIntervalSpy = vi.spyOn(window, 'setInterval');
+
+    const midnight = new Date();
+    midnight.setHours(0, 0, 0, 0);
+    render(<MidnightGhost currentTime={midnight} />);
+
+    // Ghost starts at x=50 moving +0.5/tick; advancing well past the x=80 bounce
+    // (direction flips) would previously tear down and recreate the interval.
+    vi.advanceTimersByTime(100 * 70);
+
+    const floatIntervalCalls = setIntervalSpy.mock.calls.filter(call => call[1] === 100);
+    expect(floatIntervalCalls.length).toBe(1);
+
+    setIntervalSpy.mockRestore();
+    vi.useRealTimers();
+  });
+
+  it('clamps the vertical float to a sane band under sustained drift (P-4)', () => {
+    vi.useFakeTimers();
+    // Force the sine term to its maximum positive value on every tick.
+    vi.spyOn(Date, 'now').mockReturnValue(Math.PI / 2 / 0.002);
+
+    const midnight = new Date();
+    midnight.setHours(0, 0, 0, 0);
+    const { container } = render(<MidnightGhost currentTime={midnight} />);
+
+    vi.advanceTimersByTime(100 * 200);
+
+    const ghostEl = container.querySelector('div[style*="top"]') as HTMLElement;
+    const topValue = parseFloat(ghostEl.style.top);
+    expect(topValue).toBeLessThanOrEqual(50);
+
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
 });

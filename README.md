@@ -1,73 +1,85 @@
-# Welcome to your Lovable project
+# Sun Chaser
 
-## Project info
+> summary: Sun Chaser is a React/Vite PWA. It shows live sun and moon position, sunrise/sunset/twilight times, and current weather for your location. This file covers setup, scripts, project structure, external services, and the (currently unused) Stripe/Supabase subscription functions.
 
-**URL**: https://lovable.dev/projects/1f809dc3-48f9-4f44-a884-bb9b22333676
+## Features
 
-## How can I edit this code?
+- Live sun and moon position, based on your device location.
+- Sunrise, sunset, and twilight times (civil, nautical, astronomical).
+- Current weather, with a background that matches time of day and weather.
+- Fullscreen mode with wake lock (the screen stays on).
+- Lo-fi radio streams.
+- Installable as a PWA, with offline caching.
 
-There are several ways of editing your application.
+## Tech stack
 
-**Use Lovable**
+- React 18, TypeScript, Vite.
+- Tailwind CSS, shadcn-ui (Radix UI primitives).
+- `suncalc` for sun/moon position and times.
+- `vite-plugin-pwa` (Workbox) for the service worker and manifest.
+- Vitest + Testing Library + jsdom for tests.
+- Supabase Edge Functions (Deno) for a Stripe subscription — see below.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/1f809dc3-48f9-4f44-a884-bb9b22333676) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+## Setup
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+npm ci
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The dev server runs at `http://localhost:8080`.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Scripts
 
-**Use GitHub Codespaces**
+- `npm run dev` — start the dev server.
+- `npm run build` — production build.
+- `npm run build:dev` — development-mode build (useful for debugging a build issue).
+- `npm run preview` — preview a production build locally.
+- `npm run lint` — run ESLint.
+- `npm run typecheck` — run the TypeScript compiler in check-only mode.
+- `npm test` — run the Vitest test suite.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Project structure
 
-## What technologies are used for this project?
+```
+src/
+  components/       app components (SunTracker is the root state owner)
+  components/ui/    shadcn-generated primitives (do not hand-edit; see CLAUDE.md)
+  hooks/            useWakeLock, useIsMobile, useToast
+  utils/            pure functions: sunUtils, moonUtils, weatherUtils
+  pages/            route-level pages (Index, NotFound)
+tests/              Vitest + jsdom tests, one file per source file
+supabase/functions/ Stripe subscription Edge Functions (Deno, not yet wired to the frontend)
+```
 
-This project is built with:
+## External services
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- **Open-Meteo** (`api.open-meteo.com`) — current weather. No API key. The app sends your exact latitude/longitude.
+- **BigDataCloud** (`api.bigdatacloud.net`) — reverse geocoding (place name for your coordinates). No API key. The app sends your exact latitude/longitude.
+- Lo-fi radio streams — third-party internet radio endpoints played through an `<audio>` element.
 
-## How can I deploy this project?
+## PWA notes
 
-Simply open [Lovable](https://lovable.dev/projects/1f809dc3-48f9-4f44-a884-bb9b22333676) and click on Share -> Publish.
+The app installs as a PWA. `vite-plugin-pwa` generates the service worker and web manifest at build time and precaches the app shell (JS, CSS, HTML, icons). Weather API responses are cached with a 30-minute network-first strategy so the app stays usable offline with stale weather data.
 
-## Can I connect a custom domain to my Lovable project?
+## Supabase Edge Functions (Stripe subscription)
 
-Yes, you can!
+Three Deno Edge Functions implement a Stripe subscription backend. **The frontend does not call them yet** — they exist but are not wired into the UI.
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+- `check-subscription` — looks up the caller's Stripe customer by e-mail and returns subscription status. Upserts the result into a `subscribers` table.
+- `create-checkout` — creates a Stripe Checkout session for the "Sun Chaser Premium" subscription (with a first-time trial).
+- `customer-portal` — creates a Stripe Billing Portal session so a subscriber can manage their subscription.
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+Required secrets (set with `supabase secrets set`):
+
+- `STRIPE_SECRET_KEY`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_ANON_KEY`
+- `SITE_URL` — used for CORS and Stripe redirect URLs.
+
+The `subscribers` table schema (columns, RLS policies) is not in this repo. It must exist in the target Supabase project before these functions will work.
+
+## Lovable
+
+This project was scaffolded with Lovable. The Lovable editor script (`cdn.gpteng.co/gptengineer.js`) is injected only in the dev server, not in production builds — see the `lovableEditorScript` plugin in `vite.config.ts`.

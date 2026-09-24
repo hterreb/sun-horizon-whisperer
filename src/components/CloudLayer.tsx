@@ -24,8 +24,10 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
   const lastUpdateTimeRef = useRef(0);
 
   // Debug function
-  const debugLog = (message: string, data?: any) => {
-    console.log(`[CloudLayer Debug] ${message}`, data || '');
+  const debugLog = (message: string, data?: unknown) => {
+    if (import.meta.env.DEV) {
+      console.log(`[CloudLayer Debug] ${message}`, data || '');
+    }
   };
 
   useEffect(() => {
@@ -117,8 +119,6 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
                               timeOfDay !== 'nautical-twilight';
         // Ships should be visible in most weather conditions except storms
         const shouldShowShips = weatherType !== 'storm';
-
-        debugLog(`Animation frame - Birds visible: ${shouldShowBirds}, Fish visible: ${shouldShowFish}, Ships visible: ${shouldShowShips}, Weather: ${weatherType}, Time: ${timeOfDay}`);
 
         // Bird spawning and movement
         if (shouldShowBirds) {

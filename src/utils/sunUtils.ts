@@ -57,7 +57,14 @@ const isValidDate = (date: Date | null | undefined): date is Date => {
 
 export const getSunTimes = (date: Date, latitude: number, longitude: number): SunTimes => {
   const times = SunCalc.getTimes(date, latitude, longitude);
-  
+
+  // Builds a fallback time from a copy of `date` so callers' Date objects are never mutated.
+  const at = (h: number, m = 0): Date => {
+    const d = new Date(date);
+    d.setHours(h, m, 0, 0);
+    return d;
+  };
+
   // For astronomical times, calculate approximate values if invalid
   const calculateApproximateAstronomicalTime = (baseTime: Date | null, isEarlyMorning: boolean): Date => {
     if (isValidDate(baseTime)) return baseTime;
@@ -83,15 +90,15 @@ export const getSunTimes = (date: Date, latitude: number, longitude: number): Su
   };
   
   return {
-    sunrise: isValidDate(times.sunrise) ? times.sunrise : new Date(date.setHours(6, 0, 0, 0)),
-    sunset: isValidDate(times.sunset) ? times.sunset : new Date(date.setHours(18, 0, 0, 0)),
-    solarNoon: isValidDate(times.solarNoon) ? times.solarNoon : new Date(date.setHours(12, 0, 0, 0)),
+    sunrise: isValidDate(times.sunrise) ? times.sunrise : at(6, 0),
+    sunset: isValidDate(times.sunset) ? times.sunset : at(18, 0),
+    solarNoon: isValidDate(times.solarNoon) ? times.solarNoon : at(12, 0),
     // Civil twilight: -6° to 0° (dawn to sunrise) / 0° to -6° (sunset to dusk)
-    dawn: isValidDate(times.dawn) ? times.dawn : new Date(date.setHours(5, 30, 0, 0)), // -6° (civil dawn)
-    dusk: isValidDate(times.dusk) ? times.dusk : new Date(date.setHours(18, 30, 0, 0)), // -6° (civil dusk)
+    dawn: isValidDate(times.dawn) ? times.dawn : at(5, 30), // -6° (civil dawn)
+    dusk: isValidDate(times.dusk) ? times.dusk : at(18, 30), // -6° (civil dusk)
     // Nautical twilight: -12° to -6° (nautical dawn to civil dawn) / -6° to -12° (civil dusk to nautical dusk)
-    nauticalDawn: isValidDate(times.nauticalDawn) ? times.nauticalDawn : new Date(date.setHours(5, 0, 0, 0)), // -12° (nautical dawn)
-    nauticalDusk: isValidDate(times.nauticalDusk) ? times.nauticalDusk : new Date(date.setHours(19, 0, 0, 0)), // -12° (nautical dusk)
+    nauticalDawn: isValidDate(times.nauticalDawn) ? times.nauticalDawn : at(5, 0), // -12° (nautical dawn)
+    nauticalDusk: isValidDate(times.nauticalDusk) ? times.nauticalDusk : at(19, 0), // -12° (nautical dusk)
     // Astronomical twilight: -18° to -12° (astronomical dawn to nautical dawn) / -12° to -18° (nautical dusk to astronomical dusk)
     astronomicalDawn: calculateApproximateAstronomicalTime(times.nightEnd, true), // -18° (astronomical dawn)
     astronomicalDusk: calculateApproximateAstronomicalTime(times.night, false), // -18° (astronomical dusk)
@@ -193,12 +200,31 @@ export interface RelevantTwilightTimes {
   astronomical: Date;
 }
 
-export const getRelevantTwilightTimes = (currentTime: Date, sunTimes: SunTimes): RelevantTwilightTimes => {
+export const getRelevantTwilightTimes = (
+  currentTime: Date,
+  sunTimes: SunTimes,
+  latitude: number,
+  longitude: number
+): RelevantTwilightTimes => {
   const now = currentTime.getTime();
   const isNightTime = now < sunTimes.astronomicalDawn.getTime() || now > sunTimes.astronomicalDusk.getTime();
-  
+
   if (isNightTime) {
-    // During night, show upcoming dawn times
+    // If we're past today's astronomical dusk, today's dawn times are already in the
+    // past - the "upcoming dawn" is tomorrow's, so recompute for date + 1 day.
+    if (now > sunTimes.astronomicalDusk.getTime()) {
+      const tomorrow = new Date(currentTime);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowTimes = getSunTimes(tomorrow, latitude, longitude);
+      return {
+        type: 'dawn',
+        civil: tomorrowTimes.dawn,
+        nautical: tomorrowTimes.nauticalDawn,
+        astronomical: tomorrowTimes.astronomicalDawn
+      };
+    }
+
+    // Before today's astronomical dawn, today's dawn times are still upcoming.
     return {
       type: 'dawn',
       civil: sunTimes.dawn,
