@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import SunTracker from '../src/components/SunTracker';
 import { vi } from 'vitest';
+import { loadManualLocation, saveManualLocation } from '../src/utils/manualLocation';
 
 // Mock the toast function
 vi.mock('@/components/ui/use-toast', () => ({
@@ -12,6 +13,7 @@ import { toast } from '@/components/ui/use-toast';
 describe('SunTracker', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    localStorage.clear();
   });
 
   it('shows loading state while detecting location', () => {
@@ -132,6 +134,49 @@ describe('SunTracker', () => {
     // Simulate fullscreen button click
     // fireEvent.click(screen.getByTestId('fullscreen-button'));
     // Optionally check for fullscreen state
+  });
+
+  describe('manual location (A-4)', () => {
+    it('uses a stored manual location on load instead of requesting geolocation', async () => {
+      saveManualLocation(48.8566, 2.3522);
+      const getCurrentPosition = vi.fn();
+      vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
+
+      render(<SunTracker />);
+
+      await waitFor(() => expect(screen.getByTestId('sun-visualization')).toBeInTheDocument());
+      expect(getCurrentPosition).not.toHaveBeenCalled();
+      expect(document.body.textContent).toContain('48.8566');
+    });
+
+    it('persists a location entered via the manual form to localStorage', async () => {
+      vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (_s, e) => e({ code: 1 }) } });
+      render(<SunTracker />);
+      await waitFor(() => expect(screen.getByTestId('sun-visualization')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole('button', { name: /change location/i }));
+      fireEvent.change(screen.getByLabelText(/latitude/i), { target: { value: '35' } });
+      fireEvent.change(screen.getByLabelText(/longitude/i), { target: { value: '139' } });
+      fireEvent.click(screen.getByRole('button', { name: /set location/i }));
+
+      expect(loadManualLocation()).toEqual({ latitude: 35, longitude: 139 });
+      expect(document.body.textContent).toContain('35.0000');
+    });
+
+    it('clears the stored manual location when "Use my location" succeeds', async () => {
+      saveManualLocation(10, 20);
+      vi.stubGlobal('navigator', {
+        geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 1, longitude: 2 } }) },
+      });
+      render(<SunTracker />);
+      await waitFor(() => expect(screen.getByTestId('sun-visualization')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole('button', { name: /change location/i }));
+      fireEvent.click(screen.getByRole('button', { name: /use my location/i }));
+
+      await waitFor(() => expect(loadManualLocation()).toBeNull());
+      expect(document.body.textContent).toContain('1.0000');
+    });
   });
 
   // More tests for weather, background, fullscreen, etc. can be added here

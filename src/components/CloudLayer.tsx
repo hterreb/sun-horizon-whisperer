@@ -11,18 +11,31 @@ interface CloudLayerProps {
   weatherType: WeatherType;
 }
 
+// Birds/fish/ships travel horizontally at a constant rate (in % of the layer's width
+// per second). A CSS animation moves each entity across the screen once at spawn time,
+// so no per-frame `setState` is needed for movement; state only changes on spawn
+// (adding an entry) and despawn (removing one, via `onAnimationEnd`).
+const BIRD_RATE_PERCENT_PER_SEC = 5; // was 0.08%/16ms in the old rAF loop
+const WATER_RATE_PERCENT_PER_SEC = 2.5; // was 0.04%/16ms in the old rAF loop (fish + ships)
+
+interface MovingEntity {
+  id: number;
+  x: number; // starting left offset, in % of the layer width
+  y: number; // top offset, in % of the layer height (fixed for the entity's lifetime)
+  dx: number; // horizontal travel distance, in vw, applied via the CSS animation
+  duration: number; // seconds
+}
+
 const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
   const [clouds, setClouds] = useState<Array<{id: number, x: number, y: number, scale: number}>>([]);
-  const [birds, setBirds] = useState<Array<{id: number, x: number, y: number}>>([]);
-  const [fish, setFish] = useState<Array<{id: number, x: number, y: number}>>([]);
-  const [ships, setShips] = useState<Array<{id: number, x: number, y: number}>>([]);
+  const [birds, setBirds] = useState<MovingEntity[]>([]);
+  const [fish, setFish] = useState<MovingEntity[]>([]);
+  const [ships, setShips] = useState<MovingEntity[]>([]);
   const [raindrops, setRaindrops] = useState<Array<{id: number, x: number, y: number, delay: number}>>([]);
   const [snowflakes, setSnowflakes] = useState<Array<{id: number, x: number, y: number, size: number, delay: number}>>([]);
 
-  // Animation refs
-  const animationFrameRef = useRef<number>();
-  const lastSpawnTimeRef = useRef({ birds: 0, fish: 0, ships: 0 });
-  const lastUpdateTimeRef = useRef(0);
+  // Spawn-timing refs (not movement — movement is CSS now).
+  const lastSpawnTimeRef = useRef({ birds: Date.now(), fish: Date.now(), ships: Date.now() });
   const prefersReducedMotion = usePrefersReducedMotion();
 
   // Debug function
@@ -34,10 +47,10 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
 
   useEffect(() => {
     debugLog(`Weather changed to: ${weatherType}`);
-    
+
     // Generate clouds based on weather type
     let newClouds: Array<{id: number, x: number, y: number, scale: number}> = [];
-    
+
     switch (weatherType) {
       case 'clear':
         newClouds = []; // No clouds for clear weather
@@ -73,7 +86,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
         debugLog(`Snow weather - generated ${newClouds.length} clouds`);
         break;
     }
-    
+
     setClouds(newClouds);
 
     // Generate weather effects
@@ -105,206 +118,114 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
     }
   }, [weatherType]);
 
-  // Main animation loop
+  // Determine if it's night time (for showing different colored birds)
+  const isNightTime = timeOfDay === 'night' ||
+                      timeOfDay === 'astronomical-twilight' ||
+                      timeOfDay === 'nautical-twilight';
+
+  // Spawn loop: periodically checks whether a new bird/fish/ship is due, and clears
+  // each group when the weather/time no longer supports it. This is the only place
+  // that calls `setBirds`/`setFish`/`setShips` — once per spawn or clear, never per
+  // animation frame. Movement itself happens via the CSS animation applied to each
+  // entity below (see the `moveAcrossX` keyframes), driven by `onAnimationEnd` for
+  // off-screen removal.
   useEffect(() => {
-    // Reduced motion: skip spawning/moving birds, fish and ships entirely (static sky).
+    // Reduced motion: skip spawning birds, fish and ships entirely (static sky).
     if (prefersReducedMotion) return;
 
-    const animate = (currentTime: number) => {
-      const deltaTime = currentTime - lastUpdateTimeRef.current;
-      
-      // Only update if enough time has passed (60fps throttle)
-      if (deltaTime >= 16) {
-        // Make birds and fish visible in more weather conditions
-        const shouldShowBirds = weatherType === 'clear' || weatherType === 'cloudy' || weatherType === 'overcast';
-        // Fish should not appear during night time periods
-        const shouldShowFish = (weatherType === 'clear' || weatherType === 'cloudy' || weatherType === 'overcast' || weatherType === 'rain') &&
-                              timeOfDay !== 'night' && 
-                              timeOfDay !== 'astronomical-twilight' && 
-                              timeOfDay !== 'nautical-twilight';
-        // Ships should be visible in most weather conditions except storms
-        const shouldShowShips = weatherType !== 'storm';
+    const shouldShowBirds = weatherType === 'clear' || weatherType === 'cloudy' || weatherType === 'overcast';
+    const shouldShowFish = (weatherType === 'clear' || weatherType === 'cloudy' || weatherType === 'overcast' || weatherType === 'rain') &&
+                          timeOfDay !== 'night' &&
+                          timeOfDay !== 'astronomical-twilight' &&
+                          timeOfDay !== 'nautical-twilight';
+    const shouldShowShips = weatherType !== 'storm';
 
-        // Bird spawning and movement
-        if (shouldShowBirds) {
-          // Spawn birds every 3-5 seconds
-          if (currentTime - lastSpawnTimeRef.current.birds > 3000 + Math.random() * 2000) {
-            if (Math.random() < 0.8) { // 80% chance to spawn
-              // Dynamically calculate the off-screen start position for the bird
-              const birdSvgWidth = 300; // px
-              const birdScale = (timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight') ? 0.5 : 0.3;
-              const scaledBirdWidth = birdSvgWidth * birdScale;
-              const viewportWidth = window.innerWidth;
-              // Convert scaled width to percent of viewport
-              const offscreenPercent = -(scaledBirdWidth / viewportWidth) * 100;
-              const newBird = {
-                id: Date.now() + Math.random(),
-                x: offscreenPercent, // Dynamically calculated to start fully off-screen
-                y: 20 + Math.random() * 30
-              };
-              debugLog('Spawning new bird', newBird);
-              setBirds(prev => {
-                const updated = [...prev, newBird];
-                debugLog(`Birds count after spawn: ${updated.length}`);
-                return updated;
-              });
-            }
-            lastSpawnTimeRef.current.birds = currentTime;
+    const spawnTick = () => {
+      const currentTime = Date.now();
+
+      if (shouldShowBirds) {
+        if (currentTime - lastSpawnTimeRef.current.birds > 3000 + Math.random() * 2000) {
+          if (Math.random() < 0.8) { // 80% chance to spawn
+            // Dynamically calculate the off-screen start position for the bird
+            const birdSvgWidth = 300; // px
+            const birdScale = isNightTime ? 0.5 : 0.3;
+            const scaledBirdWidth = birdSvgWidth * birdScale;
+            const viewportWidth = window.innerWidth;
+            const startX = -(scaledBirdWidth / viewportWidth) * 100;
+            const endX = 110;
+            const newBird: MovingEntity = {
+              id: Date.now() + Math.random(),
+              x: startX,
+              y: 20 + Math.random() * 30,
+              dx: endX - startX,
+              duration: (endX - startX) / BIRD_RATE_PERCENT_PER_SEC,
+            };
+            debugLog('Spawning new bird', newBird);
+            setBirds(prev => [...prev, newBird]);
           }
-
-          // Move birds (reduced speed from 0.3 to 0.15)
-          setBirds(prevBirds => {
-            const updated = prevBirds
-              .map(bird => ({
-                ...bird,
-                x: bird.x + 0.08 // Reduced for slower movement
-              }))
-              .filter(bird => {
-                const keep = bird.x < 110;
-                if (!keep) debugLog('Removing bird that went off screen', bird);
-                return keep;
-              });
-            
-            if (updated.length !== prevBirds.length) {
-              debugLog(`Birds count after movement: ${updated.length}`);
-            }
-            return updated;
-          });
-        } else {
-          // Clear birds if weather doesn't support them
-          setBirds(prev => {
-            if (prev.length > 0) {
-              debugLog('Clearing birds due to weather change');
-              return [];
-            }
-            return prev;
-          });
+          lastSpawnTimeRef.current.birds = currentTime;
         }
-
-        // Fish spawning and movement
-        if (shouldShowFish) {
-          // Spawn fish every 5-8 seconds
-          if (currentTime - lastSpawnTimeRef.current.fish > 5000 + Math.random() * 3000) {
-            if (Math.random() < 0.7) { // 70% chance to spawn
-              const newFish = {
-                id: Date.now() + Math.random(),
-                x: -5,
-                y: 70 + Math.random() * 15
-              };
-              debugLog('Spawning new fish', newFish);
-              setFish(prev => {
-                const updated = [...prev, newFish];
-                debugLog(`Fish count after spawn: ${updated.length}`);
-                return updated;
-              });
-            }
-            lastSpawnTimeRef.current.fish = currentTime;
-          }
-
-          // Move fish (reduced speed from 0.15 to 0.075)
-          setFish(prevFish => {
-            const updated = prevFish
-              .map(fish => ({
-                ...fish,
-                x: fish.x + 0.04 // Reduced for slower movement
-              }))
-              .filter(fish => {
-                const keep = fish.x < 105;
-                if (!keep) debugLog('Removing fish that went off screen', fish);
-                return keep;
-              });
-            
-            if (updated.length !== prevFish.length) {
-              debugLog(`Fish count after movement: ${updated.length}`);
-            }
-            return updated;
-          });
-        } else {
-          // Clear fish if weather or time doesn't support them
-          setFish(prev => {
-            if (prev.length > 0) {
-              debugLog('Clearing fish due to weather or time change');
-              return [];
-            }
-            return prev;
-          });
-        }
-
-        // Ship spawning and movement
-        if (shouldShowShips) {
-          // Spawn ships every 2-4 minutes (120-240 seconds)
-          if (currentTime - lastSpawnTimeRef.current.ships > 120000 + Math.random() * 120000) {
-            if (Math.random() < 0.9) { // 90% chance to spawn
-              const newShip = {
-                id: Date.now() + Math.random(),
-                x: -8,
-                y: 65 + Math.random() * 5 // Ships sail on the water surface
-              };
-              debugLog('Spawning new ship', newShip);
-              setShips(prev => {
-                const updated = [...prev, newShip];
-                debugLog(`Ships count after spawn: ${updated.length}`);
-                return updated;
-              });
-            }
-            lastSpawnTimeRef.current.ships = currentTime;
-          }
-
-          // Move ships (reduced speed from 0.08 to 0.04)
-          setShips(prevShips => {
-            const updated = prevShips
-              .map(ship => ({
-                ...ship,
-                x: ship.x + 0.04 // Reduced from 0.08 (half speed)
-              }))
-              .filter(ship => {
-                const keep = ship.x < 108;
-                if (!keep) debugLog('Removing ship that went off screen', ship);
-                return keep;
-              });
-            
-            if (updated.length !== prevShips.length) {
-              debugLog(`Ships count after movement: ${updated.length}`);
-            }
-            return updated;
-          });
-        } else {
-          // Clear ships if weather doesn't support them
-          setShips(prev => {
-            if (prev.length > 0) {
-              debugLog('Clearing ships due to weather change');
-              return [];
-            }
-            return prev;
-          });
-        }
-
-        lastUpdateTimeRef.current = currentTime;
+      } else {
+        setBirds(prev => (prev.length > 0 ? [] : prev));
       }
 
-      animationFrameRef.current = requestAnimationFrame(animate);
+      if (shouldShowFish) {
+        if (currentTime - lastSpawnTimeRef.current.fish > 5000 + Math.random() * 3000) {
+          if (Math.random() < 0.7) { // 70% chance to spawn
+            const startX = -5;
+            const endX = 105;
+            const newFish: MovingEntity = {
+              id: Date.now() + Math.random(),
+              x: startX,
+              y: 70 + Math.random() * 15,
+              dx: endX - startX,
+              duration: (endX - startX) / WATER_RATE_PERCENT_PER_SEC,
+            };
+            debugLog('Spawning new fish', newFish);
+            setFish(prev => [...prev, newFish]);
+          }
+          lastSpawnTimeRef.current.fish = currentTime;
+        }
+      } else {
+        setFish(prev => (prev.length > 0 ? [] : prev));
+      }
+
+      if (shouldShowShips) {
+        if (currentTime - lastSpawnTimeRef.current.ships > 120000 + Math.random() * 120000) {
+          if (Math.random() < 0.9) { // 90% chance to spawn
+            const startX = -8;
+            const endX = 108;
+            const newShip: MovingEntity = {
+              id: Date.now() + Math.random(),
+              x: startX,
+              y: 65 + Math.random() * 5,
+              dx: endX - startX,
+              duration: (endX - startX) / WATER_RATE_PERCENT_PER_SEC,
+            };
+            debugLog('Spawning new ship', newShip);
+            setShips(prev => [...prev, newShip]);
+          }
+          lastSpawnTimeRef.current.ships = currentTime;
+        }
+      } else {
+        setShips(prev => (prev.length > 0 ? [] : prev));
+      }
     };
 
-    // Start animation loop
-    debugLog('Starting animation loop');
-    animationFrameRef.current = requestAnimationFrame(animate);
+    const intervalId = setInterval(spawnTick, 500);
 
-    // Cleanup
     return () => {
-      if (animationFrameRef.current) {
-        debugLog('Stopping animation loop');
-        cancelAnimationFrame(animationFrameRef.current);
-      }
+      clearInterval(intervalId);
     };
-  }, [weatherType, timeOfDay, prefersReducedMotion]);
+  }, [weatherType, timeOfDay, prefersReducedMotion, isNightTime]);
 
   const getCloudColor = () => {
     switch(weatherType) {
       case 'clear':
         return 'transparent';
       case 'storm':
-        return timeOfDay === 'night' 
-          ? 'rgba(20, 20, 25, 0.9)' 
+        return timeOfDay === 'night'
+          ? 'rgba(20, 20, 25, 0.9)'
           : 'rgba(60, 60, 70, 0.95)';
       case 'rain':
         return timeOfDay === 'night'
@@ -350,13 +271,13 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
 
   const getOvercastLayer = () => {
     if (weatherType === 'clear') return null;
-    
-    const intensity = weatherType === 'storm' ? 0.8 : 
-                     weatherType === 'rain' ? 0.7 : 
+
+    const intensity = weatherType === 'storm' ? 0.8 :
+                     weatherType === 'rain' ? 0.7 :
                      weatherType === 'overcast' ? 0.6 : 0.3;
-    
+
     return (
-      <div 
+      <div
         className="absolute inset-0 transition-colors duration-[5000ms]"
         style={{
           background: `linear-gradient(to bottom, ${getCloudColor()} 0%, transparent 40%)`,
@@ -366,18 +287,13 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
     );
   };
 
-  // Determine if it's night time (for showing different colored birds)
-  const isNightTime = timeOfDay === 'night' || 
-                      timeOfDay === 'astronomical-twilight' || 
-                      timeOfDay === 'nautical-twilight';
-
   debugLog(`Rendering - Birds: ${birds.length}, Fish: ${fish.length}, Ships: ${ships.length}, Clouds: ${clouds.length}`);
 
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
       <div data-testid="iceberg" />
       {getOvercastLayer()}
-      
+
       {/* Clouds */}
       {clouds.map((cloud) => (
         <div
@@ -440,7 +356,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
         </div>
       ))}
 
-      {/* Birds (or bats at night) */}
+      {/* Birds (or bats at night) — each spawns once and travels via the
+          `moveAcrossX` CSS animation; onAnimationEnd removes it (off-screen). */}
       {birds.map((bird) => (
         <div
           key={bird.id}
@@ -448,38 +365,42 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
           style={{
             left: `${bird.x}%`,
             top: `${bird.y}%`,
-            transform: `${isNightTime ? 'scale(0.5)' : 'scale(0.3)'} translateX(-100%)`,
-            zIndex: 10
+            zIndex: 10,
+            ['--dx' as string]: `${bird.dx}vw`,
+            animation: `moveAcrossX ${bird.duration}s linear forwards`,
           }}
+          onAnimationEnd={() => setBirds(prev => prev.filter(b => b.id !== bird.id))}
         >
-          {isNightTime ? (
-            <div className="text-4xl">🦇</div>
-          ) : (
-            <svg
-              version="1.1"
-              id="Capa_1"
-              xmlns="http://www.w3.org/2000/svg"
-              xmlnsXlink="http://www.w3.org/1999/xlink"
-              x="0px"
-              y="0px"
-              viewBox="0 0 300 60"
-              xmlSpace="preserve"
-              width="300"
-              height="60"
-              className="transition-colors duration-1000"
-            >
-              <g>
-                <path
-                  d="M94.51,37.677c0.606,0.254,1.313,0.05,1.702-0.492c7.256-10.366,20.402-13.103,34.655-10.466
-                  c8.789,1.622,16.164,6.439,21.22,13.003c7.066-4.324,15.686-6.186,24.484-4.559c14.253,2.633,25.539,9.888,28.625,22.165
-                  c0.159,0.643,0.747,1.086,1.403,1.06c0.657-0.019,1.215-0.497,1.334-1.149c3.503-18.931-9.008-37.12-27.939-40.618
-                  c-8.798-1.623-17.407,0.233-24.475,4.558c-5.056-6.564-12.441-11.381-21.229-13.003c-18.941-3.499-37.125,9.012-40.629,27.948
-                  C93.544,36.776,93.892,37.424,94.51,37.677z"
-                  fill="rgba(0, 0, 0, 0.6)"
-                />
-              </g>
-            </svg>
-          )}
+          <div style={{ transform: `${isNightTime ? 'scale(0.5)' : 'scale(0.3)'} translateX(-100%)` }}>
+            {isNightTime ? (
+              <div className="text-4xl">🦇</div>
+            ) : (
+              <svg
+                version="1.1"
+                id="Capa_1"
+                xmlns="http://www.w3.org/2000/svg"
+                xmlnsXlink="http://www.w3.org/1999/xlink"
+                x="0px"
+                y="0px"
+                viewBox="0 0 300 60"
+                xmlSpace="preserve"
+                width="300"
+                height="60"
+                className="transition-colors duration-1000"
+              >
+                <g>
+                  <path
+                    d="M94.51,37.677c0.606,0.254,1.313,0.05,1.702-0.492c7.256-10.366,20.402-13.103,34.655-10.466
+                    c8.789,1.622,16.164,6.439,21.22,13.003c7.066-4.324,15.686-6.186,24.484-4.559c14.253,2.633,25.539,9.888,28.625,22.165
+                    c0.159,0.643,0.747,1.086,1.403,1.06c0.657-0.019,1.215-0.497,1.334-1.149c3.503-18.931-9.008-37.12-27.939-40.618
+                    c-8.798-1.623-17.407,0.233-24.475,4.558c-5.056-6.564-12.441-11.381-21.229-13.003c-18.941-3.499-37.125,9.012-40.629,27.948
+                    C93.544,36.776,93.892,37.424,94.51,37.677z"
+                    fill="rgba(0, 0, 0, 0.6)"
+                  />
+                </g>
+              </svg>
+            )}
+          </div>
         </div>
       ))}
 
@@ -491,16 +412,20 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
           style={{
             left: `${fishItem.x}%`,
             top: `${fishItem.y}%`,
-            transform: 'scale(1.2)',
-            zIndex: 5
+            zIndex: 5,
+            ['--dx' as string]: `${fishItem.dx}vw`,
+            animation: `moveAcrossX ${fishItem.duration}s linear forwards`,
           }}
+          onAnimationEnd={() => setFish(prev => prev.filter(f => f.id !== fishItem.id))}
         >
-          <Fish 
-            size={36} 
-            className={`transition-colors duration-1000 ${
-              timeOfDay === 'night' ? 'text-blue-200 text-opacity-50' : 'text-blue-400 text-opacity-70'
-            }`}
-          />
+          <div style={{ transform: 'scale(1.2)' }}>
+            <Fish
+              size={36}
+              className={`transition-colors duration-1000 ${
+                timeOfDay === 'night' ? 'text-blue-200 text-opacity-50' : 'text-blue-400 text-opacity-70'
+              }`}
+            />
+          </div>
         </div>
       ))}
 
@@ -512,30 +437,43 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
           style={{
             left: `${ship.x}%`,
             top: `${ship.y}%`,
-            transform: 'scale(1.4)',
-            zIndex: 7
+            zIndex: 7,
+            ['--dx' as string]: `${ship.dx}vw`,
+            animation: `moveAcrossX ${ship.duration}s linear forwards`,
           }}
+          onAnimationEnd={() => setShips(prev => prev.filter(s => s.id !== ship.id))}
         >
-          <Ship 
-            size={48} 
-            className={`transition-colors duration-1000 ${
-              timeOfDay === 'night' ? 'text-gray-300 text-opacity-60' : 'text-gray-600 text-opacity-80'
-            }`}
-          />
+          <div style={{ transform: 'scale(1.4)' }}>
+            <Ship
+              size={48}
+              className={`transition-colors duration-1000 ${
+                timeOfDay === 'night' ? 'text-gray-300 text-opacity-60' : 'text-gray-600 text-opacity-80'
+              }`}
+            />
+          </div>
         </div>
       ))}
 
-      {/* CSS animations for weather effects */}
+      {/* CSS animations for weather effects and entity movement */}
       <style>{`
         @keyframes fall {
           to {
             transform: translateY(100vh);
           }
         }
-        
+
         @keyframes snowfall {
           to {
             transform: translateY(100vh) translateX(20px);
+          }
+        }
+
+        @keyframes moveAcrossX {
+          from {
+            transform: translateX(0);
+          }
+          to {
+            transform: translateX(var(--dx));
           }
         }
       `}</style>
