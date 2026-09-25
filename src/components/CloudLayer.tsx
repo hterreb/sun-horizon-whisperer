@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Fish } from 'lucide-react';
 import { Ship } from 'lucide-react';
 import { type TimeOfDay } from '../utils/sunUtils';
+import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 
 export type WeatherType = 'clear' | 'cloudy' | 'overcast' | 'rain' | 'storm' | 'snow';
 
@@ -22,10 +23,13 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
   const animationFrameRef = useRef<number>();
   const lastSpawnTimeRef = useRef({ birds: 0, fish: 0, ships: 0 });
   const lastUpdateTimeRef = useRef(0);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   // Debug function
-  const debugLog = (message: string, data?: any) => {
-    console.log(`[CloudLayer Debug] ${message}`, data || '');
+  const debugLog = (message: string, data?: unknown) => {
+    if (import.meta.env.DEV) {
+      console.log(`[CloudLayer Debug] ${message}`, data || '');
+    }
   };
 
   useEffect(() => {
@@ -103,6 +107,9 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
 
   // Main animation loop
   useEffect(() => {
+    // Reduced motion: skip spawning/moving birds, fish and ships entirely (static sky).
+    if (prefersReducedMotion) return;
+
     const animate = (currentTime: number) => {
       const deltaTime = currentTime - lastUpdateTimeRef.current;
       
@@ -117,8 +124,6 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
                               timeOfDay !== 'nautical-twilight';
         // Ships should be visible in most weather conditions except storms
         const shouldShowShips = weatherType !== 'storm';
-
-        debugLog(`Animation frame - Birds visible: ${shouldShowBirds}, Fish visible: ${shouldShowFish}, Ships visible: ${shouldShowShips}, Weather: ${weatherType}, Time: ${timeOfDay}`);
 
         // Bird spawning and movement
         if (shouldShowBirds) {
@@ -291,7 +296,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [weatherType, timeOfDay]);
+  }, [weatherType, timeOfDay, prefersReducedMotion]);
 
   const getCloudColor = () => {
     switch(weatherType) {
@@ -312,7 +317,6 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
       case 'overcast':
         switch(timeOfDay) {
           case 'dawn':
-          case 'dusk':
             return 'rgba(180, 180, 180, 0.8)';
           case 'morning':
           case 'evening':
@@ -329,7 +333,6 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
       default:
         switch(timeOfDay) {
           case 'dawn':
-          case 'dusk':
             return 'rgba(255, 198, 161, 0.6)';
           case 'morning':
           case 'evening':

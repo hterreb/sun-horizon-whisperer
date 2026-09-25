@@ -5,6 +5,19 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from 'vite-plugin-pwa';
 
+// Injects the Lovable editor script (cdn.gpteng.co/gptengineer.js) for the dev server only — never in production builds.
+const lovableEditorScript = () => ({
+  name: "inject-lovable-editor-script",
+  apply: "serve" as const,
+  transformIndexHtml: () => [
+    {
+      tag: "script",
+      attrs: { type: "module", src: "https://cdn.gpteng.co/gptengineer.js" },
+      injectTo: "body-prepend" as const,
+    },
+  ],
+});
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
@@ -14,6 +27,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     mode === 'development' && componentTagger(),
+    mode === 'development' && lovableEditorScript(),
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
@@ -33,18 +47,6 @@ export default defineConfig(({ mode }) => ({
               },
             },
           },
-          // Force icon cache invalidation
-          {
-            urlPattern: /\.(ico|png|svg)$/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'icons-cache-v2',
-              expiration: {
-                maxEntries: 20,
-                maxAgeSeconds: 60 * 60 * 24, // 24 hours
-              },
-            },
-          },
         ],
       },
       includeAssets: ['favicon.ico', 'icon-192.png', 'icon-512.png', 'icon-144.png'],
@@ -58,31 +60,21 @@ export default defineConfig(({ mode }) => ({
         display: 'standalone',
         orientation: 'any',
         scope: '/',
-        start_url: '/?v=2.0',
+        start_url: '/',
+        // ponytail: these icons are 'any' only because the source PNGs are not maskable-safe
+        // (no safe-zone padding) - they would get cropped. Add real maskable icons later.
         icons: [
           {
-            src: '/icon-192.png?v=2.0',
+            src: '/icon-192.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any'
           },
           {
-            src: '/icon-192.png?v=2.0',
-            sizes: '192x192',
-            type: 'image/png',
-            purpose: 'maskable'
-          },
-          {
-            src: '/icon-512.png?v=2.0',
+            src: '/icon-512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any'
-          },
-          {
-            src: '/icon-512.png?v=2.0',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'maskable'
           }
         ],
         categories: ['weather', 'utilities', 'lifestyle'],

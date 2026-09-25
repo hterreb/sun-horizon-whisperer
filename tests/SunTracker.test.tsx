@@ -44,7 +44,7 @@ describe('SunTracker', () => {
   });
 
   it('fetches and displays real weather (mocked)', async () => {
-    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current_weather: { temperature: 20, weathercode: 0, windspeed: 0, winddirection: 0, time: '' } }) })) as any;
+    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current_weather: { temperature: 20, weathercode: 0, windspeed: 0, winddirection: 0, time: '' } }) })) as unknown as typeof fetch;
     render(<SunTracker />);
     await waitFor(() => expect(fetch).toHaveBeenCalled());
     // Optionally check for weather display in InfoPanel
@@ -78,6 +78,53 @@ describe('SunTracker', () => {
     // Simulate user interaction for weather refresh
     // fireEvent.click(screen.getByTestId('weather-refresh'));
     // Optionally check for fetch call or UI update
+  });
+
+  it('does not toast on a successful weather refresh, only on failure (A-5)', async () => {
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 1, longitude: 2 } }) } });
+    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current_weather: { temperature: 20, weathercode: 0, windspeed: 0, winddirection: 0, time: '' } }) })) as unknown as typeof fetch;
+
+    render(<SunTracker />);
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+
+    expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ title: 'Weather updated' }));
+  });
+
+  it('toasts when the weather refresh fails (A-5)', async () => {
+    // Distinct coordinates from the previous test, so the weather cache (keyed on
+    // location, not test) doesn't serve a stale successful result here.
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 5, longitude: 6 } }) } });
+    global.fetch = vi.fn(() => Promise.reject(new Error('network down'))) as unknown as typeof fetch;
+
+    render(<SunTracker />);
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Weather unavailable' }))
+    );
+  });
+
+  it('does not re-register the fullscreenchange listener on every render (P-5)', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 1, longitude: 2 } }) } });
+    const addSpy = vi.spyOn(document, 'addEventListener');
+    const removeSpy = vi.spyOn(document, 'removeEventListener');
+
+    render(<SunTracker />);
+    const initialAdds = addSpy.mock.calls.filter((c) => c[0] === 'fullscreenchange').length;
+    expect(initialAdds).toBe(1);
+
+    // The clock ticks every second, causing SunTracker to re-render repeatedly.
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    const addsAfter = addSpy.mock.calls.filter((c) => c[0] === 'fullscreenchange').length;
+    const removesAfter = removeSpy.mock.calls.filter((c) => c[0] === 'fullscreenchange').length;
+    expect(addsAfter).toBe(1);
+    expect(removesAfter).toBe(0);
+
+    addSpy.mockRestore();
+    removeSpy.mockRestore();
+    vi.useRealTimers();
   });
 
   it('enters and exits fullscreen mode, hiding cursor as appropriate', async () => {

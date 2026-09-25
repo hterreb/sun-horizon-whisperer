@@ -1,0 +1,131 @@
+# Sun Chaser — Repository Audit
+
+> summary: Audit of the Sun Chaser repository (a React/Vite PWA that shows sun and moon positions and live weather, plus unused Supabase/Stripe edge functions).
+> It lists findings by area (security, correctness, performance, build/CI, dependencies, accessibility, docs) with severity, file location, and a recommended fix.
+> The top of the file has the verification results and a prioritized quick-win list.
+> Audit date: 2026-09-24. Commit audited: `365d8a7` (main).
+
+## 1. Verification results
+
+| Check | Command | Result |
+|---|---|---|
+| Tests | `npx vitest run` | ✅ 16 files, 63 tests pass. Noise: jsdom `HTMLMediaElement.pause` "not implemented" errors from `MusicPlayer`. |
+| Lint | `npx eslint .` | ❌ 25 problems (12 errors, 13 warnings). |
+| Typecheck | `npx tsc -p tsconfig.app.json --noEmit` | ✅ 0 errors (but `strict: false`). With `--strict`: only 2 errors. |
+| Build | `npx vite build` | ✅ One JS chunk, 415 kB (130 kB gzip). PWA precache 16 entries / 762 KiB. |
+| Dependency audit | `npm audit --omit=dev` | ❌ 24 vulnerabilities (16 high, 6 moderate, 2 low) in the production tree: `vite`, `rollup`, `react-router(-dom)`, `@remix-run/router`, `postcss`, `nanoid`, `lodash`, `glob`, `minimatch`, `serialize-javascript`, others. `npm audit fix` is available. |
+
+## 2. Severity scale
+
+- **High** — security risk, data loss, or visible wrong behavior for many users.
+- **Medium** — wrong behavior in edge cases, resource leaks, noticeable performance cost.
+- **Low** — maintainability, hygiene, polish.
+
+## 3. Quick wins (do these first)
+
+> **Status 2026-09-24:** fixed: S-1…S-7, C-1…C-4, C-6, C-7, C-9, C-12, C-13, P-1…P-6 (P-4 except `CloudLayer`), B-1…B-7, M-1…M-4. Each fixed bug has a test that failed before the fix.
+> Partial: D-1: 4 production advisories remain (1 high, 3 moderate). They need major upgrades: `vite` 5→8 (esbuild), `react-router-dom` 6→7.
+> **Status 2026-09-25:** also fixed: S-8, C-5, C-8, C-10, C-11, D-2, D-3, D-4, A-1, A-2, A-3, A-5; A-4 partial (locale time format; no manual location input).
+> Open: S-9, D-5 (decide on the Supabase/Stripe feature), D-1 remainder (major upgrades), A-4 manual location, P-4 `CloudLayer`. `eslint` stays pinned at `^9.13.0` (newer 9.x crashes with `typescript-eslint` 8.11).
+> New required secret for the Supabase functions: `SITE_URL`.
+
+1. Remove the third-party `gptengineer.js` script from production HTML (S-1).
+2. Run `npm audit fix` and commit the lockfile (D-1).
+3. Delete the `console.log` calls that run on every render and on every animation frame (P-1, P-2).
+4. Fix the `getSunTimes` date mutation (C-1) and the wake-lock re-acquire bug (C-2).
+5. Add `lint`, `typecheck`, `build` steps to CI and add a `test` script (B-1, B-2).
+6. Decide on the Supabase/Stripe functions: finish the feature or delete the folder (S-2 … S-6).
+
+## 4. Findings
+
+### 4.1 Security and privacy
+
+| ID | Sev | Location | Finding | Recommendation |
+|---|---|---|---|---|
+| S-1 | High | `index.html:46` | Production page loads `https://cdn.gpteng.co/gptengineer.js` (Lovable editor script). A remote script with full page access, no SRI, no pinning. Supply-chain risk. | Remove it from production builds (inject only in dev via a Vite plugin, or drop it if you no longer edit in Lovable). |
+| S-2 | High | `supabase/functions/create-checkout/index.ts:52-54` | Every checkout gets `trial_period_days: 7`, and nothing checks `trial_used`. A user can cancel and re-subscribe to get unlimited trials. | Read `subscribers.trial_used` (or Stripe subscription history) and omit the trial when it was used. |
+| S-3 | Medium | all 3 functions, `corsHeaders` | `Access-Control-Allow-Origin: *` on authenticated payment endpoints. | Restrict to the app origin(s). |
+| S-4 | Medium | `create-checkout/index.ts:55-56`, `customer-portal/index.ts:52` | Redirect URLs come from the client `Origin` header; fallback `http://localhost:3000`. | Use a configured `SITE_URL` env var. |
+| S-5 | Medium | `check-subscription/index.ts:44`, `customer-portal/index.ts:42` | Logs user e-mail and IDs (PII) on every call; error messages from Stripe/Supabase go back to the client verbatim. | Log only user ID; return generic error text, keep details in server logs. |
+| S-6 | Medium | `create-checkout/index.ts:21-27` | No check for missing `Authorization` header (non-null assertion → `TypeError` → 500) and no check for missing `STRIPE_SECRET_KEY`. `getUser` error is ignored. | Match the checks in `check-subscription` (return 401 for missing/invalid auth). |
+| S-7 | Low | `check-subscription/index.ts:51,101` | `upsert` results are not checked, so DB write failures are silent. | Check `{ error }` and fail visibly. |
+| S-8 | Low | `src/components/InfoPanel.tsx:130`, `src/utils/weatherUtils.ts:106` | Exact GPS coordinates go to `api.bigdatacloud.net` and `api.open-meteo.com`. No privacy notice. | Round coordinates to 2 decimals (~1 km) before sending; add a short privacy note. |
+| S-9 | Low | `supabase/` | No migrations for the `subscribers` table, no `config.toml`, no RLS definition in repo. Stripe identity is matched by e-mail only. | Commit schema + RLS policies; store and match `stripe_customer_id` per `user_id`. |
+
+### 4.2 Correctness
+
+| ID | Sev | Location | Finding | Recommendation |
+|---|---|---|---|---|
+| C-1 | High | `src/utils/sunUtils.ts:86-94` | Fallback branches call `date.setHours(...)`, which **mutates the caller's `Date`** (the `date` state in `SunTracker`). Each fallback also overwrites the previous one. Triggers at high latitudes (polar day/night), where SunCalc returns invalid dates. | Use `new Date(date)` copies (`const d = new Date(date); d.setHours(...)`). Add a test with latitude 78° in June. |
+| C-2 | Medium | `src/hooks/useWakeLock.ts:32` | When the tab is hidden the browser releases the lock, but `wakeLockRef.current` stays non-null. On return the hook does not re-acquire it → screen sleeps in fullscreen after a tab switch. | Set the ref to `null` on the sentinel's `release` event (or check `sentinel.released`). |
+| C-3 | Medium | `src/components/SunVisualization.tsx:109-110` | Azimuth maps linearly 0°→left, 360°→right. In the southern hemisphere the sun culminates at north (0°/360°), so at noon it jumps from the right edge to the left edge. | Center the map on the hemisphere's culmination azimuth (180° north, 0° south). |
+| C-4 | Medium | `src/utils/sunUtils.ts:196-216` | `getRelevantTwilightTimes`: after astronomical dusk it shows *today's* dawn times (already past) as "upcoming dawn". | Use tomorrow's `getSunTimes` after dusk. |
+| C-5 | Medium | `src/utils/sunUtils.ts:86-94` | At polar day/night the fallbacks show invented sunrise 06:00 / sunset 18:00 as real data. | Show "No sunrise today" / "Sun does not set" instead of fake times. |
+| C-6 | Medium | `src/components/SunTracker.tsx:190-215` | Midnight effect: the `setInterval` created inside `setTimeout` is never cleared (the returned cleanup is discarded) → interval leak. The effect is also redundant: the 30 s timer already recomputes `sunTimes`. | Delete the effect. |
+| C-7 | Medium | `src/components/PWAInstallPrompt.tsx:56,67,77` | Effect depends on `showPrompt` / `deferredPrompt`; the `setTimeout`s are never cleared and restart on every dependency change. Fallback prompt shows on any narrow desktop window. `alert()` for instructions. | One effect with cleared timers; fallback only for iOS Safari; replace `alert` with the existing `Dialog`. |
+| C-8 | Low | `src/components/SunVisualization.tsx:28-45` | Fireworks trigger needs rounded altitude to hit exactly `0.0` within a 30 s sample. It fires unreliably or not at all. | Trigger on sign change (`prev < 0 !== cur < 0`). |
+| C-9 | Low | `src/components/MusicPlayer.tsx:67-75,94-97` | Stream list contains dead endpoints (Radionomy shut down in 2020). When a stream fails during playback, the next `src` is set but `play()` is not called again. | Verify streams, drop dead ones, call `play()` after switching when `isPlaying`. Check stream licensing. |
+| C-10 | Low | `src/utils/sunUtils.ts:27-37,172` | `'dusk'` `TimeOfDay` is never returned by `getTimeOfDay` → dead branch in gradients/labels. | Remove it, or return it. |
+| C-11 | Low | `src/components/InfoPanel.tsx:103-122` | Auto-collapse overrides the user's manual expand/collapse choice at every time-of-day change. | Apply auto state only until the user toggles a section. |
+| C-12 | Low | `src/components/TemperatureIceberg.tsx:53` | `z-6` is not a Tailwind class (no effect). | Use `z-[6]` or an existing step. |
+| C-13 | Low | `src/components/FullscreenButton.tsx:25` | iPhone Safari has no Fullscreen API; the button silently does nothing. | Hide the button when `document.fullscreenEnabled` is false. |
+
+### 4.3 Performance
+
+| ID | Sev | Location | Finding | Recommendation |
+|---|---|---|---|---|
+| P-1 | High | `src/components/CloudLayer.tsx:27-29` + animation loop | `debugLog` → `console.log` runs **every animation frame** (~60/s) plus on each spawn/removal. Heavy CPU and memory on a long-running display app. | Remove `debugLog` or gate it behind `import.meta.env.DEV`. |
+| P-2 | Medium | `src/components/SunTracker.tsx:55-59` | Four `console.log` lines on every render; the component re-renders every second. | Delete. Same for `[Weather Debug]`, `[PWA Debug]`, SW logs in `main.tsx`. |
+| P-3 | Medium | `src/components/NightStars.tsx:125` | Effect depends on the `moonPosition` object (new every 30 s) → 300 stars are re-randomized, so the sky "jumps" every 30 s. The rAF loop also runs in daytime only to `clearRect`. | Depend on `moonPosition.illumination`; create stars once (`useRef`); stop the loop when not night. |
+| P-4 | Medium | `src/components/CloudLayer.tsx:105-285`, `Fireworks.tsx:96-113`, `MidnightGhost.tsx`, `TemperatureIceberg.tsx` | Animations use React `setState` per frame / per 100 ms. Fireworks stores the rAF id in state (stale in cleanup, loop may not stop). Ghost/Iceberg call `setDirection` inside a `setPosition` updater and recreate the interval on every direction change. | Prefer CSS animations; keep rAF ids in `useRef`; keep direction in the position state. |
+| P-5 | Low | `src/components/SunTracker.tsx:314` → `FullscreenButton.tsx:23` | `handleFullscreenChange` is a new function every render → the `fullscreenchange` listener is removed and re-added every second. | Pass `setIsFullscreen` directly (stable). |
+| P-6 | Low | `src/main.tsx:19-26` | Service worker update check every 60 s and `onNeedRefresh → updateSW(true)` with `skipWaiting` → page reloads under the user on each deploy. | Check hourly; reload on next visibility change, not immediately. |
+
+### 4.4 Build, CI, and tooling
+
+| ID | Sev | Location | Finding | Recommendation |
+|---|---|---|---|---|
+| B-1 | Medium | `.github/workflows/ci.yml` | CI runs only `vitest`. No lint, typecheck, build, or audit. Lint is already red (12 errors) and nobody sees it. | Add `npm run lint`, `npx tsc -p tsconfig.app.json`, `npm run build`. Fix the 12 lint errors first. |
+| B-2 | Low | `package.json` | No `test` / `typecheck` scripts; package name `vite_react_shadcn_ts`, version `0.0.0`. | Add scripts; rename to `sun-chaser`. |
+| B-3 | Medium | `tsconfig*.json` | `strict: false`, `strictNullChecks: false`, `noImplicitAny: false`. Enabling `--strict` gives only 2 errors today. | Enable `strict` now while it is cheap. |
+| B-4 | Low | repo root | Two lockfiles: `bun.lockb` and `package-lock.json`. CI uses npm. | Delete `bun.lockb` (or pick bun and delete the npm lock). |
+| B-5 | Low | `.gitignore` | Commits `a74da3f`/`503e2a8` show a `vite.config.ts.timestamp-*.mjs` file got committed. | Add `vite.config.ts.timestamp-*` to `.gitignore`. |
+| B-6 | Low | `supabase/functions/*` | Deno functions use `std@0.190.0` `serve` (deprecated) and are linted by the browser ESLint config (3 lint errors). No tests. | Use `Deno.serve`; exclude `supabase/` from the Vite ESLint config or give it a Deno config. |
+| B-7 | Low | `tests/` | jsdom lacks `HTMLMediaElement.play/pause` → stack traces in test output. `test-cases.md` checklist is all unchecked and stale. | Stub `play`/`pause` in `tests/setupTests.ts`; delete or update `test-cases.md`. |
+
+### 4.5 Dependencies and dead code
+
+| ID | Sev | Location | Finding | Recommendation |
+|---|---|---|---|---|
+| D-1 | High | `package-lock.json` | 16 high-severity advisories in production deps (see §1). | `npm audit fix`; re-run tests + build. |
+| D-2 | Low | `package.json` | Unused runtime deps: `recharts`, `react-hook-form`, `@hookform/resolvers`, `zod`, `next-themes`, `cmdk`, `vaul`, `embla-carousel-react`, `input-otp`, `react-day-picker`, `react-resizable-panels`. `@tanstack/react-query` is mounted but has no queries. `vite-plugin-pwa` belongs in `devDependencies`. | Remove unused packages (smaller install, fewer advisories). |
+| D-3 | Low | `src/components/ui/` | ~48 shadcn components, ~14 used. Tree-shaking keeps the bundle clean, but they add maintenance and lint noise. | Delete unused files; re-add with `npx shadcn add` when needed. |
+| D-4 | Low | `src/App.tsx:14-15`, `src/hooks/use-toast.ts`, `src/components/ui/use-toast.ts` | Two toast systems mounted (`Toaster` + `Sonner`); Sonner is never called. Toast is imported from two different paths (`@/hooks/use-toast` and `@/components/ui/use-toast`). | Keep one system and one import path. |
+| D-5 | Low | `supabase/functions/*` | Stripe functions have no caller in `src/` and `/success`, `/pricing` routes do not exist. The "Premium: line-of-sight terrain analysis" product is not implemented. | Finish the feature on a branch, or delete the functions from `main`. |
+
+### 4.6 Accessibility and UX
+
+| ID | Sev | Location | Finding | Recommendation |
+|---|---|---|---|---|
+| A-1 | Medium | `src/components/InfoPanel.tsx:420-515` | Twilight labels are `<span onClick>`: not focusable, no keyboard access, info only on hover. | Use `<button>` or the existing `Tooltip` component. |
+| A-2 | Medium | all animated components | No `prefers-reduced-motion` handling for stars, clouds, birds, fireworks, ghost. | Disable or slow animations under `motion-reduce`. |
+| A-3 | Low | `FullscreenButton.tsx`, `MusicPlayer.tsx`, `InfoPanel.tsx` | Controls fade to `opacity-0` but stay focusable and clickable; reappear only on mouse hover (no touch/keyboard path). Music `Switch` has no accessible label. | Show on focus/touch too; add `aria-label`s. |
+| A-4 | Low | `src/utils/sunUtils.ts:105`, `SunTracker.tsx:233-236` | 12-hour clock and °C are hard-coded; default location is New York with no way to set a location manually. | Use `Intl`/locale for time; add a manual location input. |
+| A-5 | Low | `src/components/SunTracker.tsx:144-155` | A toast appears on every weather refresh (every 30 min, and on cache hits). | Toast only on failure. |
+
+### 4.7 Documentation and metadata
+
+| ID | Sev | Location | Finding | Recommendation |
+|---|---|---|---|---|
+| M-1 | Low | `README.md` | Lovable boilerplate; no description of features, APIs used, env vars, Supabase setup, or deploy. | Rewrite with a summary block, setup, scripts, architecture, external services. |
+| M-2 | Low | `index.html:9,36-40` | `author: Lovable`, OG/Twitter image and `@lovable_dev` handle belong to Lovable, not this app. | Replace with own metadata and an OG image. |
+| M-3 | Low | `vite.config.ts:36-47,61-86` | Manual cache-busting (`?v=2.0`, `icons-cache-v2`); icon runtime-cache regex matches every origin; maskable icons reuse the "any" icons (probably cropped). | Rely on Workbox revisioning; anchor the regex to same-origin; add real maskable icons. |
+| M-4 | Low | repo root | No `CLAUDE.md` / contributor notes. | Add a short one (commands, architecture, conventions). |
+
+## 5. Suggested order of work
+
+1. **Security + deps (½ day):** S-1, D-1, S-2 … S-6 (or delete `supabase/` per D-5).
+2. **Correctness (1 day):** C-1, C-2, C-3, C-4, C-6, each with one test that fails before the fix.
+3. **Performance (½ day):** P-1 … P-5.
+4. **CI hardening (½ day):** B-1, B-3, B-4, B-5, lint to green.
+5. **Cleanup + a11y + docs (1 day):** D-2 … D-4, A-1 … A-3, M-1 … M-3.
