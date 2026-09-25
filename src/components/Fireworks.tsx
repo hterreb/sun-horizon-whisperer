@@ -1,5 +1,6 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 
 interface FireworkParticle {
   id: number;
@@ -24,13 +25,14 @@ interface FireworksProps {
   trigger: boolean;
 }
 
+const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff'];
+
 const Fireworks: React.FC<FireworksProps> = ({ trigger }) => {
   const [fireworks, setFireworks] = useState<Firework[]>([]);
-  const [animationId, setAnimationId] = useState<number | null>(null);
+  const animationIdRef = useRef<number | null>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
-  const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff'];
-
-  const createFirework = () => {
+  const createFirework = useCallback(() => {
     const x = Math.random() * 100;
     const y = 20 + Math.random() * 30; // Higher in the sky
     
@@ -60,7 +62,7 @@ const Fireworks: React.FC<FireworksProps> = ({ trigger }) => {
       particles,
       exploded: true
     };
-  };
+  }, []);
 
   const updateFireworks = () => {
     setFireworks(prevFireworks => {
@@ -83,34 +85,42 @@ const Fireworks: React.FC<FireworksProps> = ({ trigger }) => {
   };
 
   useEffect(() => {
-    if (trigger) {
+    // Reduced motion: skip spawning the animated firework bursts entirely.
+    if (trigger && !prefersReducedMotion) {
       // Create more fireworks when triggered - spread them out over time
+      const timeoutIds: ReturnType<typeof setTimeout>[] = [];
       for (let i = 0; i < 8; i++) { // More fireworks
-        setTimeout(() => {
+        timeoutIds.push(setTimeout(() => {
           setFireworks(prev => [...prev, createFirework()]);
-        }, i * 300); // Longer delays between fireworks
+        }, i * 300)); // Longer delays between fireworks
       }
+      return () => {
+        timeoutIds.forEach(clearTimeout);
+      };
     }
-  }, [trigger]);
+  }, [trigger, createFirework, prefersReducedMotion]);
+
+  const hasFireworks = fireworks.length > 0;
 
   useEffect(() => {
-    if (fireworks.length > 0) {
+    if (hasFireworks) {
       const animate = () => {
         updateFireworks();
-        setAnimationId(requestAnimationFrame(animate));
+        animationIdRef.current = requestAnimationFrame(animate);
       };
-      setAnimationId(requestAnimationFrame(animate));
-    } else if (animationId) {
-      cancelAnimationFrame(animationId);
-      setAnimationId(null);
+      animationIdRef.current = requestAnimationFrame(animate);
+    } else if (animationIdRef.current !== null) {
+      cancelAnimationFrame(animationIdRef.current);
+      animationIdRef.current = null;
     }
 
     return () => {
-      if (animationId) {
-        cancelAnimationFrame(animationId);
+      if (animationIdRef.current !== null) {
+        cancelAnimationFrame(animationIdRef.current);
+        animationIdRef.current = null;
       }
     };
-  }, [fireworks.length > 0]);
+  }, [hasFireworks]);
 
   return (
     <div className="absolute inset-0 pointer-events-none">

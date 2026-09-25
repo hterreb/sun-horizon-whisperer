@@ -57,6 +57,12 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   const [isVisible, setIsVisible] = useState(true);
   const [hoveredTwilight, setHoveredTwilight] = useState<string | null>(null);
   const fadeTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  // Tracks which collapsible sections the user has manually toggled, so the
+  // time-of-day auto-collapse effect below only ever touches sections the user
+  // hasn't taken control of themselves.
+  const userToggledMoonRef = React.useRef(false);
+  const userToggledTwilightRef = React.useRef(false);
+  const userToggledSunPositionRef = React.useRef(false);
 
   // Handle fade out in fullscreen
   useEffect(() => {
@@ -99,6 +105,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     }
   };
 
+  // Keyboard focus and touch also need to bring the panel back, not just mouse hover.
+  const handleFocus = handleMouseEnter;
+  const handleTouchStart = handleMouseEnter;
+
   // Auto-adjust collapsed states based on time of day
   useEffect(() => {
     const isNightTime = timeOfDay === 'night' || 
@@ -108,16 +118,16 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     
     if (isNightTime) {
       // During night/twilight: collapse twilight times and sun position, expand moon
-      setIsTwilightCollapsed(true);
-      setIsSunPositionCollapsed(true);
-      if (moonPosition.visible) {
+      if (!userToggledTwilightRef.current) setIsTwilightCollapsed(true);
+      if (!userToggledSunPositionRef.current) setIsSunPositionCollapsed(true);
+      if (moonPosition.visible && !userToggledMoonRef.current) {
         setIsMoonCollapsed(false);
       }
     } else {
       // During day: expand twilight times and sun position, collapse moon
-      setIsTwilightCollapsed(false);
-      setIsSunPositionCollapsed(false);
-      setIsMoonCollapsed(true);
+      if (!userToggledTwilightRef.current) setIsTwilightCollapsed(false);
+      if (!userToggledSunPositionRef.current) setIsSunPositionCollapsed(false);
+      if (!userToggledMoonRef.current) setIsMoonCollapsed(true);
     }
   }, [timeOfDay, moonPosition.visible]);
 
@@ -127,8 +137,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
       
       setLoadingLocation(true);
       try {
+        // Round to ~1km precision before sending the location to a third party.
+        const roundedLat = Math.round(location.latitude * 100) / 100;
+        const roundedLon = Math.round(location.longitude * 100) / 100;
         const response = await fetch(
-          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${location.latitude}&longitude=${location.longitude}&localityLanguage=en`
+          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${roundedLat}&longitude=${roundedLon}&localityLanguage=en`
         );
         const data = await response.json();
         
@@ -154,7 +167,16 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
   if (!sunTimes) return null;
 
-  const relevantTwilightTimes = getRelevantTwilightTimes(currentTime, sunTimes);
+  const relevantTwilightTimes = getRelevantTwilightTimes(currentTime, sunTimes, location.latitude, location.longitude);
+
+  // At polar day/night, SunCalc has no real sunrise/sunset, so `sunTimes.sunrise`/`.sunset`
+  // hold invented 06:00/18:00 fallback times (kept only for internal time-of-day math).
+  // Show a plain-language label instead of those fake times.
+  const polarSunLabel = sunTimes.polar === 'day'
+    ? 'Sun does not set'
+    : sunTimes.polar === 'night'
+      ? 'Sun does not rise'
+      : null;
 
   const weatherOptions: { type: WeatherType; label: string; icon: React.ReactNode }[] = [
     { type: 'clear', label: 'Clear', icon: <Sun size={16} /> },
@@ -197,6 +219,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
         isVisible ? 'opacity-100' : 'opacity-0'
       }`}
       onMouseEnter={handleMouseEnter}
+      onFocus={handleFocus}
+      onTouchStart={handleTouchStart}
     >
       {/* Header with toggle button */}
       <div className="p-4 pb-2 flex items-start justify-between flex-shrink-0">
@@ -341,15 +365,15 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 <Sunrise size={18} className="mr-2" />
                 <span className="text-sm">Sunrise</span>
               </div>
-              <span className="font-semibold text-sm sm:text-base">{formatTime(sunTimes.sunrise)}</span>
+              <span className="font-semibold text-sm sm:text-base">{polarSunLabel ?? formatTime(sunTimes.sunrise)}</span>
             </div>
-            
+
             <div className="flex justify-between items-center">
               <div className="flex items-center">
                 <Sunset size={18} className="mr-2" />
                 <span className="text-sm">Sunset</span>
               </div>
-              <span className="font-semibold text-sm sm:text-base">{formatTime(sunTimes.sunset)}</span>
+              <span className="font-semibold text-sm sm:text-base">{polarSunLabel ?? formatTime(sunTimes.sunset)}</span>
             </div>
           </div>
           
@@ -362,7 +386,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   Moon Information
                 </h3>
                 <button
-                  onClick={() => setIsMoonCollapsed(!isMoonCollapsed)}
+                  onClick={() => {
+                    userToggledMoonRef.current = true;
+                    setIsMoonCollapsed(!isMoonCollapsed);
+                  }}
                   className="p-1 rounded hover:bg-white hover:bg-opacity-10 transition-colors"
                   aria-label={isMoonCollapsed ? "Expand moon info" : "Collapse moon info"}
                 >
@@ -402,7 +429,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 Upcoming {relevantTwilightTimes.type === 'dawn' ? 'Dawn' : 'Dusk'} Times
               </h3>
               <button
-                onClick={() => setIsTwilightCollapsed(!isTwilightCollapsed)}
+                onClick={() => {
+                  userToggledTwilightRef.current = true;
+                  setIsTwilightCollapsed(!isTwilightCollapsed);
+                }}
                 className="p-1 rounded hover:bg-white hover:bg-opacity-10 transition-colors"
                 aria-label={isTwilightCollapsed ? "Expand twilight times" : "Collapse twilight times"}
               >
@@ -417,53 +447,68 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 {relevantTwilightTimes.type === 'dusk' ? (
                   <>
                     <div className="flex justify-between">
-                      <span 
-                        className="font-semibold cursor-pointer hover:opacity-80 transition-opacity"
+                      <button
+                        type="button"
+                        className="font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left"
                         onMouseEnter={() => setHoveredTwilight('civil')}
                         onMouseLeave={() => setHoveredTwilight(null)}
+                        onFocus={() => setHoveredTwilight('civil')}
+                        onBlur={() => setHoveredTwilight(null)}
                         onClick={() => setHoveredTwilight(hoveredTwilight === 'civil' ? null : 'civil')}
+                        aria-expanded={hoveredTwilight === 'civil'}
+                        aria-describedby="twilight-degree-civil"
                         title="Click or hover for degree information"
                       >
                         Civil:
-                      </span>
+                      </button>
                       <span className="font-mono">{formatTime(sunTimes.sunset)} - {formatTime(relevantTwilightTimes.civil)}</span>
                     </div>
                     {hoveredTwilight === 'civil' && (
-                      <div className="text-xs opacity-60 ml-2">
+                      <div id="twilight-degree-civil" className="text-xs opacity-60 ml-2">
                         {getDegreeInfo('civil')}
                       </div>
                     )}
                     <div className="flex justify-between">
-                      <span 
-                        className="font-semibold cursor-pointer hover:opacity-80 transition-opacity"
+                      <button
+                        type="button"
+                        className="font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left"
                         onMouseEnter={() => setHoveredTwilight('nautical')}
                         onMouseLeave={() => setHoveredTwilight(null)}
+                        onFocus={() => setHoveredTwilight('nautical')}
+                        onBlur={() => setHoveredTwilight(null)}
                         onClick={() => setHoveredTwilight(hoveredTwilight === 'nautical' ? null : 'nautical')}
+                        aria-expanded={hoveredTwilight === 'nautical'}
+                        aria-describedby="twilight-degree-nautical"
                         title="Click or hover for degree information"
                       >
                         Nautical:
-                      </span>
+                      </button>
                       <span className="font-mono">{formatTime(relevantTwilightTimes.civil)} - {formatTime(relevantTwilightTimes.nautical)}</span>
                     </div>
                     {hoveredTwilight === 'nautical' && (
-                      <div className="text-xs opacity-60 ml-2">
+                      <div id="twilight-degree-nautical" className="text-xs opacity-60 ml-2">
                         {getDegreeInfo('nautical')}
                       </div>
                     )}
                     <div className="flex justify-between">
-                      <span 
-                        className="font-semibold cursor-pointer hover:opacity-80 transition-opacity"
+                      <button
+                        type="button"
+                        className="font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left"
                         onMouseEnter={() => setHoveredTwilight('astronomical')}
                         onMouseLeave={() => setHoveredTwilight(null)}
+                        onFocus={() => setHoveredTwilight('astronomical')}
+                        onBlur={() => setHoveredTwilight(null)}
                         onClick={() => setHoveredTwilight(hoveredTwilight === 'astronomical' ? null : 'astronomical')}
+                        aria-expanded={hoveredTwilight === 'astronomical'}
+                        aria-describedby="twilight-degree-astronomical"
                         title="Click or hover for degree information"
                       >
                         Astronomical:
-                      </span>
+                      </button>
                       <span className="font-mono">{formatTime(relevantTwilightTimes.nautical)} - {formatTime(relevantTwilightTimes.astronomical)}</span>
                     </div>
                     {hoveredTwilight === 'astronomical' && (
-                      <div className="text-xs opacity-60 ml-2">
+                      <div id="twilight-degree-astronomical" className="text-xs opacity-60 ml-2">
                         {getDegreeInfo('astronomical')}
                       </div>
                     )}
@@ -471,53 +516,68 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 ) : (
                   <>
                     <div className="flex justify-between">
-                      <span 
-                        className="font-semibold cursor-pointer hover:opacity-80 transition-opacity"
+                      <button
+                        type="button"
+                        className="font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left"
                         onMouseEnter={() => setHoveredTwilight('astronomical')}
                         onMouseLeave={() => setHoveredTwilight(null)}
+                        onFocus={() => setHoveredTwilight('astronomical')}
+                        onBlur={() => setHoveredTwilight(null)}
                         onClick={() => setHoveredTwilight(hoveredTwilight === 'astronomical' ? null : 'astronomical')}
+                        aria-expanded={hoveredTwilight === 'astronomical'}
+                        aria-describedby="twilight-degree-astronomical"
                         title="Click or hover for degree information"
                       >
                         Astronomical:
-                      </span>
+                      </button>
                       <span className="font-mono">{formatTime(relevantTwilightTimes.astronomical)} - {formatTime(relevantTwilightTimes.nautical)}</span>
                     </div>
                     {hoveredTwilight === 'astronomical' && (
-                      <div className="text-xs opacity-60 ml-2">
+                      <div id="twilight-degree-astronomical" className="text-xs opacity-60 ml-2">
                         {getDegreeInfo('astronomical')}
                       </div>
                     )}
                     <div className="flex justify-between">
-                      <span 
-                        className="font-semibold cursor-pointer hover:opacity-80 transition-opacity"
+                      <button
+                        type="button"
+                        className="font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left"
                         onMouseEnter={() => setHoveredTwilight('nautical')}
                         onMouseLeave={() => setHoveredTwilight(null)}
+                        onFocus={() => setHoveredTwilight('nautical')}
+                        onBlur={() => setHoveredTwilight(null)}
                         onClick={() => setHoveredTwilight(hoveredTwilight === 'nautical' ? null : 'nautical')}
+                        aria-expanded={hoveredTwilight === 'nautical'}
+                        aria-describedby="twilight-degree-nautical"
                         title="Click or hover for degree information"
                       >
                         Nautical:
-                      </span>
+                      </button>
                       <span className="font-mono">{formatTime(relevantTwilightTimes.nautical)} - {formatTime(relevantTwilightTimes.civil)}</span>
                     </div>
                     {hoveredTwilight === 'nautical' && (
-                      <div className="text-xs opacity-60 ml-2">
+                      <div id="twilight-degree-nautical" className="text-xs opacity-60 ml-2">
                         {getDegreeInfo('nautical')}
                       </div>
                     )}
                     <div className="flex justify-between">
-                      <span 
-                        className="font-semibold cursor-pointer hover:opacity-80 transition-opacity"
+                      <button
+                        type="button"
+                        className="font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left"
                         onMouseEnter={() => setHoveredTwilight('civil')}
                         onMouseLeave={() => setHoveredTwilight(null)}
+                        onFocus={() => setHoveredTwilight('civil')}
+                        onBlur={() => setHoveredTwilight(null)}
                         onClick={() => setHoveredTwilight(hoveredTwilight === 'civil' ? null : 'civil')}
+                        aria-expanded={hoveredTwilight === 'civil'}
+                        aria-describedby="twilight-degree-civil"
                         title="Click or hover for degree information"
                       >
                         Civil:
-                      </span>
+                      </button>
                       <span className="font-mono">{formatTime(relevantTwilightTimes.civil)} - {formatTime(sunTimes.sunrise)}</span>
                     </div>
                     {hoveredTwilight === 'civil' && (
-                      <div className="text-xs opacity-60 ml-2">
+                      <div id="twilight-degree-civil" className="text-xs opacity-60 ml-2">
                         {getDegreeInfo('civil')}
                       </div>
                     )}
@@ -532,7 +592,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-bold">Sun Position</h3>
               <button
-                onClick={() => setIsSunPositionCollapsed(!isSunPositionCollapsed)}
+                onClick={() => {
+                  userToggledSunPositionRef.current = true;
+                  setIsSunPositionCollapsed(!isSunPositionCollapsed);
+                }}
                 className="p-1 rounded hover:bg-white hover:bg-opacity-10 transition-colors"
                 aria-label={isSunPositionCollapsed ? "Expand sun position" : "Collapse sun position"}
               >

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Ghost } from 'lucide-react';
+import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 
 interface MidnightGhostProps {
   currentTime: Date;
@@ -7,8 +8,8 @@ interface MidnightGhostProps {
 
 const MidnightGhost: React.FC<MidnightGhostProps> = ({ currentTime }) => {
   const [isVisible, setIsVisible] = useState(false);
-  const [position, setPosition] = useState({ x: 50, y: 30 });
-  const [direction, setDirection] = useState(1);
+  const [position, setPosition] = useState({ x: 50, y: 30, direction: 1 });
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   // Check if it's exactly midnight (00:00)
   const isMidnight = currentTime.getHours() === 0 && currentTime.getMinutes() === 0;
@@ -29,12 +30,13 @@ const MidnightGhost: React.FC<MidnightGhostProps> = ({ currentTime }) => {
 
   // Floating animation
   useEffect(() => {
-    if (!isVisible) return;
+    // Reduced motion: keep the ghost static at its initial position, no floating.
+    if (!isVisible || prefersReducedMotion) return;
 
     const floatInterval = setInterval(() => {
       setPosition(prev => {
-        let newX = prev.x + (direction * 0.5);
-        let newDirection = direction;
+        let newX = prev.x + (prev.direction * 0.5);
+        let newDirection = prev.direction;
 
         // Bounce off edges
         if (newX >= 80) {
@@ -45,17 +47,19 @@ const MidnightGhost: React.FC<MidnightGhostProps> = ({ currentTime }) => {
           newDirection = 1;
         }
 
-        setDirection(newDirection);
+        // Clamp the vertical drift to a sane band so the ghost can't wander off-screen
+        const newY = Math.min(50, Math.max(10, prev.y + Math.sin(Date.now() * 0.002) * 0.3));
 
         return {
           x: newX,
-          y: prev.y + Math.sin(Date.now() * 0.002) * 0.3
+          y: newY,
+          direction: newDirection
         };
       });
     }, 100);
 
     return () => clearInterval(floatInterval);
-  }, [isVisible, direction]);
+  }, [isVisible, prefersReducedMotion]);
 
   if (!isVisible) return null;
 

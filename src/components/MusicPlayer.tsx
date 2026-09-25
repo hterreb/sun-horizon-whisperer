@@ -15,6 +15,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
   const [isVisible, setIsVisible] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fadeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isPlayingRef = useRef(isPlaying);
   const isMobile = useIsMobile();
 
   // Handle fade out in fullscreen
@@ -58,27 +59,38 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
     }
   };
 
+  // Keyboard focus and touch also need to bring the controls back, not just mouse hover.
+  const handleFocus = handleMouseEnter;
+  const handleTouchStart = handleMouseEnter;
+
   useEffect(() => {
     // Create audio element with lo-fi streams
     audioRef.current = new Audio();
     audioRef.current.crossOrigin = "anonymous";
     audioRef.current.preload = "none";
-    
+
     // Lo-fi hip hop radio streams
     const streams = [
       'https://fluxfm.streamabc.net/flx-chillhop-mp3-320-1595440',
       'https://streams.ilovemusic.de/iloveradio17.mp3', // ILoveRadio Lo-Fi
       'https://radio.lofihiphop.com/lofi', // Dedicated lo-fi stream
-      'https://streaming.radionomy.com/lofi-hip-hop', // Radionomy lo-fi
       'https://cast1.torontocast.com:1025/stream' // Chillout backup
     ];
-    
+
     let currentStreamIndex = 0;
-    
+
     const tryNextStream = () => {
       if (currentStreamIndex < streams.length) {
         audioRef.current!.src = streams[currentStreamIndex];
         currentStreamIndex++;
+        if (isPlayingRef.current) {
+          const playPromise = audioRef.current!.play();
+          if (playPromise !== undefined) {
+            playPromise.catch(error => {
+              console.error('Audio playback failed after stream switch:', error);
+            });
+          }
+        }
       } else {
         console.error('All lo-fi streams failed');
         toast({
@@ -89,17 +101,15 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
         setIsPlaying(false);
       }
     };
-    
+
     // Set up error handling
     const handleError = () => {
-      console.log(`Lo-fi stream ${currentStreamIndex} failed, trying next...`);
       tryNextStream();
     };
-    
+
     const handleCanPlay = () => {
-      console.log('Lo-fi stream loaded successfully');
     };
-    
+
     audioRef.current.addEventListener('error', handleError);
     audioRef.current.addEventListener('canplay', handleCanPlay);
     
@@ -121,6 +131,10 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
       audioRef.current.volume = volume[0];
     }
   }, [volume]);
+
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -157,11 +171,14 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
         isMobile ? 'bottom-16 left-4' : 'bottom-4 left-4'
       } ${isVisible ? 'opacity-100' : 'opacity-0'}`}
       onMouseEnter={handleMouseEnter}
+      onFocus={handleFocus}
+      onTouchStart={handleTouchStart}
     >
       <Switch
         checked={isPlaying}
         onCheckedChange={handlePlayToggle}
         className="data-[state=checked]:bg-primary"
+        aria-label="Play lo-fi music"
       />
       <Music className="h-4 w-4 text-white" />
       {volume[0] === 0 ? (
@@ -176,6 +193,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
         max={1}
         step={0.01}
         min={0}
+        aria-label="Volume"
       />
     </div>
   );
