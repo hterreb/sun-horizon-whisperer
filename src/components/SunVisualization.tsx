@@ -25,6 +25,13 @@ export const getAzimuthScreenFraction = (azimuth: number, latitude: number): num
   return adjusted / 360;
 };
 
+// True when the sun's altitude crosses the horizon (0°) between two samples, i.e. it
+// was on one side and is now on the other. A rounded `altitude === 0.0` check can miss
+// the crossing entirely if the 30s sample lands slightly off zero either side.
+// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
+export const crossesHorizon = (prevAltitude: number, currentAltitude: number): boolean =>
+  (prevAltitude < 0) !== (currentAltitude < 0);
+
 const SunVisualization: React.FC<SunVisualizationProps> = ({
   sunPosition,
   moonPosition,
@@ -38,15 +45,13 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   const [showFireworks, setShowFireworks] = useState(false);
   const prevAltitudeRef = useRef<number>(sunPosition.altitude);
 
-  // Check if sun crosses the horizon (0.0 degrees)
+  // Check if sun crosses the horizon (0° altitude)
   useEffect(() => {
-    const currentAltitude = Math.round(sunPosition.altitude * 10) / 10; // Round to 1 decimal place
-    const prevAltitude = Math.round(prevAltitudeRef.current * 10) / 10;
-    
-    // Trigger fireworks if sun crosses exactly 0.0 degrees (either direction)
-    if ((prevAltitude !== 0.0 && currentAltitude === 0.0) || 
-        (Math.abs(currentAltitude) < 0.05 && Math.abs(prevAltitude - currentAltitude) > 0.1)) {
-      console.log('Sun hit horizon! Triggering fireworks. Altitude:', currentAltitude);
+    const currentAltitude = sunPosition.altitude;
+    const prevAltitude = prevAltitudeRef.current;
+
+    // Trigger fireworks on a sign change (crossing the horizon in either direction).
+    if (crossesHorizon(prevAltitude, currentAltitude)) {
       setShowFireworks(true);
       
       // Reset fireworks trigger after a short delay
@@ -184,7 +189,6 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       case 'nautical-twilight':
         return '#221F26';
       case 'dawn':
-      case 'dusk':
         return '#403E43';
       default:
         return '#33C3F0';

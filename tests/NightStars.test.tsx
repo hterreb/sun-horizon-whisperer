@@ -17,6 +17,18 @@ const mockCanvasContext = () =>
     stroke: () => {},
   } as unknown as CanvasRenderingContext2D);
 
+const mockReducedMotion = (matches: boolean) =>
+  vi.spyOn(window, 'matchMedia').mockReturnValue({
+    matches,
+    media: '',
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  } as unknown as MediaQueryList);
+
 describe('NightStars', () => {
   it('renders stars at night', () => {
     const { container } = render(<NightStars timeOfDay="night" moonPosition={{ illumination: 0.5 }} />);
@@ -77,6 +89,20 @@ describe('NightStars', () => {
 
     rafSpy.mockRestore();
     cafSpy.mockRestore();
+    ctxSpy.mockRestore();
+  });
+
+  it('draws stars statically without starting the animation loop when reduced motion is preferred (A-2)', () => {
+    const ctxSpy = mockCanvasContext();
+    const mediaSpy = mockReducedMotion(true);
+    const rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 1);
+
+    render(<NightStars timeOfDay="night" moonPosition={{ illumination: 0.5 }} />);
+
+    expect(rafSpy).not.toHaveBeenCalled();
+
+    rafSpy.mockRestore();
+    mediaSpy.mockRestore();
     ctxSpy.mockRestore();
   });
 });

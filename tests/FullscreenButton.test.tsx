@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, afterEach } from 'vitest';
 import FullscreenButton from '../src/components/FullscreenButton';
 
@@ -30,5 +30,19 @@ describe('FullscreenButton', () => {
     Reflect.deleteProperty(document, 'fullscreenEnabled');
     render(<FullscreenButton />);
     expect(screen.getByRole('button')).toBeInTheDocument();
+  });
+
+  it('has an aria-label, and reappears on focus and touch as well as mouse hover (A-3)', () => {
+    Object.defineProperty(document, 'fullscreenEnabled', { value: true, configurable: true });
+    render(<FullscreenButton />);
+    const button = screen.getByRole('button');
+    expect(button).toHaveAttribute('aria-label');
+
+    fireEvent.mouseLeave(button); // fullscreen-only fade; harmless when not fullscreen
+    fireEvent.focus(button);
+    expect(button.className).toContain('opacity-100');
+
+    fireEvent.touchStart(button);
+    expect(button.className).toContain('opacity-100');
   });
 });

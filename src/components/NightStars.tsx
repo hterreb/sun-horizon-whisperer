@@ -2,6 +2,7 @@
 import React, { useEffect, useRef } from 'react';
 import { type TimeOfDay } from '../utils/sunUtils';
 import { type MoonPosition } from '../utils/moonUtils';
+import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 
 interface NightStarsProps {
   timeOfDay: TimeOfDay;
@@ -31,6 +32,7 @@ const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const starsRef = useRef<Star[]>([]);
   const moonBrightnessRef = useRef(moonPosition?.illumination || 0);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   // Keep the latest moon brightness in a ref so the animation effect below
   // doesn't need to depend on the moonPosition object (a new object every
@@ -72,6 +74,21 @@ const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition }) => {
     if (!isNightTime) {
       // Not night: clear once and don't keep an animation loop running.
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      return;
+    }
+
+    if (prefersReducedMotion) {
+      // Draw stars once at a fixed brightness: no twinkle, no shooting stars, no rAF loop.
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const moonBrightness = moonBrightnessRef.current;
+      const starVisibilityFactor = 1 - (moonBrightness * 0.3);
+      starsRef.current.forEach(star => {
+        const opacity = star.baseOpacity * starVisibilityFactor * (timeOfDay === 'night' ? 1 : 0.6);
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+        ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+        ctx.fill();
+      });
       return;
     }
 
@@ -152,7 +169,7 @@ const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition }) => {
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-  }, [timeOfDay]);
+  }, [timeOfDay, prefersReducedMotion]);
 
   return (
     <canvas

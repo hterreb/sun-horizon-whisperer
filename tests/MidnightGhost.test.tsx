@@ -2,6 +2,18 @@ import React from 'react';
 import { render } from '@testing-library/react';
 import MidnightGhost from '../src/components/MidnightGhost';
 
+const mockReducedMotion = (matches: boolean) =>
+  vi.spyOn(window, 'matchMedia').mockReturnValue({
+    matches,
+    media: '',
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  } as unknown as MediaQueryList);
+
 describe('MidnightGhost', () => {
   it('shows ghost at midnight', () => {
     const midnight = new Date();
@@ -51,6 +63,23 @@ describe('MidnightGhost', () => {
     expect(topValue).toBeLessThanOrEqual(50);
 
     vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it('stays static (no floating interval) when reduced motion is preferred (A-2)', () => {
+    const mediaSpy = mockReducedMotion(true);
+    vi.useFakeTimers();
+    const setIntervalSpy = vi.spyOn(window, 'setInterval');
+
+    const midnight = new Date();
+    midnight.setHours(0, 0, 0, 0);
+    render(<MidnightGhost currentTime={midnight} />);
+
+    const floatIntervalCalls = setIntervalSpy.mock.calls.filter(call => call[1] === 100);
+    expect(floatIntervalCalls.length).toBe(0);
+
+    setIntervalSpy.mockRestore();
+    mediaSpy.mockRestore();
     vi.useRealTimers();
   });
 });

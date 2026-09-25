@@ -1,4 +1,4 @@
-import { getSunPosition, getSunTimes, getTimeOfDay, getRelevantTwilightTimes } from '../src/utils/sunUtils';
+import { getSunPosition, getSunTimes, getTimeOfDay, getRelevantTwilightTimes, formatTime } from '../src/utils/sunUtils';
 describe('sunUtils', () => {
   it('calculates sun position', () => {
     const pos = getSunPosition(new Date(), 0, 0);
@@ -54,5 +54,36 @@ describe('sunUtils', () => {
     const originalTime = date.getTime();
     getSunTimes(date, 78, 15); // polar day at this latitude/date → SunCalc returns invalid sunrise/sunset, triggering fallbacks
     expect(date.getTime()).toBe(originalTime);
+  });
+
+  it('marks polar day at lat 78 in June, when the sun never sets (C-5)', () => {
+    const date = new Date(2026, 5, 21, 12, 0, 0, 0); // 2026-06-21, near summer solstice
+    const times = getSunTimes(date, 78, 15);
+    expect(times.polar).toBe('day');
+    // The invented fallback sunrise/sunset are still present for internal time-of-day math.
+    expect(times.sunrise).toBeInstanceOf(Date);
+    expect(times.sunset).toBeInstanceOf(Date);
+  });
+
+  it('marks polar night at lat 78 in December, when the sun never rises (C-5)', () => {
+    const date = new Date(2026, 11, 21, 12, 0, 0, 0); // 2026-12-21, near winter solstice
+    const times = getSunTimes(date, 78, 15);
+    expect(times.polar).toBe('night');
+  });
+
+  it('leaves polar null on an ordinary day at a temperate latitude', () => {
+    const times = getSunTimes(new Date(2026, 5, 21, 12, 0, 0, 0), 51, 0);
+    expect(times.polar).toBeNull();
+  });
+
+  it('formats time using the runtime locale instead of a hard-coded pattern (A-4)', () => {
+    const date = new Date(2026, 0, 1, 13, 5, 0);
+    const expected = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    expect(formatTime(date)).toBe(expected);
+  });
+
+  it('formatTime still reports "Unknown" for an invalid date', () => {
+    expect(formatTime(new Date('invalid'))).toBe('Unknown');
+    expect(formatTime(null)).toBe('Unknown');
   });
 });

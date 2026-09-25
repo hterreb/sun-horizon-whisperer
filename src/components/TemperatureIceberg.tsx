@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 
 interface TemperatureIcebergProps {
   temperature: number;
@@ -7,9 +8,11 @@ interface TemperatureIcebergProps {
 
 const TemperatureIceberg: React.FC<TemperatureIcebergProps> = ({ temperature, isVisible }) => {
   const [position, setPosition] = useState({ x: -10, y: 75, direction: 1 }); // Start off-screen left
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
-    if (!isVisible || temperature >= 0) {
+    // Reduced motion: keep the iceberg static at its initial position, no floating.
+    if (!isVisible || temperature >= 0 || prefersReducedMotion) {
       // Reset position when not visible
       setPosition({ x: -10, y: 75, direction: 1 });
       return;
@@ -39,7 +42,7 @@ const TemperatureIceberg: React.FC<TemperatureIcebergProps> = ({ temperature, is
     }, 100);
 
     return () => clearInterval(floatInterval);
-  }, [isVisible, temperature]);
+  }, [isVisible, temperature, prefersReducedMotion]);
 
   if (!isVisible || temperature >= 0) {
     return null;

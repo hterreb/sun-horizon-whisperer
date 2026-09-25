@@ -2,6 +2,18 @@ import React from 'react';
 import { render } from '@testing-library/react';
 import TemperatureIceberg from '../src/components/TemperatureIceberg';
 
+const mockReducedMotion = (matches: boolean) =>
+  vi.spyOn(window, 'matchMedia').mockReturnValue({
+    matches,
+    media: '',
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  } as unknown as MediaQueryList);
+
 describe('TemperatureIceberg', () => {
   it('uses an arbitrary-value Tailwind z-index class (C-12)', () => {
     const { container } = render(<TemperatureIceberg temperature={-5} isVisible={true} />);
@@ -23,6 +35,21 @@ describe('TemperatureIceberg', () => {
     expect(floatIntervalCalls.length).toBe(1);
 
     setIntervalSpy.mockRestore();
+    vi.useRealTimers();
+  });
+
+  it('stays static (no floating interval) when reduced motion is preferred (A-2)', () => {
+    const mediaSpy = mockReducedMotion(true);
+    vi.useFakeTimers();
+    const setIntervalSpy = vi.spyOn(window, 'setInterval');
+
+    render(<TemperatureIceberg temperature={-5} isVisible={true} />);
+
+    const floatIntervalCalls = setIntervalSpy.mock.calls.filter(call => call[1] === 100);
+    expect(floatIntervalCalls.length).toBe(0);
+
+    setIntervalSpy.mockRestore();
+    mediaSpy.mockRestore();
     vi.useRealTimers();
   });
 });

@@ -1,5 +1,4 @@
 import SunCalc from 'suncalc';
-import { format } from 'date-fns';
 
 export interface SunPosition {
   azimuth: number;
@@ -16,6 +15,11 @@ export interface SunTimes {
   nauticalDusk: Date;
   astronomicalDawn: Date;
   astronomicalDusk: Date;
+  // Set when SunCalc could not find a sunrise/sunset for this date/location (polar
+  // day or night): 'day' if the sun never sets (altitude at solar noon > 0), 'night'
+  // if it never rises. Null on ordinary days. The sunrise/sunset fields above still
+  // hold the invented 06:00/18:00 fallback for internal time-of-day math.
+  polar: 'day' | 'night' | null;
 }
 
 export interface LocationData {
@@ -32,9 +36,8 @@ export type TimeOfDay =
   | 'dawn' 
   | 'morning' 
   | 'midday' 
-  | 'afternoon' 
-  | 'evening' 
-  | 'dusk';
+  | 'afternoon'
+  | 'evening';
 
 export const getSunPosition = (date: Date, latitude: number, longitude: number): SunPosition => {
   const position = SunCalc.getPosition(date, latitude, longitude);
@@ -89,10 +92,22 @@ export const getSunTimes = (date: Date, latitude: number, longitude: number): Su
     return fallback;
   };
   
+  // At polar day/night SunCalc can't find a sunrise/sunset event; the fallback times
+  // below are invented for internal time-of-day math only. Record which case this is
+  // so callers (e.g. InfoPanel) can show "sun does not rise/set" instead of the fake time.
+  const sunriseSunsetInvalid = !isValidDate(times.sunrise) || !isValidDate(times.sunset);
+  let polar: 'day' | 'night' | null = null;
+  if (sunriseSunsetInvalid) {
+    const noon = isValidDate(times.solarNoon) ? times.solarNoon : date;
+    const noonAltitude = getSunPosition(noon, latitude, longitude).altitude;
+    polar = noonAltitude > 0 ? 'day' : 'night';
+  }
+
   return {
     sunrise: isValidDate(times.sunrise) ? times.sunrise : at(6, 0),
     sunset: isValidDate(times.sunset) ? times.sunset : at(18, 0),
     solarNoon: isValidDate(times.solarNoon) ? times.solarNoon : at(12, 0),
+    polar,
     // Civil twilight: -6° to 0° (dawn to sunrise) / 0° to -6° (sunset to dusk)
     dawn: isValidDate(times.dawn) ? times.dawn : at(5, 30), // -6° (civil dawn)
     dusk: isValidDate(times.dusk) ? times.dusk : at(18, 30), // -6° (civil dusk)
@@ -109,7 +124,7 @@ export const formatTime = (date: Date | null): string => {
   if (!isValidDate(date)) return "Unknown";
   
   try {
-    return format(date, 'h:mm a');
+    return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   } catch (error) {
     console.error('Error formatting time:', error);
     return "Unknown";
@@ -151,7 +166,6 @@ export const getTimeOfDayLabel = (timeOfDay: TimeOfDay): string => {
     case 'midday': return 'Midday';
     case 'afternoon': return 'Afternoon';
     case 'evening': return 'Evening';
-    case 'dusk': return 'Dusk';
     default: return 'Unknown';
   }
 };
@@ -176,8 +190,6 @@ export const getBackgroundGradient = (timeOfDay: TimeOfDay): string => {
       return 'linear-gradient(to bottom, #33C3F0 0%, #FEC6A1 100%)';
     case 'evening':
       return 'linear-gradient(180deg, #FEC6A1 0%, #F97316 100%)';
-    case 'dusk':
-      return 'linear-gradient(to bottom, #ea384c 0%, #E5DEFF 100%)';
     default:
       return 'linear-gradient(to bottom, #0EA5E9 0%, #33C3F0 100%)';
   }

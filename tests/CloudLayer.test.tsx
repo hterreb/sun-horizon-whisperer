@@ -3,6 +3,18 @@ import { render } from '@testing-library/react';
 import CloudLayer, { WeatherType } from '../src/components/CloudLayer';
 import type { TimeOfDay } from '../src/utils/sunUtils';
 
+const mockReducedMotion = (matches: boolean) =>
+  vi.spyOn(window, 'matchMedia').mockReturnValue({
+    matches,
+    media: '',
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  } as unknown as MediaQueryList);
+
 describe('CloudLayer', () => {
   const renderLayer = (weatherType: WeatherType, timeOfDay: string) =>
     render(<CloudLayer weatherType={weatherType} timeOfDay={timeOfDay as TimeOfDay} />);
@@ -47,5 +59,17 @@ describe('CloudLayer', () => {
 
   it('removes birds, ships, and fishes when off-screen or weather/time changes', () => {
     // Simulate time/weather change and check for removal
+  });
+
+  it('skips the bird/fish/ship animation loop when reduced motion is preferred (A-2)', () => {
+    const mediaSpy = mockReducedMotion(true);
+    const rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 1);
+
+    renderLayer('clear', 'midday');
+
+    expect(rafSpy).not.toHaveBeenCalled();
+
+    rafSpy.mockRestore();
+    mediaSpy.mockRestore();
   });
 });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import MusicPlayer from '../src/components/MusicPlayer';
 import { toast } from '@/hooks/use-toast';
 
@@ -31,6 +31,31 @@ describe('MusicPlayer', () => {
     render(<MusicPlayer />);
     expect(screen.getByRole('switch')).toBeInTheDocument();
     expect(screen.getByRole('slider')).toBeInTheDocument();
+  });
+
+  it('has an accessible label on the play switch (A-3)', () => {
+    render(<MusicPlayer />);
+    expect(screen.getByRole('switch')).toHaveAttribute('aria-label', 'Play lo-fi music');
+  });
+
+  it('reappears on focus and touch in fullscreen, not just mouse hover (A-3)', () => {
+    vi.useFakeTimers();
+    const { container } = render(<MusicPlayer isFullscreen={true} />);
+    const player = container.firstChild as HTMLElement;
+
+    act(() => { vi.advanceTimersByTime(10000); });
+    expect(player.className).toContain('opacity-0');
+
+    fireEvent.focus(player);
+    expect(player.className).toContain('opacity-100');
+
+    act(() => { vi.advanceTimersByTime(10000); });
+    expect(player.className).toContain('opacity-0');
+
+    fireEvent.touchStart(player);
+    expect(player.className).toContain('opacity-100');
+
+    vi.useRealTimers();
   });
 
   // More tests for play, pause, error fallback, etc.
