@@ -44,6 +44,15 @@ const FullscreenButton: React.FC<FullscreenButtonProps> = ({ onFullscreenChange 
     }
   };
 
+  // Keyboard focus and touch also need to bring the button back, not just mouse hover.
+  const handleFocus = () => {
+    setIsVisible(true);
+  };
+
+  const handleTouchStart = () => {
+    setIsVisible(true);
+  };
+
   // iPhone Safari has no Fullscreen API; render nothing rather than a button that does nothing.
   if (document.fullscreenEnabled === false) {
     return null;
@@ -56,10 +65,13 @@ const FullscreenButton: React.FC<FullscreenButtonProps> = ({ onFullscreenChange 
       onClick={toggleFullscreen}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onFocus={handleFocus}
+      onTouchStart={handleTouchStart}
       className={`fixed top-4 left-4 z-40 bg-black/20 backdrop-blur-sm hover:bg-black/40 text-white border border-white/20 transition-opacity duration-300 ${
         isVisible ? 'opacity-100' : 'opacity-0'
       }`}
       title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+      aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
     >
       {isFullscreen ? (
         <Minimize className="h-4 w-4" />

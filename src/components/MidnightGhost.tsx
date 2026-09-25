@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Ghost } from 'lucide-react';
+import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 
 interface MidnightGhostProps {
   currentTime: Date;
@@ -8,6 +9,7 @@ interface MidnightGhostProps {
 const MidnightGhost: React.FC<MidnightGhostProps> = ({ currentTime }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ x: 50, y: 30, direction: 1 });
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   // Check if it's exactly midnight (00:00)
   const isMidnight = currentTime.getHours() === 0 && currentTime.getMinutes() === 0;
@@ -28,7 +30,8 @@ const MidnightGhost: React.FC<MidnightGhostProps> = ({ currentTime }) => {
 
   // Floating animation
   useEffect(() => {
-    if (!isVisible) return;
+    // Reduced motion: keep the ghost static at its initial position, no floating.
+    if (!isVisible || prefersReducedMotion) return;
 
     const floatInterval = setInterval(() => {
       setPosition(prev => {
@@ -56,7 +59,7 @@ const MidnightGhost: React.FC<MidnightGhostProps> = ({ currentTime }) => {
     }, 100);
 
     return () => clearInterval(floatInterval);
-  }, [isVisible]);
+  }, [isVisible, prefersReducedMotion]);
 
   if (!isVisible) return null;
 

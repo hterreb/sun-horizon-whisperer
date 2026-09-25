@@ -100,7 +100,12 @@ export const fetchCurrentWeather = async (latitude: number, longitude: number): 
   }
 
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`;
+    // Round to ~1km precision before sending the location to a third party. The
+    // cache above still keys off the unrounded coordinates passed in, so its
+    // "location changed" check is unaffected.
+    const roundedLatitude = Math.round(latitude * 100) / 100;
+    const roundedLongitude = Math.round(longitude * 100) / 100;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${roundedLatitude}&longitude=${roundedLongitude}&current_weather=true`;
 
     const response = await fetch(url);
     if (!response.ok) {

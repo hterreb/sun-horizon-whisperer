@@ -114,12 +114,9 @@ const SunTracker: React.FC = () => {
         setWeatherType(weather.weatherType);
       }
 
-      if (weather.isRealWeather) {
-        toast({
-          title: "Weather updated",
-          description: `${weather.weatherDescription}, ${weather.temperature}°C`,
-        });
-      } else {
+      // Only surface a toast when the refresh actually failed; a successful
+      // refresh (every 30 min, or a cache hit) should stay silent.
+      if (!weather.isRealWeather) {
         toast({
           title: "Weather unavailable",
           description: "Using default weather. Check your connection.",

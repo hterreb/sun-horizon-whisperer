@@ -59,6 +59,10 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
     }
   };
 
+  // Keyboard focus and touch also need to bring the controls back, not just mouse hover.
+  const handleFocus = handleMouseEnter;
+  const handleTouchStart = handleMouseEnter;
+
   useEffect(() => {
     // Create audio element with lo-fi streams
     audioRef.current = new Audio();
@@ -167,11 +171,14 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
         isMobile ? 'bottom-16 left-4' : 'bottom-4 left-4'
       } ${isVisible ? 'opacity-100' : 'opacity-0'}`}
       onMouseEnter={handleMouseEnter}
+      onFocus={handleFocus}
+      onTouchStart={handleTouchStart}
     >
       <Switch
         checked={isPlaying}
         onCheckedChange={handlePlayToggle}
         className="data-[state=checked]:bg-primary"
+        aria-label="Play lo-fi music"
       />
       <Music className="h-4 w-4 text-white" />
       {volume[0] === 0 ? (
@@ -186,6 +193,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
         max={1}
         step={0.01}
         min={0}
+        aria-label="Volume"
       />
     </div>
   );

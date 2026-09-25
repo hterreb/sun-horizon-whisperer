@@ -80,6 +80,28 @@ describe('SunTracker', () => {
     // Optionally check for fetch call or UI update
   });
 
+  it('does not toast on a successful weather refresh, only on failure (A-5)', async () => {
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 1, longitude: 2 } }) } });
+    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current_weather: { temperature: 20, weathercode: 0, windspeed: 0, winddirection: 0, time: '' } }) })) as unknown as typeof fetch;
+
+    render(<SunTracker />);
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+
+    expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ title: 'Weather updated' }));
+  });
+
+  it('toasts when the weather refresh fails (A-5)', async () => {
+    // Distinct coordinates from the previous test, so the weather cache (keyed on
+    // location, not test) doesn't serve a stale successful result here.
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 5, longitude: 6 } }) } });
+    global.fetch = vi.fn(() => Promise.reject(new Error('network down'))) as unknown as typeof fetch;
+
+    render(<SunTracker />);
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Weather unavailable' }))
+    );
+  });
+
   it('does not re-register the fullscreenchange listener on every render (P-5)', () => {
     vi.useFakeTimers();
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 1, longitude: 2 } }) } });

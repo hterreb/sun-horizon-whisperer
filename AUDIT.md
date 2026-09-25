@@ -25,7 +25,8 @@
 
 > **Status 2026-09-24:** fixed: S-1…S-7, C-1…C-4, C-6, C-7, C-9, C-12, C-13, P-1…P-6 (P-4 except `CloudLayer`), B-1…B-7, M-1…M-4. Each fixed bug has a test that failed before the fix.
 > Partial: D-1: 4 production advisories remain (1 high, 3 moderate). They need major upgrades: `vite` 5→8 (esbuild), `react-router-dom` 6→7.
-> Open: `eslint` stays pinned at `^9.13.0` (newer 9.x crashes with `typescript-eslint` 8.11). Open: S-8, S-9, C-5, C-8, C-10, C-11, D-2…D-5, A-1…A-5.
+> **Status 2026-09-25:** also fixed: S-8, C-5, C-8, C-10, C-11, D-2, D-3, D-4, A-1, A-2, A-3, A-5; A-4 partial (locale time format; no manual location input).
+> Open: S-9, D-5 (decide on the Supabase/Stripe feature), D-1 remainder (major upgrades), A-4 manual location, P-4 `CloudLayer`. `eslint` stays pinned at `^9.13.0` (newer 9.x crashes with `typescript-eslint` 8.11).
 > New required secret for the Supabase functions: `SITE_URL`.
 
 1. Remove the third-party `gptengineer.js` script from production HTML (S-1).

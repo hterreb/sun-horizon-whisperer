@@ -1,5 +1,6 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 
 interface FireworkParticle {
   id: number;
@@ -29,6 +30,7 @@ const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3'
 const Fireworks: React.FC<FireworksProps> = ({ trigger }) => {
   const [fireworks, setFireworks] = useState<Firework[]>([]);
   const animationIdRef = useRef<number | null>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   const createFirework = useCallback(() => {
     const x = Math.random() * 100;
@@ -83,7 +85,8 @@ const Fireworks: React.FC<FireworksProps> = ({ trigger }) => {
   };
 
   useEffect(() => {
-    if (trigger) {
+    // Reduced motion: skip spawning the animated firework bursts entirely.
+    if (trigger && !prefersReducedMotion) {
       // Create more fireworks when triggered - spread them out over time
       const timeoutIds: ReturnType<typeof setTimeout>[] = [];
       for (let i = 0; i < 8; i++) { // More fireworks
@@ -95,7 +98,7 @@ const Fireworks: React.FC<FireworksProps> = ({ trigger }) => {
         timeoutIds.forEach(clearTimeout);
       };
     }
-  }, [trigger, createFirework]);
+  }, [trigger, createFirework, prefersReducedMotion]);
 
   const hasFireworks = fireworks.length > 0;
 
