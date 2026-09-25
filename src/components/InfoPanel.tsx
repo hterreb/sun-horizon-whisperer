@@ -1,17 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, CloudRain, CloudSnow, CloudSun, Sun, CloudLightning, Moon, RefreshCw, Thermometer } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
-import { 
-  type SunPosition, 
-  type SunTimes, 
-  type LocationData, 
+import { Button } from './ui/button';
+import {
+  type SunPosition,
+  type SunTimes,
+  type LocationData,
   type TimeOfDay,
   formatTime,
   getTimeOfDayLabel,
-  getRelevantTwilightTimes 
+  getRelevantTwilightTimes
 } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhaseLabel } from '../utils/moonUtils';
 import { type WeatherData } from '../utils/weatherUtils';
+import { isValidLatitude, isValidLongitude } from '../utils/manualLocation';
 import { type WeatherType } from './CloudLayer';
 import { format } from 'date-fns';
 
@@ -30,13 +32,15 @@ interface InfoPanelProps {
   onWeatherChange: (weather: WeatherType) => void;
   onWeatherModeToggle: (useReal: boolean) => void;
   onWeatherRefresh: () => void;
+  onLocationChange: (latitude: number, longitude: number) => void;
+  onUseMyLocation: () => void;
 }
 
-const InfoPanel: React.FC<InfoPanelProps> = ({ 
-  sunPosition, 
+const InfoPanel: React.FC<InfoPanelProps> = ({
+  sunPosition,
   moonPosition,
-  sunTimes, 
-  location, 
+  sunTimes,
+  location,
   timeOfDay,
   currentTime,
   weatherType,
@@ -46,11 +50,19 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   isFullscreen = false,
   onWeatherChange,
   onWeatherModeToggle,
-  onWeatherRefresh
+  onWeatherRefresh,
+  onLocationChange,
+  onUseMyLocation
 }) => {
   const [locationName, setLocationName] = useState<string>('');
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isLocationFormOpen, setIsLocationFormOpen] = useState(false);
+  const [latInput, setLatInput] = useState('');
+  const [lonInput, setLonInput] = useState('');
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const latInputRef = useRef<HTMLInputElement>(null);
+  const changeLocationButtonRef = useRef<HTMLButtonElement>(null);
   const [isMoonCollapsed, setIsMoonCollapsed] = useState(true);
   const [isTwilightCollapsed, setIsTwilightCollapsed] = useState(false);
   const [isSunPositionCollapsed, setIsSunPositionCollapsed] = useState(false);
@@ -165,6 +177,49 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     fetchLocationName();
   }, [location.latitude, location.longitude, location.loaded]);
 
+  // Focus the latitude field when the manual-location form opens.
+  useEffect(() => {
+    if (isLocationFormOpen) {
+      latInputRef.current?.focus();
+    }
+  }, [isLocationFormOpen]);
+
+  const openLocationForm = () => {
+    setLatInput(location.latitude.toFixed(4));
+    setLonInput(location.longitude.toFixed(4));
+    setLocationError(null);
+    setIsLocationFormOpen(true);
+  };
+
+  const closeLocationForm = () => {
+    setIsLocationFormOpen(false);
+    setLocationError(null);
+    changeLocationButtonRef.current?.focus();
+  };
+
+  const handleSubmitLocation = (e: React.FormEvent) => {
+    e.preventDefault();
+    const lat = parseFloat(latInput);
+    const lon = parseFloat(lonInput);
+
+    if (Number.isNaN(lat) || !isValidLatitude(lat)) {
+      setLocationError('Latitude must be a number between -90 and 90.');
+      return;
+    }
+    if (Number.isNaN(lon) || !isValidLongitude(lon)) {
+      setLocationError('Longitude must be a number between -180 and 180.');
+      return;
+    }
+
+    onLocationChange(lat, lon);
+    closeLocationForm();
+  };
+
+  const handleUseMyLocationClick = () => {
+    onUseMyLocation();
+    closeLocationForm();
+  };
+
   if (!sunTimes) return null;
 
   const relevantTwilightTimes = getRelevantTwilightTimes(currentTime, sunTimes, location.latitude, location.longitude);
@@ -237,10 +292,21 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               <span className="text-xs opacity-70">
                 {location.latitude.toFixed(4)}°, {location.longitude.toFixed(4)}°
               </span>
+              <Button
+                ref={changeLocationButtonRef}
+                type="button"
+                variant="link"
+                size="sm"
+                className="h-auto p-0 mt-1 text-xs opacity-80 hover:opacity-100 text-white justify-start"
+                onClick={() => (isLocationFormOpen ? closeLocationForm() : openLocationForm())}
+                aria-expanded={isLocationFormOpen}
+              >
+                {isLocationFormOpen ? 'Cancel' : 'Change location'}
+              </Button>
             </div>
           </div>
         </div>
-        
+
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
           className="ml-2 p-1 rounded hover:bg-white hover:bg-opacity-10 transition-colors flex-shrink-0"
@@ -249,7 +315,48 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           {isCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
         </button>
       </div>
-      
+
+      {isLocationFormOpen && (
+        <form onSubmit={handleSubmitLocation} noValidate className="mx-4 mb-3 p-2 space-y-2 text-xs bg-white bg-opacity-10 rounded">
+          <div className="flex flex-col gap-1">
+            <label htmlFor="manual-location-lat" className="opacity-80">Latitude</label>
+            <input
+              id="manual-location-lat"
+              ref={latInputRef}
+              type="number"
+              step="any"
+              min={-90}
+              max={90}
+              value={latInput}
+              onChange={(e) => setLatInput(e.target.value)}
+              className="bg-black bg-opacity-30 rounded px-2 py-1 text-white"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="manual-location-lon" className="opacity-80">Longitude</label>
+            <input
+              id="manual-location-lon"
+              type="number"
+              step="any"
+              min={-180}
+              max={180}
+              value={lonInput}
+              onChange={(e) => setLonInput(e.target.value)}
+              className="bg-black bg-opacity-30 rounded px-2 py-1 text-white"
+            />
+          </div>
+          {locationError && (
+            <p role="alert" className="text-red-300">{locationError}</p>
+          )}
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Button type="submit" size="sm" variant="secondary">Set location</Button>
+            <Button type="button" size="sm" variant="outline" onClick={handleUseMyLocationClick}>
+              Use my location
+            </Button>
+          </div>
+        </form>
+      )}
+
       {/* Collapsible content */}
       {!isCollapsed && (
         <div className="flex-1 min-h-0">

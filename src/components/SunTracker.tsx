@@ -25,6 +25,7 @@ import { type WeatherType } from './CloudLayer';
 import { toast } from '@/components/ui/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useWakeLock } from '@/hooks/useWakeLock';
+import { loadManualLocation, saveManualLocation, clearManualLocation } from '../utils/manualLocation';
 
 const SunTracker: React.FC = () => {
   const [date, setDate] = useState<Date>(new Date());
@@ -176,6 +177,14 @@ const SunTracker: React.FC = () => {
   }, [location]);
 
   useEffect(() => {
+    // A manually chosen location (set via InfoPanel's "Change location" form) takes
+    // priority over both geolocation and the New York fallback.
+    const manual = loadManualLocation();
+    if (manual) {
+      setLocation({ latitude: manual.latitude, longitude: manual.longitude, loaded: true });
+      return;
+    }
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -215,6 +224,48 @@ const SunTracker: React.FC = () => {
         loaded: true
       });
     }
+  }, []);
+
+  // Manual location form (InfoPanel): validated lat/lon submitted by the user.
+  const handleLocationChange = useCallback((latitude: number, longitude: number) => {
+    setLocation({ latitude, longitude, loaded: true });
+    saveManualLocation(latitude, longitude);
+  }, []);
+
+  // "Use my location" inside the manual form: re-requests geolocation and, on
+  // success, drops the manual override so future loads go back to auto-detection.
+  const handleUseMyLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      toast({
+        title: "Geolocation not supported",
+        description: "Your browser doesn't support geolocation.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        clearManualLocation();
+        setLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          loaded: true
+        });
+        toast({
+          title: "Location detected",
+          description: "Using your current location for sun calculations.",
+        });
+      },
+      (error) => {
+        console.error("Error getting location:", error);
+        toast({
+          title: "Location unavailable",
+          description: "Could not get your current location.",
+          variant: "destructive"
+        });
+      }
+    );
   }, []);
 
   useEffect(() => {
@@ -315,6 +366,8 @@ const SunTracker: React.FC = () => {
             onWeatherChange={handleWeatherChange}
             onWeatherModeToggle={handleWeatherModeToggle}
             onWeatherRefresh={handleWeatherRefresh}
+            onLocationChange={handleLocationChange}
+            onUseMyLocation={handleUseMyLocation}
           />
         </>
       ) : (
