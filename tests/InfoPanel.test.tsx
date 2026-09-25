@@ -34,6 +34,8 @@ describe('InfoPanel', () => {
     onWeatherChange: () => {},
     onWeatherModeToggle: () => {},
     onWeatherRefresh: () => {},
+    onLocationChange: () => {},
+    onUseMyLocation: () => {},
   };
 
   it('renders InfoPanel root', () => {
@@ -146,5 +148,72 @@ describe('InfoPanel', () => {
     expect(calledUrl).toContain('longitude=-0.13');
 
     vi.unstubAllGlobals();
+  });
+
+  describe('manual location (A-4)', () => {
+    it('opens a labeled, pre-filled form from "Change location" and closes on Cancel', () => {
+      render(<InfoPanel {...defaultProps} location={{ latitude: 12.3456, longitude: -65.4321, loaded: true }} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /change location/i }));
+
+      const latField = screen.getByLabelText(/latitude/i) as HTMLInputElement;
+      const lonField = screen.getByLabelText(/longitude/i) as HTMLInputElement;
+      expect(latField).toHaveValue(12.3456);
+      expect(lonField).toHaveValue(-65.4321);
+      expect(latField).toHaveFocus();
+
+      fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+      expect(screen.queryByLabelText(/latitude/i)).not.toBeInTheDocument();
+    });
+
+    it('shows an inline error for an out-of-range latitude and does not submit', () => {
+      const onLocationChange = vi.fn();
+      render(<InfoPanel {...defaultProps} onLocationChange={onLocationChange} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /change location/i }));
+      fireEvent.change(screen.getByLabelText(/latitude/i), { target: { value: '123' } });
+      fireEvent.change(screen.getByLabelText(/longitude/i), { target: { value: '10' } });
+      fireEvent.click(screen.getByRole('button', { name: /set location/i }));
+
+      expect(screen.getByRole('alert')).toHaveTextContent(/latitude/i);
+      expect(onLocationChange).not.toHaveBeenCalled();
+    });
+
+    it('shows an inline error for an out-of-range longitude and does not submit', () => {
+      const onLocationChange = vi.fn();
+      render(<InfoPanel {...defaultProps} onLocationChange={onLocationChange} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /change location/i }));
+      fireEvent.change(screen.getByLabelText(/latitude/i), { target: { value: '10' } });
+      fireEvent.change(screen.getByLabelText(/longitude/i), { target: { value: '200' } });
+      fireEvent.click(screen.getByRole('button', { name: /set location/i }));
+
+      expect(screen.getByRole('alert')).toHaveTextContent(/longitude/i);
+      expect(onLocationChange).not.toHaveBeenCalled();
+    });
+
+    it('submits valid coordinates and closes the form', () => {
+      const onLocationChange = vi.fn();
+      render(<InfoPanel {...defaultProps} onLocationChange={onLocationChange} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /change location/i }));
+      fireEvent.change(screen.getByLabelText(/latitude/i), { target: { value: '48.1' } });
+      fireEvent.change(screen.getByLabelText(/longitude/i), { target: { value: '11.6' } });
+      fireEvent.click(screen.getByRole('button', { name: /set location/i }));
+
+      expect(onLocationChange).toHaveBeenCalledWith(48.1, 11.6);
+      expect(screen.queryByLabelText(/latitude/i)).not.toBeInTheDocument();
+    });
+
+    it('calls onUseMyLocation and closes the form', () => {
+      const onUseMyLocation = vi.fn();
+      render(<InfoPanel {...defaultProps} onUseMyLocation={onUseMyLocation} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /change location/i }));
+      fireEvent.click(screen.getByRole('button', { name: /use my location/i }));
+
+      expect(onUseMyLocation).toHaveBeenCalledTimes(1);
+      expect(screen.queryByLabelText(/latitude/i)).not.toBeInTheDocument();
+    });
   });
 });
