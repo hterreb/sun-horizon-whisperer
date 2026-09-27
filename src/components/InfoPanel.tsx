@@ -7,6 +7,9 @@ import {
   type SunTimes,
   type LocationData,
   type TimeOfDay,
+  type GoldenHourTimes,
+  type BlueHourTimes,
+  type TimeWindow,
   formatTime,
   getTimeOfDayLabel,
   getRelevantTwilightTimes
@@ -22,6 +25,8 @@ interface InfoPanelProps {
   sunPosition: SunPosition;
   moonPosition: MoonPosition;
   sunTimes: SunTimes | null;
+  goldenHourTimes: GoldenHourTimes | null;
+  blueHourTimes: BlueHourTimes | null;
   location: LocationData;
   // The place name chosen via search, when the current location came from one; takes
   // priority over the reverse-geocode guess below for the same coordinates.
@@ -44,6 +49,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   sunPosition,
   moonPosition,
   sunTimes,
+  goldenHourTimes,
+  blueHourTimes,
   location,
   manualPlaceName,
   timeOfDay,
@@ -309,6 +316,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     : sunTimes.polar === 'night'
       ? 'Sun does not rise'
       : null;
+
+  // Golden/blue hour windows (ROADMAP item 11): null at polar day/night, or
+  // before SunTracker has computed them yet.
+  const formatWindow = (window: TimeWindow | null | undefined): string =>
+    window ? `${formatTime(window.start)} – ${formatTime(window.end)}` : '—';
 
   const weatherOptions: { type: WeatherType; label: string; icon: React.ReactNode }[] = [
     { type: 'clear', label: 'Clear', icon: <Sun size={16} /> },
@@ -607,8 +619,45 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               </div>
               <span className="font-semibold text-sm sm:text-base">{polarSunLabel ?? formatTime(sunTimes.sunset)}</span>
             </div>
+
+            {/* Sunset score (ROADMAP item 11) */}
+            {weatherData?.sunsetScoreToday && (
+              <div className="text-xs opacity-80 tabular-nums -mt-2">
+                <div>
+                  Sunset score {weatherData.sunsetScoreToday.score}/10 · {weatherData.sunsetScoreToday.reason}
+                </div>
+                {weatherData.sunsetScoreTomorrow && (
+                  <div className="opacity-70 mt-0.5">
+                    Tomorrow: {weatherData.sunsetScoreTomorrow.score}/10 · {weatherData.sunsetScoreTomorrow.reason}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          
+
+          {/* Golden & blue hour windows (ROADMAP item 11) */}
+          <div className="mt-6 pt-4 border-t border-white border-opacity-20">
+            <h3 className="text-sm font-bold mb-2">Golden &amp; Blue Hour</h3>
+            <div className="space-y-1 text-xs">
+              <div className="flex justify-between">
+                <span className="opacity-80">Blue hour (morning):</span>
+                <span className="font-mono tabular-nums">{formatWindow(blueHourTimes?.morning)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="opacity-80">Golden hour (morning):</span>
+                <span className="font-mono tabular-nums">{formatWindow(goldenHourTimes?.morning)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="opacity-80">Golden hour (evening):</span>
+                <span className="font-mono tabular-nums">{formatWindow(goldenHourTimes?.evening)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="opacity-80">Blue hour (evening):</span>
+                <span className="font-mono tabular-nums">{formatWindow(blueHourTimes?.evening)}</span>
+              </div>
+            </div>
+          </div>
+
           {/* Moon information - collapsible */}
           {moonPosition.visible && (
             <div className="mt-6 pt-4 border-t border-white border-opacity-20">

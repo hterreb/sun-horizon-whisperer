@@ -23,6 +23,8 @@ describe('InfoPanel', () => {
     sunPosition: { azimuth: 0, altitude: 0 },
     moonPosition: { azimuth: 0, altitude: 0, phase: 0, illumination: 0, visible: true },
     sunTimes,
+    goldenHourTimes: null,
+    blueHourTimes: null,
     location: { latitude: 0, longitude: 0, loaded: true },
     manualPlaceName: null,
     timeOfDay: 'midday' as TimeOfDay,
