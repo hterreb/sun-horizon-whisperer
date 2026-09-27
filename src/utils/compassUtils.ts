@@ -8,9 +8,13 @@
 // (and its tests) never needs a real one.
 export interface DeviceOrientationEventLike {
   alpha: number | null;
+  beta?: number | null;
+  gamma?: number | null;
   absolute?: boolean;
   webkitCompassHeading?: number;
 }
+
+const DEG = Math.PI / 180;
 
 // Normalizes any heading/azimuth into [0, 360).
 export const normalizeHeading = (heading: number): number => {
@@ -52,10 +56,20 @@ export const headingFromDeviceOrientationEvent = (
     return normalizeHeading(event.webkitCompassHeading);
   }
   if (event.absolute && typeof event.alpha === 'number' && Number.isFinite(event.alpha)) {
-    // Android `deviceorientationabsolute`: alpha is measured counter-clockwise from
-    // magnetic North around the device's natural (portrait) top edge. Convert to a
-    // clockwise heading, then correct for the screen having been rotated away from
-    // that natural orientation (e.g. landscape).
+    // Android `deviceorientationabsolute` (W3C Z-X'-Y'' Euler angles, alpha from North).
+    // The user points the back camera at the sky, so the heading is the horizontal
+    // direction of the device's -z axis: R(alpha, beta, gamma) · (0, 0, -1) in the
+    // East/North/Up frame. That direction doesn't depend on how the screen is rotated.
+    const a = event.alpha * DEG;
+    const b = (event.beta ?? 0) * DEG;
+    const g = (event.gamma ?? 0) * DEG;
+    const east = -Math.sin(g) * Math.cos(a) - Math.cos(g) * Math.sin(b) * Math.sin(a);
+    const north = -Math.sin(g) * Math.sin(a) + Math.cos(g) * Math.sin(b) * Math.cos(a);
+    if (Math.hypot(east, north) > 0.3) {
+      return normalizeHeading(Math.atan2(east, north) / DEG);
+    }
+    // Phone lies (nearly) flat: the back points at the ground, so use the direction
+    // of the screen's top edge instead, corrected for screen rotation (e.g. landscape).
     return normalizeHeading(360 - event.alpha - screenAngleDeg);
   }
   // A plain, non-absolute `deviceorientation` reading has no fixed reference, so it
