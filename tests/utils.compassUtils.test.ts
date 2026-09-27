@@ -49,15 +49,23 @@ describe('headingFromDeviceOrientationEvent', () => {
     expect(headingFromDeviceOrientationEvent({ alpha: null, absolute: true })).toBeNull();
   });
 
-  it('Android deviceorientationabsolute: heading = 360 - alpha', () => {
-    expect(headingFromDeviceOrientationEvent({ alpha: 90, absolute: true })).toBeCloseTo(270);
-    expect(headingFromDeviceOrientationEvent({ alpha: 0, absolute: true })).toBeCloseTo(0);
+  it('Android, phone upright in portrait: heading = 360 - alpha (back camera direction)', () => {
+    expect(headingFromDeviceOrientationEvent({ alpha: 90, beta: 90, gamma: 0, absolute: true })).toBeCloseTo(270);
+    expect(headingFromDeviceOrientationEvent({ alpha: 0, beta: 90, gamma: 0, absolute: true })).toBeCloseTo(0);
+    // Tilted up toward the sky (beta 60) still points the same way.
+    expect(headingFromDeviceOrientationEvent({ alpha: 30, beta: 60, gamma: 0, absolute: true })).toBeCloseTo(330);
   });
 
-  it('corrects for screen orientation angle', () => {
-    // Rotating the screen 90° (landscape) shifts the raw alpha->heading result back
-    // by the same amount.
-    expect(headingFromDeviceOrientationEvent({ alpha: 90, absolute: true }, 90)).toBeCloseTo(180);
+  it('Android, phone upright in landscape: screen rotation does not change the back camera direction', () => {
+    // Portrait facing East is (alpha 270, beta 90, gamma 0). Turning the phone onto its
+    // side about the camera axis gives (alpha 0, beta 0, gamma -90) in W3C angles.
+    expect(headingFromDeviceOrientationEvent({ alpha: 0, beta: 0, gamma: -90, absolute: true }, 90)).toBeCloseTo(90);
+    expect(headingFromDeviceOrientationEvent({ alpha: 180, beta: 0, gamma: 90, absolute: true }, 270)).toBeCloseTo(90);
+  });
+
+  it('Android, phone flat: uses the top edge, corrected for screen rotation', () => {
+    expect(headingFromDeviceOrientationEvent({ alpha: 90, beta: 0, gamma: 0, absolute: true })).toBeCloseTo(270);
+    expect(headingFromDeviceOrientationEvent({ alpha: 90, beta: 0, gamma: 0, absolute: true }, 90)).toBeCloseTo(180);
   });
 
   it('iOS: uses webkitCompassHeading directly, ignoring alpha/absolute', () => {
