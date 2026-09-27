@@ -9,6 +9,24 @@ import {
   getNextNewMoon,
   getMoonPhasePath,
 } from '../src/utils/moonUtils';
+import { moonEclipticFromT, scanMoonEvents } from '../src/utils/lunarEphemeris';
+import usnoMoonReference from './fixtures/usno-moon-reference.json';
+
+interface UsnoFixtureEntry {
+  loc: string;
+  lat: number;
+  lon: number;
+  dateUTC: string; // YYYY-MM-DD
+  events: string[]; // e.g. "Rise 04:55", "Set 12:26"; empty = no rise/set that UTC day
+}
+
+// [start, end) ms of the given UTC calendar day, for scanMoonEvents - independent of
+// the test runner's own timezone (unlike getMoonTimes, which uses the local day).
+const utcDayBoundsMs = (dateUTC: string): { startMs: number; endMs: number } => {
+  const [year, month, day] = dateUTC.split('-').map(Number);
+  const startMs = Date.UTC(year, month - 1, day);
+  return { startMs, endMs: startMs + 24 * 60 * 60 * 1000 };
+};
 
 // Parses an SVG path "d" attribute of the form "Mx,y Lx,y Lx,y ... Z" (as produced by
 // getMoonPhasePath) back into an array of [x, y] points, for area/shape assertions.
@@ -106,12 +124,16 @@ describe('getMoonTimes (ROADMAP item 9)', () => {
     expect((times.rise as Date).getTime()).toBeGreaterThan(new Date(Date.UTC(2026, 0, 10)).getTime());
   });
 
-  it('falls back to null when a missing set still isn\'t found the next day (lat 78, 2026-01-24 has only a rise, and 2026-01-25 is alwaysUp)', () => {
+  it('finds a missing set by searching the next day (lat 78, 2026-01-24 has only a rise)', () => {
+    // suncalc (low precision) put 2026-01-25 as alwaysUp with no set; the higher-
+    // precision Meeus-based scan finds a set on 2026-01-25 at ~02:33 UTC, which this
+    // moonset belongs to.
     const times = getMoonTimes(new Date(Date.UTC(2026, 0, 24)), 78, 15);
     expect(times.rise).toBeInstanceOf(Date);
-    expect(times.set).toBeNull();
+    expect(times.set).toBeInstanceOf(Date);
     expect(times.alwaysUp).toBe(false);
     expect(times.alwaysDown).toBe(false);
+    expect((times.set as Date).getTime()).toBeGreaterThan(new Date(Date.UTC(2026, 0, 25)).getTime());
   });
 
   it('rise comes before set when both fall on the same calendar day (verified against suncalc for 2026-06-15, 48N/11E)', () => {
@@ -288,4 +310,53 @@ describe('getMoonPhasePath (ROADMAP item 9 - phase shape)', () => {
     const south = parsePathPoints(getMoonPhasePath(0.3, 0.9, -33, RADIUS)).find((p) => p[1] === 0);
     expect(Math.sign(north?.[0] ?? 0)).toBe(-Math.sign(south?.[0] ?? 0));
   });
+});
+
+describe('moonEclipticFromT (Meeus ch. 47, Astronomical Algorithms 2nd ed.)', () => {
+  it('matches worked Example 47.a (1992-04-12 0h TD) to 0.001 degree', () => {
+    // JDE for 1992-04-12.0 TD, as given in the example (p. 342-343).
+    const jde = 2448724.5;
+    const T = (jde - 2451545) / 36525;
+
+    const { lambdaDeg, betaDeg, distanceKm } = moonEclipticFromT(T);
+
+    expect(Math.abs(lambdaDeg - 133.162655)).toBeLessThanOrEqual(0.001);
+    expect(Math.abs(betaDeg - -3.229126)).toBeLessThanOrEqual(0.001);
+    expect(Math.abs(distanceKm - 368409.7)).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('getMoonTimes accuracy against USNO reference (ROADMAP item 9, <= 2 min)', () => {
+  const fixture = usnoMoonReference as UsnoFixtureEntry[];
+
+  for (const entry of fixture) {
+    const { loc, lat, lon, dateUTC, events } = entry;
+
+    if (events.length === 0) {
+      it(`${loc} ${dateUTC}: no rise/set that UTC day`, () => {
+        const { startMs, endMs } = utcDayBoundsMs(dateUTC);
+        const scan = scanMoonEvents(startMs, endMs, lat, lon);
+        expect(scan.rise).toBeNull();
+        expect(scan.set).toBeNull();
+      });
+      continue;
+    }
+
+    for (const eventStr of events) {
+      it(`${loc} ${dateUTC}: ${eventStr} (USNO) within +-2 min`, () => {
+        const [kind, hhmm] = eventStr.split(' ');
+        const [hh, mm] = hhmm.split(':').map(Number);
+        const [year, month, day] = dateUTC.split('-').map(Number);
+        const expectedMs = Date.UTC(year, month - 1, day, hh, mm);
+
+        const { startMs, endMs } = utcDayBoundsMs(dateUTC);
+        const scan = scanMoonEvents(startMs, endMs, lat, lon);
+        const found = kind === 'Rise' ? scan.rise : scan.set;
+
+        expect(found).toBeInstanceOf(Date);
+        const errorMinutes = Math.abs((found as Date).getTime() - expectedMs) / 60000;
+        expect(errorMinutes).toBeLessThanOrEqual(2);
+      });
+    }
+  }
 });
