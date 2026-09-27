@@ -25,6 +25,7 @@ describe('MusicPlayer', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+    localStorage.clear();
   });
 
   it('renders play/pause switch and volume slider', () => {
@@ -127,5 +128,49 @@ describe('MusicPlayer', () => {
 
     expect(logSpy).not.toHaveBeenCalled();
     logSpy.mockRestore();
+  });
+
+  it('shows the current station name and has a Next button that cycles and wraps (P0-5)', () => {
+    render(<MusicPlayer />);
+    const names = ['FluxFM Chillhop', 'ILoveRadio Lo-Fi', 'Lofi Hip Hop Radio', 'Chillout Radio'];
+    expect(screen.getByText(names[0])).toBeInTheDocument();
+
+    const nextButton = screen.getByRole('button', { name: 'Next station' });
+    for (let i = 1; i <= names.length; i++) {
+      fireEvent.click(nextButton);
+      expect(screen.getByText(names[i % names.length])).toBeInTheDocument();
+    }
+  });
+
+  it('persists the selected station index in localStorage and resumes it on reload (P0-5)', () => {
+    const { unmount } = render(<MusicPlayer />);
+    const nextButton = screen.getByRole('button', { name: 'Next station' });
+    fireEvent.click(nextButton);
+    fireEvent.click(nextButton);
+    expect(localStorage.getItem('radio_station_index')).toBe('2');
+    unmount();
+
+    render(<MusicPlayer />);
+    expect(screen.getByText('Lofi Hip Hop Radio')).toBeInTheDocument();
+  });
+
+  it('falls back to the first station when the stored index is invalid (P0-5)', () => {
+    localStorage.setItem('radio_station_index', 'not-a-number');
+    const { unmount } = render(<MusicPlayer />);
+    expect(screen.getByText('FluxFM Chillhop')).toBeInTheDocument();
+    unmount();
+
+    localStorage.setItem('radio_station_index', '99');
+    render(<MusicPlayer />);
+    expect(screen.getByText('FluxFM Chillhop')).toBeInTheDocument();
+  });
+
+  it('still selects a station when localStorage access throws (P0-5)', () => {
+    const getItemSpy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('storage disabled');
+    });
+    render(<MusicPlayer />);
+    expect(screen.getByText('FluxFM Chillhop')).toBeInTheDocument();
+    getItemSpy.mockRestore();
   });
 });
