@@ -16,11 +16,20 @@ describe('SunTracker', () => {
     localStorage.clear();
   });
 
-  it('shows loading state while detecting location', () => {
+  it('shows a spinner and "Locating…" while detecting location (P0-3)', () => {
     // Mock geolocation to never call success or error
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: () => {} } });
     render(<SunTracker />);
-    expect(screen.getByText(/detecting your location/i)).toBeInTheDocument();
+    expect(screen.getByText(/locating…/i)).toBeInTheDocument();
+  });
+
+  it('does not toast on a successful geolocation lookup (P0-3)', async () => {
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 1, longitude: 2 } }) } });
+    render(<SunTracker />);
+    await waitFor(() => expect(screen.getByTestId('sun-visualization')).toBeInTheDocument());
+    expect(toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: expect.stringContaining('Location detected') })
+    );
   });
 
   it('falls back to default location if geolocation fails', async () => {
