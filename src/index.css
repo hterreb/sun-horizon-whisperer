@@ -99,6 +99,14 @@
   body {
     @apply bg-background text-foreground;
     overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  /* Radix ScrollArea viewport (InfoPanel): touch scrolling should stay inside the
+     panel and never rubber-band/pan the fixed scene behind it. */
+  [data-radix-scroll-area-viewport] {
+    overscroll-behavior: contain;
+    touch-action: pan-y;
   }
 }
 

@@ -22,6 +22,15 @@ describe('MidnightGhost', () => {
     expect(container.innerHTML).toMatch(/ghost/i);
   });
 
+  it('stays below the InfoPanel (z-10, not z-30) (ROADMAP item 1)', () => {
+    const midnight = new Date();
+    midnight.setHours(0, 0, 0, 0);
+    const { container } = render(<MidnightGhost currentTime={midnight} />);
+    const ghost = container.firstChild as HTMLElement;
+    expect(ghost.className).toContain('z-10');
+    expect(ghost.className).not.toContain('z-30');
+  });
+
   // More tests for disappearance, animation, etc.
 
   it('ghost floats and bounces within bounds', () => {
