@@ -24,7 +24,8 @@ Status: last updated 2026-09-27. Done: items 1–7, 9, 11, 12 (marked **✅ Done
 - **Spec:**
   - Give the InfoPanel root `z-30`.
   - Keep scene animations at z ≤ 10. Move `MidnightGhost` from `z-30` to `z-10`.
-  - Keep the FullscreenButton (`z-40`), MusicPlayer / PWA prompt (`z-50`) and toasts (`z-[100]`) above the panel.
+  - Keep the FullscreenButton (`z-40`), PWA prompt (`z-50`) and toasts (`z-[100]`) above the panel.
+  - The MusicPlayer sits under the panel (`z-20`), so it never hides panel rows on narrow screens.
 - **Done when:** no scene element draws over the panel, at day or night, with the panel open or collapsed.
 
 ### 2. Scrollable InfoPanel on mobile — S — **✅ Done**
