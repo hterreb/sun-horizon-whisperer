@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getAzimuthScreenFraction, crossesHorizon } from '../src/components/SunVisualization';
+import { getAzimuthScreenFraction, crossesHorizon, buildArcPath } from '../src/components/SunVisualization';
 
 describe('getAzimuthScreenFraction (C-3)', () => {
   it('northern hemisphere: culmination (180°, South) stays centered', () => {
@@ -41,3 +41,25 @@ describe('crossesHorizon (C-8)', () => {
   });
 });
 
+
+describe('buildArcPath (moon arc)', () => {
+  const toXY = (p: { altitude: number; azimuth: number }) => ({ x: p.azimuth, y: -p.altitude });
+
+  it('skips below-horizon points and starts a new segment after the gap', () => {
+    const path = buildArcPath(
+      [
+        { altitude: -5, azimuth: 0 },
+        { altitude: 10, azimuth: 1 },
+        { altitude: 20, azimuth: 2 },
+        { altitude: -1, azimuth: 3 },
+        { altitude: 5, azimuth: 4 },
+      ],
+      toXY
+    );
+    expect(path).toBe('M1,-10 L2,-20 M4,-5');
+  });
+
+  it('is empty when the moon stays below the horizon', () => {
+    expect(buildArcPath([{ altitude: -3, azimuth: 0 }], toXY)).toBe('');
+  });
+});

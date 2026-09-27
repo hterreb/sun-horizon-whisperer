@@ -17,7 +17,7 @@ import {
 } from '../utils/sunUtils';
 import {
   getMoonPosition,
-  getMoonPathForDay,
+  getMoonPathAround,
   getMoonTimes,
   getNextFullMoon,
   getNextNewMoon,
@@ -336,11 +336,11 @@ const SunTracker: React.FC = () => {
     }
   }
 
-  // Moonrise/moonset, next full/new moon, and the day's arc (for SunVisualization) only
-  // change once a day (or when the location changes), unlike sun/moon position above
-  // which update every 30s. Keying the memo on the calendar day rather than `date`
-  // itself (which ticks every second) avoids recomputing these on every render.
-  const moonDayKey = date.toDateString();
+  // Moonrise/moonset, next full/new moon, and the moon's arc (for SunVisualization,
+  // a ±12 h window around now) change slowly, unlike sun/moon position above which
+  // update every 30s. Keying the memo on the hour rather than `date` itself (which
+  // ticks every second) avoids recomputing these on every render.
+  const moonHourKey = `${date.toDateString()} ${date.getHours()}`;
   const moonExtras = useMemo(() => {
     if (!location.loaded) {
       return {
@@ -351,13 +351,13 @@ const SunTracker: React.FC = () => {
       };
     }
     return {
-      moonPath: getMoonPathForDay(date, location.latitude, location.longitude),
+      moonPath: getMoonPathAround(date, location.latitude, location.longitude),
       moonTimes: getMoonTimes(date, location.latitude, location.longitude),
       nextFullMoon: getNextFullMoon(date),
       nextNewMoon: getNextNewMoon(date),
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on moonDayKey (the calendar day), not `date` itself
-  }, [moonDayKey, location.loaded, location.latitude, location.longitude]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on moonHourKey (the hour), not `date` itself
+  }, [moonHourKey, location.loaded, location.latitude, location.longitude]);
 
   const getBackgroundStyle = useCallback(() => {
     let baseGradient = getBackgroundGradient(timeOfDay);

@@ -4,7 +4,7 @@ import {
   getMoonPhaseLabel,
   getMoonPhaseIndex,
   getMoonTimes,
-  getMoonPathForDay,
+  getMoonPathAround,
   getNextFullMoon,
   getNextNewMoon,
   getMoonPhasePath,
@@ -151,17 +151,17 @@ describe('getMoonTimes (ROADMAP item 9)', () => {
   });
 });
 
-describe('getMoonPathForDay (ROADMAP item 9 - arc)', () => {
+describe('getMoonPathAround (ROADMAP item 9 - arc)', () => {
   it('does not mutate the Date argument', () => {
     const date = new Date('2026-06-01T12:34:56Z');
     const before = date.getTime();
-    getMoonPathForDay(date, 48, 11);
+    getMoonPathAround(date, 48, 11);
     expect(date.getTime()).toBe(before);
   });
 
-  it('samples across the whole day, in chronological order, at the requested resolution', () => {
+  it('samples a 24 h window centred on the date, at the requested resolution', () => {
     const steps = 24;
-    const points = getMoonPathForDay(new Date('2026-06-15T09:00:00Z'), 48, 11, steps);
+    const points = getMoonPathAround(new Date('2026-06-15T09:00:00Z'), 48, 11, steps);
     expect(points).toHaveLength(steps + 1);
     for (const p of points) {
       expect(p).toHaveProperty('azimuth');
