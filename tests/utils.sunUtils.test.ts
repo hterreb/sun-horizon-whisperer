@@ -1,4 +1,4 @@
-import { getSunPosition, getSunTimes, getTimeOfDay, getRelevantTwilightTimes, formatTime } from '../src/utils/sunUtils';
+import { getSunPosition, getSunTimes, getTimeOfDay, getRelevantTwilightTimes, formatTime, getGoldenHourTimes, getBlueHourTimes } from '../src/utils/sunUtils';
 describe('sunUtils', () => {
   it('calculates sun position', () => {
     const pos = getSunPosition(new Date(), 0, 0);
@@ -85,5 +85,81 @@ describe('sunUtils', () => {
   it('formatTime still reports "Unknown" for an invalid date', () => {
     expect(formatTime(new Date('invalid'))).toBe('Unknown');
     expect(formatTime(null)).toBe('Unknown');
+  });
+
+  describe('golden hour (ROADMAP item 11)', () => {
+    it('returns a morning window ending at sunrise->goldenHourEnd and an evening window from goldenHour->sunset', () => {
+      const date = new Date(2026, 5, 21, 12, 0, 0, 0); // temperate latitude, ordinary day
+      const latitude = 51.5;
+      const longitude = 0;
+      const times = getSunTimes(date, latitude, longitude);
+      const golden = getGoldenHourTimes(date, latitude, longitude);
+
+      expect(golden.morning).not.toBeNull();
+      expect(golden.evening).not.toBeNull();
+      expect(golden.morning?.start.getTime()).toBe(times.sunrise.getTime());
+      expect(golden.morning?.end.getTime()).toBeGreaterThan(golden.morning!.start.getTime());
+      expect(golden.evening?.end.getTime()).toBe(times.sunset.getTime());
+      expect(golden.evening?.start.getTime()).toBeLessThan(golden.evening!.end.getTime());
+    });
+
+    it('is null at polar day/night, where SunCalc has no sunrise/sunset/goldenHour times', () => {
+      const date = new Date(2026, 5, 21, 12, 0, 0, 0); // polar day at lat 78 in June
+      const golden = getGoldenHourTimes(date, 78, 15);
+      expect(golden.morning).toBeNull();
+      expect(golden.evening).toBeNull();
+    });
+
+    it('does not mutate the input date', () => {
+      const date = new Date(2026, 5, 21, 12, 0, 0, 0);
+      const originalTime = date.getTime();
+      getGoldenHourTimes(date, 51.5, 0);
+      expect(date.getTime()).toBe(originalTime);
+    });
+  });
+
+  describe('blue hour (ROADMAP item 11)', () => {
+    it('returns a morning window between dawn (-6°) and -4°, and an evening window between -4° and dusk (-6°)', () => {
+      const date = new Date(2026, 5, 21, 12, 0, 0, 0);
+      const latitude = 51.5;
+      const longitude = 0;
+      const times = getSunTimes(date, latitude, longitude);
+      const blue = getBlueHourTimes(date, latitude, longitude);
+
+      expect(blue.morning).not.toBeNull();
+      expect(blue.evening).not.toBeNull();
+      expect(blue.morning?.start.getTime()).toBe(times.dawn.getTime());
+      expect(blue.morning?.end.getTime()).toBeGreaterThan(blue.morning!.start.getTime());
+      expect(blue.morning?.end.getTime()).toBeLessThan(times.sunrise.getTime());
+      expect(blue.evening?.end.getTime()).toBe(times.dusk.getTime());
+      expect(blue.evening?.start.getTime()).toBeGreaterThan(times.sunset.getTime());
+      expect(blue.evening?.start.getTime()).toBeLessThan(blue.evening!.end.getTime());
+    });
+
+    it('the sun altitude at the blue hour boundaries is close to -4° and -6°', () => {
+      const date = new Date(2026, 5, 21, 12, 0, 0, 0);
+      const latitude = 51.5;
+      const longitude = 0;
+      const blue = getBlueHourTimes(date, latitude, longitude);
+
+      const dawnEndAltitude = getSunPosition(blue.morning!.end, latitude, longitude).altitude;
+      const duskStartAltitude = getSunPosition(blue.evening!.start, latitude, longitude).altitude;
+      expect(dawnEndAltitude).toBeCloseTo(-4, 0);
+      expect(duskStartAltitude).toBeCloseTo(-4, 0);
+    });
+
+    it('is null at polar day/night', () => {
+      const date = new Date(2026, 5, 21, 12, 0, 0, 0);
+      const blue = getBlueHourTimes(date, 78, 15);
+      expect(blue.morning).toBeNull();
+      expect(blue.evening).toBeNull();
+    });
+
+    it('does not mutate the input date', () => {
+      const date = new Date(2026, 5, 21, 12, 0, 0, 0);
+      const originalTime = date.getTime();
+      getBlueHourTimes(date, 51.5, 0);
+      expect(date.getTime()).toBe(originalTime);
+    });
   });
 });

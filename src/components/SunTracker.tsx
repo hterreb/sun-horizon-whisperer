@@ -1,15 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  getSunPosition, 
-  getSunTimes, 
-  formatTime, 
+import {
+  getSunPosition,
+  getSunTimes,
+  formatTime,
   getTimeOfDay,
   getTimeOfDayLabel,
   getBackgroundGradient,
+  getGoldenHourTimes,
+  getBlueHourTimes,
   type LocationData,
   type SunPosition,
   type SunTimes,
-  type TimeOfDay
+  type TimeOfDay,
+  type GoldenHourTimes,
+  type BlueHourTimes
 } from '../utils/sunUtils';
 import { getMoonPosition, type MoonPosition } from '../utils/moonUtils';
 import { fetchCurrentWeather, type WeatherData } from '../utils/weatherUtils';
@@ -57,6 +61,8 @@ const SunTracker: React.FC = () => {
     visible: false 
   });
   const [sunTimes, setSunTimes] = useState<SunTimes | null>(null);
+  const [goldenHourTimes, setGoldenHourTimes] = useState<GoldenHourTimes | null>(null);
+  const [blueHourTimes, setBlueHourTimes] = useState<BlueHourTimes | null>(null);
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('midday');
   const [weatherType, setWeatherType] = useState<WeatherType>('clear');
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
@@ -123,7 +129,22 @@ const SunTracker: React.FC = () => {
 
     setIsLoadingWeather(true);
     try {
-      const weather = await fetchCurrentWeather(location.latitude, location.longitude);
+      // Sunset score (ROADMAP item 11) needs today's and tomorrow's sunset time.
+      // Computed fresh here (rather than reading `sunTimes` state) so this
+      // callback's identity stays stable across the 30s sun-position tick -
+      // it's relied on by the 30-minute auto-refresh interval below.
+      const now = new Date();
+      const todaySunTimes = getSunTimes(now, location.latitude, location.longitude);
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowSunTimes = getSunTimes(tomorrow, location.latitude, location.longitude);
+
+      const weather = await fetchCurrentWeather(
+        location.latitude,
+        location.longitude,
+        todaySunTimes.sunset,
+        tomorrowSunTimes.sunset
+      );
       setWeatherData(weather);
 
       if (useRealWeather) {
@@ -183,11 +204,13 @@ const SunTracker: React.FC = () => {
         const sunPos = getSunPosition(currentDate, location.latitude, location.longitude);
         const moonPos = getMoonPosition(currentDate, location.latitude, location.longitude);
         const times = getSunTimes(currentDate, location.latitude, location.longitude);
-        
+
         setSunPosition(sunPos);
         setMoonPosition(moonPos);
         setSunTimes(times);
-        
+        setGoldenHourTimes(getGoldenHourTimes(currentDate, location.latitude, location.longitude));
+        setBlueHourTimes(getBlueHourTimes(currentDate, location.latitude, location.longitude));
+
         if (times) {
           const tod = getTimeOfDay(currentDate, times);
           setTimeOfDay(tod);
@@ -297,6 +320,8 @@ const SunTracker: React.FC = () => {
     setSunPosition(sunPos);
     setMoonPosition(moonPos);
     setSunTimes(times);
+    setGoldenHourTimes(getGoldenHourTimes(date, location.latitude, location.longitude));
+    setBlueHourTimes(getBlueHourTimes(date, location.latitude, location.longitude));
 
     if (times) {
       setTimeOfDay(getTimeOfDay(date, times));
@@ -368,6 +393,8 @@ const SunTracker: React.FC = () => {
             sunPosition={sunPosition}
             moonPosition={moonPosition}
             sunTimes={sunTimes}
+            goldenHourTimes={goldenHourTimes}
+            blueHourTimes={blueHourTimes}
             location={location}
             manualPlaceName={manualPlaceName}
             timeOfDay={timeOfDay}
