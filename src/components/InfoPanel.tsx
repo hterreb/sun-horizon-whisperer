@@ -7,21 +7,33 @@ import {
   type SunTimes,
   type LocationData,
   type TimeOfDay,
+  type GoldenHourTimes,
+  type BlueHourTimes,
+  type TimeWindow,
   formatTime,
   getTimeOfDayLabel,
   getRelevantTwilightTimes
 } from '../utils/sunUtils';
-import { type MoonPosition, getMoonPhaseLabel } from '../utils/moonUtils';
+import { type MoonPosition, type MoonTimes, getMoonPhaseLabel } from '../utils/moonUtils';
 import { type WeatherData } from '../utils/weatherUtils';
 import { isValidLatitude, isValidLongitude } from '../utils/manualLocation';
+import { searchPlaces, formatGeocodeResultLabel, type GeocodeResult } from '../utils/geocodeUtils';
 import { type WeatherType } from './CloudLayer';
 import { format } from 'date-fns';
 
 interface InfoPanelProps {
   sunPosition: SunPosition;
   moonPosition: MoonPosition;
+  moonTimes: MoonTimes;
+  nextFullMoon: Date;
+  nextNewMoon: Date;
   sunTimes: SunTimes | null;
+  goldenHourTimes: GoldenHourTimes | null;
+  blueHourTimes: BlueHourTimes | null;
   location: LocationData;
+  // The place name chosen via search, when the current location came from one; takes
+  // priority over the reverse-geocode guess below for the same coordinates.
+  manualPlaceName: string | null;
   timeOfDay: TimeOfDay;
   currentTime: Date;
   weatherType: WeatherType;
@@ -32,15 +44,21 @@ interface InfoPanelProps {
   onWeatherChange: (weather: WeatherType) => void;
   onWeatherModeToggle: (useReal: boolean) => void;
   onWeatherRefresh: () => void;
-  onLocationChange: (latitude: number, longitude: number) => void;
+  onLocationChange: (latitude: number, longitude: number, name?: string) => void;
   onUseMyLocation: () => void;
 }
 
 const InfoPanel: React.FC<InfoPanelProps> = ({
   sunPosition,
   moonPosition,
+  moonTimes,
+  nextFullMoon,
+  nextNewMoon,
   sunTimes,
+  goldenHourTimes,
+  blueHourTimes,
   location,
+  manualPlaceName,
   timeOfDay,
   currentTime,
   weatherType,
@@ -61,6 +79,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   const [latInput, setLatInput] = useState('');
   const [lonInput, setLonInput] = useState('');
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [placeQuery, setPlaceQuery] = useState('');
+  const [placeResults, setPlaceResults] = useState<GeocodeResult[]>([]);
+  const [placeSearchStatus, setPlaceSearchStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
+  const placeAbortRef = useRef<AbortController | null>(null);
   const latInputRef = useRef<HTMLInputElement>(null);
   const changeLocationButtonRef = useRef<HTMLButtonElement>(null);
   const [isMoonCollapsed, setIsMoonCollapsed] = useState(true);
@@ -140,9 +162,22 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   }, [timeOfDay, moonPosition.visible]);
 
   useEffect(() => {
+    if (!location.loaded) return;
+
+    // A place chosen via search already has its name; use it instead of guessing
+    // from a reverse-geocode call for the same coordinates. Deferred to a timer
+    // callback (rather than run synchronously in the effect body) so this setState
+    // doesn't run as part of the effect's own commit; see the weather-fetch effect
+    // in SunTracker.tsx for the same pattern.
+    if (manualPlaceName) {
+      const timeoutId = setTimeout(() => {
+        setLocationName(manualPlaceName);
+        setLoadingLocation(false);
+      }, 0);
+      return () => clearTimeout(timeoutId);
+    }
+
     const fetchLocationName = async () => {
-      if (!location.loaded) return;
-      
       setLoadingLocation(true);
       try {
         // Round to ~1km precision before sending the location to a third party.
@@ -171,7 +206,51 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     };
 
     fetchLocationName();
-  }, [location.latitude, location.longitude, location.loaded]);
+  }, [location.latitude, location.longitude, location.loaded, manualPlaceName]);
+
+  // Debounced place-name search (ROADMAP item 12): waits 300ms after typing stops,
+  // ignores queries under 2 characters, and aborts a request superseded by a newer
+  // one so a slow response can never clobber the results of a later query.
+  useEffect(() => {
+    const trimmed = placeQuery.trim();
+    if (trimmed.length < 2) {
+      placeAbortRef.current?.abort();
+      const timeoutId = setTimeout(() => {
+        setPlaceResults([]);
+        setPlaceSearchStatus('idle');
+      }, 0);
+      return () => clearTimeout(timeoutId);
+    }
+
+    const timeoutId = setTimeout(() => {
+      placeAbortRef.current?.abort();
+      const controller = new AbortController();
+      placeAbortRef.current = controller;
+      setPlaceSearchStatus('loading');
+
+      searchPlaces(trimmed, controller.signal)
+        .then((results) => {
+          if (controller.signal.aborted) return;
+          setPlaceResults(results);
+          setPlaceSearchStatus('done');
+        })
+        .catch((error) => {
+          if (controller.signal.aborted) return;
+          console.error('Error searching places:', error);
+          setPlaceResults([]);
+          setPlaceSearchStatus('error');
+        });
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [placeQuery]);
+
+  // Abort any in-flight search when the panel unmounts.
+  useEffect(() => {
+    return () => {
+      placeAbortRef.current?.abort();
+    };
+  }, []);
 
   // Focus the latitude field when the manual-location form opens.
   useEffect(() => {
@@ -180,16 +259,25 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     }
   }, [isLocationFormOpen]);
 
+  const resetPlaceSearch = () => {
+    placeAbortRef.current?.abort();
+    setPlaceQuery('');
+    setPlaceResults([]);
+    setPlaceSearchStatus('idle');
+  };
+
   const openLocationForm = () => {
     setLatInput(location.latitude.toFixed(4));
     setLonInput(location.longitude.toFixed(4));
     setLocationError(null);
+    resetPlaceSearch();
     setIsLocationFormOpen(true);
   };
 
   const closeLocationForm = () => {
     setIsLocationFormOpen(false);
     setLocationError(null);
+    resetPlaceSearch();
     changeLocationButtonRef.current?.focus();
   };
 
@@ -211,6 +299,12 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     closeLocationForm();
   };
 
+  const handleSelectPlace = (result: GeocodeResult) => {
+    const label = formatGeocodeResultLabel(result);
+    onLocationChange(result.latitude, result.longitude, label);
+    closeLocationForm();
+  };
+
   const handleUseMyLocationClick = () => {
     onUseMyLocation();
     closeLocationForm();
@@ -228,6 +322,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     : sunTimes.polar === 'night'
       ? 'Sun does not rise'
       : null;
+
+  // Golden/blue hour windows (ROADMAP item 11): null at polar day/night, or
+  // before SunTracker has computed them yet.
+  const formatWindow = (window: TimeWindow | null | undefined): string =>
+    window ? `${formatTime(window.start)} – ${formatTime(window.end)}` : '—';
 
   const weatherOptions: { type: WeatherType; label: string; icon: React.ReactNode }[] = [
     { type: 'clear', label: 'Clear', icon: <Sun size={16} /> },
@@ -315,6 +414,52 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
       {isLocationFormOpen && (
         <form onSubmit={handleSubmitLocation} noValidate className="mx-4 mb-3 p-2 space-y-2 text-xs bg-white bg-opacity-10 rounded">
+          <div className="flex flex-col gap-1">
+            <label htmlFor="manual-location-search" className="opacity-80">Search for a place</label>
+            <input
+              id="manual-location-search"
+              type="text"
+              value={placeQuery}
+              onChange={(e) => setPlaceQuery(e.target.value)}
+              placeholder="e.g. Friedrichshafen"
+              className="bg-black bg-opacity-30 rounded px-2 py-1 text-white"
+              role="combobox"
+              aria-expanded={placeResults.length > 0}
+              aria-controls="manual-location-search-results"
+              aria-autocomplete="list"
+            />
+            {placeSearchStatus === 'loading' && (
+              <p className="opacity-70">Searching…</p>
+            )}
+            {placeSearchStatus === 'error' && (
+              <p role="alert" className="text-red-300">Could not search for places.</p>
+            )}
+            {placeSearchStatus === 'done' && placeResults.length === 0 && (
+              <p className="opacity-70">No results</p>
+            )}
+            {placeResults.length > 0 && (
+              <ul
+                id="manual-location-search-results"
+                role="listbox"
+                aria-label="Search results"
+                className="space-y-1"
+              >
+                {placeResults.map((result, index) => (
+                  <li key={`${result.latitude}-${result.longitude}-${index}`}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={false}
+                      onClick={() => handleSelectPlace(result)}
+                      className="w-full text-left px-2 py-1 rounded bg-white bg-opacity-5 hover:bg-opacity-20 transition-colors"
+                    >
+                      {formatGeocodeResultLabel(result)}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
           <div className="flex flex-col gap-1">
             <label htmlFor="manual-location-lat" className="opacity-80">Latitude</label>
             <input
@@ -480,8 +625,45 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               </div>
               <span className="font-semibold text-sm sm:text-base">{polarSunLabel ?? formatTime(sunTimes.sunset)}</span>
             </div>
+
+            {/* Sunset score (ROADMAP item 11) */}
+            {weatherData?.sunsetScoreToday && (
+              <div className="text-xs opacity-80 tabular-nums -mt-2">
+                <div>
+                  Sunset score {weatherData.sunsetScoreToday.score}/10 · {weatherData.sunsetScoreToday.reason}
+                </div>
+                {weatherData.sunsetScoreTomorrow && (
+                  <div className="opacity-70 mt-0.5">
+                    Tomorrow: {weatherData.sunsetScoreTomorrow.score}/10 · {weatherData.sunsetScoreTomorrow.reason}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          
+
+          {/* Golden & blue hour windows (ROADMAP item 11) */}
+          <div className="mt-6 pt-4 border-t border-white border-opacity-20">
+            <h3 className="text-sm font-bold mb-2">Golden &amp; Blue Hour</h3>
+            <div className="space-y-1 text-xs">
+              <div className="flex justify-between">
+                <span className="opacity-80">Blue hour (morning):</span>
+                <span className="font-mono tabular-nums">{formatWindow(blueHourTimes?.morning)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="opacity-80">Golden hour (morning):</span>
+                <span className="font-mono tabular-nums">{formatWindow(goldenHourTimes?.morning)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="opacity-80">Golden hour (evening):</span>
+                <span className="font-mono tabular-nums">{formatWindow(goldenHourTimes?.evening)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="opacity-80">Blue hour (evening):</span>
+                <span className="font-mono tabular-nums">{formatWindow(blueHourTimes?.evening)}</span>
+              </div>
+            </div>
+          </div>
+
           {/* Moon information - collapsible */}
           {moonPosition.visible && (
             <div className="mt-6 pt-4 border-t border-white border-opacity-20">
@@ -503,7 +685,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               </div>
               
               <div className={`transition-all duration-300 ease-in-out ${
-                isMoonCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-32 opacity-100'
+                isMoonCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-64 opacity-100'
               }`}>
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between">
@@ -521,6 +703,38 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   <div className="flex justify-between">
                     <span>Azimuth:</span>
                     <span className="font-mono">{moonPosition.azimuth.toFixed(1)}°</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Moonrise:</span>
+                    <span className="font-mono">
+                      {moonTimes.alwaysUp
+                        ? 'Up all day'
+                        : moonTimes.alwaysDown
+                          ? 'Down all day'
+                          : moonTimes.rise
+                            ? formatTime(moonTimes.rise)
+                            : '—'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Moonset:</span>
+                    <span className="font-mono">
+                      {moonTimes.alwaysUp
+                        ? 'Up all day'
+                        : moonTimes.alwaysDown
+                          ? 'Down all day'
+                          : moonTimes.set
+                            ? formatTime(moonTimes.set)
+                            : '—'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Next full moon:</span>
+                    <span className="font-mono">{format(nextFullMoon, 'MMM d, h:mm a')}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Next new moon:</span>
+                    <span className="font-mono">{format(nextNewMoon, 'MMM d, h:mm a')}</span>
                   </div>
                 </div>
               </div>

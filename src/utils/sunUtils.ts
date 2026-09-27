@@ -195,6 +195,68 @@ export const getBackgroundGradient = (timeOfDay: TimeOfDay): string => {
   }
 };
 
+export interface TimeWindow {
+  start: Date;
+  end: Date;
+}
+
+export interface GoldenHourTimes {
+  // Sunrise to the sun climbing past +6° (SunCalc's `goldenHourEnd`).
+  morning: TimeWindow | null;
+  // The sun dropping back below +6° (SunCalc's `goldenHour`) to sunset.
+  evening: TimeWindow | null;
+}
+
+export interface BlueHourTimes {
+  // Civil dawn (-6°, SunCalc's `dawn`) to the sun climbing past -4°.
+  morning: TimeWindow | null;
+  // The sun dropping below -4° to civil dusk (-6°, SunCalc's `dusk`).
+  evening: TimeWindow | null;
+}
+
+// SunCalc.getTimes only reports fixed altitude events out of the box (see its
+// `times` table). Blue hour's -4° edge isn't one of them, so we register it as a
+// custom time via SunCalc.addTime. That call pushes onto SunCalc's *global*
+// times table, so it must run exactly once no matter how many times this module
+// is evaluated (e.g. hot reload) - the guard below ensures that.
+const BLUE_HOUR_DAWN_END = 'blueHourDawnEnd'; // morning: sun climbing past -4°
+const BLUE_HOUR_DUSK_START = 'blueHourDuskStart'; // evening: sun dropping past -4°
+let blueHourAngleRegistered = false;
+const registerBlueHourAngle = (): void => {
+  if (blueHourAngleRegistered) return;
+  SunCalc.addTime(-4, BLUE_HOUR_DAWN_END, BLUE_HOUR_DUSK_START);
+  blueHourAngleRegistered = true;
+};
+registerBlueHourAngle();
+
+interface ExtendedSunCalcTimes extends SunCalc.GetTimesResult {
+  [BLUE_HOUR_DAWN_END]: Date;
+  [BLUE_HOUR_DUSK_START]: Date;
+}
+
+const buildWindow = (start: Date, end: Date): TimeWindow | null => {
+  if (!isValidDate(start) || !isValidDate(end)) return null;
+  return { start, end };
+};
+
+export const getGoldenHourTimes = (date: Date, latitude: number, longitude: number): GoldenHourTimes => {
+  const times = SunCalc.getTimes(date, latitude, longitude);
+
+  return {
+    morning: buildWindow(times.sunrise, times.goldenHourEnd),
+    evening: buildWindow(times.goldenHour, times.sunset)
+  };
+};
+
+export const getBlueHourTimes = (date: Date, latitude: number, longitude: number): BlueHourTimes => {
+  const times = SunCalc.getTimes(date, latitude, longitude) as ExtendedSunCalcTimes;
+
+  return {
+    morning: buildWindow(times.dawn, times[BLUE_HOUR_DAWN_END]),
+    evening: buildWindow(times[BLUE_HOUR_DUSK_START], times.dusk)
+  };
+};
+
 export interface RelevantTwilightTimes {
   type: 'dawn' | 'dusk';
   civil: Date;

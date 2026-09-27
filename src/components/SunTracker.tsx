@@ -1,17 +1,29 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  getSunPosition, 
-  getSunTimes, 
-  formatTime, 
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  getSunPosition,
+  getSunTimes,
+  formatTime,
   getTimeOfDay,
   getTimeOfDayLabel,
   getBackgroundGradient,
+  getGoldenHourTimes,
+  getBlueHourTimes,
   type LocationData,
   type SunPosition,
   type SunTimes,
-  type TimeOfDay
+  type TimeOfDay,
+  type GoldenHourTimes,
+  type BlueHourTimes
 } from '../utils/sunUtils';
-import { getMoonPosition, type MoonPosition } from '../utils/moonUtils';
+import {
+  getMoonPosition,
+  getMoonPathForDay,
+  getMoonTimes,
+  getNextFullMoon,
+  getNextNewMoon,
+  type MoonPosition,
+  type MoonTimes
+} from '../utils/moonUtils';
 import { fetchCurrentWeather, type WeatherData } from '../utils/weatherUtils';
 import SunVisualization from './SunVisualization';
 import InfoPanel from './InfoPanel';
@@ -42,6 +54,12 @@ const SunTracker: React.FC = () => {
     }
     return { latitude: 0, longitude: 0, loaded: false };
   });
+  // The place name chosen via search (ROADMAP item 12); takes priority over the
+  // reverse-geocode guess InfoPanel would otherwise compute for the same coordinates.
+  // Cleared whenever the location changes without a name (typed lat/lon, geolocation).
+  const [manualPlaceName, setManualPlaceName] = useState<string | null>(
+    () => loadManualLocation()?.name ?? null
+  );
   const [sunPosition, setSunPosition] = useState<SunPosition>({ azimuth: 0, altitude: 0 });
   const [moonPosition, setMoonPosition] = useState<MoonPosition>({ 
     azimuth: 0, 
@@ -51,6 +69,8 @@ const SunTracker: React.FC = () => {
     visible: false 
   });
   const [sunTimes, setSunTimes] = useState<SunTimes | null>(null);
+  const [goldenHourTimes, setGoldenHourTimes] = useState<GoldenHourTimes | null>(null);
+  const [blueHourTimes, setBlueHourTimes] = useState<BlueHourTimes | null>(null);
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('midday');
   const [weatherType, setWeatherType] = useState<WeatherType>('clear');
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
@@ -117,7 +137,22 @@ const SunTracker: React.FC = () => {
 
     setIsLoadingWeather(true);
     try {
-      const weather = await fetchCurrentWeather(location.latitude, location.longitude);
+      // Sunset score (ROADMAP item 11) needs today's and tomorrow's sunset time.
+      // Computed fresh here (rather than reading `sunTimes` state) so this
+      // callback's identity stays stable across the 30s sun-position tick -
+      // it's relied on by the 30-minute auto-refresh interval below.
+      const now = new Date();
+      const todaySunTimes = getSunTimes(now, location.latitude, location.longitude);
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowSunTimes = getSunTimes(tomorrow, location.latitude, location.longitude);
+
+      const weather = await fetchCurrentWeather(
+        location.latitude,
+        location.longitude,
+        todaySunTimes.sunset,
+        tomorrowSunTimes.sunset
+      );
       setWeatherData(weather);
 
       if (useRealWeather) {
@@ -177,11 +212,13 @@ const SunTracker: React.FC = () => {
         const sunPos = getSunPosition(currentDate, location.latitude, location.longitude);
         const moonPos = getMoonPosition(currentDate, location.latitude, location.longitude);
         const times = getSunTimes(currentDate, location.latitude, location.longitude);
-        
+
         setSunPosition(sunPos);
         setMoonPosition(moonPos);
         setSunTimes(times);
-        
+        setGoldenHourTimes(getGoldenHourTimes(currentDate, location.latitude, location.longitude));
+        setBlueHourTimes(getBlueHourTimes(currentDate, location.latitude, location.longitude));
+
         if (times) {
           const tod = getTimeOfDay(currentDate, times);
           setTimeOfDay(tod);
@@ -231,10 +268,12 @@ const SunTracker: React.FC = () => {
     );
   }, []);
 
-  // Manual location form (InfoPanel): validated lat/lon submitted by the user.
-  const handleLocationChange = useCallback((latitude: number, longitude: number) => {
+  // Manual location form (InfoPanel): validated lat/lon submitted by the user, or a
+  // place selected from search (in which case `name` is set alongside the coordinates).
+  const handleLocationChange = useCallback((latitude: number, longitude: number, name?: string) => {
     setLocation({ latitude, longitude, loaded: true });
-    saveManualLocation(latitude, longitude);
+    setManualPlaceName(name ?? null);
+    saveManualLocation(latitude, longitude, name);
   }, []);
 
   // "Use my location" inside the manual form: re-requests geolocation and, on
@@ -252,6 +291,7 @@ const SunTracker: React.FC = () => {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         clearManualLocation();
+        setManualPlaceName(null);
         setLocation({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
@@ -288,11 +328,36 @@ const SunTracker: React.FC = () => {
     setSunPosition(sunPos);
     setMoonPosition(moonPos);
     setSunTimes(times);
+    setGoldenHourTimes(getGoldenHourTimes(date, location.latitude, location.longitude));
+    setBlueHourTimes(getBlueHourTimes(date, location.latitude, location.longitude));
 
     if (times) {
       setTimeOfDay(getTimeOfDay(date, times));
     }
   }
+
+  // Moonrise/moonset, next full/new moon, and the day's arc (for SunVisualization) only
+  // change once a day (or when the location changes), unlike sun/moon position above
+  // which update every 30s. Keying the memo on the calendar day rather than `date`
+  // itself (which ticks every second) avoids recomputing these on every render.
+  const moonDayKey = date.toDateString();
+  const moonExtras = useMemo(() => {
+    if (!location.loaded) {
+      return {
+        moonPath: [] as MoonPosition[],
+        moonTimes: { rise: null, set: null, alwaysUp: false, alwaysDown: false } as MoonTimes,
+        nextFullMoon: date,
+        nextNewMoon: date,
+      };
+    }
+    return {
+      moonPath: getMoonPathForDay(date, location.latitude, location.longitude),
+      moonTimes: getMoonTimes(date, location.latitude, location.longitude),
+      nextFullMoon: getNextFullMoon(date),
+      nextNewMoon: getNextNewMoon(date),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on moonDayKey (the calendar day), not `date` itself
+  }, [moonDayKey, location.loaded, location.latitude, location.longitude]);
 
   const getBackgroundStyle = useCallback(() => {
     let baseGradient = getBackgroundGradient(timeOfDay);
@@ -351,15 +416,22 @@ const SunTracker: React.FC = () => {
           <SunVisualization
             sunPosition={sunPosition}
             moonPosition={moonPosition}
+            moonPath={moonExtras.moonPath}
             timeOfDay={timeOfDay}
             weatherType={weatherType}
             latitude={location.latitude}
           />
-          <InfoPanel 
+          <InfoPanel
             sunPosition={sunPosition}
             moonPosition={moonPosition}
+            moonTimes={moonExtras.moonTimes}
+            nextFullMoon={moonExtras.nextFullMoon}
+            nextNewMoon={moonExtras.nextNewMoon}
             sunTimes={sunTimes}
+            goldenHourTimes={goldenHourTimes}
+            blueHourTimes={blueHourTimes}
             location={location}
+            manualPlaceName={manualPlaceName}
             timeOfDay={timeOfDay}
             currentTime={date}
             weatherType={weatherType}
