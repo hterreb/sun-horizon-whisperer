@@ -245,7 +245,7 @@ Status: last updated 2026-09-27. Nothing on this list is built yet.
   - The scene color refactor: hardcoded colors → tokens.
   - Restyle of the InfoPanel, the buttons and the easter eggs.
   - Play Store graphics: 512 px icon, 1024×500 feature graphic, phone screenshots.
-- **Must keep: the living scene.** Every direction keeps all moving elements and their random spawn rules from `CloudLayer.tsx` and `TemperatureIceberg.tsx`: birds (bats at night), fish, ships, the iceberg below 0 °C, and drifting clouds. The redesign changes how they look, not whether or how often they appear. `prefers-reduced-motion` still turns them off.
+- **Must keep: the living scene.** Every direction keeps all moving elements and their random spawn rules from `CloudLayer.tsx` and `TemperatureIceberg.tsx`: birds (bats at night), fish, ships, the iceberg below 0 °C, and drifting clouds. The redesign changes how they look, not whether or how often they appear. All movement stays slow and calm, for relaxed watching: things glide straight across, with no jumping fish, flapping or wiggling. `prefers-reduced-motion` still turns them off.
 - **Style book:** a preview page with directions A–C plus D (today's look, polished) and E (8-bit lo-fi) exists as a private artifact: <https://claude.ai/artifact/Q6rTg9xQLPhG9SNcaz68Bj>. The final choice is still open.
 
 ### 16. Google Play release (TWA via Bubblewrap) — M
