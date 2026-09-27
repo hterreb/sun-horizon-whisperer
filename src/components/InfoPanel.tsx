@@ -607,7 +607,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 <Clock size={18} className="mr-2" />
                 <span className="text-sm">Current Time</span>
               </div>
-              <span className="font-semibold text-sm sm:text-base">{format(currentTime, 'h:mm:ss a')}</span>
+              <span className="font-semibold text-sm sm:text-base">{format(currentTime, 'HH:mm:ss')}</span>
             </div>
             
             <div className="flex justify-between items-center">
@@ -730,11 +730,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   </div>
                   <div className="flex justify-between">
                     <span>Next full moon:</span>
-                    <span className="font-mono">{format(nextFullMoon, 'MMM d, h:mm a')}</span>
+                    <span className="font-mono">{format(nextFullMoon, 'MMM d, HH:mm')}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Next new moon:</span>
-                    <span className="font-mono">{format(nextNewMoon, 'MMM d, h:mm a')}</span>
+                    <span className="font-mono">{format(nextNewMoon, 'MMM d, HH:mm')}</span>
                   </div>
                 </div>
               </div>

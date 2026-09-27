@@ -76,10 +76,9 @@ describe('sunUtils', () => {
     expect(times.polar).toBeNull();
   });
 
-  it('formats time using the runtime locale instead of a hard-coded pattern (A-4)', () => {
-    const date = new Date(2026, 0, 1, 13, 5, 0);
-    const expected = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-    expect(formatTime(date)).toBe(expected);
+  it('formats time as 24-hour, with the runtime locale separator (A-4)', () => {
+    expect(formatTime(new Date(2026, 0, 1, 13, 5, 0))).toMatch(/^13\D05$/);
+    expect(formatTime(new Date(2026, 0, 1, 7, 5, 0))).toMatch(/^07\D05$/);
   });
 
   it('formatTime still reports "Unknown" for an invalid date', () => {

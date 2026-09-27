@@ -12,6 +12,14 @@ describe('weatherUtils', () => {
   it('uses cache if valid', async () => {
     // Mock cache and check fetchCurrentWeather returns cached value
   });
+  it('ignores a cache entry with a future timestamp (device clock set back)', async () => {
+    const cached = { temperature: -30, weatherType: 'snow', lastUpdated: new Date().toISOString() };
+    localStorage.setItem('weather_cache', JSON.stringify({ data: cached, timestamp: Date.now() + 864e5, latitude: 0, longitude: 0 }));
+    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current_weather: { temperature: 20, weathercode: 0, windspeed: 0, winddirection: 0, time: '' } }) })) as unknown as typeof fetch;
+    const data = await fetchCurrentWeather(0, 0);
+    expect(fetch).toHaveBeenCalled();
+    expect(data.temperature).toBe(20);
+  });
   it('falls back on error', async () => {
     global.fetch = vi.fn(() => Promise.reject('fail')) as unknown as typeof fetch;
     const data = await fetchCurrentWeather(0, 0);
