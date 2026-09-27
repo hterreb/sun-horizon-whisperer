@@ -87,8 +87,8 @@ Status: last updated 2026-09-27. Nothing on this list is built yet.
 ### 7. Pick the design direction and tokens — S *(decision)*
 
 - **Why:** items 8–10 add many new visuals. If we build them in the current style, we must restyle them in item 15.
+- **Decision (2026-09-27):** direction **D, Polished Classic**, with the **badge logo from F** (see item 15).
 - **Spec:**
-  - Lutz picks direction A, B or C (see item 15).
   - Define the tokens only: colors, type scale, fonts and scene palette, in `index.css` and `tailwind.config.ts`.
   - The full restyle stays in item 15.
 - **Done when:** the tokens exist, and items 8–10 use them.
@@ -238,7 +238,19 @@ Status: last updated 2026-09-27. Nothing on this list is built yet.
   | Easter eggs | Subtle, few | Recurring characters (ghost, fish, whale…) in one paper style | Stamps and stickers |
   | Fits | A paid tool | The current playful soul | Store screenshots and social sharing |
 
-- **Recommendation: B.** It keeps the easter-egg character of the app, and the line-of-sight silhouette (item 13) becomes the visual signature: your real horizon as paper layers. Use the precise numbers and typography of A in the data panel.
+- **Decision (2026-09-27): D, Polished Classic, with the badge logo from F.** Style book: <https://claude.ai/artifact/Q6rTg9xQLPhG9SNcaz68Bj> (private artifact, directions A–F).
+  - **From D:**
+    - Palette: Sunset `#F97316`, Peach `#FEC6A1`, Sky `#0EA5E9`, Cyan `#33C3F0`, Night `#0F1016`, Coral `#E8625A`.
+    - Today's sky gradients with a third color stop, the soft glowing sun, the soft blurred clouds and the water reflection.
+    - The dark glass InfoPanel with a thin light border and 18 px corners.
+    - The system font with one type scale (12 / 14 / 17 / 28 / 34 px) and tabular numbers.
+    - Pill-shaped labels and buttons.
+  - **From F:**
+    - The round badge logo: the name around the edge, and a striped sun over water in the D colors.
+    - The simpler round icon without text, for the maskable Android icon.
+    - The Shrikhand wordmark, used for the logo lockup only.
+  - **To check:** the badge text may not be readable at 48 px on a home screen. If it isn't, use the round icon without text as the app icon, and keep the badge for the splash screen and the store listing.
+  - **Not taken:** F's outlined sticker UI and sticker sprites. The birds, bats, fish, ships, iceberg and ghost stay in D's soft style.
 - **Deliverables:**
   - Logo SVG and app icons (any + maskable), plus a favicon.
   - Tokens for UI and scene in one place.
@@ -246,7 +258,6 @@ Status: last updated 2026-09-27. Nothing on this list is built yet.
   - Restyle of the InfoPanel, the buttons and the easter eggs.
   - Play Store graphics: 512 px icon, 1024×500 feature graphic, phone screenshots.
 - **Must keep: the living scene.** Every direction keeps all moving elements and their random spawn rules from `CloudLayer.tsx` and `TemperatureIceberg.tsx`: birds (bats at night), fish, ships, the iceberg below 0 °C, and drifting clouds. The redesign changes how they look, not whether or how often they appear. All movement stays slow and calm, for relaxed watching: things glide straight across, with no jumping fish, flapping or wiggling. `prefers-reduced-motion` still turns them off.
-- **Style book:** a preview page with directions A–C plus D (today's look, polished) and E (8-bit lo-fi) exists as a private artifact: <https://claude.ai/artifact/Q6rTg9xQLPhG9SNcaz68Bj>. The final choice is still open.
 
 ### 16. Google Play release (TWA via Bubblewrap) — M
 
