@@ -214,7 +214,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   );
 
   return (
-    <div ref={containerRef} className="w-full h-screen relative overflow-hidden" data-testid="sun-visualization">
+    <div ref={containerRef} className="w-full h-dvh relative overflow-hidden" data-testid="sun-visualization">
       <CloudLayer timeOfDay={timeOfDay} weatherType={weatherType} />
       <Fireworks trigger={showFireworks} />
       
