@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   getSunPosition,
   getSunTimes,
@@ -15,7 +15,15 @@ import {
   type GoldenHourTimes,
   type BlueHourTimes
 } from '../utils/sunUtils';
-import { getMoonPosition, type MoonPosition } from '../utils/moonUtils';
+import {
+  getMoonPosition,
+  getMoonPathForDay,
+  getMoonTimes,
+  getNextFullMoon,
+  getNextNewMoon,
+  type MoonPosition,
+  type MoonTimes
+} from '../utils/moonUtils';
 import { fetchCurrentWeather, type WeatherData } from '../utils/weatherUtils';
 import SunVisualization from './SunVisualization';
 import InfoPanel from './InfoPanel';
@@ -328,6 +336,29 @@ const SunTracker: React.FC = () => {
     }
   }
 
+  // Moonrise/moonset, next full/new moon, and the day's arc (for SunVisualization) only
+  // change once a day (or when the location changes), unlike sun/moon position above
+  // which update every 30s. Keying the memo on the calendar day rather than `date`
+  // itself (which ticks every second) avoids recomputing these on every render.
+  const moonDayKey = date.toDateString();
+  const moonExtras = useMemo(() => {
+    if (!location.loaded) {
+      return {
+        moonPath: [] as MoonPosition[],
+        moonTimes: { rise: null, set: null, alwaysUp: false, alwaysDown: false } as MoonTimes,
+        nextFullMoon: date,
+        nextNewMoon: date,
+      };
+    }
+    return {
+      moonPath: getMoonPathForDay(date, location.latitude, location.longitude),
+      moonTimes: getMoonTimes(date, location.latitude, location.longitude),
+      nextFullMoon: getNextFullMoon(date),
+      nextNewMoon: getNextNewMoon(date),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on moonDayKey (the calendar day), not `date` itself
+  }, [moonDayKey, location.loaded, location.latitude, location.longitude]);
+
   const getBackgroundStyle = useCallback(() => {
     let baseGradient = getBackgroundGradient(timeOfDay);
     
@@ -385,13 +416,17 @@ const SunTracker: React.FC = () => {
           <SunVisualization
             sunPosition={sunPosition}
             moonPosition={moonPosition}
+            moonPath={moonExtras.moonPath}
             timeOfDay={timeOfDay}
             weatherType={weatherType}
             latitude={location.latitude}
           />
-          <InfoPanel 
+          <InfoPanel
             sunPosition={sunPosition}
             moonPosition={moonPosition}
+            moonTimes={moonExtras.moonTimes}
+            nextFullMoon={moonExtras.nextFullMoon}
+            nextNewMoon={moonExtras.nextNewMoon}
             sunTimes={sunTimes}
             goldenHourTimes={goldenHourTimes}
             blueHourTimes={blueHourTimes}

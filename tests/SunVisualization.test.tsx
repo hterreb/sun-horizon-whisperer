@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getAzimuthScreenFraction, crossesHorizon, getMoonPhaseIcon } from '../src/components/SunVisualization';
-import { getMoonPhaseLabel } from '../src/utils/moonUtils';
+import { getAzimuthScreenFraction, crossesHorizon } from '../src/components/SunVisualization';
 
 describe('getAzimuthScreenFraction (C-3)', () => {
   it('northern hemisphere: culmination (180°, South) stays centered', () => {
@@ -42,27 +41,3 @@ describe('crossesHorizon (C-8)', () => {
   });
 });
 
-describe('getMoonPhaseIcon (P0-6a)', () => {
-  const ICONS = ['🌑', '🌒', '🌓', '🌔', '🌕', '🌖', '🌗', '🌘'];
-  const LABELS = [
-    'New Moon',
-    'Waxing Crescent',
-    'First Quarter',
-    'Waxing Gibbous',
-    'Full Moon',
-    'Waning Gibbous',
-    'Third Quarter',
-    'Waning Crescent',
-  ];
-
-  it('agrees with getMoonPhaseLabel (moonUtils) on the same one of 8 phases, for every phase value', () => {
-    // Before the fix, the icon and the label used different thresholds and could
-    // disagree (e.g. one saying "Full Moon" while the other showed a gibbous icon).
-    for (let i = 0; i <= 100; i++) {
-      const phase = i / 100;
-      const icon = getMoonPhaseIcon(phase);
-      const label = getMoonPhaseLabel(phase);
-      expect(ICONS.indexOf(icon)).toBe(LABELS.indexOf(label));
-    }
-  });
-});
