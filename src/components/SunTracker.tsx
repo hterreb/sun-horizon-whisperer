@@ -214,10 +214,6 @@ const SunTracker: React.FC = () => {
           longitude: position.coords.longitude,
           loaded: true
         });
-        toast({
-          title: "Location detected",
-          description: "Using your current location for sun calculations.",
-        });
       },
       (error) => {
         console.error("Error getting location:", error);
@@ -335,7 +331,7 @@ const SunTracker: React.FC = () => {
 
   return (
     <div 
-      className={`relative min-h-screen w-full overflow-hidden ${
+      className={`relative min-h-dvh w-full overflow-hidden ${
         isFullscreen && !showCursor ? 'cursor-none' : ''
       }`} 
       style={getBackgroundStyle()}
@@ -379,10 +375,10 @@ const SunTracker: React.FC = () => {
           />
         </>
       ) : (
-        <div className="flex h-screen items-center justify-center">
+        <div className="flex h-dvh items-center justify-center">
           <div className="text-white text-center">
-            <p className="mb-4">Detecting your location...</p>
-            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-white mx-auto"></div>
+            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-white mx-auto mb-4"></div>
+            <p>Locating…</p>
           </div>
         </div>
       )}
