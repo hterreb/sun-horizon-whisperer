@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Slider } from "@/components/ui/slider";
-import { Music, Volume2, VolumeX } from "lucide-react";
+import { Music, SkipForward, Volume2, VolumeX } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -9,13 +9,44 @@ interface MusicPlayerProps {
   isFullscreen?: boolean;
 }
 
+// Lo-fi hip hop radio streams
+const STREAMS: { name: string; url: string }[] = [
+  { name: 'FluxFM Chillhop', url: 'https://fluxfm.streamabc.net/flx-chillhop-mp3-320-1595440' },
+  { name: 'ILoveRadio Lo-Fi', url: 'https://streams.ilovemusic.de/iloveradio17.mp3' },
+  { name: 'Lofi Hip Hop Radio', url: 'https://radio.lofihiphop.com/lofi' },
+  { name: 'Chillout Radio', url: 'https://cast1.torontocast.com:1025/stream' }
+];
+
+const STATION_INDEX_KEY = 'radio_station_index';
+
+// Reads the last-selected station index back from localStorage, falling back to the
+// first station if nothing is stored, storage is unavailable, or the stored value is
+// no longer a valid index (e.g. the stream list shrank).
+const loadStoredStationIndex = (): number => {
+  try {
+    const raw = localStorage.getItem(STATION_INDEX_KEY);
+    if (raw === null) return 0;
+    const parsed = Number.parseInt(raw, 10);
+    if (Number.isInteger(parsed) && parsed >= 0 && parsed < STREAMS.length) {
+      return parsed;
+    }
+    return 0;
+  } catch (error) {
+    console.error('Error reading saved radio station:', error);
+    return 0;
+  }
+};
+
 const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState([0.5]);
   const [isVisible, setIsVisible] = useState(true);
+  const [stationIndex, setStationIndex] = useState(loadStoredStationIndex);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fadeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isPlayingRef = useRef(isPlaying);
+  const stationIndexRef = useRef(stationIndex);
+  const errorAttemptsRef = useRef(0);
   const isMobile = useIsMobile();
 
   // Whenever fullscreen mode toggles (either direction), the player should be visible
@@ -59,34 +90,34 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
   const handleFocus = handleMouseEnter;
   const handleTouchStart = handleMouseEnter;
 
+  // Plays the given station on the current audio element (if already playing).
+  const playStream = (index: number) => {
+    if (!audioRef.current) return;
+    audioRef.current.src = STREAMS[index].url;
+    if (isPlayingRef.current) {
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.error('Audio playback failed after stream switch:', error);
+        });
+      }
+    }
+  };
+
   useEffect(() => {
     // Create audio element with lo-fi streams
     audioRef.current = new Audio();
     audioRef.current.crossOrigin = "anonymous";
     audioRef.current.preload = "none";
 
-    // Lo-fi hip hop radio streams
-    const streams = [
-      'https://fluxfm.streamabc.net/flx-chillhop-mp3-320-1595440',
-      'https://streams.ilovemusic.de/iloveradio17.mp3', // ILoveRadio Lo-Fi
-      'https://radio.lofihiphop.com/lofi', // Dedicated lo-fi stream
-      'https://cast1.torontocast.com:1025/stream' // Chillout backup
-    ];
-
-    let currentStreamIndex = 0;
-
-    const tryNextStream = () => {
-      if (currentStreamIndex < streams.length) {
-        audioRef.current!.src = streams[currentStreamIndex];
-        currentStreamIndex++;
-        if (isPlayingRef.current) {
-          const playPromise = audioRef.current!.play();
-          if (playPromise !== undefined) {
-            playPromise.catch(error => {
-              console.error('Audio playback failed after stream switch:', error);
-            });
-          }
-        }
+    // Set up error handling: auto-skip to the next station, wrapping around, until
+    // every station has failed once since the last manual Next (see errorAttemptsRef).
+    const handleError = () => {
+      errorAttemptsRef.current++;
+      if (errorAttemptsRef.current < STREAMS.length) {
+        const nextIndex = (stationIndexRef.current + 1) % STREAMS.length;
+        setStationIndex(nextIndex);
+        playStream(nextIndex);
       } else {
         console.error('All lo-fi streams failed');
         toast({
@@ -98,20 +129,15 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
       }
     };
 
-    // Set up error handling
-    const handleError = () => {
-      tryNextStream();
-    };
-
     const handleCanPlay = () => {
     };
 
     audioRef.current.addEventListener('error', handleError);
     audioRef.current.addEventListener('canplay', handleCanPlay);
-    
-    // Try first stream
-    tryNextStream();
-    
+
+    // Try the last-selected (or first) station
+    playStream(stationIndexRef.current);
+
     return () => {
       if (audioRef.current) {
         audioRef.current.removeEventListener('error', handleError);
@@ -131,6 +157,15 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
   useEffect(() => {
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
+
+  useEffect(() => {
+    stationIndexRef.current = stationIndex;
+    try {
+      localStorage.setItem(STATION_INDEX_KEY, String(stationIndex));
+    } catch (error) {
+      console.error('Error saving radio station:', error);
+    }
+  }, [stationIndex]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -161,6 +196,13 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
     setIsPlaying(checked);
   };
 
+  const handleNext = () => {
+    errorAttemptsRef.current = 0;
+    const nextIndex = (stationIndexRef.current + 1) % STREAMS.length;
+    setStationIndex(nextIndex);
+    playStream(nextIndex);
+  };
+
   return (
     <div 
       className={`fixed z-50 bg-black/30 backdrop-blur-lg rounded-full px-3 py-2 flex items-center gap-2 transition-opacity duration-300 ${
@@ -177,6 +219,17 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
         aria-label="Play lo-fi music"
       />
       <Music className="h-4 w-4 text-white" />
+      <span className="hidden sm:inline max-w-[100px] truncate text-xs text-white/80">
+        {STREAMS[stationIndex].name}
+      </span>
+      <button
+        type="button"
+        onClick={handleNext}
+        aria-label="Next station"
+        className="text-white/80 hover:text-white transition-colors"
+      >
+        <SkipForward className="h-4 w-4" />
+      </button>
       {volume[0] === 0 ? (
         <VolumeX className="h-4 w-4 text-white" />
       ) : (
