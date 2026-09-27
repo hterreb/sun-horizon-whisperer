@@ -122,7 +122,14 @@ const PWAInstallPrompt: React.FC = () => {
   }
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 bg-gradient-to-r from-blue-900/95 to-purple-900/95 backdrop-blur-md text-white p-4 rounded-xl border border-white/20 shadow-2xl animate-in slide-in-from-bottom-2 duration-500">
+    <div
+      className="fixed z-50 bg-gradient-to-r from-blue-900/95 to-purple-900/95 backdrop-blur-md text-white p-4 rounded-xl border border-white/20 shadow-2xl animate-in slide-in-from-bottom-2 duration-500"
+      style={{
+        bottom: 'calc(1rem + env(safe-area-inset-bottom))',
+        left: 'calc(1rem + env(safe-area-inset-left))',
+        right: 'calc(1rem + env(safe-area-inset-right))',
+      }}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 flex-1">
           <div className="flex-shrink-0">
