@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { Sun, Moon } from 'lucide-react';
 import { type SunPosition, type TimeOfDay } from '../utils/sunUtils';
-import { type MoonPosition } from '../utils/moonUtils';
+import { type MoonPosition, getMoonPhaseIndex } from '../utils/moonUtils';
 import CloudLayer, { type WeatherType } from './CloudLayer';
 import Fireworks from './Fireworks';
 
@@ -31,6 +31,13 @@ export const getAzimuthScreenFraction = (azimuth: number, latitude: number): num
 // eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
 export const crossesHorizon = (prevAltitude: number, currentAltitude: number): boolean =>
   (prevAltitude < 0) !== (currentAltitude < 0);
+
+const MOON_PHASE_ICONS = ['🌑', '🌒', '🌓', '🌔', '🌕', '🌖', '🌗', '🌘'];
+
+// Looks up the same phase index as moonUtils' getMoonPhaseLabel, so the icon and the
+// label text always agree on which of the 8 phases the moon is in.
+// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
+export const getMoonPhaseIcon = (phase: number): string => MOON_PHASE_ICONS[getMoonPhaseIndex(phase)];
 
 const SunVisualization: React.FC<SunVisualizationProps> = ({
   sunPosition,
@@ -199,18 +206,6 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     return timeOfDay === 'night' ? 0.1 : 0.3;
   };
 
-  const getMoonPhaseIcon = () => {
-    const phase = moonPosition.phase;
-    if (phase < 0.1 || phase > 0.9) return '🌑'; // New moon
-    if (phase < 0.3) return '🌒'; // Waxing crescent
-    if (phase < 0.4) return '🌓'; // First quarter
-    if (phase < 0.6) return '🌔'; // Waxing gibbous
-    if (phase < 0.7) return '🌕'; // Full moon
-    if (phase < 0.8) return '🌖'; // Waning gibbous
-    if (phase < 0.9) return '🌗'; // Third quarter
-    return '🌘'; // Waning crescent
-  };
-
   const isSunVisible = sunPosition.altitude > -18 && weatherType !== 'storm';
   const isMoonVisible = moonPosition.visible && (
     timeOfDay === 'night' || 
@@ -250,7 +245,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         >
           <Moon size={36 + moonPosition.illumination * 12} strokeWidth={1} />
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-xs pointer-events-none">
-            {getMoonPhaseIcon()}
+            {getMoonPhaseIcon(moonPosition.phase)}
           </div>
         </div>
       )}
