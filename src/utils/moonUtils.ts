@@ -1,5 +1,6 @@
 
 import SunCalc from 'suncalc';
+import { scanMoonEvents } from './lunarEphemeris';
 
 export interface MoonPosition {
   azimuth: number;
@@ -56,27 +57,33 @@ export interface MoonTimes {
   alwaysDown: boolean;
 }
 
-// Wraps SunCalc.getMoonTimes, which only searches within the given calendar day and so
-// can come back with just one of rise/set (e.g. the moon rose yesterday and sets
-// today, or rises today and sets tomorrow). When that happens, search the next day for
-// the missing event; if it still isn't there (e.g. the next day is alwaysUp/alwaysDown)
-// leave it null so the caller can show "-" for it.
+// Moonrise/moonset via Jean Meeus, "Astronomical Algorithms" (see lunarEphemeris.ts) -
+// suncalc's low-precision lunar theory can be several minutes off (see ROADMAP item 9),
+// so this scans the day directly instead of delegating to SunCalc.getMoonTimes. Only
+// searches within the given calendar day (local, midnight to midnight per `date`'s own
+// getHours/setHours) and so can come back with just one of rise/set (e.g. the moon rose
+// yesterday and sets today, or rises today and sets tomorrow). When that happens,
+// search the next day for the missing event; if it still isn't there (e.g. the next day
+// is alwaysUp/alwaysDown) leave it null so the caller can show "-" for it.
 export const getMoonTimes = (date: Date, latitude: number, longitude: number): MoonTimes => {
-  const times = SunCalc.getMoonTimes(new Date(date), latitude, longitude);
+  const dayStart = new Date(date);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayStartMs = dayStart.getTime();
+  const dayEndMs = dayStartMs + 24 * 60 * 60 * 1000;
 
-  if (times.alwaysUp || times.alwaysDown) {
-    return { rise: null, set: null, alwaysUp: !!times.alwaysUp, alwaysDown: !!times.alwaysDown };
+  const scan = scanMoonEvents(dayStartMs, dayEndMs, latitude, longitude);
+
+  if (scan.alwaysUp || scan.alwaysDown) {
+    return { rise: null, set: null, alwaysUp: scan.alwaysUp, alwaysDown: scan.alwaysDown };
   }
 
-  let rise = times.rise ?? null;
-  let set = times.set ?? null;
+  let rise = scan.rise;
+  let set = scan.set;
 
   if (!rise || !set) {
-    const nextDay = new Date(date);
-    nextDay.setDate(nextDay.getDate() + 1);
-    const nextTimes = SunCalc.getMoonTimes(nextDay, latitude, longitude);
-    if (!rise) rise = nextTimes.rise ?? null;
-    if (!set) set = nextTimes.set ?? null;
+    const nextScan = scanMoonEvents(dayEndMs, dayEndMs + 24 * 60 * 60 * 1000, latitude, longitude);
+    if (!rise) rise = nextScan.rise;
+    if (!set) set = nextScan.set;
   }
 
   return { rise, set, alwaysUp: false, alwaysDown: false };
