@@ -1,13 +1,16 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { Sun, Moon } from 'lucide-react';
+import { Sun } from 'lucide-react';
 import { type SunPosition, type TimeOfDay } from '../utils/sunUtils';
-import { type MoonPosition, getMoonPhaseIndex } from '../utils/moonUtils';
+import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
 import CloudLayer, { type WeatherType } from './CloudLayer';
 import Fireworks from './Fireworks';
 
 interface SunVisualizationProps {
   sunPosition: SunPosition;
   moonPosition: MoonPosition;
+  // The moon's altitude/azimuth sampled across the current day (see
+  // moonUtils.getMoonPathForDay), used to draw its arc across the sky.
+  moonPath: MoonPosition[];
   timeOfDay: TimeOfDay;
   weatherType: WeatherType;
   latitude: number;
@@ -32,16 +35,34 @@ export const getAzimuthScreenFraction = (azimuth: number, latitude: number): num
 export const crossesHorizon = (prevAltitude: number, currentAltitude: number): boolean =>
   (prevAltitude < 0) !== (currentAltitude < 0);
 
-const MOON_PHASE_ICONS = ['🌑', '🌒', '🌓', '🌔', '🌕', '🌖', '🌗', '🌘'];
+// Maps a sky position (altitude/azimuth, in degrees) to screen x/y for the given
+// container size and latitude. Shared by the sun and moon's current-position dots and
+// by each sampled point of the moon's day arc, so they all agree on the same mapping.
+const getScreenPosition = (
+  altitude: number,
+  azimuth: number,
+  width: number,
+  height: number,
+  latitude: number
+): { x: number; y: number } => {
+  if (width === 0 || height === 0) return { x: 0, y: 0 };
 
-// Looks up the same phase index as moonUtils' getMoonPhaseLabel, so the icon and the
-// label text always agree on which of the 8 phases the moon is in.
-// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
-export const getMoonPhaseIcon = (phase: number): string => MOON_PHASE_ICONS[getMoonPhaseIndex(phase)];
+  const horizonY = height * 0.65;
+  const altitudeRadians = altitude * (Math.PI / 180);
+  const maxAltitudeHeight = horizonY - 30;
+  const y = horizonY - Math.sin(altitudeRadians) * maxAltitudeHeight;
+  const x = width * getAzimuthScreenFraction(azimuth, latitude);
+
+  return {
+    x: Math.max(30, Math.min(width - 30, x)),
+    y: Math.max(30, Math.min(height - 30, y))
+  };
+};
 
 const SunVisualization: React.FC<SunVisualizationProps> = ({
   sunPosition,
   moonPosition,
+  moonPath,
   timeOfDay,
   weatherType,
   latitude
@@ -114,53 +135,29 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     return path;
   }, [containerDimensions]);
 
-  const getSunPosition = () => {
-    const { width, height } = containerDimensions;
-    if (width === 0 || height === 0) return { x: 0, y: 0 };
+  const getSunPosition = () =>
+    getScreenPosition(sunPosition.altitude, sunPosition.azimuth, containerDimensions.width, containerDimensions.height, latitude);
 
-    const horizonY = height * 0.65;
-    
-    // Map altitude to vertical position
-    // At 0° altitude, sun should be exactly at horizon
-    // At 90° altitude, sun should be at the top
-    // At -90° altitude, sun should be well below horizon (but clamp to screen)
-    const altitudeRadians = sunPosition.altitude * (Math.PI / 180);
-    const maxAltitudeHeight = horizonY - 30; // Leave some margin from top
-    const y = horizonY - (Math.sin(altitudeRadians) * maxAltitudeHeight);
-    
-    // Map azimuth to horizontal position
-    // 0° = North (top of screen), 90° = East (right), 180° = South (bottom), 270° = West (left)
-    // But we want 0° at left edge, 180° at center, 360° at right edge for a typical sun path
-    // So we adjust: map azimuth directly to screen width (shifted for southern hemisphere)
-    const x = width * getAzimuthScreenFraction(sunPosition.azimuth, latitude);
-    
-    return { 
-      x: Math.max(30, Math.min(width - 30, x)), 
-      y: Math.max(30, Math.min(height - 30, y)) 
-    };
-  };
-
-  const getMoonPosition = () => {
-    const { width, height } = containerDimensions;
-    if (width === 0 || height === 0) return { x: 0, y: 0 };
-
-    const horizonY = height * 0.65;
-    
-    // Use same logic as sun for consistent positioning
-    const altitudeRadians = moonPosition.altitude * (Math.PI / 180);
-    const maxAltitudeHeight = horizonY - 30;
-    const y = horizonY - (Math.sin(altitudeRadians) * maxAltitudeHeight);
-    
-    const x = width * getAzimuthScreenFraction(moonPosition.azimuth, latitude);
-    
-    return { 
-      x: Math.max(30, Math.min(width - 30, x)), 
-      y: Math.max(30, Math.min(height - 30, y)) 
-    };
-  };
+  const getMoonPosition = () =>
+    getScreenPosition(moonPosition.altitude, moonPosition.azimuth, containerDimensions.width, containerDimensions.height, latitude);
 
   const { x: sunX, y: sunY } = getSunPosition();
   const { x: moonX, y: moonY } = getMoonPosition();
+
+  // The moon's arc for the current day: same screen mapping as its current-position
+  // dot, just applied to every sampled point in `moonPath`. Paler than the moon itself
+  // (lower stroke opacity), using the scene.moon token (see index.css/tailwind.config).
+  const moonArcPath = useMemo(() => {
+    const { width, height } = containerDimensions;
+    if (width === 0 || height === 0 || moonPath.length === 0) return '';
+
+    return moonPath
+      .map((point, i) => {
+        const { x, y } = getScreenPosition(point.altitude, point.azimuth, width, height, latitude);
+        return `${i === 0 ? 'M' : 'L'}${x},${y}`;
+      })
+      .join(' ');
+  }, [moonPath, containerDimensions, latitude]);
 
   const getSunColor = () => {
     if (sunPosition.altitude > 10) {
@@ -208,16 +205,34 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
   const isSunVisible = sunPosition.altitude > -18 && weatherType !== 'storm';
   const isMoonVisible = moonPosition.visible && (
-    timeOfDay === 'night' || 
-    timeOfDay === 'astronomical-twilight' || 
+    timeOfDay === 'night' ||
+    timeOfDay === 'astronomical-twilight' ||
     timeOfDay === 'nautical-twilight'
+  );
+
+  const moonRadius = 18 + moonPosition.illumination * 6; // same footprint as the old 36 + illumination*12 diameter
+  const moonPhasePath = useMemo(
+    () => getMoonPhasePath(moonPosition.illumination, moonPosition.phase, latitude, moonRadius),
+    [moonPosition.illumination, moonPosition.phase, latitude, moonRadius]
   );
 
   return (
     <div ref={containerRef} className="w-full h-dvh relative overflow-hidden" data-testid="sun-visualization">
       <CloudLayer timeOfDay={timeOfDay} weatherType={weatherType} />
       <Fireworks trigger={showFireworks} />
-      
+
+      {moonArcPath && (
+        <svg className="absolute inset-0 w-full h-full pointer-events-none">
+          <path
+            d={moonArcPath}
+            fill="none"
+            stroke="hsl(var(--scene-moon))"
+            strokeOpacity={0.25}
+            strokeWidth={1.5}
+          />
+        </svg>
+      )}
+
       {isSunVisible && (
         <div 
           className={`absolute transition-transform duration-1000 ${getSunColor()} ${getGlowIntensity()} animate-glow`}
@@ -233,20 +248,24 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       )}
       
       {isMoonVisible && (
-        <div 
-          className="absolute text-gray-300 transition-all duration-1000"
-          style={{ 
-            left: `${moonX}px`, 
+        <div
+          className="absolute transition-all duration-1000"
+          style={{
+            left: `${moonX}px`,
             top: `${moonY}px`,
             transform: 'translate(-50%, -50%)',
             opacity: weatherType === 'storm' ? 0.3 : moonPosition.illumination * 0.8 + 0.2,
             filter: `drop-shadow(0 0 ${moonPosition.illumination * 15}px rgba(255,255,255,0.4))`
           }}
         >
-          <Moon size={36 + moonPosition.illumination * 12} strokeWidth={1} />
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-xs pointer-events-none">
-            {getMoonPhaseIcon(moonPosition.phase)}
-          </div>
+          <svg
+            width={moonRadius * 2}
+            height={moonRadius * 2}
+            viewBox={`${-moonRadius} ${-moonRadius} ${moonRadius * 2} ${moonRadius * 2}`}
+          >
+            <circle cx={0} cy={0} r={moonRadius - 0.5} fill="#2b2f3a" stroke="hsl(var(--scene-moon))" strokeOpacity={0.3} />
+            <path d={moonPhasePath} fill="hsl(var(--scene-moon))" />
+          </svg>
         </div>
       )}
       

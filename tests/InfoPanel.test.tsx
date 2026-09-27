@@ -22,8 +22,14 @@ describe('InfoPanel', () => {
   const defaultProps = {
     sunPosition: { azimuth: 0, altitude: 0 },
     moonPosition: { azimuth: 0, altitude: 0, phase: 0, illumination: 0, visible: true },
+    moonTimes: { rise: new Date(now.setHours(20, 0, 0, 0)), set: new Date(now.setHours(7, 0, 0, 0)), alwaysUp: false, alwaysDown: false },
+    nextFullMoon: new Date(now.setHours(12, 0, 0, 0)),
+    nextNewMoon: new Date(now.setHours(12, 0, 0, 0)),
     sunTimes,
+    goldenHourTimes: null,
+    blueHourTimes: null,
     location: { latitude: 0, longitude: 0, loaded: true },
+    manualPlaceName: null,
     timeOfDay: 'midday' as TimeOfDay,
     currentTime: new Date(),
     weatherType: 'clear' as WeatherType,
@@ -221,6 +227,97 @@ describe('InfoPanel', () => {
 
       expect(onUseMyLocation).toHaveBeenCalledTimes(1);
       expect(screen.queryByLabelText(/latitude/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('place-name search (ROADMAP 12)', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('shows the searched place name instead of fetching a reverse-geocode guess', async () => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+
+      render(<InfoPanel {...defaultProps} manualPlaceName="Friedrichshafen, Germany" />);
+
+      await screen.findByText('Friedrichshafen, Germany');
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('ignores queries under 2 chars, debounces by 300ms, and selecting a result sets lat/lon/name', async () => {
+      const fetchMock = vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              results: [
+                {
+                  name: 'Friedrichshafen',
+                  admin1: 'Baden-Württemberg',
+                  country: 'Germany',
+                  latitude: 47.65,
+                  longitude: 9.48,
+                },
+              ],
+            }),
+        })
+      );
+      vi.stubGlobal('fetch', fetchMock);
+
+      const onLocationChange = vi.fn();
+      // A manual place name already set means mounting doesn't also kick off the
+      // unrelated reverse-geocode fetch, which would otherwise share this mock.
+      render(
+        <InfoPanel
+          {...defaultProps}
+          manualPlaceName="Somewhere Else"
+          onLocationChange={onLocationChange}
+        />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /change location/i }));
+      const searchInput = screen.getByLabelText(/search for a place/i);
+
+      fireEvent.change(searchInput, { target: { value: 'F' } });
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      expect(fetchMock).not.toHaveBeenCalled();
+
+      fireEvent.change(searchInput, { target: { value: 'Friedrichshafen' } });
+      expect(fetchMock).not.toHaveBeenCalled();
+
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1), { timeout: 2000 });
+
+      const resultOption = await screen.findByRole('option', {
+        name: 'Friedrichshafen, Baden-Württemberg, Germany',
+      });
+      fireEvent.click(resultOption);
+
+      expect(onLocationChange).toHaveBeenCalledWith(47.65, 9.48, 'Friedrichshafen, Baden-Württemberg, Germany');
+      // Selecting a result closes the form, like submitting or "Use my location" do.
+      expect(screen.queryByLabelText(/search for a place/i)).not.toBeInTheDocument();
+    });
+
+    it('shows "No results" for an empty response and an error state for a failed request', async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ results: [] }) })
+        .mockRejectedValueOnce(new Error('network down'));
+      vi.stubGlobal('fetch', fetchMock);
+
+      // Same reasoning as above: suppress the unrelated reverse-geocode fetch on mount.
+      render(<InfoPanel {...defaultProps} manualPlaceName="Somewhere Else" />);
+      fireEvent.click(screen.getByRole('button', { name: /change location/i }));
+      const searchInput = screen.getByLabelText(/search for a place/i);
+
+      fireEvent.change(searchInput, { target: { value: 'Nowhereville' } });
+      await waitFor(() => expect(screen.getByText(/no results/i)).toBeInTheDocument(), { timeout: 2000 });
+
+      fireEvent.change(searchInput, { target: { value: 'Errorville' } });
+      await waitFor(
+        () => expect(screen.getByRole('alert')).toHaveTextContent(/could not search/i),
+        { timeout: 2000 }
+      );
     });
   });
 });

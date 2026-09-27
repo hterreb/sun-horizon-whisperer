@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-09-27. Nothing on this list is built yet.
+Status: last updated 2026-09-27. Done: items 1–7, 9, 11, 12 (marked **✅ Done** in the heading). Open: items 8, 10, 13–16, easter eggs, backlog.
 
 ## Priority rules
 
@@ -18,7 +18,7 @@ Status: last updated 2026-09-27. Nothing on this list is built yet.
 
 ## P0 — Quick wins (fixes and polish)
 
-### 1. InfoPanel always on top — S
+### 1. InfoPanel always on top — S — **✅ Done**
 
 - **Why:** fish, ships, birds, the iceberg and the midnight ghost draw over the InfoPanel. The panel root (`InfoPanel.tsx:267`) has no z-index. The scene elements use z 5–30.
 - **Spec:**
@@ -27,7 +27,7 @@ Status: last updated 2026-09-27. Nothing on this list is built yet.
   - Keep the FullscreenButton (`z-40`), MusicPlayer / PWA prompt (`z-50`) and toasts (`z-[100]`) above the panel.
 - **Done when:** no scene element draws over the panel, at day or night, with the panel open or collapsed.
 
-### 2. Scrollable InfoPanel on mobile — S
+### 2. Scrollable InfoPanel on mobile — S — **✅ Done**
 
 - **Why:** the panel height uses `max-h-[calc(100vh-120px)]` (`InfoPanel.tsx:359`). On mobile, `100vh` includes the browser bars, so the lower sections can't be reached.
 - **Spec:**
@@ -36,7 +36,7 @@ Status: last updated 2026-09-27. Nothing on this list is built yet.
   - Add bottom padding equal to `env(safe-area-inset-bottom)`.
 - **Done when:** on a 360×640 viewport, with all sections expanded, the last section can be scrolled into view.
 
-### 3. Remove the location success toast — S
+### 3. Remove the location success toast — S — **✅ Done**
 
 - **Why:** the "Location detected" toast at startup adds no information.
 - **Spec:**
@@ -45,7 +45,7 @@ Status: last updated 2026-09-27. Nothing on this list is built yet.
   - Keep the "Location unavailable → using default location" toast. The user must know about the fallback.
 - **Done when:** a successful start shows no toast, and a failed start still shows the fallback toast.
 
-### 4. True fullscreen on mobile — S
+### 4. True fullscreen on mobile — S — **✅ Done**
 
 - **Why:** there is no `viewport-fit=cover` and no safe-area handling, the app uses `h-screen`/`100vh`, `requestFullscreen` has no webkit fallback, and the manifest uses `display: standalone`.
 - **Spec:**
@@ -59,7 +59,7 @@ Status: last updated 2026-09-27. Nothing on this list is built yet.
   - The installed PWA on Android shows no browser bars and no gaps at the notch or home indicator.
   - On iOS, the installed PWA draws under the status bar.
 
-### 5. Radio: Next button — S
+### 5. Radio: Next button — S — **✅ Done**
 
 - **Why:** `MusicPlayer.tsx` has 4 lo-fi radio streams. It only moves to the next stream when one fails. The user can't choose.
 - **Spec:**
@@ -70,7 +70,7 @@ Status: last updated 2026-09-27. Nothing on this list is built yet.
   - Keep the auto-skip on error.
 - **Done when:** Next cycles through all 4 stations and back to the first, and a reload resumes the last station.
 
-### 6. Tech-debt sweep — S *(suggestion)*
+### 6. Tech-debt sweep — S *(suggestion)* — **✅ Done**
 
 - **Why:** these issues are small, but they block the store release or cause wrong output.
 - **Spec:**
@@ -84,7 +84,7 @@ Status: last updated 2026-09-27. Nothing on this list is built yet.
 
 ## P1 — Core sky features
 
-### 7. Pick the design direction and tokens — S *(decision)*
+### 7. Pick the design direction and tokens — S *(decision)* — **✅ Done**
 
 - **Why:** items 8–10 add many new visuals. If we build them in the current style, we must restyle them in item 15.
 - **Decision (2026-09-27):** direction **D, Polished Classic**, with the **badge logo from F** (see item 15).
@@ -112,7 +112,7 @@ Status: last updated 2026-09-27. Nothing on this list is built yet.
   - The labels match real directions in both hemispheres.
   - In compass mode, pointing the phone at the sun puts the sun at screen center.
 
-### 9. Moon upgrade — M
+### 9. Moon upgrade — M — **✅ Done**
 
 - **Why:** the moon is a lucide icon with an emoji on top. It has no rise/set times and no path.
 - **Spec:**
@@ -143,7 +143,7 @@ Status: last updated 2026-09-27. Nothing on this list is built yet.
   - All animations respect `prefers-reduced-motion`, and the rAF id lives in a `useRef` (see CLAUDE.md).
 - **Done when:** each weather type has its own look, and the mapping test covers all WMO codes.
 
-### 11. Golden hour, blue hour and a sunset score — M *(suggestion)*
+### 11. Golden hour, blue hour and a sunset score — M *(suggestion)* — **✅ Done**
 
 - **Why:** people who chase sunsets care about two things: when the light is good, and whether the sunset will be colorful. This is the core use case of the app.
 - **Spec:**
@@ -152,7 +152,7 @@ Status: last updated 2026-09-27. Nothing on this list is built yet.
   - Candidate for Premium later.
 - **Done when:** the score shows next to the sunset time, with a short reason (for example "high clouds, clear horizon").
 
-### 12. Place-name search — S
+### 12. Place-name search — S — **✅ Done**
 
 - **Why:** the manual location only accepts lat/lon.
 - **Spec:**

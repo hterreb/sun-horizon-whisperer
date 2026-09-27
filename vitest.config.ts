@@ -12,6 +12,8 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    // Date tests use local-day semantics; pin the zone so local runs match CI.
+    env: { TZ: 'UTC' },
     setupFiles: './tests/setupTests.ts',
     include: ['tests/**/*.test.{ts,tsx}'],
     coverage: {

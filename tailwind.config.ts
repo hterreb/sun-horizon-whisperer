@@ -75,12 +75,63 @@ export default {
 					civil: '#403E43',
 					nautical: '#221F26',
 					astronomical: '#0F0E11'
+				},
+				// Direction D "Polished Classic" tokens (ROADMAP item 7)
+				brand: {
+					sunset: 'hsl(var(--brand-sunset))',
+					peach: 'hsl(var(--brand-peach))',
+					sky: 'hsl(var(--brand-sky))',
+					cyan: 'hsl(var(--brand-cyan))',
+					night: 'hsl(var(--brand-night))',
+					coral: 'hsl(var(--brand-coral))'
+				},
+				scene: {
+					sky: {
+						'night-1': 'hsl(var(--scene-sky-night-1))',
+						'night-2': 'hsl(var(--scene-sky-night-2))',
+						'night-3': 'hsl(var(--scene-sky-night-3))',
+						'dawn-1': 'hsl(var(--scene-sky-dawn-1))',
+						'dawn-2': 'hsl(var(--scene-sky-dawn-2))',
+						'dawn-3': 'hsl(var(--scene-sky-dawn-3))',
+						'day-1': 'hsl(var(--scene-sky-day-1))',
+						'day-2': 'hsl(var(--scene-sky-day-2))',
+						'day-3': 'hsl(var(--scene-sky-day-3))',
+						'dusk-1': 'hsl(var(--scene-sky-dusk-1))',
+						'dusk-2': 'hsl(var(--scene-sky-dusk-2))',
+						'dusk-3': 'hsl(var(--scene-sky-dusk-3))'
+					},
+					sunGlow: {
+						high: 'hsl(var(--scene-sun-glow-high))',
+						low: 'hsl(var(--scene-sun-glow-low))',
+						horizon: 'hsl(var(--scene-sun-glow-horizon))'
+					},
+					moon: 'hsl(var(--scene-moon))',
+					horizon: {
+						night: 'hsl(var(--scene-horizon-night))',
+						'astro-twilight': 'hsl(var(--scene-horizon-astro-twilight))',
+						'nautical-twilight': 'hsl(var(--scene-horizon-nautical-twilight))',
+						dawn: 'hsl(var(--scene-horizon-dawn))',
+						day: 'hsl(var(--scene-horizon-day))'
+					},
+					water: 'hsl(var(--scene-water))'
+				},
+				panel: {
+					background: 'hsl(var(--panel-background))',
+					border: 'hsl(var(--panel-border))'
 				}
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
 				md: 'calc(var(--radius) - 2px)',
-				sm: 'calc(var(--radius) - 4px)'
+				sm: 'calc(var(--radius) - 4px)',
+				panel: 'var(--panel-radius)'
+			},
+			fontSize: {
+				caption: ['12px', { lineHeight: '16px' }],
+				body: ['14px', { lineHeight: '20px' }],
+				title: ['17px', { lineHeight: '24px' }],
+				display: ['28px', { lineHeight: '34px' }],
+				hero: ['34px', { lineHeight: '40px' }]
 			},
 			keyframes: {
 				'accordion-down': {

@@ -1,0 +1,239 @@
+[
+ {
+  "loc": "fn",
+  "lat": 47.65,
+  "lon": 9.48,
+  "dateUTC": "2026-01-15",
+  "events": [
+   "Rise 04:55",
+   "Set 12:26"
+  ]
+ },
+ {
+  "loc": "fn",
+  "lat": 47.65,
+  "lon": 9.48,
+  "dateUTC": "2026-03-03",
+  "events": [
+   "Set 05:57",
+   "Rise 17:23"
+  ]
+ },
+ {
+  "loc": "fn",
+  "lat": 47.65,
+  "lon": 9.48,
+  "dateUTC": "2026-06-10",
+  "events": [
+   "Rise 00:10",
+   "Set 13:45"
+  ]
+ },
+ {
+  "loc": "fn",
+  "lat": 47.65,
+  "lon": 9.48,
+  "dateUTC": "2026-10-10",
+  "events": [
+   "Rise 05:19",
+   "Set 16:16"
+  ]
+ },
+ {
+  "loc": "fn",
+  "lat": 47.65,
+  "lon": 9.48,
+  "dateUTC": "2026-10-26",
+  "events": [
+   "Set 06:23",
+   "Rise 15:56"
+  ]
+ },
+ {
+  "loc": "fn",
+  "lat": 47.65,
+  "lon": 9.48,
+  "dateUTC": "2026-12-20",
+  "events": [
+   "Set 02:45",
+   "Rise 12:17"
+  ]
+ },
+ {
+  "loc": "syd",
+  "lat": -33.87,
+  "lon": 151.21,
+  "dateUTC": "2026-01-15",
+  "events": [
+   "Set 06:32",
+   "Rise 16:07"
+  ]
+ },
+ {
+  "loc": "syd",
+  "lat": -33.87,
+  "lon": 151.21,
+  "dateUTC": "2026-03-03",
+  "events": [
+   "Rise 08:21",
+   "Set 20:10"
+  ]
+ },
+ {
+  "loc": "syd",
+  "lat": -33.87,
+  "lon": 151.21,
+  "dateUTC": "2026-06-10",
+  "events": [
+   "Set 02:55",
+   "Rise 16:09"
+  ]
+ },
+ {
+  "loc": "syd",
+  "lat": -33.87,
+  "lon": 151.21,
+  "dateUTC": "2026-10-10",
+  "events": [
+   "Set 07:44",
+   "Rise 19:12"
+  ]
+ },
+ {
+  "loc": "syd",
+  "lat": -33.87,
+  "lon": 151.21,
+  "dateUTC": "2026-10-26",
+  "events": [
+   "Rise 08:32",
+   "Set 19:08"
+  ]
+ },
+ {
+  "loc": "syd",
+  "lat": -33.87,
+  "lon": 151.21,
+  "dateUTC": "2026-12-20",
+  "events": [
+   "Rise 04:54",
+   "Set 15:29"
+  ]
+ },
+ {
+  "loc": "tromso",
+  "lat": 69.65,
+  "lon": 18.96,
+  "dateUTC": "2026-01-15",
+  "events": []
+ },
+ {
+  "loc": "tromso",
+  "lat": 69.65,
+  "lon": 18.96,
+  "dateUTC": "2026-03-03",
+  "events": [
+   "Set 06:11",
+   "Rise 16:08"
+  ]
+ },
+ {
+  "loc": "tromso",
+  "lat": 69.65,
+  "lon": 18.96,
+  "dateUTC": "2026-06-10",
+  "events": [
+   "Set 14:15",
+   "Rise 22:24"
+  ]
+ },
+ {
+  "loc": "tromso",
+  "lat": 69.65,
+  "lon": 18.96,
+  "dateUTC": "2026-10-10",
+  "events": [
+   "Rise 05:36",
+   "Set 14:27"
+  ]
+ },
+ {
+  "loc": "tromso",
+  "lat": 69.65,
+  "lon": 18.96,
+  "dateUTC": "2026-10-26",
+  "events": [
+   "Set 08:24",
+   "Rise 12:24"
+  ]
+ },
+ {
+  "loc": "tromso",
+  "lat": 69.65,
+  "lon": 18.96,
+  "dateUTC": "2026-12-20",
+  "events": [
+   "Set 04:47",
+   "Rise 08:45"
+  ]
+ },
+ {
+  "loc": "quito",
+  "lat": -0.18,
+  "lon": -78.47,
+  "dateUTC": "2026-01-15",
+  "events": [
+   "Rise 08:33",
+   "Set 20:59"
+  ]
+ },
+ {
+  "loc": "quito",
+  "lat": -0.18,
+  "lon": -78.47,
+  "dateUTC": "2026-03-03",
+  "events": [
+   "Set 11:24",
+   "Rise 23:48"
+  ]
+ },
+ {
+  "loc": "quito",
+  "lat": -0.18,
+  "lon": -78.47,
+  "dateUTC": "2026-06-10",
+  "events": [
+   "Rise 06:41",
+   "Set 19:04"
+  ]
+ },
+ {
+  "loc": "quito",
+  "lat": -0.18,
+  "lon": -78.47,
+  "dateUTC": "2026-10-10",
+  "events": [
+   "Rise 10:46",
+   "Set 23:08"
+  ]
+ },
+ {
+  "loc": "quito",
+  "lat": -0.18,
+  "lon": -78.47,
+  "dateUTC": "2026-10-26",
+  "events": [
+   "Set 11:05",
+   "Rise 23:35"
+  ]
+ },
+ {
+  "loc": "quito",
+  "lat": -0.18,
+  "lon": -78.47,
+  "dateUTC": "2026-12-20",
+  "events": [
+   "Set 07:27",
+   "Rise 19:56"
+  ]
+ }
+]
