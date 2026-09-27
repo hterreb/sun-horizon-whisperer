@@ -34,10 +34,17 @@ import PWAInstallPrompt from './PWAInstallPrompt';
 import MidnightGhost from './MidnightGhost';
 import TemperatureIceberg from './TemperatureIceberg';
 import { type WeatherType } from './CloudLayer';
+import CompassToggle from './CompassToggle';
 import { toast } from '@/components/ui/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useWakeLock } from '@/hooks/useWakeLock';
+import { useCompassHeading } from '@/hooks/useCompassHeading';
 import { loadManualLocation, saveManualLocation, clearManualLocation } from '../utils/manualLocation';
+import {
+  headingToAzimuthOffset,
+  hasSeenCompassCalibrationHint,
+  markCompassCalibrationHintSeen
+} from '../utils/compassUtils';
 
 const SunTracker: React.FC = () => {
   const [date, setDate] = useState<Date>(new Date());
@@ -84,6 +91,26 @@ const SunTracker: React.FC = () => {
 
   // Use wake lock when in fullscreen mode
   useWakeLock(isFullscreen);
+
+  // Live compass mode (ROADMAP item 8): heading -> azimuth offset needs `location`,
+  // which only SunTracker holds, so the offset is computed here and handed down as
+  // a prop rather than SunVisualization reading the heading itself.
+  const { status: compassStatus, heading: compassHeading, enable: enableCompass, disable: disableCompass } = useCompassHeading();
+  const compassAzimuthOffset =
+    compassStatus === 'active' && compassHeading !== null
+      ? headingToAzimuthOffset(compassHeading, location.latitude)
+      : 0;
+
+  const handleCompassEnable = useCallback(() => {
+    if (!hasSeenCompassCalibrationHint()) {
+      markCompassCalibrationHintSeen();
+      toast({
+        title: "Calibrating compass",
+        description: "Move your phone in a figure 8 for a more accurate heading."
+      });
+    }
+    enableCompass();
+  }, [enableCompass]);
 
   // Whenever fullscreen mode toggles (either direction), the cursor should be shown
   // immediately; the effect below then re-arms the auto-hide timer for fullscreen.
@@ -404,6 +431,7 @@ const SunTracker: React.FC = () => {
       <NightStars timeOfDay={timeOfDay} moonPosition={moonPosition} />
       <MusicPlayer isFullscreen={isFullscreen} />
       <FullscreenButton onFullscreenChange={setIsFullscreen} />
+      <CompassToggle status={compassStatus} onEnable={handleCompassEnable} onDisable={disableCompass} />
       <PWAInstallPrompt />
       <MidnightGhost currentTime={date} />
       <TemperatureIceberg 
@@ -420,6 +448,7 @@ const SunTracker: React.FC = () => {
             timeOfDay={timeOfDay}
             weatherType={weatherType}
             latitude={location.latitude}
+            azimuthOffset={compassAzimuthOffset}
           />
           <InfoPanel
             sunPosition={sunPosition}
