@@ -143,8 +143,8 @@ describe('getMoonTimes (ROADMAP item 9)', () => {
     expect((times.rise as Date).getTime()).toBeLessThan((times.set as Date).getTime());
   });
 
-  it('set can come before rise, when the moon rose the previous day (verified against suncalc for 2026-06-20, 48N/11E)', () => {
-    const times = getMoonTimes(new Date('2026-06-20T00:00:00Z'), 48, 11);
+  it('set can come before rise, when the moon rose the previous day (2026-06-04 UTC, 48N/11E: set 06:22, rise 22:36)', () => {
+    const times = getMoonTimes(new Date('2026-06-04T00:00:00Z'), 48, 11);
     expect(times.rise).toBeInstanceOf(Date);
     expect(times.set).toBeInstanceOf(Date);
     expect((times.set as Date).getTime()).toBeLessThan((times.rise as Date).getTime());
