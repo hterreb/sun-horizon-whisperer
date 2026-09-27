@@ -195,16 +195,6 @@ export const getBackgroundGradient = (timeOfDay: TimeOfDay): string => {
   }
 };
 
-export const getHorizonSvg = (timeOfDay: TimeOfDay): string => {
-  if (timeOfDay === 'night' || 
-      timeOfDay === 'astronomical-twilight' || 
-      timeOfDay === 'nautical-twilight') {
-    return '/mountain-night.svg';
-  }
-  
-  return '/mountain-day.svg';
-};
-
 export interface RelevantTwilightTimes {
   type: 'dawn' | 'dusk';
   civil: Date;
