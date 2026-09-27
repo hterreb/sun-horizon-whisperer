@@ -76,26 +76,22 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   const userToggledTwilightRef = React.useRef(false);
   const userToggledSunPositionRef = React.useRef(false);
 
-  // Handle fade out in fullscreen
+  // Whenever fullscreen mode toggles (either direction), the panel should be visible
+  // immediately; the effect below then re-arms the auto-fade timer for fullscreen.
+  // Adjusting state during render (rather than in an effect) avoids an extra commit.
+  const [prevIsFullscreen, setPrevIsFullscreen] = useState(isFullscreen);
+  if (isFullscreen !== prevIsFullscreen) {
+    setPrevIsFullscreen(isFullscreen);
+    setIsVisible(true);
+  }
+
+  // Fade out after 10 seconds, but only while in fullscreen.
   useEffect(() => {
-    if (isFullscreen) {
-      // Clear any existing timeout
-      if (fadeTimeoutRef.current) {
-        clearTimeout(fadeTimeoutRef.current);
-      }
-      
-      // Set timeout to fade out after 10 seconds
-      fadeTimeoutRef.current = setTimeout(() => {
-        setIsVisible(false);
-      }, 10000);
-    } else {
-      // Always visible when not in fullscreen
-      setIsVisible(true);
-      if (fadeTimeoutRef.current) {
-        clearTimeout(fadeTimeoutRef.current);
-        fadeTimeoutRef.current = null;
-      }
-    }
+    if (!isFullscreen) return;
+
+    fadeTimeoutRef.current = setTimeout(() => {
+      setIsVisible(false);
+    }, 10000);
 
     return () => {
       if (fadeTimeoutRef.current) {
@@ -360,8 +356,6 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
       {/* Collapsible content */}
       {!isCollapsed && (
         <div className="flex-1 min-h-0">
-          <ScrollArea className="max-h-[calc(100vh-120px)]">
-            <div className="px-4 pb-4">
           <ScrollArea className="max-h-[calc(100vh-120px)]">
             <div className="px-4 pb-4">
           {/* Current Weather Display */}
@@ -725,8 +719,6 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               </div>
             </div>
           </div>
-            </div>
-          </ScrollArea>
             </div>
           </ScrollArea>
         </div>

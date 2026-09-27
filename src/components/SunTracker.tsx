@@ -29,7 +29,19 @@ import { loadManualLocation, saveManualLocation, clearManualLocation } from '../
 
 const SunTracker: React.FC = () => {
   const [date, setDate] = useState<Date>(new Date());
-  const [location, setLocation] = useState<LocationData>({ latitude: 0, longitude: 0, loaded: false });
+  // A manually chosen location (set via InfoPanel's "Change location" form) takes
+  // priority over both geolocation and the New York fallback; reading localStorage
+  // here (rather than in an effect) means it's available from the very first render.
+  const [location, setLocation] = useState<LocationData>(() => {
+    const manual = loadManualLocation();
+    if (manual) {
+      return { latitude: manual.latitude, longitude: manual.longitude, loaded: true };
+    }
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      return { latitude: 40.7128, longitude: -74.0060, loaded: true };
+    }
+    return { latitude: 0, longitude: 0, loaded: false };
+  });
   const [sunPosition, setSunPosition] = useState<SunPosition>({ azimuth: 0, altitude: 0 });
   const [moonPosition, setMoonPosition] = useState<MoonPosition>({ 
     azimuth: 0, 
@@ -53,45 +65,42 @@ const SunTracker: React.FC = () => {
   // Use wake lock when in fullscreen mode
   useWakeLock(isFullscreen);
 
-  // Handle cursor visibility in fullscreen
+  // Whenever fullscreen mode toggles (either direction), the cursor should be shown
+  // immediately; the effect below then re-arms the auto-hide timer for fullscreen.
+  // Adjusting state during render (rather than in an effect) avoids an extra commit.
+  const [prevIsFullscreenForCursor, setPrevIsFullscreenForCursor] = useState(isFullscreen);
+  if (isFullscreen !== prevIsFullscreenForCursor) {
+    setPrevIsFullscreenForCursor(isFullscreen);
+    setShowCursor(true);
+  }
+
+  // Hide the cursor after 10 seconds of no movement, but only while in fullscreen.
   useEffect(() => {
-    if (isFullscreen) {
-      // Set initial timeout for cursor fade
-      if (cursorTimeoutRef.current) {
-        clearTimeout(cursorTimeoutRef.current);
-      }
-      
-      cursorTimeoutRef.current = setTimeout(() => {
-        setShowCursor(false);
-      }, 10000);
+    if (!isFullscreen) return;
 
-      // Add mouse move listener to show cursor and reset timer
-      const handleMouseMove = () => {
-        setShowCursor(true);
-        if (cursorTimeoutRef.current) {
-          clearTimeout(cursorTimeoutRef.current);
-        }
-        cursorTimeoutRef.current = setTimeout(() => {
-          setShowCursor(false);
-        }, 10000);
-      };
+    cursorTimeoutRef.current = setTimeout(() => {
+      setShowCursor(false);
+    }, 10000);
 
-      document.addEventListener('mousemove', handleMouseMove);
-      
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        if (cursorTimeoutRef.current) {
-          clearTimeout(cursorTimeoutRef.current);
-        }
-      };
-    } else {
-      // Always show cursor when not in fullscreen
+    // Add mouse move listener to show cursor and reset timer
+    const handleMouseMove = () => {
       setShowCursor(true);
       if (cursorTimeoutRef.current) {
         clearTimeout(cursorTimeoutRef.current);
-        cursorTimeoutRef.current = null;
       }
-    }
+      cursorTimeoutRef.current = setTimeout(() => {
+        setShowCursor(false);
+      }, 10000);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      if (cursorTimeoutRef.current) {
+        clearTimeout(cursorTimeoutRef.current);
+      }
+    };
   }, [isFullscreen]);
 
   // Update time every second for smooth clock display
@@ -136,11 +145,18 @@ const SunTracker: React.FC = () => {
     }
   }, [location.loaded, location.latitude, location.longitude, useRealWeather]);
 
-  // Fetch weather data when location is available
+  // Fetch weather data when location is available. Kicking off the fetch from a
+  // timer callback (rather than calling it synchronously in the effect body) avoids
+  // `fetchWeatherData`'s own synchronous `setIsLoadingWeather(true)` running as part
+  // of the effect's commit.
   useEffect(() => {
-    if (location.loaded && useRealWeather) {
+    if (!(location.loaded && useRealWeather)) return;
+
+    const timeoutId = setTimeout(() => {
       fetchWeatherData();
-    }
+    }, 0);
+
+    return () => clearTimeout(timeoutId);
   }, [location.loaded, useRealWeather, fetchWeatherData]);
 
   // Auto-refresh weather every 30 minutes
@@ -177,53 +193,46 @@ const SunTracker: React.FC = () => {
   }, [location]);
 
   useEffect(() => {
-    // A manually chosen location (set via InfoPanel's "Change location" form) takes
-    // priority over both geolocation and the New York fallback.
-    const manual = loadManualLocation();
-    if (manual) {
-      setLocation({ latitude: manual.latitude, longitude: manual.longitude, loaded: true });
-      return;
-    }
+    // Manual location and the no-geolocation-support fallback are already applied
+    // via the lazy state initializer above; only geolocation itself needs an effect
+    // (an actual async browser API call).
+    if (loadManualLocation()) return;
 
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLocation({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            loaded: true
-          });
-          toast({
-            title: "Location detected",
-            description: "Using your current location for sun calculations.",
-          });
-        },
-        (error) => {
-          console.error("Error getting location:", error);
-          setLocation({
-            latitude: 40.7128,
-            longitude: -74.0060,
-            loaded: true
-          });
-          toast({
-            title: "Location unavailable",
-            description: "Using default location. Please enable location services for accurate data.",
-            variant: "destructive"
-          });
-        }
-      );
-    } else {
+    if (!navigator.geolocation) {
       toast({
         title: "Geolocation not supported",
         description: "Your browser doesn't support geolocation. Using default location.",
         variant: "destructive"
       });
-      setLocation({
-        latitude: 40.7128,
-        longitude: -74.0060,
-        loaded: true
-      });
+      return;
     }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          loaded: true
+        });
+        toast({
+          title: "Location detected",
+          description: "Using your current location for sun calculations.",
+        });
+      },
+      (error) => {
+        console.error("Error getting location:", error);
+        setLocation({
+          latitude: 40.7128,
+          longitude: -74.0060,
+          loaded: true
+        });
+        toast({
+          title: "Location unavailable",
+          description: "Using default location. Please enable location services for accurate data.",
+          variant: "destructive"
+        });
+      }
+    );
   }, []);
 
   // Manual location form (InfoPanel): validated lat/lon submitted by the user.
@@ -268,27 +277,26 @@ const SunTracker: React.FC = () => {
     );
   }, []);
 
-  useEffect(() => {
-    if (location.loaded) {
-      const sunPos = getSunPosition(date, location.latitude, location.longitude);
-      const moonPos = getMoonPosition(date, location.latitude, location.longitude);
-      const times = getSunTimes(date, location.latitude, location.longitude);
+  // Compute sun/moon position and time-of-day the moment location first becomes
+  // available or changes (the 30s interval effect above keeps them in sync
+  // afterwards). Adjusting state during render, keyed on the location itself rather
+  // than `date`, avoids re-running this on every one-second clock tick.
+  const locationKey = location.loaded ? `${location.latitude},${location.longitude}` : null;
+  const [prevLocationKey, setPrevLocationKey] = useState<string | null>(null);
+  if (locationKey !== null && locationKey !== prevLocationKey) {
+    setPrevLocationKey(locationKey);
+    const sunPos = getSunPosition(date, location.latitude, location.longitude);
+    const moonPos = getMoonPosition(date, location.latitude, location.longitude);
+    const times = getSunTimes(date, location.latitude, location.longitude);
 
-      setSunPosition(sunPos);
-      setMoonPosition(moonPos);
-      setSunTimes(times);
+    setSunPosition(sunPos);
+    setMoonPosition(moonPos);
+    setSunTimes(times);
 
-      if (times) {
-        const tod = getTimeOfDay(date, times);
-        setTimeOfDay(tod);
-      }
+    if (times) {
+      setTimeOfDay(getTimeOfDay(date, times));
     }
-    // `date` is intentionally excluded: this effect only needs to run once when
-    // location first becomes available (the 30s interval effect above keeps
-    // sun/moon position in sync afterwards) — including `date` would re-run it
-    // every second.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.loaded, location.latitude, location.longitude]);
+  }
 
   const getBackgroundStyle = useCallback(() => {
     let baseGradient = getBackgroundGradient(timeOfDay);

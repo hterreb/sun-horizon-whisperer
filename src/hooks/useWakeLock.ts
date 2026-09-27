@@ -46,6 +46,4 @@ export const useWakeLock = (isActive: boolean) => {
       }
     };
   }, [isActive]);
-
-  return wakeLockRef.current;
 };

@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Download, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useIsMobile } from '@/hooks/use-mobile';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -12,21 +11,13 @@ interface BeforeInstallPromptEvent extends Event {
 const PWAInstallPrompt: React.FC = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
-  const [isIOS, setIsIOS] = useState(false);
-  const [isStandalone, setIsStandalone] = useState(false);
-  const isMobile = useIsMobile();
 
-  useEffect(() => {
-    // Detect iOS
-    const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    setIsIOS(iOS);
-
-    // Check if already installed
-    const standalone = window.matchMedia('(display-mode: standalone)').matches ||
+  // Both are plain reads of the current browser environment, so they're derived
+  // during render instead of synced into state via an effect.
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
                      (window.navigator as Navigator & { standalone?: boolean }).standalone ||
                      document.referrer.includes('android-app://');
-    setIsStandalone(standalone);
-  }, [isMobile]);
 
   useEffect(() => {
     if (isStandalone) {
