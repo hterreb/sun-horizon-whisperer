@@ -71,7 +71,7 @@ const MidnightGhost: React.FC<MidnightGhostProps> = ({ currentTime }) => {
 
   return (
     <div 
-      className="fixed pointer-events-none z-30 transition-all duration-1000"
+      className="fixed pointer-events-none z-10 transition-all duration-1000"
       style={{
         left: `${position.x}%`,
         top: `${position.y}%`,
