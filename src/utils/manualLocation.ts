@@ -5,6 +5,9 @@
 export interface ManualLocation {
   latitude: number;
   longitude: number;
+  // Set when the location came from place-name search (ROADMAP item 12), so the
+  // chosen place survives a reload instead of falling back to a reverse-geocode guess.
+  name?: string;
 }
 
 const STORAGE_KEY = 'manual-location';
@@ -21,14 +24,16 @@ export const loadManualLocation = (): ManualLocation | null => {
     if (!raw) return null;
 
     const parsed = JSON.parse(raw);
-    const { latitude, longitude } = parsed ?? {};
+    const { latitude, longitude, name } = parsed ?? {};
     if (
       typeof latitude === 'number' &&
       typeof longitude === 'number' &&
       isValidLatitude(latitude) &&
       isValidLongitude(longitude)
     ) {
-      return { latitude, longitude };
+      return typeof name === 'string' && name.length > 0
+        ? { latitude, longitude, name }
+        : { latitude, longitude };
     }
     return null;
   } catch (error) {
@@ -37,9 +42,9 @@ export const loadManualLocation = (): ManualLocation | null => {
   }
 };
 
-export const saveManualLocation = (latitude: number, longitude: number): void => {
+export const saveManualLocation = (latitude: number, longitude: number, name?: string): void => {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ latitude, longitude }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ latitude, longitude, name }));
   } catch (error) {
     console.error('Error saving manual location:', error);
   }
