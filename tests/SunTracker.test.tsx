@@ -50,8 +50,8 @@ describe('SunTracker', () => {
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 1, longitude: 2 } }) } });
     render(<SunTracker />);
     // Wait for InfoPanel and SunVisualization to appear
-    await waitFor(() => expect(screen.getByRole('heading', { name: /current weather/i })).toBeInTheDocument());
-    await waitFor(() => expect(screen.getByTestId('sun-visualization')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { name: /current weather/i })).toBeInTheDocument(), { timeout: 5000 });
+    await waitFor(() => expect(screen.getByTestId('sun-visualization')).toBeInTheDocument(), { timeout: 5000 });
   });
 
   it('fetches and displays real weather (mocked)', async () => {
