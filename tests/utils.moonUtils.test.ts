@@ -157,35 +157,51 @@ describe('getNextFullMoon / getNextNewMoon (ROADMAP item 9)', () => {
     expect(date.getTime()).toBe(before);
   });
 
-  // Reference dates from the task: full moon 2026-10-26 04:12 UTC, new moon
-  // 2026-10-10 15:50 UTC. Verified directly against SunCalc.getMoonIllumination by
-  // scanning its `phase` value across these dates:
-  //  - New moon: SunCalc's phase crosses 0 at ~2026-10-10T15:27 UTC, 23 minutes off
-  //    the reference - within the ±30 min tolerance the task allows.
-  //  - Full moon: SunCalc's phase does NOT pass smoothly through 0.5 here. Sampling it
-  //    minute-by-minute shows a jump from ~0.4856 to ~0.5145 between 08:50 and 09:00
-  //    UTC (a known artifact of SunCalc's low-precision formula, whose `angle` term
-  //    flips sign near opposition) and the crossing our search finds lands at
-  //    ~2026-10-26T08:58 UTC - 4h46m off the almanac reference, far outside ±30 min.
-  //    This is a SunCalc accuracy limitation (its simplified lunar theory), not a bug
-  //    in the search: the tolerance below is widened accordingly, as instructed.
-  it('finds the new moon near 2026-10-10 within 30 minutes of the reference time', () => {
+  // Published UTC event times (Meeus ch. 49 / almanac references), checked to
+  // within ±5 minutes - the old ±6h-wide tolerance was hiding suncalc's low-precision
+  // lunar theory being hours off; getNextFullMoon/getNextNewMoon no longer use it.
+  const FIVE_MINUTES_MS = 5 * 60 * 1000;
+
+  it('finds the new moon on 2026-10-10 within 5 minutes of the published time', () => {
     const result = getNextNewMoon(new Date('2026-10-01T00:00:00Z'));
     const reference = new Date('2026-10-10T15:50:00Z').getTime();
-    expect(Math.abs(result.getTime() - reference)).toBeLessThan(30 * 60 * 1000);
+    expect(Math.abs(result.getTime() - reference)).toBeLessThan(FIVE_MINUTES_MS);
   });
 
-  it('finds the full moon near 2026-10-26 within SunCalc\'s own accuracy for this event (~5h, see comment above)', () => {
+  it('finds the full moon on 2026-10-26 within 5 minutes of the published time', () => {
     const result = getNextFullMoon(new Date('2026-10-01T00:00:00Z'));
     const reference = new Date('2026-10-26T04:12:00Z').getTime();
-    expect(Math.abs(result.getTime() - reference)).toBeLessThan(6 * 60 * 60 * 1000);
+    expect(Math.abs(result.getTime() - reference)).toBeLessThan(FIVE_MINUTES_MS);
+  });
+
+  it('finds the 2024-04-23 full moon (the total eclipse cycle) within 5 minutes of the published time', () => {
+    const result = getNextFullMoon(new Date('2024-04-01T00:00:00Z'));
+    const reference = new Date('2024-04-23T23:49:00Z').getTime();
+    expect(Math.abs(result.getTime() - reference)).toBeLessThan(FIVE_MINUTES_MS);
+  });
+
+  it('finds the 2024-04-08 new moon (the total eclipse) within 5 minutes of the published time', () => {
+    const result = getNextNewMoon(new Date('2024-04-01T00:00:00Z'));
+    const reference = new Date('2024-04-08T18:21:00Z').getTime();
+    expect(Math.abs(result.getTime() - reference)).toBeLessThan(FIVE_MINUTES_MS);
+  });
+
+  it('finds the 2000-01-06 new moon within 5 minutes of the published time', () => {
+    const result = getNextNewMoon(new Date('2000-01-01T00:00:00Z'));
+    const reference = new Date('2000-01-06T18:14:00Z').getTime();
+    expect(Math.abs(result.getTime() - reference)).toBeLessThan(FIVE_MINUTES_MS);
+  });
+
+  it('finds the 2000-01-21 full moon within 5 minutes of the published time', () => {
+    const result = getNextFullMoon(new Date('2000-01-01T00:00:00Z'));
+    const reference = new Date('2000-01-21T04:40:00Z').getTime();
+    expect(Math.abs(result.getTime() - reference)).toBeLessThan(FIVE_MINUTES_MS);
   });
 
   it('lands on a moment of near-maximum illumination, independent of the almanac reference', () => {
-    // Regardless of how SunCalc's simplified model compares to the real world, the
-    // instant our search finds for the "next full moon" should itself be a moment
-    // where SunCalc reports the moon as (nearly) fully lit - i.e. we found a genuine
-    // peak in SunCalc's own illumination data, not an arbitrary date.
+    // The instant our search finds for the "next full moon" should itself be a
+    // moment where SunCalc reports the moon as (nearly) fully lit - i.e. we found a
+    // genuine peak in SunCalc's own illumination data, not an arbitrary date.
     const full = getNextFullMoon(new Date('2026-03-01T00:00:00Z'));
     expect(SunCalc.getMoonIllumination(full).fraction).toBeGreaterThan(0.99);
   });
@@ -199,6 +215,22 @@ describe('getNextFullMoon / getNextNewMoon (ROADMAP item 9)', () => {
     const start = new Date('2026-01-01T00:00:00Z');
     expect(getNextFullMoon(start).getTime()).toBeGreaterThan(start.getTime());
     expect(getNextNewMoon(start).getTime()).toBeGreaterThan(start.getTime());
+  });
+
+  it('strictly after: calling with the exact event instant returns the next one, ~29.5 days later', () => {
+    const firstFull = getNextFullMoon(new Date('2026-10-01T00:00:00Z'));
+    const secondFull = getNextFullMoon(firstFull);
+    expect(secondFull.getTime()).toBeGreaterThan(firstFull.getTime());
+    const fullGapDays = (secondFull.getTime() - firstFull.getTime()) / (24 * 60 * 60 * 1000);
+    expect(fullGapDays).toBeGreaterThan(29);
+    expect(fullGapDays).toBeLessThan(30);
+
+    const firstNew = getNextNewMoon(new Date('2026-10-01T00:00:00Z'));
+    const secondNew = getNextNewMoon(firstNew);
+    expect(secondNew.getTime()).toBeGreaterThan(firstNew.getTime());
+    const newGapDays = (secondNew.getTime() - firstNew.getTime()) / (24 * 60 * 60 * 1000);
+    expect(newGapDays).toBeGreaterThan(29);
+    expect(newGapDays).toBeLessThan(30);
   });
 });
 
