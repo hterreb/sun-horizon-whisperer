@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { Sun, Moon } from 'lucide-react';
 import { type SunPosition, type TimeOfDay } from '../utils/sunUtils';
 import { type MoonPosition } from '../utils/moonUtils';
@@ -39,7 +39,6 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   weatherType,
   latitude
 }) => {
-  const [svgPath, setSvgPath] = useState<string>('');
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerDimensions, setContainerDimensions] = useState({ width: 0, height: 0 });
   const [showFireworks, setShowFireworks] = useState(false);
@@ -78,33 +77,34 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     return () => window.removeEventListener('resize', updateDimensions);
   }, []);
 
-  useEffect(() => {
-    if (containerDimensions.width > 0 && containerDimensions.height > 0) {
-      const width = containerDimensions.width;
-      const height = containerDimensions.height;
-      const horizonY = height * 0.65;
-      
-      let path = `M0,${horizonY} `;
-      
-      const waveCount = Math.ceil(width / 80);
-      const waveWidth = width / waveCount;
-      
-      for (let i = 0; i < waveCount; i++) {
-        const x1 = i * waveWidth;
-        const x2 = (i + 0.5) * waveWidth;
-        const x3 = (i + 1) * waveWidth;
-        
-        const waveHeight = Math.sin(i * 0.5) * 8 + 4;
-        const y1 = horizonY;
-        const y2 = horizonY - waveHeight;
-        const y3 = horizonY;
-        
-        path += `L${x1},${y1} Q${x2},${y2} ${x3},${y3} `;
-      }
-      
-      path += `L${width},${horizonY} L${width},${height} L0,${height} Z`;
-      setSvgPath(path);
+  // The horizon path is fully derived from `containerDimensions` (deterministic, no
+  // randomness), so it's computed during render instead of synced into state.
+  const svgPath = useMemo(() => {
+    const { width, height } = containerDimensions;
+    if (width === 0 || height === 0) return '';
+
+    const horizonY = height * 0.65;
+
+    let path = `M0,${horizonY} `;
+
+    const waveCount = Math.ceil(width / 80);
+    const waveWidth = width / waveCount;
+
+    for (let i = 0; i < waveCount; i++) {
+      const x1 = i * waveWidth;
+      const x2 = (i + 0.5) * waveWidth;
+      const x3 = (i + 1) * waveWidth;
+
+      const waveHeight = Math.sin(i * 0.5) * 8 + 4;
+      const y1 = horizonY;
+      const y2 = horizonY - waveHeight;
+      const y3 = horizonY;
+
+      path += `L${x1},${y1} Q${x2},${y2} ${x3},${y3} `;
     }
+
+    path += `L${width},${horizonY} L${width},${height} L0,${height} Z`;
+    return path;
   }, [containerDimensions]);
 
   const getSunPosition = () => {

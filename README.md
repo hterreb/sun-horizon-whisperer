@@ -78,7 +78,7 @@ Required secrets (set with `supabase secrets set`):
 - `SUPABASE_ANON_KEY`
 - `SITE_URL` — used for CORS and Stripe redirect URLs.
 
-The `subscribers` table schema (columns, RLS policies) is not in this repo. It must exist in the target Supabase project before these functions will work.
+The `subscribers` table and its RLS policy are in `supabase/migrations/`. Apply them with `supabase db push` before you deploy the functions. The premium feature and its frontend are planned; see [ROADMAP.md](ROADMAP.md).
 
 ## Lovable
 
