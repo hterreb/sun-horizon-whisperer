@@ -10,13 +10,23 @@ const TemperatureIceberg: React.FC<TemperatureIcebergProps> = ({ temperature, is
   const [position, setPosition] = useState({ x: -10, y: 75, direction: 1 }); // Start off-screen left
   const prefersReducedMotion = usePrefersReducedMotion();
 
-  useEffect(() => {
-    // Reduced motion: keep the iceberg static at its initial position, no floating.
-    if (!isVisible || temperature >= 0 || prefersReducedMotion) {
-      // Reset position when not visible
+  // Reduced motion: keep the iceberg static at its initial position, no floating.
+  const shouldReset = !isVisible || temperature >= 0 || prefersReducedMotion;
+
+  // Reset the position as soon as floating stops being applicable. Adjusting state
+  // during render (rather than in an effect) avoids an extra commit; the effect
+  // below still owns the interval itself (using the exact same dependencies as
+  // before, so it keeps restarting on every temperature tick while floating).
+  const [prevShouldReset, setPrevShouldReset] = useState(shouldReset);
+  if (shouldReset !== prevShouldReset) {
+    setPrevShouldReset(shouldReset);
+    if (shouldReset) {
       setPosition({ x: -10, y: 75, direction: 1 });
-      return;
     }
+  }
+
+  useEffect(() => {
+    if (shouldReset) return;
 
     // Floating animation - slower than ships
     const floatInterval = setInterval(() => {
@@ -42,7 +52,7 @@ const TemperatureIceberg: React.FC<TemperatureIcebergProps> = ({ temperature, is
     }, 100);
 
     return () => clearInterval(floatInterval);
-  }, [isVisible, temperature, prefersReducedMotion]);
+  }, [isVisible, temperature, prefersReducedMotion, shouldReset]);
 
   if (!isVisible || temperature >= 0) {
     return null;

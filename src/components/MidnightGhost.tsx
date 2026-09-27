@@ -7,25 +7,31 @@ interface MidnightGhostProps {
 }
 
 const MidnightGhost: React.FC<MidnightGhostProps> = ({ currentTime }) => {
-  const [isVisible, setIsVisible] = useState(false);
-  const [position, setPosition] = useState({ x: 50, y: 30, direction: 1 });
-  const prefersReducedMotion = usePrefersReducedMotion();
-
   // Check if it's exactly midnight (00:00)
   const isMidnight = currentTime.getHours() === 0 && currentTime.getMinutes() === 0;
 
-  useEffect(() => {
-    if (isMidnight) {
-      setIsVisible(true);
-      // Hide the ghost after 10 seconds
-      const hideTimer = setTimeout(() => {
-        setIsVisible(false);
-      }, 10000);
+  const [isVisible, setIsVisible] = useState(isMidnight);
+  const [position, setPosition] = useState({ x: 50, y: 30, direction: 1 });
+  const prefersReducedMotion = usePrefersReducedMotion();
 
-      return () => clearTimeout(hideTimer);
-    } else {
+  // Visibility follows `isMidnight` directly: show as soon as it turns true, hide as
+  // soon as it turns false. Adjusting state during render (rather than in an effect)
+  // avoids an extra commit; the effect below only owns the 10-second auto-hide timer.
+  const [prevIsMidnight, setPrevIsMidnight] = useState(isMidnight);
+  if (isMidnight !== prevIsMidnight) {
+    setPrevIsMidnight(isMidnight);
+    setIsVisible(isMidnight);
+  }
+
+  useEffect(() => {
+    if (!isMidnight) return;
+
+    // Hide the ghost after 10 seconds
+    const hideTimer = setTimeout(() => {
       setIsVisible(false);
-    }
+    }, 10000);
+
+    return () => clearTimeout(hideTimer);
   }, [isMidnight]);
 
   // Floating animation

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Fish } from 'lucide-react';
 import { Ship } from 'lucide-react';
 import { type TimeOfDay } from '../utils/sunUtils';
@@ -26,29 +26,39 @@ interface MovingEntity {
   duration: number; // seconds
 }
 
+// Deterministic pseudo-random value in [0, 1), seeded by an integer. Lets raindrop/
+// snowflake layouts be derived during render (pure, no `Math.random()`) while still
+// looking randomly scattered; the classic fract(sin(x)) trick.
+const seededRandom = (seed: number): number => {
+  const x = Math.sin(seed * 12.9898) * 43758.5453;
+  return x - Math.floor(x);
+};
+
+const debugLog = (message: string, data?: unknown) => {
+  if (import.meta.env.DEV) {
+    console.log(`[CloudLayer Debug] ${message}`, data || '');
+  }
+};
+
 const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
-  const [clouds, setClouds] = useState<Array<{id: number, x: number, y: number, scale: number}>>([]);
   const [birds, setBirds] = useState<MovingEntity[]>([]);
   const [fish, setFish] = useState<MovingEntity[]>([]);
   const [ships, setShips] = useState<MovingEntity[]>([]);
-  const [raindrops, setRaindrops] = useState<Array<{id: number, x: number, y: number, delay: number}>>([]);
-  const [snowflakes, setSnowflakes] = useState<Array<{id: number, x: number, y: number, size: number, delay: number}>>([]);
 
-  // Spawn-timing refs (not movement — movement is CSS now).
-  const lastSpawnTimeRef = useRef({ birds: Date.now(), fish: Date.now(), ships: Date.now() });
+  // Spawn-timing refs (not movement — movement is CSS now). Seeded with a placeholder
+  // and set to the real mount time in an effect (Date.now() is impure, so it can't be
+  // called during render); the 500ms spawn-check loop below doesn't start reading these
+  // until after that effect has run.
+  const lastSpawnTimeRef = useRef({ birds: 0, fish: 0, ships: 0 });
+  useEffect(() => {
+    const now = Date.now();
+    lastSpawnTimeRef.current = { birds: now, fish: now, ships: now };
+  }, []);
   const prefersReducedMotion = usePrefersReducedMotion();
 
-  // Debug function
-  const debugLog = (message: string, data?: unknown) => {
-    if (import.meta.env.DEV) {
-      console.log(`[CloudLayer Debug] ${message}`, data || '');
-    }
-  };
-
-  useEffect(() => {
-    debugLog(`Weather changed to: ${weatherType}`);
-
-    // Generate clouds based on weather type
+  // Clouds are fully derived from `weatherType` (deterministic, no randomness), so
+  // they're computed during render instead of synced into state via an effect.
+  const clouds = useMemo(() => {
     let newClouds: Array<{id: number, x: number, y: number, scale: number}> = [];
 
     switch (weatherType) {
@@ -87,35 +97,35 @@ const CloudLayer: React.FC<CloudLayerProps> = ({ timeOfDay, weatherType }) => {
         break;
     }
 
-    setClouds(newClouds);
+    return newClouds;
+  }, [weatherType]);
 
-    // Generate weather effects
-    if (weatherType === 'rain' || weatherType === 'storm') {
-      const newRaindrops = Array.from({ length: 80 }, (_, i) => ({
-        id: i,
-        x: Math.random() * 100,
-        y: -10 - Math.random() * 100,
-        delay: Math.random() * 5
-      }));
-      setRaindrops(newRaindrops);
-      debugLog(`Generated ${newRaindrops.length} raindrops`);
-    } else {
-      setRaindrops([]);
-    }
+  // Raindrops/snowflakes look randomly scattered but only need to change when the
+  // weather changes, so they're derived with a stable seed rather than `Math.random()`
+  // (impure) inside an effect + setState.
+  const raindrops = useMemo(() => {
+    if (weatherType !== 'rain' && weatherType !== 'storm') return [];
+    const newRaindrops = Array.from({ length: 80 }, (_, i) => ({
+      id: i,
+      x: seededRandom(i * 3 + 1) * 100,
+      y: -10 - seededRandom(i * 3 + 2) * 100,
+      delay: seededRandom(i * 3 + 3) * 5
+    }));
+    debugLog(`Generated ${newRaindrops.length} raindrops`);
+    return newRaindrops;
+  }, [weatherType]);
 
-    if (weatherType === 'snow') {
-      const newSnowflakes = Array.from({ length: 60 }, (_, i) => ({
-        id: i,
-        x: Math.random() * 100,
-        y: -10 - Math.random() * 100,
-        size: 0.5 + Math.random() * 1.5,
-        delay: Math.random() * 8
-      }));
-      setSnowflakes(newSnowflakes);
-      debugLog(`Generated ${newSnowflakes.length} snowflakes`);
-    } else {
-      setSnowflakes([]);
-    }
+  const snowflakes = useMemo(() => {
+    if (weatherType !== 'snow') return [];
+    const newSnowflakes = Array.from({ length: 60 }, (_, i) => ({
+      id: i,
+      x: seededRandom(i * 4 + 1) * 100,
+      y: -10 - seededRandom(i * 4 + 2) * 100,
+      size: 0.5 + seededRandom(i * 4 + 3) * 1.5,
+      delay: seededRandom(i * 4 + 4) * 8
+    }));
+    debugLog(`Generated ${newSnowflakes.length} snowflakes`);
+    return newSnowflakes;
   }, [weatherType]);
 
   // Determine if it's night time (for showing different colored birds)
