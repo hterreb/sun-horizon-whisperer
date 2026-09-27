@@ -27,7 +27,7 @@
 > Partial: D-1: 4 production advisories remain (1 high, 3 moderate). They need major upgrades: `vite` 5→8 (esbuild), `react-router-dom` 6→7.
 > **Status 2026-09-25:** also fixed: S-8, C-5, C-8, C-10, C-11, D-2, D-3, D-4, A-1, A-2, A-3, A-5; A-4 partial (locale time format; no manual location input).
 > **Status 2026-09-25 (branch `chore/upgrades`):** D-1 done (`npm audit`: 0 vulnerabilities after vite 8, react-router 7, vitest 4, eslint 10). A-4 done (manual location input). P-4 `CloudLayer` done (CSS movement, no per-frame state).
-> Open: S-9, D-5 (decide on the Supabase/Stripe feature). Follow-ups: 3 react-hooks v7 React Compiler rules are off (`set-state-in-effect`, `purity`, `refs`: 16 hits in 8 files); `InfoPanel` has a duplicated `ScrollArea` wrapper.
+> **Status 2026-09-27:** S-9 done (`subscribers` migration + RLS). D-5 decided: keep the backend, feature on [ROADMAP.md](ROADMAP.md). React Compiler rules re-enabled, 0 hits. Duplicated `ScrollArea` removed. No open findings.
 > New required secret for the Supabase functions: `SITE_URL`.
 
 1. Remove the third-party `gptengineer.js` script from production HTML (S-1).

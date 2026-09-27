@@ -18,26 +18,22 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
   const isPlayingRef = useRef(isPlaying);
   const isMobile = useIsMobile();
 
-  // Handle fade out in fullscreen
+  // Whenever fullscreen mode toggles (either direction), the player should be visible
+  // immediately; the effect below then re-arms the auto-fade timer for fullscreen.
+  // Adjusting state during render (rather than in an effect) avoids an extra commit.
+  const [prevIsFullscreen, setPrevIsFullscreen] = useState(isFullscreen);
+  if (isFullscreen !== prevIsFullscreen) {
+    setPrevIsFullscreen(isFullscreen);
+    setIsVisible(true);
+  }
+
+  // Fade out after 10 seconds, but only while in fullscreen.
   useEffect(() => {
-    if (isFullscreen) {
-      // Clear any existing timeout
-      if (fadeTimeoutRef.current) {
-        clearTimeout(fadeTimeoutRef.current);
-      }
-      
-      // Set timeout to fade out after 10 seconds
-      fadeTimeoutRef.current = setTimeout(() => {
-        setIsVisible(false);
-      }, 10000);
-    } else {
-      // Always visible when not in fullscreen
-      setIsVisible(true);
-      if (fadeTimeoutRef.current) {
-        clearTimeout(fadeTimeoutRef.current);
-        fadeTimeoutRef.current = null;
-      }
-    }
+    if (!isFullscreen) return;
+
+    fadeTimeoutRef.current = setTimeout(() => {
+      setIsVisible(false);
+    }, 10000);
 
     return () => {
       if (fadeTimeoutRef.current) {
