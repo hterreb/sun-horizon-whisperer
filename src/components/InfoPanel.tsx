@@ -265,10 +265,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   };
 
   return (
-    <div 
-      className={`absolute top-0 right-0 w-full max-w-[300px] sm:w-[300px] bg-black bg-opacity-40 backdrop-blur-md text-white rounded-bl-lg overflow-hidden transition-opacity duration-300 max-h-screen ${
+    <div
+      className={`absolute top-0 right-0 z-30 w-full max-w-[300px] sm:w-[300px] bg-black bg-opacity-40 backdrop-blur-md text-white rounded-bl-lg overflow-hidden transition-opacity duration-300 max-h-dvh ${
         isVisible ? 'opacity-100' : 'opacity-0'
       }`}
+      style={{ paddingTop: 'env(safe-area-inset-top)', paddingRight: 'env(safe-area-inset-right)' }}
       onMouseEnter={handleMouseEnter}
       onFocus={handleFocus}
       onTouchStart={handleTouchStart}
@@ -356,8 +357,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
       {/* Collapsible content */}
       {!isCollapsed && (
         <div className="flex-1 min-h-0">
-          <ScrollArea className="max-h-[calc(100vh-120px)]">
-            <div className="px-4 pb-4">
+          <ScrollArea className="max-h-[calc(100dvh-120px)]">
+            <div
+              className="px-4 pb-4"
+              style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
+            >
           {/* Current Weather Display */}
           {weatherData && (
             <div className="mb-4 pt-2 border-t border-white border-opacity-20">

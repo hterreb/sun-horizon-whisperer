@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import FullscreenButton from '../src/components/FullscreenButton';
 
 describe('FullscreenButton', () => {
@@ -12,6 +12,8 @@ describe('FullscreenButton', () => {
     } else {
       Reflect.deleteProperty(document, 'fullscreenEnabled');
     }
+    Reflect.deleteProperty(document, 'webkitFullscreenEnabled');
+    Reflect.deleteProperty(document.documentElement, 'webkitRequestFullscreen');
   });
 
   it('renders nothing when the Fullscreen API is unavailable (C-13, e.g. iPhone Safari)', () => {
@@ -30,6 +32,25 @@ describe('FullscreenButton', () => {
     Reflect.deleteProperty(document, 'fullscreenEnabled');
     render(<FullscreenButton />);
     expect(screen.getByRole('button')).toBeInTheDocument();
+  });
+
+  it('renders the button when only the webkit-prefixed Fullscreen API is available (ROADMAP item 4)', () => {
+    Object.defineProperty(document, 'fullscreenEnabled', { value: false, configurable: true });
+    Object.defineProperty(document, 'webkitFullscreenEnabled', { value: true, configurable: true });
+    render(<FullscreenButton />);
+    expect(screen.getByRole('button')).toBeInTheDocument();
+  });
+
+  it('falls back to webkitRequestFullscreen when the standard API is unavailable (ROADMAP item 4)', () => {
+    Object.defineProperty(document, 'fullscreenEnabled', { value: true, configurable: true });
+    const webkitRequestFullscreen = vi.fn();
+    // jsdom implements neither API; this simulates a webkit-only browser (e.g. older Safari).
+    (document.documentElement as unknown as { webkitRequestFullscreen: () => void }).webkitRequestFullscreen = webkitRequestFullscreen;
+
+    render(<FullscreenButton />);
+    fireEvent.click(screen.getByRole('button'));
+
+    expect(webkitRequestFullscreen).toHaveBeenCalledTimes(1);
   });
 
   it('has an aria-label, and reappears on focus and touch as well as mouse hover (A-3)', () => {
