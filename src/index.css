@@ -50,6 +50,63 @@
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /*
+     * Design tokens — direction D "Polished Classic" (ROADMAP item 7, tokens only).
+     * Groups:
+     *   - Brand palette: the 6 core app colors (sunset, peach, sky, cyan, night, coral).
+     *   - Scene palette: sky-gradient stops per time-of-day bucket (night/dawn/day/dusk,
+     *     3 stops each), sun glow, moon, horizon and water tints. Starting values match
+     *     the hardcoded colors in SunVisualization.tsx and sunUtils.ts's
+     *     getBackgroundGradient, so wiring them in later (item 15) changes no pixels.
+     *   - Glass panel: background, border and corner radius for the InfoPanel restyle
+     *     (item 15). Not yet applied to InfoPanel.tsx.
+     *   - Type scale: see the fontSize entries (caption/body/title/display/hero) in
+     *     tailwind.config.ts. Tabular figures use Tailwind's built-in `tabular-nums`.
+     * Existing shadcn tokens above are untouched.
+     */
+
+    /* Brand palette */
+    --brand-sunset: 24.6 95% 53.1%;
+    --brand-peach: 23.9 97.9% 81.4%;
+    --brand-sky: 198.6 88.7% 48.4%;
+    --brand-cyan: 194.3 86.3% 57.1%;
+    --brand-night: 231.4 18.9% 7.3%;
+    --brand-coral: 3.4 75.5% 63.1%;
+
+    /* Scene palette — sky gradient stops, 3 per time-of-day bucket */
+    --scene-sky-night-1: 231.4 18.9% 7.3%;
+    --scene-sky-night-2: 223.3 25.7% 13.7%;
+    --scene-sky-night-3: 265.7 10.1% 13.5%;
+    --scene-sky-dawn-1: 24.6 95% 53.1%;
+    --scene-sky-dawn-2: 23.9 97.9% 81.4%;
+    --scene-sky-dawn-3: 194.3 86.3% 57.1%;
+    --scene-sky-day-1: 198.6 88.7% 48.4%;
+    --scene-sky-day-2: 194.3 86.3% 57.1%;
+    --scene-sky-day-3: 23.9 97.9% 81.4%;
+    --scene-sky-dusk-1: 23.9 97.9% 81.4%;
+    --scene-sky-dusk-2: 24.6 95% 53.1%;
+    --scene-sky-dusk-3: 223.3 25.7% 13.7%;
+
+    /* Scene palette — sun glow, matching the 3 altitude bands in
+       SunVisualization's getGlowIntensity (yellow / orange / tomato) */
+    --scene-sun-glow-high: 60 100% 50%;
+    --scene-sun-glow-low: 38.8 100% 50%;
+    --scene-sun-glow-horizon: 9.1 100% 63.9%;
+
+    /* Scene palette — moon, horizon (per SunVisualization's getHorizonColor), water */
+    --scene-moon: 216 12.2% 83.9%;
+    --scene-horizon-night: 260 9.7% 6.1%;
+    --scene-horizon-astro-twilight: 223.3 25.7% 13.7%;
+    --scene-horizon-nautical-twilight: 265.7 10.1% 13.5%;
+    --scene-horizon-dawn: 264 3.9% 25.3%;
+    --scene-horizon-day: 194.3 86.3% 57.1%;
+    --scene-water: 194.3 86.3% 57.1%;
+
+    /* Glass panel (InfoPanel restyle target, item 15) */
+    --panel-background: 231.4 18.9% 7.3%;
+    --panel-border: 0 0% 100%;
+    --panel-radius: 18px;
   }
 
   .dark {
