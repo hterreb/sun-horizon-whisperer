@@ -46,6 +46,13 @@ describe('InfoPanel', () => {
     expect(screen.getByText(/weather mode/i)).toBeInTheDocument();
   });
 
+  it('stays above the scene (z-30) and fits within the dynamic viewport height on mobile (ROADMAP items 1 & 2)', () => {
+    const { container } = render(<InfoPanel {...defaultProps} />);
+    const panel = container.firstChild as HTMLElement;
+    expect(panel.className).toContain('z-30');
+    expect(panel.className).toContain('max-h-dvh');
+  });
+
   // More tests for collapse/expand, weather options, etc.
 
   it('collapses and expands sections', () => {
