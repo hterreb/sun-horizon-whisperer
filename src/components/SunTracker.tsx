@@ -42,6 +42,12 @@ const SunTracker: React.FC = () => {
     }
     return { latitude: 0, longitude: 0, loaded: false };
   });
+  // The place name chosen via search (ROADMAP item 12); takes priority over the
+  // reverse-geocode guess InfoPanel would otherwise compute for the same coordinates.
+  // Cleared whenever the location changes without a name (typed lat/lon, geolocation).
+  const [manualPlaceName, setManualPlaceName] = useState<string | null>(
+    () => loadManualLocation()?.name ?? null
+  );
   const [sunPosition, setSunPosition] = useState<SunPosition>({ azimuth: 0, altitude: 0 });
   const [moonPosition, setMoonPosition] = useState<MoonPosition>({ 
     azimuth: 0, 
@@ -231,10 +237,12 @@ const SunTracker: React.FC = () => {
     );
   }, []);
 
-  // Manual location form (InfoPanel): validated lat/lon submitted by the user.
-  const handleLocationChange = useCallback((latitude: number, longitude: number) => {
+  // Manual location form (InfoPanel): validated lat/lon submitted by the user, or a
+  // place selected from search (in which case `name` is set alongside the coordinates).
+  const handleLocationChange = useCallback((latitude: number, longitude: number, name?: string) => {
     setLocation({ latitude, longitude, loaded: true });
-    saveManualLocation(latitude, longitude);
+    setManualPlaceName(name ?? null);
+    saveManualLocation(latitude, longitude, name);
   }, []);
 
   // "Use my location" inside the manual form: re-requests geolocation and, on
@@ -252,6 +260,7 @@ const SunTracker: React.FC = () => {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         clearManualLocation();
+        setManualPlaceName(null);
         setLocation({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
@@ -360,6 +369,7 @@ const SunTracker: React.FC = () => {
             moonPosition={moonPosition}
             sunTimes={sunTimes}
             location={location}
+            manualPlaceName={manualPlaceName}
             timeOfDay={timeOfDay}
             currentTime={date}
             weatherType={weatherType}
