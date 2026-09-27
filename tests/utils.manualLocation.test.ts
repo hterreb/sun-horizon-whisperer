@@ -47,6 +47,15 @@ describe('manualLocation', () => {
       expect(loadManualLocation()).toEqual({ latitude: 51.5074, longitude: -0.1278 });
     });
 
+    it('round-trips a saved location with a place name', () => {
+      saveManualLocation(47.6559, 9.4794, 'Friedrichshafen, Germany');
+      expect(loadManualLocation()).toEqual({
+        latitude: 47.6559,
+        longitude: 9.4794,
+        name: 'Friedrichshafen, Germany',
+      });
+    });
+
     it('clears the stored location', () => {
       saveManualLocation(1, 2);
       clearManualLocation();
