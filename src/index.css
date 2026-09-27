@@ -164,6 +164,8 @@
   [data-radix-scroll-area-viewport] {
     overscroll-behavior: contain;
     touch-action: pan-y;
+    /* The root only has a max-height; h-full alone lets the viewport grow past it. */
+    max-height: inherit;
   }
 }
 

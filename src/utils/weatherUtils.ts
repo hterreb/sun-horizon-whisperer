@@ -208,7 +208,8 @@ const getCachedWeather = (latitude: number, longitude: number): WeatherData | nu
     const now = Date.now();
     
     // Check if cache is expired
-    if (now - cacheData.timestamp > CACHE_DURATION) return null;
+    // A future timestamp (device clock set back) must not keep the entry fresh.
+    if (now < cacheData.timestamp || now - cacheData.timestamp > CACHE_DURATION) return null;
     
     // Check if location has changed significantly (more than ~1km)
     const latDiff = Math.abs(cacheData.latitude - latitude);
