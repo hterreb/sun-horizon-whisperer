@@ -14,7 +14,7 @@ import {
   getTimeOfDayLabel,
   getRelevantTwilightTimes
 } from '../utils/sunUtils';
-import { type MoonPosition, getMoonPhaseLabel } from '../utils/moonUtils';
+import { type MoonPosition, type MoonTimes, getMoonPhaseLabel } from '../utils/moonUtils';
 import { type WeatherData } from '../utils/weatherUtils';
 import { isValidLatitude, isValidLongitude } from '../utils/manualLocation';
 import { searchPlaces, formatGeocodeResultLabel, type GeocodeResult } from '../utils/geocodeUtils';
@@ -24,6 +24,9 @@ import { format } from 'date-fns';
 interface InfoPanelProps {
   sunPosition: SunPosition;
   moonPosition: MoonPosition;
+  moonTimes: MoonTimes;
+  nextFullMoon: Date;
+  nextNewMoon: Date;
   sunTimes: SunTimes | null;
   goldenHourTimes: GoldenHourTimes | null;
   blueHourTimes: BlueHourTimes | null;
@@ -48,6 +51,9 @@ interface InfoPanelProps {
 const InfoPanel: React.FC<InfoPanelProps> = ({
   sunPosition,
   moonPosition,
+  moonTimes,
+  nextFullMoon,
+  nextNewMoon,
   sunTimes,
   goldenHourTimes,
   blueHourTimes,
@@ -679,7 +685,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               </div>
               
               <div className={`transition-all duration-300 ease-in-out ${
-                isMoonCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-32 opacity-100'
+                isMoonCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-64 opacity-100'
               }`}>
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between">
@@ -697,6 +703,38 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   <div className="flex justify-between">
                     <span>Azimuth:</span>
                     <span className="font-mono">{moonPosition.azimuth.toFixed(1)}°</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Moonrise:</span>
+                    <span className="font-mono">
+                      {moonTimes.alwaysUp
+                        ? 'Up all day'
+                        : moonTimes.alwaysDown
+                          ? 'Down all day'
+                          : moonTimes.rise
+                            ? formatTime(moonTimes.rise)
+                            : '—'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Moonset:</span>
+                    <span className="font-mono">
+                      {moonTimes.alwaysUp
+                        ? 'Up all day'
+                        : moonTimes.alwaysDown
+                          ? 'Down all day'
+                          : moonTimes.set
+                            ? formatTime(moonTimes.set)
+                            : '—'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Next full moon:</span>
+                    <span className="font-mono">{format(nextFullMoon, 'MMM d, h:mm a')}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Next new moon:</span>
+                    <span className="font-mono">{format(nextNewMoon, 'MMM d, h:mm a')}</span>
                   </div>
                 </div>
               </div>

@@ -22,6 +22,9 @@ describe('InfoPanel', () => {
   const defaultProps = {
     sunPosition: { azimuth: 0, altitude: 0 },
     moonPosition: { azimuth: 0, altitude: 0, phase: 0, illumination: 0, visible: true },
+    moonTimes: { rise: new Date(now.setHours(20, 0, 0, 0)), set: new Date(now.setHours(7, 0, 0, 0)), alwaysUp: false, alwaysDown: false },
+    nextFullMoon: new Date(now.setHours(12, 0, 0, 0)),
+    nextNewMoon: new Date(now.setHours(12, 0, 0, 0)),
     sunTimes,
     goldenHourTimes: null,
     blueHourTimes: null,
