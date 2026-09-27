@@ -9,7 +9,7 @@ interface SunVisualizationProps {
   sunPosition: SunPosition;
   moonPosition: MoonPosition;
   // The moon's altitude/azimuth sampled across the current day (see
-  // moonUtils.getMoonPathForDay), used to draw its arc across the sky.
+  // moonUtils.getMoonPathAround), used to draw its arc across the sky.
   moonPath: MoonPosition[];
   timeOfDay: TimeOfDay;
   weatherType: WeatherType;
@@ -57,6 +57,24 @@ const getScreenPosition = (
     x: Math.max(30, Math.min(width - 30, x)),
     y: Math.max(30, Math.min(height - 30, y))
   };
+};
+
+// SVG path through the above-horizon points only; a gap below the horizon starts a new segment.
+type SkyPoint = { altitude: number; azimuth: number };
+// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
+export const buildArcPath = (points: SkyPoint[], toXY: (p: SkyPoint) => { x: number; y: number }): string => {
+  let path = '';
+  let penDown = false;
+  for (const point of points) {
+    if (point.altitude < 0) {
+      penDown = false;
+      continue;
+    }
+    const { x, y } = toXY(point);
+    path += `${penDown ? 'L' : 'M'}${x},${y} `;
+    penDown = true;
+  }
+  return path.trim();
 };
 
 const SunVisualization: React.FC<SunVisualizationProps> = ({
@@ -144,19 +162,14 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   const { x: sunX, y: sunY } = getSunPosition();
   const { x: moonX, y: moonY } = getMoonPosition();
 
-  // The moon's arc for the current day: same screen mapping as its current-position
+  // The moon's arc for its current pass (above-horizon points only): same screen mapping as its current-position
   // dot, just applied to every sampled point in `moonPath`. Paler than the moon itself
   // (lower stroke opacity), using the scene.moon token (see index.css/tailwind.config).
   const moonArcPath = useMemo(() => {
     const { width, height } = containerDimensions;
     if (width === 0 || height === 0 || moonPath.length === 0) return '';
 
-    return moonPath
-      .map((point, i) => {
-        const { x, y } = getScreenPosition(point.altitude, point.azimuth, width, height, latitude);
-        return `${i === 0 ? 'M' : 'L'}${x},${y}`;
-      })
-      .join(' ');
+    return buildArcPath(moonPath, (p) => getScreenPosition(p.altitude, p.azimuth, width, height, latitude));
   }, [moonPath, containerDimensions, latitude]);
 
   const getSunColor = () => {

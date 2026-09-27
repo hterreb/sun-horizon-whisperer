@@ -31,18 +31,19 @@ export const getMoonPosition = (date: Date, latitude: number, longitude: number)
 // `date`'s own getHours/getDate), for drawing the day's arc in the sky. Pure and
 // stateless: callers map each point to screen coordinates themselves, the same way
 // they already map the moon's current position.
-export const getMoonPathForDay = (
+// Samples date − 12 h … date + 12 h, so the moon's current pass across the sky is one
+// unbroken arc (a calendar-day window splits it at midnight).
+export const getMoonPathAround = (
   date: Date,
   latitude: number,
   longitude: number,
   steps = 48
 ): MoonPosition[] => {
-  const dayStart = new Date(date);
-  dayStart.setHours(0, 0, 0, 0);
+  const start = date.getTime() - 12 * 60 * 60 * 1000;
 
   const points: MoonPosition[] = [];
   for (let i = 0; i <= steps; i++) {
-    const t = new Date(dayStart.getTime() + (i / steps) * 24 * 60 * 60 * 1000);
+    const t = new Date(start + (i / steps) * 24 * 60 * 60 * 1000);
     points.push(getMoonPosition(t, latitude, longitude));
   }
   return points;
