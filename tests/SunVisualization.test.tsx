@@ -710,27 +710,14 @@ describe('SunVisualization (rendered): sea visible at the horizon (ROADMAP item 
     expect(ridge.compareDocumentPosition(sea) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('gives the sea a thin, lighter wave-crest stroke, distinct from its own fill', () => {
-    setMockedContainerSize(800, 600);
-    render(<SunVisualization {...baseProps} />);
-
-    const sea = screen.getByTestId('sea');
-    expect(sea.getAttribute('stroke')).toBeTruthy();
-    expect(sea.getAttribute('stroke')).not.toBe(sea.getAttribute('fill'));
-  });
-
-  it('the night wave-crest color differs from the night ridge and uses an existing scene token', () => {
+  it('draws the sea without an outline (ROADMAP item 32), day and night', () => {
     setMockedContainerSize(800, 600);
 
-    const { unmount } = render(
-      <SunVisualization {...baseProps} timeOfDay="night" horizonProfile={ridgeProfile} />
-    );
-    const seaStroke = screen.getByTestId('sea').getAttribute('stroke');
-    const ridgeFill = screen.getByTestId('terrain-silhouette').getAttribute('fill');
-    unmount();
-
-    expect(seaStroke).toBe('hsl(var(--scene-moon))');
-    expect(seaStroke).not.toBe(ridgeFill);
+    for (const timeOfDay of ['midday', 'night'] as const) {
+      const { unmount } = render(<SunVisualization {...baseProps} timeOfDay={timeOfDay} horizonProfile={ridgeProfile} />);
+      expect(screen.getByTestId('sea').getAttribute('stroke')).toBeNull();
+      unmount();
+    }
   });
 });
 
