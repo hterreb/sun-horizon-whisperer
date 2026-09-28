@@ -34,7 +34,7 @@ import PWAInstallPrompt from './PWAInstallPrompt';
 import MidnightGhost from './MidnightGhost';
 import TemperatureIceberg from './TemperatureIceberg';
 import { type WeatherType } from './CloudLayer';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useWakeLock } from '@/hooks/useWakeLock';
 import { useCompassHeading } from '@/hooks/useCompassHeading';
