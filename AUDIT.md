@@ -3,7 +3,7 @@
 > summary: Audit of the Sun Chaser repository (a React/Vite PWA that shows sun and moon positions and live weather, plus unused Supabase/Stripe edge functions).
 > It lists findings by area (security, correctness, performance, build/CI, dependencies, accessibility, docs) with severity, file location, and a recommended fix.
 > The top of the file has the verification results and a prioritized quick-win list.
-> Audit date: 2026-09-24. Commit audited: `365d8a7` (main). Re-verified 2026-09-28 at `a9882c4`: 44 fixed, 5 partly fixed, 10 new open findings (see the status notes in §3). Since then 14 of them fixed; open: P-7.
+> Audit date: 2026-09-24. Commit audited: `365d8a7` (main). Re-verified 2026-09-28 at `a9882c4`: 44 fixed, 5 partly fixed, 10 new open findings (see the status notes in §3). Since then all 15 of them fixed.
 
 ## 1. Verification results
 
@@ -50,7 +50,10 @@ Re-verification, 2026-09-28 (`a9882c4`):
 >
 > Notes: A-2 is covered by the global `prefers-reduced-motion` rule in `index.css` plus `usePrefersReducedMotion` for the JS loops. A-4 uses a fixed 24-hour format by decision (`6856be1`), not the locale format. S-1 … S-9 have no automated tests; Deno tests for the functions are ROADMAP item 14, step 7.
 
-> **Status 2026-09-28 (fixes):** fixed: C-14 (PR #21); C-15, C-17, A-8 (PR #22); C-7 (install steps shown in the prompt card instead of `alert()`, no Dialog needed), P-4 (`TemperatureIceberg` interval depends on `shouldReset` only; `Fireworks` per-frame state accepted with a `ponytail:` comment, it runs a few seconds), P-6 (reload on the next `visibilitychange` to hidden), B-6 (`supabase/` ignored by ESLint), B-8 (fast-refresh rule off for `src/components/ui/**`), D-4 (one import path, `src/components/ui/use-toast.ts` deleted), A-9 (rainbow spectrum marked as a deliberate exception); C-16, A-6, A-7 (ROADMAP item 39, loading screen). Open: P-7.
+> **Status 2026-09-28 (fixes):** fixed: C-14 (PR #21); C-15, C-17, A-8 (PR #22); C-7 (install steps shown in the prompt card instead of `alert()`, no Dialog needed), P-4 (`TemperatureIceberg` interval depends on `shouldReset` only; `Fireworks` per-frame state accepted with a `ponytail:` comment, it runs a few seconds), P-6 (reload on the next `visibilitychange` to hidden), B-6 (`supabase/` ignored by ESLint), B-8 (fast-refresh rule off for `src/components/ui/**`), D-4 (one import path, `src/components/ui/use-toast.ts` deleted), A-9 (rainbow spectrum marked as a deliberate exception). Open: C-16, A-6, A-7 (ROADMAP item 39), P-7.
+> P-7 step 1: react-router (one page) and date-fns (3 format calls, now `Intl`) removed. Bundle 580 → 524 kB (190 → 171 kB gzip). The rest of the gap is Sentry (~125 kB, feedback form 38 kB).
+> P-7 step 2: decided to keep one chunk; `build.chunkSizeWarningLimit: 600` on purpose. P-7 done. Open: C-16, A-6, A-7 (ROADMAP item 39).
+> C-16, A-6, A-7: fixed by ROADMAP item 39 (loading screen). None of the re-verification findings is open.
 
 1. Remove the third-party `gptengineer.js` script from production HTML (S-1).
 2. Run `npm audit fix` and commit the lockfile (D-1).
@@ -107,7 +110,7 @@ Re-verification, 2026-09-28 (`a9882c4`):
 | ✅ P-4 | Medium | `src/components/CloudLayer.tsx:105-285`, `Fireworks.tsx:96-113`, `MidnightGhost.tsx`, `TemperatureIceberg.tsx` | Animations use React `setState` per frame / per 100 ms. Fireworks stores the rAF id in state (stale in cleanup, loop may not stop). Ghost/Iceberg call `setDirection` inside a `setPosition` updater and recreate the interval on every direction change. | Prefer CSS animations; keep rAF ids in `useRef`; keep direction in the position state. |
 | ✅ P-5 | Low | `src/components/SunTracker.tsx:314` → `FullscreenButton.tsx:23` | `handleFullscreenChange` is a new function every render → the `fullscreenchange` listener is removed and re-added every second. | Pass `setIsFullscreen` directly (stable). |
 | ✅ P-6 | Low | `src/main.tsx:19-26` | Service worker update check every 60 s and `onNeedRefresh → updateSW(true)` with `skipWaiting` → page reloads under the user on each deploy. | Check hourly; reload on next visibility change, not immediately. |
-| ⬜ P-7 | Low | build output (`npm run build`) | One JS chunk of 576 kB (188 kB gzip), above Vite's 500 kB warning. | Find the largest modules (for example with `rollup-plugin-visualizer`). Load the terrain code and the Sentry feedback form with `import()` when they are needed, or set `build.chunkSizeWarningLimit` on purpose. |
+| ✅ P-7 | Low | build output (`npm run build`) | One JS chunk of 576 kB (188 kB gzip), above Vite's 500 kB warning. | Find the largest modules (for example with `rollup-plugin-visualizer`). Load the terrain code and the Sentry feedback form with `import()` when they are needed, or set `build.chunkSizeWarningLimit` on purpose. |
 
 ### 4.4 Build, CI, and tooling
 
