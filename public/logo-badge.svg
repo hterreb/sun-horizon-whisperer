@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 120 120" role="img" aria-label="Sun Chaser badge logo">
+  <defs>
+    <clipPath id="badge-clip"><circle cx="60" cy="60" r="32"/></clipPath>
+    <linearGradient id="badge-sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5A4A8C"/>
+      <stop offset=".55" stop-color="#F97316"/>
+      <stop offset="1" stop-color="#FEC6A1"/>
+    </linearGradient>
+  </defs>
+  <circle cx="60" cy="60" r="58" fill="#FFFFFF" stroke="#1A1F2C" stroke-width="3"/>
+  <!--
+    Name-around-the-edge text, laid out as individually positioned/rotated
+    glyphs rather than <textPath>: librsvg (rsvg-convert 2.62, used to
+    generate the PNG icons and store graphics) does not render textPath
+    text at all, so a textPath-based badge is invisible outside a browser.
+    This layout is real, editable text (not outlined paths) and renders
+    identically in rsvg-convert and browsers. Font stack: system-ui first
+    for browsers, falling back to Helvetica/Arial (both resolve via
+    fontconfig for rsvg-convert).
+  -->
+  <g font-family="system-ui, -apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="800" font-size="10.5" fill="#1A1F2C">
+    <text x="0" y="3.5" text-anchor="middle" transform="translate(16.00 60.00) rotate(270.0)">S</text>
+    <text x="0" y="3.5" text-anchor="middle" transform="translate(17.38 49.06) rotate(284.4)">U</text>
+    <text x="0" y="3.5" text-anchor="middle" transform="translate(21.44 38.80) rotate(298.8)">N</text>
+    <text x="0" y="3.5" text-anchor="middle" transform="translate(36.42 22.85) rotate(327.6)">C</text>
+    <text x="0" y="3.5" text-anchor="middle" transform="translate(46.40 18.15) rotate(342.0)">H</text>
+    <text x="0" y="3.5" text-anchor="middle" transform="translate(57.24 16.09) rotate(356.4)">A</text>
+    <text x="0" y="3.5" text-anchor="middle" transform="translate(68.24 16.78) rotate(10.8)">S</text>
+    <text x="0" y="3.5" text-anchor="middle" transform="translate(78.73 20.19) rotate(25.2)">E</text>
+    <text x="0" y="3.5" text-anchor="middle" transform="translate(88.05 26.10) rotate(39.6)">R</text>
+    <text x="0" y="3.5" text-anchor="middle" transform="translate(100.91 43.80) rotate(68.4)">&#10022;</text>
+    <text x="0" y="3.5" text-anchor="middle" transform="translate(103.65 65.51) rotate(97.2)">S</text>
+    <text x="0" y="3.5" text-anchor="middle" transform="translate(100.91 76.20) rotate(111.6)">U</text>
+    <text x="0" y="3.5" text-anchor="middle" transform="translate(95.60 85.86) rotate(126.0)">N</text>
+    <text x="0" y="3.5" text-anchor="middle" transform="translate(78.73 99.81) rotate(154.8)">C</text>
+    <text x="0" y="3.5" text-anchor="middle" transform="translate(68.24 103.22) rotate(169.2)">H</text>
+    <text x="0" y="3.5" text-anchor="middle" transform="translate(57.24 103.91) rotate(183.6)">A</text>
+    <text x="0" y="3.5" text-anchor="middle" transform="translate(46.40 101.85) rotate(198.0)">S</text>
+    <text x="0" y="3.5" text-anchor="middle" transform="translate(36.42 97.15) rotate(212.4)">E</text>
+    <text x="0" y="3.5" text-anchor="middle" transform="translate(27.93 90.12) rotate(226.8)">R</text>
+    <text x="0" y="3.5" text-anchor="middle" transform="translate(17.38 70.94) rotate(255.6)">&#10022;</text>
+  </g>
+  <g clip-path="url(#badge-clip)">
+    <rect x="20" y="20" width="80" height="80" fill="url(#badge-sky)"/>
+    <circle cx="60" cy="64" r="16" fill="#FFD84D"/>
+    <rect x="30" y="66" width="60" height="2" fill="#F97316"/>
+    <rect x="30" y="71" width="60" height="3" fill="#F97316"/>
+    <rect x="20" y="76" width="80" height="24" fill="#0EA5E9"/>
+    <rect x="50" y="81" width="20" height="2" rx="1" fill="#FFD84D"/>
+    <rect x="53" y="86" width="14" height="2" rx="1" fill="#FFD84D" opacity=".8"/>
+    <rect x="56" y="91" width="8" height="2" rx="1" fill="#FFD84D" opacity=".6"/>
+  </g>
+  <circle cx="60" cy="60" r="32" fill="none" stroke="#1A1F2C" stroke-width="3"/>
+</svg>
