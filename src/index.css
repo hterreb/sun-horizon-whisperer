@@ -96,6 +96,7 @@
 
     /* Scene palette — moon, horizon (per SunVisualization's getHorizonColor), water */
     --scene-moon: 216 12.2% 83.9%;
+    --scene-moon-dark: 224 14.9% 19.8%; /* the moon disc's unlit-side fill */
     --scene-horizon-night: 260 9.7% 6.1%;
     --scene-horizon-astro-twilight: 223.3 25.7% 13.7%;
     --scene-horizon-nautical-twilight: 265.7 10.1% 13.5%;
@@ -107,6 +108,52 @@
     --panel-background: 231.4 18.9% 7.3%;
     --panel-border: 0 0% 100%;
     --panel-radius: 18px;
+
+    /*
+     * Scene palette — item 15 D polish (scene colour refactor + deliverable 2/3).
+     * Extends the item-7 scene tokens above with the pieces the style book's D
+     * ("Polished Classic") branches actually draw: a two-tone water body (paired
+     * with the existing --scene-horizon-* as its top/surface stop), the
+     * line-of-sight ridge's soft colour per time-of-day bucket, and the palette
+     * for the iceberg/ghost/critter easter eggs. Values are converted from the
+     * style book's hex (see scene() k==='d' and ghostTile('d')) to this file's
+     * HSL-triple convention so `hsl(var(--x))` and Tailwind's `/opacity` modifier
+     * both work.
+     */
+
+    /* Water — bottom (deep) stop, one per --scene-horizon-* bucket (its top/surface
+       stop). day's deep tone is the style book's water.day[1] (#0C5F8A); the other
+       buckets are a darkened version of their own --scene-horizon-* colour, since
+       the style book only defines golden/day/night/storm and this app's TimeOfDay
+       has finer twilight buckets. */
+    --scene-water-deep-night: 240 6.7% 2.9%;
+    --scene-water-deep-astro-twilight: 226.7 25.7% 6.9%;
+    --scene-water-deep-nautical-twilight: 270 11.8% 6.7%;
+    --scene-water-deep-dawn: 270 3.1% 12.5%;
+    --scene-water-deep-day: 200.5 84% 29.4%;
+
+    /* Line-of-sight ridge (terrain-silhouette) — the style book's soft ridge
+       colour per time-of-day: night #1C1D2A, day #5C8FB0, golden #6A4A6E. Drawn at
+       .85 opacity (see SunVisualization) so it reads as distance. */
+    --scene-ridge-night: 235.7 20% 13.7%;
+    --scene-ridge-day: 203.6 34.7% 52.5%;
+    --scene-ridge-golden: 293.3 19.6% 36.1%;
+
+    /* Soft white glow, shared by the day/fair-weather clouds and the midnight
+       ghost easter egg (the style book's D ghost: "soft white glow"). */
+    --scene-glow-white: 0 0% 100%;
+    /* The ghost's outer halo ring, a hair cooler than pure white. */
+    --scene-ghost-halo: 240 100% 89.2%;
+
+    /* Iceberg easter egg — pale ice blue (style book D: #E0F2FE / #BAE6FD),
+       replacing the old grey/white icon palette. */
+    --scene-iceberg-fill: 204 93.8% 93.7%;
+    --scene-iceberg-shade: 200.6 94.4% 86.1%;
+    --scene-iceberg-glow: 207.3 100% 89.2%;
+
+    /* Bird/bat silhouette (CloudLayer) — matches the style book's D bird, a soft
+       dark flock shape. */
+    --scene-critter-silhouette: 0 0% 0%;
   }
 
   .dark {

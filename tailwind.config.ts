@@ -106,6 +106,7 @@ export default {
 						horizon: 'hsl(var(--scene-sun-glow-horizon))'
 					},
 					moon: 'hsl(var(--scene-moon))',
+					moonDark: 'hsl(var(--scene-moon-dark))',
 					horizon: {
 						night: 'hsl(var(--scene-horizon-night))',
 						'astro-twilight': 'hsl(var(--scene-horizon-astro-twilight))',
@@ -113,7 +114,27 @@ export default {
 						dawn: 'hsl(var(--scene-horizon-dawn))',
 						day: 'hsl(var(--scene-horizon-day))'
 					},
-					water: 'hsl(var(--scene-water))'
+					water: 'hsl(var(--scene-water))',
+					waterDeep: {
+						night: 'hsl(var(--scene-water-deep-night))',
+						'astro-twilight': 'hsl(var(--scene-water-deep-astro-twilight))',
+						'nautical-twilight': 'hsl(var(--scene-water-deep-nautical-twilight))',
+						dawn: 'hsl(var(--scene-water-deep-dawn))',
+						day: 'hsl(var(--scene-water-deep-day))'
+					},
+					ridge: {
+						night: 'hsl(var(--scene-ridge-night))',
+						day: 'hsl(var(--scene-ridge-day))',
+						golden: 'hsl(var(--scene-ridge-golden))'
+					},
+					glowWhite: 'hsl(var(--scene-glow-white))',
+					ghostHalo: 'hsl(var(--scene-ghost-halo))',
+					iceberg: {
+						fill: 'hsl(var(--scene-iceberg-fill))',
+						shade: 'hsl(var(--scene-iceberg-shade))',
+						glow: 'hsl(var(--scene-iceberg-glow))'
+					},
+					critter: 'hsl(var(--scene-critter-silhouette))'
 				},
 				panel: {
 					background: 'hsl(var(--panel-background))',
