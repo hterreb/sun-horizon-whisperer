@@ -3,7 +3,7 @@
 > summary: Audit of the Sun Chaser repository (a React/Vite PWA that shows sun and moon positions and live weather, plus unused Supabase/Stripe edge functions).
 > It lists findings by area (security, correctness, performance, build/CI, dependencies, accessibility, docs) with severity, file location, and a recommended fix.
 > The top of the file has the verification results and a prioritized quick-win list.
-> Audit date: 2026-09-24. Commit audited: `365d8a7` (main). Re-verified 2026-09-28 at `a9882c4`: 44 fixed, 5 partly fixed (see the status notes in §3).
+> Audit date: 2026-09-24. Commit audited: `365d8a7` (main). Re-verified 2026-09-28 at `a9882c4`: 44 fixed, 5 partly fixed, 10 new open findings (see the status notes in §3).
 
 ## 1. Verification results
 
@@ -41,7 +41,7 @@ Re-verification, 2026-09-28 (`a9882c4`):
 > **Status 2026-09-25 (branch `chore/upgrades`):** D-1 done (`npm audit`: 0 vulnerabilities after vite 8, react-router 7, vitest 4, eslint 10). A-4 done (manual location input). P-4 `CloudLayer` done (CSS movement, no per-frame state).
 > **Status 2026-09-27:** S-9 done (`subscribers` migration + RLS). D-5 decided: keep the backend, feature on [ROADMAP.md](ROADMAP.md). React Compiler rules re-enabled, 0 hits. Duplicated `ScrollArea` removed. No open findings.
 > New required secret for the Supabase functions: `SITE_URL`.
-> **Status 2026-09-28 (re-verification):** each finding was checked again in the code, the tests and the running app. In §4, ✅ = fixed and verified, 🟡 = partly fixed. Open parts:
+> **Status 2026-09-28 (re-verification):** each finding was checked again in the code, the tests and the running app. In §4, ✅ = fixed and verified, 🟡 = partly fixed, ⬜ = new, open. New findings: C-14 (Medium, sun arc drops out at night), C-15, C-16, C-17, P-7, B-8, A-6 … A-9 (all Low). Open parts of the partly fixed findings:
 > - C-7: `showManualInstructions` in `PWAInstallPrompt.tsx` still calls `alert()`. The shadcn `Dialog` was deleted in D-3, so add it back with `npx shadcn add dialog`.
 > - P-4: `Fireworks` still sets React state on each animation frame (it runs only for a few seconds at sunrise/sunset). `TemperatureIceberg` restarts its interval on each temperature change.
 > - P-6: the hourly update check is done, but `onNeedRefresh` still calls `updateSW(true)` at once. Reload on the next `visibilitychange` instead.
@@ -90,6 +90,10 @@ Re-verification, 2026-09-28 (`a9882c4`):
 | ✅ C-11 | Low | `src/components/InfoPanel.tsx:103-122` | Auto-collapse overrides the user's manual expand/collapse choice at every time-of-day change. | Apply auto state only until the user toggles a section. |
 | ✅ C-12 | Low | `src/components/TemperatureIceberg.tsx:53` | `z-6` is not a Tailwind class (no effect). | Use `z-[6]` or an existing step. |
 | ✅ C-13 | Low | `src/components/FullscreenButton.tsx:25` | iPhone Safari has no Fullscreen API; the button silently does nothing. | Hide the button when `document.fullscreenEnabled` is false. |
+| ⬜ C-14 | Medium | `src/utils/sunUtils.ts` `findSunPass`, `src/utils/moonUtils.ts` `findMoonPass` | When the body is below the horizon, the set search starts at the bisected rise time, which is only within ±5 s of the crossing. When that time lands just below 0°, the search finds the same rise again and returns a pass of zero length (for example 05:22–05:22 UTC). At night the sun arc then collapses to one point and its zenith label disappears, every other minute (seen at 22:30 in Ravensburg). | In both functions, start the set search after the rise crossing (for example at `startMs + HORIZON_BISECT_TOLERANCE_MS`). Test: for each minute of one night, the pass is longer than 6 h and has a zenith. ROADMAP item 31. |
+| ⬜ C-15 | Low | `src/components/SunVisualization.tsx` arc-label geometry | When the moon culminates high, its zenith label lands under the collapsed InfoPanel (390×844: label at y ≈ 112 px, panel at y 65–175 px, x ≥ 90 px). | Move a label that overlaps the collapsed panel below the panel's bottom edge, or beside the apex. ROADMAP item 32. |
+| ⬜ C-16 | Low | `src/components/SunTracker.tsx` startup `getCurrentPosition` | No `timeout` option. When the user leaves the location prompt open, "Locating…" stays on screen, and there is no way to choose a place instead. | Pass `{ timeout: 10000 }`. On timeout, use the default location with the existing toast. After 3 s, offer "Choose a place". ROADMAP item 33. |
+| ⬜ C-17 | Low | `src/components/InfoPanel.tsx` sun and moon times, `src/utils/arcLabels.ts` | After sunset the panel still shows today's sunrise, sunset and moonset, which are past, while the arc labels show the next pass. At 22:30: panel 07:17 / 19:09 and moonset 09:25, arcs 07:18 / 19:07 and 10:47. The comment in `arcLabels.ts` says the labels always match the panel. | After sunset, show the next sunrise and sunset in the panel (as `getRelevantTwilightTimes` does for twilight, C-4), and the next moonset after today's has passed. Or mark past times as "today". |
 
 ### 4.3 Performance
 
@@ -101,6 +105,7 @@ Re-verification, 2026-09-28 (`a9882c4`):
 | 🟡 P-4 | Medium | `src/components/CloudLayer.tsx:105-285`, `Fireworks.tsx:96-113`, `MidnightGhost.tsx`, `TemperatureIceberg.tsx` | Animations use React `setState` per frame / per 100 ms. Fireworks stores the rAF id in state (stale in cleanup, loop may not stop). Ghost/Iceberg call `setDirection` inside a `setPosition` updater and recreate the interval on every direction change. | Prefer CSS animations; keep rAF ids in `useRef`; keep direction in the position state. |
 | ✅ P-5 | Low | `src/components/SunTracker.tsx:314` → `FullscreenButton.tsx:23` | `handleFullscreenChange` is a new function every render → the `fullscreenchange` listener is removed and re-added every second. | Pass `setIsFullscreen` directly (stable). |
 | 🟡 P-6 | Low | `src/main.tsx:19-26` | Service worker update check every 60 s and `onNeedRefresh → updateSW(true)` with `skipWaiting` → page reloads under the user on each deploy. | Check hourly; reload on next visibility change, not immediately. |
+| ⬜ P-7 | Low | build output (`npm run build`) | One JS chunk of 576 kB (188 kB gzip), above Vite's 500 kB warning. | Find the largest modules (for example with `rollup-plugin-visualizer`). Load the terrain code and the Sentry feedback form with `import()` when they are needed, or set `build.chunkSizeWarningLimit` on purpose. |
 
 ### 4.4 Build, CI, and tooling
 
@@ -113,6 +118,7 @@ Re-verification, 2026-09-28 (`a9882c4`):
 | ✅ B-5 | Low | `.gitignore` | Commits `a74da3f`/`503e2a8` show a `vite.config.ts.timestamp-*.mjs` file got committed. | Add `vite.config.ts.timestamp-*` to `.gitignore`. |
 | 🟡 B-6 | Low | `supabase/functions/*` | Deno functions use `std@0.190.0` `serve` (deprecated) and are linted by the browser ESLint config (3 lint errors). No tests. | Use `Deno.serve`; exclude `supabase/` from the Vite ESLint config or give it a Deno config. |
 | ✅ B-7 | Low | `tests/` | jsdom lacks `HTMLMediaElement.play/pause` → stack traces in test output. `test-cases.md` checklist is all unchecked and stale. | Stub `play`/`pause` in `tests/setupTests.ts`; delete or update `test-cases.md`. |
+| ⬜ B-8 | Low | `src/components/ui/button.tsx:56` | `npm run lint` shows 1 warning (`react-refresh/only-export-components`) for the shadcn `buttonVariants` export. The file is generated and must not be edited by hand. | Turn the rule off for `src/components/ui/**` in `eslint.config.js`, so the lint output stays clean. |
 
 ### 4.5 Dependencies and dead code
 
@@ -133,6 +139,10 @@ Re-verification, 2026-09-28 (`a9882c4`):
 | ✅ A-3 | Low | `FullscreenButton.tsx`, `MusicPlayer.tsx`, `InfoPanel.tsx` | Controls fade to `opacity-0` but stay focusable and clickable; reappear only on mouse hover (no touch/keyboard path). Music `Switch` has no accessible label. | Show on focus/touch too; add `aria-label`s. |
 | ✅ A-4 | Low | `src/utils/sunUtils.ts:105`, `SunTracker.tsx:233-236` | 12-hour clock and °C are hard-coded; default location is New York with no way to set a location manually. | Use `Intl`/locale for time; add a manual location input. |
 | ✅ A-5 | Low | `src/components/SunTracker.tsx:144-155` | A toast appears on every weather refresh (every 30 min, and on cache hits). | Toast only on failure. |
+| ⬜ A-6 | Low | `src/components/SunTracker.tsx` loading branch | The loading screen always shows a daytime sky. The Android splash before it uses the manifest `background_color` `#0F1016`, so a start at night goes dark, then bright blue, then dark again. It is a generic spinner with no brand. | Replace it with the Rising Mark loading screen on `#0F1016` (ROADMAP item 33). |
+| ⬜ A-7 | Low | `src/components/SunTracker.tsx` loading branch | The top-left buttons (fullscreen, compass, feedback) and the radio show on the loading screen, before there is a scene to control. | Show them only when the scene is ready, with a fade-in (ROADMAP item 33). |
+| ⬜ A-8 | Low | `src/components/SunVisualization.tsx` cardinal labels | In the static 360° view, the label at the 0°/360° edge (N in the northern hemisphere, S in the southern) sits on the screen edge and is cut in half (seen at 390 px). | Move edge labels inside the screen, as the arc labels already do, or show the edge label once. |
+| ⬜ A-9 | Low | `src/components/WeatherEffects.tsx:27` | The six rainbow band colours are hex literals. Item 15 moved the other scene colours to tokens. The `Fireworks` confetti colours are a documented exception; the rainbow has no such comment. | Add `--scene-rainbow-*` tokens, or add a comment that marks the spectrum as a deliberate exception. |
 
 ### 4.7 Documentation and metadata
 
@@ -150,3 +160,4 @@ Re-verification, 2026-09-28 (`a9882c4`):
 3. **Performance (½ day):** P-1 … P-5.
 4. **CI hardening (½ day):** B-1, B-3, B-4, B-5, lint to green.
 5. **Cleanup + a11y + docs (1 day):** D-2 … D-4, A-1 … A-3, M-1 … M-3.
+6. **Re-verification findings, 2026-09-28 (1 day):** C-14 first (visible every night), then C-15, C-17, A-8. A-6, A-7 and C-16 together with ROADMAP item 33 (loading screen). Then the open parts of C-7, P-4, P-6, B-6, D-4, and P-7, B-8, A-9.
