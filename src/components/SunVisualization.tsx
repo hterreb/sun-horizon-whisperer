@@ -610,19 +610,6 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     return 'hsl(var(--scene-ridge-golden))'; // civil-twilight/dawn/morning/evening
   };
 
-  // Wave-crest highlight color (ROADMAP item 27): a thin lighter line traced on the
-  // sea's own path, reusing the same night/day split and tokens as the water
-  // reflection below (--scene-moon by night, a bright glint by day) so the crest and
-  // reflection read as one light source. Needed because at night the plain water fill
-  // (getHorizonColor/getWaterDeepColor) is too close to the ridge and night sky to read
-  // as a sea on its own.
-  const getWaveCrestColor = () => {
-    if (timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight') {
-      return 'hsl(var(--scene-moon))';
-    }
-    return 'hsl(var(--scene-glow-white))';
-  };
-
   const moonRadius = 18 + moonPosition.illumination * 6; // same footprint as the old 36 + illumination*12 diameter
   const moonPhasePath = useMemo(
     () => getMoonPhasePath(moonPosition.illumination, moonPosition.phase, latitude, moonRadius),
@@ -802,10 +789,9 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         )}
         <path
           d={svgPath}
+          // No outline (ROADMAP item 32): the item-27 wave-crest stroke is gone; the
+          // dark-navy night sea already reads apart from the ridge and sky.
           fill="url(#horizonGradient)"
-          stroke={getWaveCrestColor()}
-          strokeOpacity={0.5}
-          strokeWidth={1.5}
           className="transition-all duration-1000"
           data-testid="sea"
         />

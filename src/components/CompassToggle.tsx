@@ -3,6 +3,7 @@ import { Compass } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { type CompassStatus } from '@/hooks/useCompassHeading';
 import { GLASS_ICON_BUTTON } from '@/utils/glassChrome';
+import PremiumBadge from './PremiumBadge';
 
 interface CompassToggleProps {
   status: CompassStatus;
@@ -15,7 +16,7 @@ interface CompassToggleProps {
 // the row's fixed position, safe-area padding and fullscreen-idle fade. Hidden
 // entirely when the device has no DeviceOrientationEvent, and hidden again once
 // permission was denied or no sensor reading ever arrived (see useCompassHeading's
-// 'unavailable' status).
+// 'unavailable' status). Marked premium with a gold plus (ROADMAP item 35), still free.
 const CompassToggle: React.FC<CompassToggleProps> = ({
   status,
   onEnable,
@@ -44,10 +45,11 @@ const CompassToggle: React.FC<CompassToggleProps> = ({
       onClick={handleClick}
       aria-label={isActive ? 'Disable compass' : 'Enable compass'}
       aria-pressed={isActive}
-      className={`${GLASS_ICON_BUTTON} transition-colors ${isActive ? 'text-brand-sky' : 'text-white'}`}
+      className={`${GLASS_ICON_BUTTON} relative transition-colors ${isActive ? 'text-brand-sky' : 'text-white'}`}
       title={isActive ? 'Disable compass' : 'Enable compass'}
     >
       <Compass className="h-4 w-4" />
+      <PremiumBadge className="absolute -right-0.5 -top-0.5 h-3.5 w-3.5" />
     </Button>
   );
 };
