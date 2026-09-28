@@ -144,6 +144,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   const [isMoonCollapsed, setIsMoonCollapsed] = useState(true);
   const [isTwilightCollapsed, setIsTwilightCollapsed] = useState(false);
   const [isSunPositionCollapsed, setIsSunPositionCollapsed] = useState(false);
+  // Golden & Blue Hour (ROADMAP item 24): collapsed by default, and not part of the
+  // time-of-day auto-collapse effect below - it stays as the user left it.
+  const [isGoldenBlueCollapsed, setIsGoldenBlueCollapsed] = useState(true);
   const [isVisible, setIsVisible] = useState(true);
   const [hoveredTwilight, setHoveredTwilight] = useState<string | null>(null);
   const fadeTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -808,39 +811,6 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             </div>
           )}
 
-          {/* Golden & blue hour: only the next pair, from the same part of the day
-              (ROADMAP item 20) */}
-          <div className="mt-6 pt-4 border-t border-white border-opacity-20">
-            <h3 className={`${SECTION_HEADING} mb-2`}>
-              Golden &amp; Blue Hour{goldenBlueHeading ? ` · ${goldenBlueHeading}` : ''}
-            </h3>
-            <div className="space-y-1">
-              {nextGoldenBlueHours?.part === 'morning' ? (
-                <>
-                  <div className={ROW}>
-                    <span className="opacity-80 text-caption">Blue hour:</span>
-                    <span className="text-caption tabular-nums">{renderWindow(formatWindow(nextGoldenBlueHours?.blue))}</span>
-                  </div>
-                  <div className={ROW}>
-                    <span className="opacity-80 text-caption">Golden hour:</span>
-                    <span className="text-caption tabular-nums">{renderWindow(formatWindow(nextGoldenBlueHours?.golden))}</span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className={ROW}>
-                    <span className="opacity-80 text-caption">Golden hour:</span>
-                    <span className="text-caption tabular-nums">{renderWindow(formatWindow(nextGoldenBlueHours?.golden))}</span>
-                  </div>
-                  <div className={ROW}>
-                    <span className="opacity-80 text-caption">Blue hour:</span>
-                    <span className="text-caption tabular-nums">{renderWindow(formatWindow(nextGoldenBlueHours?.blue))}</span>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
           {/* Moon information - collapsible */}
           {moonPosition.visible && (
             <div className="mt-6 pt-4 border-t border-white border-opacity-20">
@@ -917,6 +887,56 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               </div>
             </div>
           )}
+
+          {/* Golden & blue hour: only the next pair, from the same part of the day
+              (ROADMAP item 20). Moved below Moon Information and collapsed by
+              default (ROADMAP item 24) - not part of the time-of-day auto-collapse
+              effect, so it stays as the user left it. */}
+          <div className="mt-6 pt-4 border-t border-white border-opacity-20">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className={SECTION_HEADING}>
+                Golden &amp; Blue Hour{goldenBlueHeading ? ` · ${goldenBlueHeading}` : ''}
+              </h3>
+              <button
+                onClick={() => setIsGoldenBlueCollapsed(!isGoldenBlueCollapsed)}
+                className={ICON_TOGGLE}
+                aria-label={isGoldenBlueCollapsed ? "Expand golden & blue hour" : "Collapse golden & blue hour"}
+                aria-expanded={!isGoldenBlueCollapsed}
+              >
+                {isGoldenBlueCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+              </button>
+            </div>
+
+            <div className={`transition-all duration-300 ease-in-out ${
+              isGoldenBlueCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-32 opacity-100'
+            }`}>
+              <div className="space-y-1">
+                {nextGoldenBlueHours?.part === 'morning' ? (
+                  <>
+                    <div className={ROW}>
+                      <span className="opacity-80 text-caption">Blue hour:</span>
+                      <span className="text-caption tabular-nums">{renderWindow(formatWindow(nextGoldenBlueHours?.blue))}</span>
+                    </div>
+                    <div className={ROW}>
+                      <span className="opacity-80 text-caption">Golden hour:</span>
+                      <span className="text-caption tabular-nums">{renderWindow(formatWindow(nextGoldenBlueHours?.golden))}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className={ROW}>
+                      <span className="opacity-80 text-caption">Golden hour:</span>
+                      <span className="text-caption tabular-nums">{renderWindow(formatWindow(nextGoldenBlueHours?.golden))}</span>
+                    </div>
+                    <div className={ROW}>
+                      <span className="opacity-80 text-caption">Blue hour:</span>
+                      <span className="text-caption tabular-nums">{renderWindow(formatWindow(nextGoldenBlueHours?.blue))}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
 
           {/* Upcoming twilight times - collapsible */}
           <div className="mt-6 pt-4 border-t border-white border-opacity-20">
