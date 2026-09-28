@@ -9,6 +9,8 @@ import SunVisualization, {
   getVisibleCardinalLabels,
   crossesHorizon,
   buildArcPath,
+  shortestAzimuthDelta,
+  horizonCrossingPoint,
   getRainbowGeometry,
   COMPASS_FOV_DEG,
   buildTerrainSegments,
@@ -130,21 +132,24 @@ describe('crossesHorizon (C-8)', () => {
 });
 
 
-describe('buildArcPath (sun/moon arcs, ROADMAP item 17)', () => {
+describe('buildArcPath (sun/moon arcs, ROADMAP item 17/26)', () => {
   const toXY = (p: { altitude: number; azimuth: number }) => ({ x: p.azimuth, y: -p.altitude });
 
-  it('skips below-horizon points and starts a new segment after the gap', () => {
+  it('inserts an interpolated altitude-0 point at each horizon crossing, then skips the below-horizon points (ROADMAP item 26)', () => {
+    // Chosen so every crossing lands on a whole number: each pair straddling the
+    // horizon has matching altitude magnitudes on both sides, so the interpolation
+    // fraction is exactly 0.5.
     const path = buildArcPath(
       [
-        { altitude: -5, azimuth: 0 },
-        { altitude: 10, azimuth: 1 },
-        { altitude: 20, azimuth: 2 },
-        { altitude: -1, azimuth: 3 },
-        { altitude: 5, azimuth: 4 },
+        { altitude: -10, azimuth: 0 }, // below horizon - not drawn
+        { altitude: 10, azimuth: 2 }, // crossing at az 1, alt 0
+        { altitude: 20, azimuth: 3 },
+        { altitude: -20, azimuth: 5 }, // crossing at az 4, alt 0
+        { altitude: 20, azimuth: 7 }, // crossing at az 6, alt 0
       ],
       toXY
     );
-    expect(path).toBe('M1,-10 L2,-20 M4,-5');
+    expect(path).toBe('M1,0 L2,-10 L3,-20 L4,0 M6,0 L7,-20');
   });
 
   it('is empty when the moon stays below the horizon', () => {
@@ -189,6 +194,43 @@ describe('buildArcPath (sun/moon arcs, ROADMAP item 17)', () => {
       (p) => (p.azimuth === 1 ? null : { x: p.azimuth, y: -p.altitude })
     );
     expect(path).toBe('M0,-10 M2,-10');
+  });
+
+  it('a horizon crossing near the 0°/360° wrap interpolates the short way (ROADMAP item 26)', () => {
+    const path = buildArcPath(
+      [
+        { altitude: -10, azimuth: 350 }, // below horizon - not drawn
+        { altitude: 10, azimuth: 10 }, // crossing: due North (az 0), not az 180
+      ],
+      toXY
+    );
+    expect(path).toBe('M0,0 L10,-10');
+  });
+});
+
+describe('shortestAzimuthDelta (ROADMAP item 26)', () => {
+  it('returns a plain positive/negative delta well inside the circle', () => {
+    expect(shortestAzimuthDelta(0, 90)).toBeCloseTo(90);
+    expect(shortestAzimuthDelta(90, 0)).toBeCloseTo(-90);
+  });
+
+  it('takes the short way across the 0°/360° wrap instead of the long way around', () => {
+    expect(shortestAzimuthDelta(350, 10)).toBeCloseTo(20);
+    expect(shortestAzimuthDelta(10, 350)).toBeCloseTo(-20);
+  });
+});
+
+describe('horizonCrossingPoint (ROADMAP item 26)', () => {
+  it('linearly interpolates altitude to exactly 0 and azimuth to the matching fraction', () => {
+    const point = horizonCrossingPoint({ altitude: -10, azimuth: 100 }, { altitude: 30, azimuth: 140 });
+    expect(point.altitude).toBe(0);
+    expect(point.azimuth).toBeCloseTo(110); // 1/4 of the way from 100 to 140
+  });
+
+  it('wraps the azimuth the short way across 0°/360°', () => {
+    const point = horizonCrossingPoint({ altitude: -10, azimuth: 350 }, { altitude: 10, azimuth: 10 });
+    expect(point.altitude).toBe(0);
+    expect(point.azimuth).toBeCloseTo(0); // halfway from 350 to 370(=10), not from 350 to 10 the long way
   });
 });
 
@@ -263,6 +305,47 @@ describe('SunVisualization (rendered): static cardinal direction labels (ROADMAP
     }
   });
 
+  it('fades out together with the top-left buttons while idle in fullscreen (ROADMAP item 29)', () => {
+    setMockedContainerSize(800, 600);
+    const props = {
+      sunPosition: { azimuth: 180, altitude: 30 },
+      moonPosition: { azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false },
+      sunPath: [],
+      moonPath: [],
+      timeOfDay: 'midday' as const,
+      weatherType: 'clear' as const,
+      latitude: 51,
+    };
+
+    const { rerender } = render(<SunVisualization {...props} isFullscreen={true} showCursor={false} />);
+    expect(screen.getByTestId('cardinal-labels')).toHaveClass('opacity-0');
+
+    rerender(<SunVisualization {...props} isFullscreen={true} showCursor={true} />);
+    expect(screen.getByTestId('cardinal-labels')).toHaveClass('opacity-100');
+
+    rerender(<SunVisualization {...props} isFullscreen={false} showCursor={false} />);
+    expect(screen.getByTestId('cardinal-labels')).toHaveClass('opacity-100');
+  });
+
+  it('stays visible in compass mode even when idle in fullscreen (ROADMAP item 29)', () => {
+    setMockedContainerSize(800, 600);
+    render(
+      <SunVisualization
+        sunPosition={{ azimuth: 180, altitude: 30 }}
+        moonPosition={{ azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false }}
+        sunPath={[]}
+        moonPath={[]}
+        timeOfDay="midday"
+        weatherType="clear"
+        latitude={51}
+        compassHeading={90}
+        isFullscreen={true}
+        showCursor={false}
+      />
+    );
+    expect(screen.getByTestId('cardinal-labels')).toHaveClass('opacity-100');
+  });
+
   it('draws a sun arc by day and does not draw a moon arc when the moon is not shown (ROADMAP item 17)', () => {
     setMockedContainerSize(800, 600);
     const { container } = render(
@@ -288,6 +371,38 @@ describe('SunVisualization (rendered): static cardinal direction labels (ROADMAP
     const strokes = Array.from(paths).map((p) => p.getAttribute('stroke'));
     expect(strokes).toContain('hsl(var(--brand-sunset))'); // the sun arc
     expect(strokes).not.toContain('hsl(var(--scene-moon))'); // no moon arc while it's midday
+  });
+
+  it('the sun dot lies on the sun arc path when sunPath includes the current position (ROADMAP item 26)', () => {
+    setMockedContainerSize(800, 600);
+    const { container } = render(
+      <SunVisualization
+        sunPosition={{ azimuth: 180, altitude: 30 }}
+        moonPosition={{ azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false }}
+        sunPath={[
+          { azimuth: 170, altitude: 20 },
+          { azimuth: 180, altitude: 30 },
+          { azimuth: 190, altitude: 20 },
+        ]}
+        moonPath={[]}
+        timeOfDay="midday"
+        weatherType="clear"
+        latitude={51}
+      />
+    );
+
+    const sunDot = screen.getByTestId('sun-dot');
+    const dotLeft = parseFloat(sunDot.style.left);
+    const dotTop = parseFloat(sunDot.style.top);
+
+    const arcPath = container.querySelector('path[stroke="hsl(var(--brand-sunset))"]');
+    const d = arcPath?.getAttribute('d') ?? '';
+    const points = Array.from(d.matchAll(/[ML](-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/g)).map(
+      (m) => [parseFloat(m[1]), parseFloat(m[2])]
+    );
+
+    const dotIsOnPath = points.some(([x, y]) => Math.abs(x - dotLeft) < 0.5 && Math.abs(y - dotTop) < 0.5);
+    expect(dotIsOnPath).toBe(true);
   });
 
   it('shows an off-FOV hint arrow in compass mode when the sun is outside the field of view (ROADMAP item 19)', () => {
@@ -422,6 +537,65 @@ describe('SunVisualization (rendered): terrain silhouette (ROADMAP item 13)', ()
     expect(nightFill).toBe('hsl(var(--scene-ridge-night))');
     expect(dayFill).toBe('hsl(var(--scene-ridge-day))');
     expect(nightFill).not.toBe(dayFill);
+  });
+});
+
+describe('SunVisualization (rendered): sea visible at the horizon (ROADMAP item 27)', () => {
+  const originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+  const originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
+
+  const setMockedContainerSize = (width: number, height: number) => {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { value: width, configurable: true });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { value: height, configurable: true });
+  };
+
+  afterEach(() => {
+    if (originalClientWidth) Object.defineProperty(HTMLElement.prototype, 'clientWidth', originalClientWidth);
+    if (originalClientHeight) Object.defineProperty(HTMLElement.prototype, 'clientHeight', originalClientHeight);
+  });
+
+  const ridgeProfile: HorizonProfile = { angles: new Array(360).fill(15), observerElevation: 500, eyeHeight: 1.7 };
+
+  const baseProps = {
+    sunPosition: { azimuth: 180, altitude: 30 },
+    moonPosition: { azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false },
+    sunPath: [],
+    moonPath: [],
+    timeOfDay: 'midday' as const,
+    weatherType: 'clear' as const,
+    latitude: 51,
+  };
+
+  it('draws the sea after the ridge in DOM order, so the wave crest sits on top of it', () => {
+    setMockedContainerSize(800, 600);
+    render(<SunVisualization {...baseProps} horizonProfile={ridgeProfile} />);
+
+    const ridge = screen.getByTestId('terrain-silhouette');
+    const sea = screen.getByTestId('sea');
+    expect(ridge.compareDocumentPosition(sea) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('gives the sea a thin, lighter wave-crest stroke, distinct from its own fill', () => {
+    setMockedContainerSize(800, 600);
+    render(<SunVisualization {...baseProps} />);
+
+    const sea = screen.getByTestId('sea');
+    expect(sea.getAttribute('stroke')).toBeTruthy();
+    expect(sea.getAttribute('stroke')).not.toBe(sea.getAttribute('fill'));
+  });
+
+  it('the night wave-crest color differs from the night ridge and uses an existing scene token', () => {
+    setMockedContainerSize(800, 600);
+
+    const { unmount } = render(
+      <SunVisualization {...baseProps} timeOfDay="night" horizonProfile={ridgeProfile} />
+    );
+    const seaStroke = screen.getByTestId('sea').getAttribute('stroke');
+    const ridgeFill = screen.getByTestId('terrain-silhouette').getAttribute('fill');
+    unmount();
+
+    expect(seaStroke).toBe('hsl(var(--scene-moon))');
+    expect(seaStroke).not.toBe(ridgeFill);
   });
 });
 

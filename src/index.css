@@ -97,7 +97,7 @@
     /* Scene palette — moon, horizon (per SunVisualization's getHorizonColor), water */
     --scene-moon: 216 12.2% 83.9%;
     --scene-moon-dark: 224 14.9% 19.8%; /* the moon disc's unlit-side fill */
-    --scene-horizon-night: 260 9.7% 6.1%;
+    --scene-horizon-night: 218 42% 15%; /* dark navy: the night sea must read against the night sky and ridge (item 27) */
     --scene-horizon-astro-twilight: 223.3 25.7% 13.7%;
     --scene-horizon-nautical-twilight: 265.7 10.1% 13.5%;
     --scene-horizon-dawn: 264 3.9% 25.3%;
@@ -126,7 +126,7 @@
        buckets are a darkened version of their own --scene-horizon-* colour, since
        the style book only defines golden/day/night/storm and this app's TimeOfDay
        has finer twilight buckets. */
-    --scene-water-deep-night: 240 6.7% 2.9%;
+    --scene-water-deep-night: 222 48% 7%;
     --scene-water-deep-astro-twilight: 226.7 25.7% 6.9%;
     --scene-water-deep-nautical-twilight: 270 11.8% 6.7%;
     --scene-water-deep-dawn: 270 3.1% 12.5%;
@@ -135,7 +135,7 @@
     /* Line-of-sight ridge (terrain-silhouette) — the style book's soft ridge
        colour per time-of-day: night #1C1D2A, day #5C8FB0, golden #6A4A6E. Drawn at
        .85 opacity (see SunVisualization) so it reads as distance. */
-    --scene-ridge-night: 235.7 20% 13.7%;
+    --scene-ridge-night: 232 30% 4%; /* darker than the night sky, so the ridge reads as a silhouette */
     --scene-ridge-day: 203.6 34.7% 52.5%;
     --scene-ridge-golden: 293.3 19.6% 36.1%;
 

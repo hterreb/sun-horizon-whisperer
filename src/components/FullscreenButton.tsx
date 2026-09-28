@@ -21,7 +21,6 @@ interface WebkitDocument extends Document {
 
 const FullscreenButton: React.FC<FullscreenButtonProps> = ({ onFullscreenChange }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -61,25 +60,6 @@ const FullscreenButton: React.FC<FullscreenButtonProps> = ({ onFullscreenChange 
     }
   };
 
-  const handleMouseEnter = () => {
-    setIsVisible(true);
-  };
-
-  const handleMouseLeave = () => {
-    if (isFullscreen) {
-      setIsVisible(false);
-    }
-  };
-
-  // Keyboard focus and touch also need to bring the button back, not just mouse hover.
-  const handleFocus = () => {
-    setIsVisible(true);
-  };
-
-  const handleTouchStart = () => {
-    setIsVisible(true);
-  };
-
   // iPhone Safari has neither the standard nor the webkit-prefixed Fullscreen API;
   // render nothing rather than a button that does nothing.
   const hasFullscreenApi = document.fullscreenEnabled !== false || (document as WebkitDocument).webkitFullscreenEnabled === true;
@@ -92,17 +72,7 @@ const FullscreenButton: React.FC<FullscreenButtonProps> = ({ onFullscreenChange 
       variant="ghost"
       size="icon"
       onClick={toggleFullscreen}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      onFocus={handleFocus}
-      onTouchStart={handleTouchStart}
-      className={`fixed z-40 ${GLASS_ICON_BUTTON} text-white transition-opacity duration-300 ${
-        isVisible ? 'opacity-100' : 'opacity-0'
-      }`}
-      style={{
-        top: 'calc(1rem + env(safe-area-inset-top))',
-        left: 'calc(1rem + env(safe-area-inset-left))',
-      }}
+      className={`${GLASS_ICON_BUTTON} text-white`}
       title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
       aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
     >

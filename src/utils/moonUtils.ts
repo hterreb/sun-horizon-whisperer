@@ -27,26 +27,118 @@ export const getMoonPosition = (date: Date, latitude: number, longitude: number)
   };
 };
 
-// Samples the moon's altitude/azimuth across the given calendar day (local time, per
-// `date`'s own getHours/getDate), for drawing the day's arc in the sky. Pure and
-// stateless: callers map each point to screen coordinates themselves, the same way
-// they already map the moon's current position.
-// Samples date − 12 h … date + 12 h, so the moon's current pass across the sky is one
-// unbroken arc (a calendar-day window splits it at midnight).
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const HORIZON_SCAN_STEP_MS = 15 * 60 * 1000;
+const HORIZON_BISECT_TOLERANCE_MS = 10 * 1000;
+
+// Finds the nearest altitude=0 crossing to `fromMs` (a coarse scan, then a bisection
+// to within HORIZON_BISECT_TOLERANCE_MS), searching forward (direction=1) or backward
+// (direction=-1) up to `maxMs` away. Returns null when no crossing exists in range -
+// alwaysUp/alwaysDown stretches (ROADMAP item 26). Uses the same suncalc-based altitude
+// (getMoonPosition) the arc/dot are drawn from, not the Meeus-precision threshold
+// getMoonTimes uses (see lunarEphemeris.ts) - the two disagree by a fraction of a
+// degree, which would put the arc's own endpoint visibly off 0°.
+const findHorizonCrossingMs = (
+  altitudeAt: (ms: number) => number,
+  fromMs: number,
+  direction: 1 | -1,
+  maxMs: number
+): number | null => {
+  let prevMs = fromMs;
+  let prevAlt = altitudeAt(prevMs);
+  const limitMs = fromMs + direction * maxMs;
+
+  for (
+    let t = fromMs + direction * HORIZON_SCAN_STEP_MS;
+    direction > 0 ? t <= limitMs : t >= limitMs;
+    t += direction * HORIZON_SCAN_STEP_MS
+  ) {
+    const alt = altitudeAt(t);
+    if ((prevAlt < 0) !== (alt < 0)) {
+      let lo = Math.min(prevMs, t);
+      let hi = Math.max(prevMs, t);
+      const loNegative = altitudeAt(lo) < 0;
+      while (hi - lo > HORIZON_BISECT_TOLERANCE_MS) {
+        const mid = (lo + hi) / 2;
+        if ((altitudeAt(mid) < 0) === loNegative) lo = mid; else hi = mid;
+      }
+      return Math.round((lo + hi) / 2);
+    }
+    prevMs = t;
+    prevAlt = alt;
+  }
+  return null;
+};
+
+interface SkyPass {
+  start: Date;
+  end: Date;
+}
+
+// The moon's current pass (ROADMAP item 26): from the last horizon crossing before
+// `date` to the next one after, when the moon is currently up; otherwise the next full
+// pass (next rise, then the following set). Bounded to +-24h per search, so an
+// alwaysUp/alwaysDown stretch (no crossing at all within that range) safely comes back
+// null instead of searching forever.
+const findMoonPass = (date: Date, latitude: number, longitude: number): SkyPass | null => {
+  const altitudeAt = (ms: number) => getMoonPosition(new Date(ms), latitude, longitude).altitude;
+  const dateMs = date.getTime();
+
+  if (altitudeAt(dateMs) >= 0) {
+    const startMs = findHorizonCrossingMs(altitudeAt, dateMs, -1, ONE_DAY_MS);
+    const endMs = findHorizonCrossingMs(altitudeAt, dateMs, 1, ONE_DAY_MS);
+    return startMs !== null && endMs !== null ? { start: new Date(startMs), end: new Date(endMs) } : null;
+  }
+
+  const startMs = findHorizonCrossingMs(altitudeAt, dateMs, 1, ONE_DAY_MS);
+  if (startMs === null) return null;
+  const endMs = findHorizonCrossingMs(altitudeAt, startMs, 1, ONE_DAY_MS);
+  return endMs !== null ? { start: new Date(startMs), end: new Date(endMs) } : null;
+};
+
+// Samples `steps+1` points across [start, end], with one sample landing exactly on
+// `date` itself (ROADMAP item 26) - so the sun/moon dot (computed straight from `date`)
+// always lies exactly on the arc built from these points, not just close to it.
+const samplePass = <T>(
+  start: Date,
+  end: Date,
+  date: Date,
+  steps: number,
+  sampleAt: (t: Date) => T
+): T[] => {
+  const startMs = start.getTime();
+  const endMs = end.getTime();
+  const dateMs = Math.min(Math.max(date.getTime(), startMs), endMs);
+  const fraction = endMs > startMs ? (dateMs - startMs) / (endMs - startMs) : 0;
+  const k = Math.min(steps, Math.max(0, Math.round(steps * fraction)));
+
+  const points: T[] = [];
+  for (let i = 0; i <= k; i++) {
+    points.push(sampleAt(new Date(k === 0 ? startMs : startMs + (i / k) * (dateMs - startMs))));
+  }
+  const remaining = steps - k;
+  for (let i = 1; i <= remaining; i++) {
+    points.push(sampleAt(new Date(dateMs + (i / remaining) * (endMs - dateMs))));
+  }
+  return points;
+};
+
+// Samples the moon's altitude/azimuth across the moon's current pass - the last rise
+// before `date` to the next set after it, or the next full pass if the moon is down
+// right now (ROADMAP item 26; previously a fixed date - 12h .. date + 12h window, which
+// cut passes longer than 24h - moon passes run up to ~17h at mid-latitudes). Pure and
+// stateless: callers map each point to screen coordinates themselves, the same way they
+// already map the moon's current position.
 export const getMoonPathAround = (
   date: Date,
   latitude: number,
   longitude: number,
   steps = 48
 ): MoonPosition[] => {
-  const start = date.getTime() - 12 * 60 * 60 * 1000;
-
-  const points: MoonPosition[] = [];
-  for (let i = 0; i <= steps; i++) {
-    const t = new Date(start + (i / steps) * 24 * 60 * 60 * 1000);
-    points.push(getMoonPosition(t, latitude, longitude));
-  }
-  return points;
+  const pass = findMoonPass(date, latitude, longitude);
+  const start = pass ? pass.start : new Date(date.getTime() - 12 * 60 * 60 * 1000);
+  const end = pass ? pass.end : new Date(date.getTime() + 12 * 60 * 60 * 1000);
+  return samplePass(start, end, date, steps, (t) => getMoonPosition(t, latitude, longitude));
 };
 
 export interface MoonTimes {

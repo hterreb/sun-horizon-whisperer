@@ -42,6 +42,11 @@ interface SunVisualizationProps {
   // feature is disabled/loading/unavailable - null draws the flat horizon only, same
   // as before the feature existed.
   horizonProfile?: HorizonProfile | null;
+  // Fade the cardinal labels out together with the top-left buttons while idle in
+  // fullscreen (ROADMAP item 29); both default to their non-fullscreen values so
+  // existing callers/tests that don't pass them keep the labels always visible.
+  isFullscreen?: boolean;
+  showCursor?: boolean;
 }
 
 // Maps an azimuth (0-360°, 0 = North) to a horizontal screen fraction (0-1), for the
@@ -215,10 +220,34 @@ const getArcScreenPosition = (
   return { x: width * fraction, y: altitudeToY(altitude, height) };
 };
 
+type SkyPoint = { altitude: number; azimuth: number };
+
+// The shortest signed delta from one azimuth to another, taking the wrap at 0°/360°
+// into account (e.g. 350° -> 10° is +20°, not -340°). Used by horizonCrossingPoint below
+// so the interpolated azimuth takes the short way around (ROADMAP item 26).
+// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
+export const shortestAzimuthDelta = (from: number, to: number): number => {
+  const delta = ((to - from) % 360 + 540) % 360 - 180;
+  return delta;
+};
+
+// The point where the sun/moon's path crosses the horizon (altitude 0) between two
+// samples `a` and `b` that are on different sides of it, by linear interpolation of
+// altitude and azimuth (ROADMAP item 26) - so the arc always reaches the flat horizon
+// line exactly, instead of stopping at the last/first sample still above/below it (up
+// to half a sampling step away, a visible gap at coarse sampling).
+// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
+export const horizonCrossingPoint = (a: SkyPoint, b: SkyPoint): SkyPoint => {
+  const t = a.altitude / (a.altitude - b.altitude);
+  const azimuth = ((a.azimuth + shortestAzimuthDelta(a.azimuth, b.azimuth) * t) % 360 + 360) % 360;
+  return { altitude: 0, azimuth };
+};
+
 // SVG path through the above-horizon, in-view points only; a gap (below the horizon,
 // outside the compass field of view, or a wrap in `toXY`'s screen x) starts a new
-// segment instead of drawing a line across the screen (ROADMAP item 17).
-type SkyPoint = { altitude: number; azimuth: number };
+// segment instead of drawing a line across the screen (ROADMAP item 17). Where two
+// neighbor samples straddle the horizon, an interpolated altitude-0 point is drawn
+// first, so the arc starts/ends exactly on the flat horizon line (ROADMAP item 26).
 // eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
 export const buildArcPath = (
   points: SkyPoint[],
@@ -228,12 +257,14 @@ export const buildArcPath = (
   let path = '';
   let penDown = false;
   let prevX: number | null = null;
-  for (const point of points) {
-    const xy = point.altitude < 0 ? null : toXY(point);
+  let prevPoint: SkyPoint | null = null;
+
+  const plot = (point: SkyPoint): void => {
+    const xy = toXY(point);
     if (xy === null) {
       penDown = false;
       prevX = null;
-      continue;
+      return;
     }
     const { x, y } = xy;
     if (penDown && prevX !== null && Math.abs(x - prevX) > width / 2) {
@@ -244,6 +275,19 @@ export const buildArcPath = (
     path += `${penDown ? 'L' : 'M'}${x},${y} `;
     penDown = true;
     prevX = x;
+  };
+
+  for (const point of points) {
+    if (prevPoint !== null && crossesHorizon(prevPoint.altitude, point.altitude)) {
+      plot(horizonCrossingPoint(prevPoint, point));
+    }
+    if (point.altitude < 0) {
+      penDown = false;
+      prevX = null;
+    } else {
+      plot(point);
+    }
+    prevPoint = point;
   }
   return path.trim();
 };
@@ -337,12 +381,18 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   windSpeedKmh = null,
   windDirectionDeg = null,
   compassHeading = null,
-  horizonProfile = null
+  horizonProfile = null,
+  isFullscreen = false,
+  showCursor = true
 }) => {
   // Compass mode (ROADMAP item 19): a real field of view centered on the heading,
   // replacing the static full-circle mapping - also turns off the CSS transitions
   // below (the heading's own low-pass filter already smooths the motion).
   const compassActive = compassHeading !== null;
+  // Cardinal labels fade out together with the top-left buttons while idle in
+  // fullscreen (ROADMAP item 29), but stay visible in compass mode, where they're
+  // needed to aim the phone.
+  const cardinalLabelsVisible = compassActive || !isFullscreen || showCursor;
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerDimensions, setContainerDimensions] = useState({ width: 0, height: 0 });
   const [showFireworks, setShowFireworks] = useState(false);
@@ -560,6 +610,19 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     return 'hsl(var(--scene-ridge-golden))'; // civil-twilight/dawn/morning/evening
   };
 
+  // Wave-crest highlight color (ROADMAP item 27): a thin lighter line traced on the
+  // sea's own path, reusing the same night/day split and tokens as the water
+  // reflection below (--scene-moon by night, a bright glint by day) so the crest and
+  // reflection read as one light source. Needed because at night the plain water fill
+  // (getHorizonColor/getWaterDeepColor) is too close to the ridge and night sky to read
+  // as a sea on its own.
+  const getWaveCrestColor = () => {
+    if (timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight') {
+      return 'hsl(var(--scene-moon))';
+    }
+    return 'hsl(var(--scene-glow-white))';
+  };
+
   const moonRadius = 18 + moonPosition.illumination * 6; // same footprint as the old 36 + illumination*12 diameter
   const moonPhasePath = useMemo(
     () => getMoonPhasePath(moonPosition.illumination, moonPosition.phase, latitude, moonRadius),
@@ -724,15 +787,12 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             <stop offset="100%" stopColor={getWaterDeepColor()} />
           </linearGradient>
         </defs>
-        <path
-          d={svgPath}
-          fill="url(#horizonGradient)"
-          className="transition-all duration-1000"
-        />
         {terrainFillPath && (
           // Line-of-sight ridge (ROADMAP item 13), colored per time-of-day like the
           // style book's soft ridge (ROADMAP item 15 deliverable 2) and drawn at .85
-          // opacity so it reads as distance rather than a flat cutout.
+          // opacity so it reads as distance rather than a flat cutout. Drawn *before*
+          // the sea (ROADMAP item 27), so the sea's wave crests sit on top of the
+          // ridge's base instead of being covered by it.
           <path
             d={terrainFillPath}
             fill={getRidgeColor()}
@@ -740,6 +800,15 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             data-testid="terrain-silhouette"
           />
         )}
+        <path
+          d={svgPath}
+          fill="url(#horizonGradient)"
+          stroke={getWaveCrestColor()}
+          strokeOpacity={0.5}
+          strokeWidth={1.5}
+          className="transition-all duration-1000"
+          data-testid="sea"
+        />
       </svg>
 
       {containerDimensions.height > 0 && weatherType !== 'storm' && (() => {
@@ -777,7 +846,12 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       })()}
 
       {containerDimensions.width > 0 && (
-        <div className="absolute inset-0 pointer-events-none" data-testid="cardinal-labels">
+        <div
+          className={`absolute inset-0 pointer-events-none transition-opacity duration-300 ${
+            cardinalLabelsVisible ? 'opacity-100' : 'opacity-0'
+          }`}
+          data-testid="cardinal-labels"
+        >
           {cardinalLabels.map(({ label, fraction }) => (
             <div
               key={label}

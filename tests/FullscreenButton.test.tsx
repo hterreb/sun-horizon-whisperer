@@ -53,17 +53,10 @@ describe('FullscreenButton', () => {
     expect(webkitRequestFullscreen).toHaveBeenCalledTimes(1);
   });
 
-  it('has an aria-label, and reappears on focus and touch as well as mouse hover (A-3)', () => {
+  it('has an aria-label (visibility is owned by the shared TopLeftButtons row, ROADMAP item 22)', () => {
     Object.defineProperty(document, 'fullscreenEnabled', { value: true, configurable: true });
     render(<FullscreenButton />);
     const button = screen.getByRole('button');
     expect(button).toHaveAttribute('aria-label');
-
-    fireEvent.mouseLeave(button); // fullscreen-only fade; harmless when not fullscreen
-    fireEvent.focus(button);
-    expect(button.className).toContain('opacity-100');
-
-    fireEvent.touchStart(button);
-    expect(button.className).toContain('opacity-100');
   });
 });
