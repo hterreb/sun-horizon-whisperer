@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Moon, RefreshCw, Thermometer, MessageSquare } from 'lucide-react';
+import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Moon, RefreshCw, Thermometer, MessageSquare, Mountain } from 'lucide-react';
 import { isFeedbackAvailable, openFeedbackForm } from '@/utils/feedback';
 import { ScrollArea } from './ui/scroll-area';
 import { Button } from './ui/button';
+import LineOfSightDetails from './LineOfSightDetails';
 import {
   type SunPosition,
   type SunTimes,
@@ -18,24 +19,29 @@ import { type MoonPosition, type MoonTimes, getMoonPhaseLabel } from '../utils/m
 import { type WeatherData } from '../utils/weatherUtils';
 import { isValidLatitude, isValidLongitude } from '../utils/manualLocation';
 import { searchPlaces, formatGeocodeResultLabel, type GeocodeResult } from '../utils/geocodeUtils';
-import { TERRAIN_ATTRIBUTION } from '../utils/terrainTiles';
 import { type HorizonProfileStatus } from '../hooks/useHorizonProfile';
 import { type WeatherType } from './CloudLayer';
 import { format } from 'date-fns';
 
 // Direction D "Polished Classic" (ROADMAP items 7 & 15): shared classes so every
-// row/section/focus ring in the panel reads as one system. Kept file-local (not a
-// shared helper across components), so no separate test file - see glassChrome.ts
-// for the one style helper that *is* shared, and its test.
-const ROW = 'flex justify-between items-center gap-2 border-t border-[hsl(var(--panel-border)/0.12)] pt-1';
+// row/section/focus ring in the panel reads as one system. ROW, ICON_TOGGLE and
+// FOCUS_RING are exported for LineOfSightDetails.tsx (ROADMAP item 30), the one
+// sibling component that reuses them; SECTION_HEADING stays file-local - see
+// glassChrome.ts for the one style helper shared more broadly, and its test.
+export const ROW = 'flex justify-between items-center gap-2 border-t border-[hsl(var(--panel-border)/0.12)] pt-1';
 const SECTION_HEADING = 'text-title font-bold flex items-center';
-const ICON_TOGGLE = 'p-1.5 rounded-full hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70';
-const FOCUS_RING = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70';
+export const ICON_TOGGLE = 'p-1.5 rounded-full hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70';
+export const FOCUS_RING = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70';
 
-// Line-of-sight terrain rows (ROADMAP item 13): formats the terrain-adjusted rise/set
-// time against the astronomical one, e.g. "behind terrain 18:42 (-23 min)" - or a
-// plain-language fallback when the body never clears the terrain that day, or when
-// the astronomical time itself is unknown (e.g. no moonrise on a given night).
+// A compact variant of ICON_TOGGLE for the inline "line of sight" buttons (ROADMAP
+// item 30), which sit inside an already-tight row and must not push it past one
+// line at 360px.
+const INLINE_ICON_TOGGLE = 'p-0.5 rounded-full hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 flex-shrink-0';
+
+// Line-of-sight terrain rows (ROADMAP items 13 & 30): formats the terrain-adjusted
+// rise/set time against the astronomical one, as a short value, e.g. "18:42 (-23 min)"
+// - or a plain-language fallback when the body never clears the terrain that day, or
+// when the astronomical time itself is unknown (e.g. no moonrise on a given night).
 // eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
 export const formatTerrainDelta = (
   body: 'sun' | 'moon',
@@ -46,16 +52,8 @@ export const formatTerrainDelta = (
   if (!terrainDate) return `${body} stays behind terrain`;
   const diffMinutes = Math.round((terrainDate.getTime() - astronomicalDate.getTime()) / 60000);
   const sign = diffMinutes >= 0 ? '+' : '';
-  return `behind terrain ${formatTime(terrainDate)} (${sign}${diffMinutes} min)`;
+  return `${formatTime(terrainDate)} (${sign}${diffMinutes} min)`;
 };
-
-// Highlights a terrain-adjusted rise/set line in the D palette's peach `--panel-hi`
-// (ROADMAP item 15). Kept as a single text node (not split around the "(+23 min)"
-// part) so it stays one direct text child - Testing Library's getByText matches
-// only an element's own direct text nodes, not text spread across child elements.
-const renderTerrainDelta = (text: string): React.ReactNode => (
-  <span className="text-brand-peach">{text}</span>
-);
 
 // Highlights "now, until 19:42" in peach, the same D `--panel-hi` treatment as the
 // terrain delta above, without changing formatWindow's own text.
@@ -144,6 +142,13 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   const [isMoonCollapsed, setIsMoonCollapsed] = useState(true);
   const [isTwilightCollapsed, setIsTwilightCollapsed] = useState(false);
   const [isSunPositionCollapsed, setIsSunPositionCollapsed] = useState(false);
+  // Golden & Blue Hour (ROADMAP item 24): collapsed by default, and not part of the
+  // time-of-day auto-collapse effect below - it stays as the user left it.
+  const [isGoldenBlueCollapsed, setIsGoldenBlueCollapsed] = useState(true);
+  // Line of sight details (ROADMAP item 30): closed by default, and independent for
+  // the sun rows and the moon rows.
+  const [isSunTerrainOpen, setIsSunTerrainOpen] = useState(false);
+  const [isMoonTerrainOpen, setIsMoonTerrainOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [hoveredTwilight, setHoveredTwilight] = useState<string | null>(null);
   const fadeTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -378,6 +383,12 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
   const relevantTwilightTimes = getRelevantTwilightTimes(currentTime, sunTimes, location.latitude, location.longitude);
 
+  // Coordinates in the header (ROADMAP item 25): shown only when there is no place
+  // name to show instead - while the reverse-geocode lookup is still loading, or
+  // after it failed ('Unknown Location'). Kept in the "Change location" form either way.
+  const hasPlaceName = locationName !== '' && locationName !== 'Unknown Location';
+  const showCoordinates = loadingLocation || !hasPlaceName;
+
   // At polar day/night, SunCalc has no real sunrise/sunset, so `sunTimes.sunrise`/`.sunset`
   // hold invented 06:00/18:00 fallback times (kept only for internal time-of-day math).
   // Show a plain-language label instead of those fake times.
@@ -478,9 +489,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               ) : (
                 locationName && <span className="mb-1 truncate">{locationName}</span>
               )}
-              <span className="text-caption opacity-70 tabular-nums">
-                {location.latitude.toFixed(4)}°, {location.longitude.toFixed(4)}°
-              </span>
+              {showCoordinates && (
+                <span className="text-caption opacity-70 tabular-nums">
+                  {location.latitude.toFixed(4)}°, {location.longitude.toFixed(4)}°
+                </span>
+              )}
               <Button
                 ref={changeLocationButtonRef}
                 type="button"
@@ -627,11 +640,6 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   <span className="opacity-80 text-body">Condition:</span>
                   <span className="font-semibold text-body">{weatherData.weatherDescription}</span>
                 </div>
-                {weatherData.isRealWeather && (
-                  <div className="text-caption opacity-60 mt-1 tabular-nums">
-                    Updated: {format(weatherData.lastUpdated, 'HH:mm')}
-                  </div>
-                )}
                 {!weatherData.isRealWeather && (
                   <div className="text-caption opacity-60 text-brand-peach mt-1">
                     Real weather unavailable
@@ -704,9 +712,20 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             </div>
 
             <div className={ROW}>
-              <div className="flex items-center">
-                <Sunrise size={18} className="mr-2" />
-                <span className="text-body">Sunrise</span>
+              <div className="flex items-center min-w-0">
+                <Sunrise size={18} className="mr-2 flex-shrink-0" />
+                <span className="text-body truncate">Sunrise</span>
+                {terrainStatus !== 'idle' && (
+                  <button
+                    type="button"
+                    onClick={() => setIsSunTerrainOpen(!isSunTerrainOpen)}
+                    className={`${INLINE_ICON_TOGGLE} ml-1`}
+                    aria-label="Show line of sight"
+                    aria-expanded={isSunTerrainOpen}
+                  >
+                    <Mountain size={14} />
+                  </button>
+                )}
               </div>
               <span className="font-semibold text-body tabular-nums">{polarSunLabel ?? formatTime(sunTimes.sunrise)}</span>
             </div>
@@ -718,6 +737,19 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               </div>
               <span className="font-semibold text-body tabular-nums">{polarSunLabel ?? formatTime(sunTimes.sunset)}</span>
             </div>
+
+            {terrainStatus !== 'idle' && isSunTerrainOpen && (
+              <LineOfSightDetails
+                idPrefix="sun-terrain"
+                terrainStatus={terrainStatus}
+                eyeHeightMeters={eyeHeightMeters}
+                onEyeHeightChange={onEyeHeightChange}
+                rows={[
+                  { label: 'Sunrise', value: formatTerrainDelta('sun', terrainSunTimes?.sunrise ?? null, sunTimes.sunrise) },
+                  { label: 'Sunset', value: formatTerrainDelta('sun', terrainSunTimes?.sunset ?? null, sunTimes.sunset) },
+                ]}
+              />
+            )}
 
             {/* Sunset score (ROADMAP item 11) */}
             {weatherData?.sunsetScoreToday && (
@@ -740,102 +772,6 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 )}
               </div>
             )}
-          </div>
-
-          {/* Line of sight with terrain (ROADMAP item 13): hidden entirely while the
-              feature is idle (disabled, or location not loaded yet). */}
-          {terrainStatus !== 'idle' && (
-            <div className="mt-6 pt-4 border-t border-white border-opacity-20">
-              <h3 className={`${SECTION_HEADING} mb-2`}>Line of Sight (Terrain)</h3>
-
-              {terrainStatus === 'loading' && (
-                <p className="text-caption opacity-70">Loading terrain…</p>
-              )}
-              {terrainStatus === 'error' && (
-                <p role="alert" className="text-caption text-brand-coral">Terrain unavailable</p>
-              )}
-              {terrainStatus === 'ready' && (
-                <div className="space-y-1">
-                  <div className={ROW}>
-                    <span className="opacity-80 text-caption">Sunrise:</span>
-                    <span className="text-caption tabular-nums">
-                      {renderTerrainDelta(formatTerrainDelta('sun', terrainSunTimes?.sunrise ?? null, sunTimes.sunrise))}
-                    </span>
-                  </div>
-                  <div className={ROW}>
-                    <span className="opacity-80 text-caption">Sunset:</span>
-                    <span className="text-caption tabular-nums">
-                      {renderTerrainDelta(formatTerrainDelta('sun', terrainSunTimes?.sunset ?? null, sunTimes.sunset))}
-                    </span>
-                  </div>
-                  {moonPosition.visible && (
-                    <>
-                      <div className={ROW}>
-                        <span className="opacity-80 text-caption">Moonrise:</span>
-                        <span className="text-caption tabular-nums">
-                          {renderTerrainDelta(formatTerrainDelta('moon', terrainMoonTimes?.rise ?? null, moonTimes.rise))}
-                        </span>
-                      </div>
-                      <div className={ROW}>
-                        <span className="opacity-80 text-caption">Moonset:</span>
-                        <span className="text-caption tabular-nums">
-                          {renderTerrainDelta(formatTerrainDelta('moon', terrainMoonTimes?.set ?? null, moonTimes.set))}
-                        </span>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-
-              <div className="flex flex-col gap-1 mt-3 text-caption">
-                <label htmlFor="eye-height" className="opacity-80">Eye height (m) — e.g. floor, tower</label>
-                <input
-                  id="eye-height"
-                  type="number"
-                  min={0}
-                  max={1000}
-                  step="any"
-                  value={eyeHeightMeters}
-                  onChange={(e) => onEyeHeightChange(Number(e.target.value))}
-                  className={`bg-black bg-opacity-30 rounded px-2 py-1 text-white w-24 tabular-nums ${FOCUS_RING}`}
-                />
-              </div>
-
-              <p className="text-caption opacity-50 mt-2">{TERRAIN_ATTRIBUTION}</p>
-            </div>
-          )}
-
-          {/* Golden & blue hour: only the next pair, from the same part of the day
-              (ROADMAP item 20) */}
-          <div className="mt-6 pt-4 border-t border-white border-opacity-20">
-            <h3 className={`${SECTION_HEADING} mb-2`}>
-              Golden &amp; Blue Hour{goldenBlueHeading ? ` · ${goldenBlueHeading}` : ''}
-            </h3>
-            <div className="space-y-1">
-              {nextGoldenBlueHours?.part === 'morning' ? (
-                <>
-                  <div className={ROW}>
-                    <span className="opacity-80 text-caption">Blue hour:</span>
-                    <span className="text-caption tabular-nums">{renderWindow(formatWindow(nextGoldenBlueHours?.blue))}</span>
-                  </div>
-                  <div className={ROW}>
-                    <span className="opacity-80 text-caption">Golden hour:</span>
-                    <span className="text-caption tabular-nums">{renderWindow(formatWindow(nextGoldenBlueHours?.golden))}</span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className={ROW}>
-                    <span className="opacity-80 text-caption">Golden hour:</span>
-                    <span className="text-caption tabular-nums">{renderWindow(formatWindow(nextGoldenBlueHours?.golden))}</span>
-                  </div>
-                  <div className={ROW}>
-                    <span className="opacity-80 text-caption">Blue hour:</span>
-                    <span className="text-caption tabular-nums">{renderWindow(formatWindow(nextGoldenBlueHours?.blue))}</span>
-                  </div>
-                </>
-              )}
-            </div>
           </div>
 
           {/* Moon information - collapsible */}
@@ -879,7 +815,20 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                     <span className="text-caption tabular-nums">{moonPosition.azimuth.toFixed(1)}°</span>
                   </div>
                   <div className={ROW}>
-                    <span className="text-caption">Moonrise:</span>
+                    <span className="text-caption flex items-center min-w-0">
+                      <span className="truncate">Moonrise:</span>
+                      {terrainStatus !== 'idle' && (
+                        <button
+                          type="button"
+                          onClick={() => setIsMoonTerrainOpen(!isMoonTerrainOpen)}
+                          className={`${INLINE_ICON_TOGGLE} ml-1`}
+                          aria-label="Show line of sight"
+                          aria-expanded={isMoonTerrainOpen}
+                        >
+                          <Mountain size={14} />
+                        </button>
+                      )}
+                    </span>
                     <span className="text-caption tabular-nums">
                       {moonTimes.alwaysUp
                         ? 'Up all day'
@@ -902,6 +851,20 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                             : '—'}
                     </span>
                   </div>
+
+                  {terrainStatus !== 'idle' && isMoonTerrainOpen && (
+                    <LineOfSightDetails
+                      idPrefix="moon-terrain"
+                      terrainStatus={terrainStatus}
+                      eyeHeightMeters={eyeHeightMeters}
+                      onEyeHeightChange={onEyeHeightChange}
+                      rows={[
+                        { label: 'Moonrise', value: formatTerrainDelta('moon', terrainMoonTimes?.rise ?? null, moonTimes.rise) },
+                        { label: 'Moonset', value: formatTerrainDelta('moon', terrainMoonTimes?.set ?? null, moonTimes.set) },
+                      ]}
+                    />
+                  )}
+
                   <div className={ROW}>
                     <span className="text-caption">Next full moon:</span>
                     <span className="text-caption tabular-nums">{format(nextFullMoon, 'MMM d, HH:mm')}</span>
@@ -914,6 +877,56 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               </div>
             </div>
           )}
+
+          {/* Golden & blue hour: only the next pair, from the same part of the day
+              (ROADMAP item 20). Moved below Moon Information and collapsed by
+              default (ROADMAP item 24) - not part of the time-of-day auto-collapse
+              effect, so it stays as the user left it. */}
+          <div className="mt-6 pt-4 border-t border-white border-opacity-20">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className={SECTION_HEADING}>
+                Golden &amp; Blue Hour{goldenBlueHeading ? ` · ${goldenBlueHeading}` : ''}
+              </h3>
+              <button
+                onClick={() => setIsGoldenBlueCollapsed(!isGoldenBlueCollapsed)}
+                className={ICON_TOGGLE}
+                aria-label={isGoldenBlueCollapsed ? "Expand golden & blue hour" : "Collapse golden & blue hour"}
+                aria-expanded={!isGoldenBlueCollapsed}
+              >
+                {isGoldenBlueCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+              </button>
+            </div>
+
+            <div className={`transition-all duration-300 ease-in-out ${
+              isGoldenBlueCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-32 opacity-100'
+            }`}>
+              <div className="space-y-1">
+                {nextGoldenBlueHours?.part === 'morning' ? (
+                  <>
+                    <div className={ROW}>
+                      <span className="opacity-80 text-caption">Blue hour:</span>
+                      <span className="text-caption tabular-nums">{renderWindow(formatWindow(nextGoldenBlueHours?.blue))}</span>
+                    </div>
+                    <div className={ROW}>
+                      <span className="opacity-80 text-caption">Golden hour:</span>
+                      <span className="text-caption tabular-nums">{renderWindow(formatWindow(nextGoldenBlueHours?.golden))}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className={ROW}>
+                      <span className="opacity-80 text-caption">Golden hour:</span>
+                      <span className="text-caption tabular-nums">{renderWindow(formatWindow(nextGoldenBlueHours?.golden))}</span>
+                    </div>
+                    <div className={ROW}>
+                      <span className="opacity-80 text-caption">Blue hour:</span>
+                      <span className="text-caption tabular-nums">{renderWindow(formatWindow(nextGoldenBlueHours?.blue))}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
 
           {/* Upcoming twilight times - collapsible */}
           <div className="mt-6 pt-4 border-t border-white border-opacity-20">

@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 import InfoPanel, { formatTerrainDelta } from '../src/components/InfoPanel';
-import { type TimeOfDay, type SunTimes } from '../src/utils/sunUtils';
+import { type TimeOfDay, type SunTimes, type NextGoldenBlueHours } from '../src/utils/sunUtils';
 import { type WeatherType } from '../src/components/CloudLayer';
 import { type WeatherData } from '../src/utils/weatherUtils';
 
@@ -193,6 +193,66 @@ describe('InfoPanel', () => {
     vi.unstubAllGlobals();
   });
 
+  describe('coordinates and weather update time (ROADMAP item 25)', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('hides the coordinates once a place name is known, and shows them again in the "Change location" form', async () => {
+      const fetchMock = vi.fn(() =>
+        Promise.resolve({ json: () => Promise.resolve({ city: 'Test City', countryName: 'Testland' }) })
+      );
+      vi.stubGlobal('fetch', fetchMock);
+
+      render(<InfoPanel {...defaultProps} location={{ latitude: 12.3456, longitude: -65.4321, loaded: true }} />);
+
+      await screen.findByText('Test City, Testland');
+      expect(screen.queryByText(/12\.3456/)).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /change location/i }));
+      expect(screen.getByLabelText(/latitude/i)).toHaveValue(12.3456);
+      expect(screen.getByLabelText(/longitude/i)).toHaveValue(-65.4321);
+    });
+
+    it('shows the coordinates while the place name is still loading', () => {
+      // A fetch that never resolves keeps the panel in the "loading" state.
+      vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+
+      render(<InfoPanel {...defaultProps} location={{ latitude: 12.3456, longitude: -65.4321, loaded: true }} />);
+      expect(screen.getByText(/loading location/i)).toBeInTheDocument();
+      expect(screen.getByText(/12\.3456.*-65\.4321/)).toBeInTheDocument();
+    });
+
+    it('shows the coordinates when the reverse geocode fails', async () => {
+      vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('network down'))));
+
+      render(<InfoPanel {...defaultProps} location={{ latitude: 12.3456, longitude: -65.4321, loaded: true }} />);
+
+      await screen.findByText('Unknown Location');
+      expect(screen.getByText(/12\.3456.*-65\.4321/)).toBeInTheDocument();
+    });
+
+    it('removes the "Updated: HH:mm" line, and keeps the "Real weather unavailable" warning and the refresh button', () => {
+      const weatherData: WeatherData = {
+        temperature: 10,
+        weatherType: 'clear',
+        weatherDescription: 'Clear',
+        lastUpdated: new Date(),
+        isRealWeather: false,
+        sunsetScoreToday: null,
+        sunsetScoreTomorrow: null,
+        cloudCoverPercent: null,
+        windSpeedKmh: null,
+        windDirectionDeg: null,
+      };
+      render(<InfoPanel {...defaultProps} weatherData={weatherData} />);
+
+      expect(screen.queryByText(/updated:/i)).not.toBeInTheDocument();
+      expect(screen.getByText(/real weather unavailable/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/refresh weather/i)).toBeInTheDocument();
+    });
+  });
+
   describe('manual location (A-4)', () => {
     it('opens a labeled, pre-filled form from "Change location" and closes on Cancel', () => {
       render(<InfoPanel {...defaultProps} location={{ latitude: 12.3456, longitude: -65.4321, loaded: true }} />);
@@ -352,7 +412,92 @@ describe('InfoPanel', () => {
   });
 });
 
-describe('InfoPanel: line of sight with terrain (ROADMAP item 13)', () => {
+describe('InfoPanel: Golden & Blue Hour after Moon Information, collapsed by default (ROADMAP item 24)', () => {
+  const now = new Date();
+  const sunTimes: SunTimes = {
+    sunrise: new Date(now.setHours(6, 0, 0, 0)),
+    sunset: new Date(now.setHours(18, 0, 0, 0)),
+    solarNoon: new Date(now.setHours(12, 0, 0, 0)),
+    dawn: new Date(now.setHours(5, 30, 0, 0)),
+    dusk: new Date(now.setHours(18, 30, 0, 0)),
+    nauticalDawn: new Date(now.setHours(5, 0, 0, 0)),
+    nauticalDusk: new Date(now.setHours(19, 0, 0, 0)),
+    astronomicalDawn: new Date(now.setHours(4, 30, 0, 0)),
+    astronomicalDusk: new Date(now.setHours(19, 30, 0, 0)),
+    polar: null,
+  };
+  const nextGoldenBlueHours: NextGoldenBlueHours = {
+    part: 'evening',
+    day: 'today',
+    golden: { start: new Date(now.setHours(17, 0, 0, 0)), end: new Date(now.setHours(18, 0, 0, 0)) },
+    blue: { start: new Date(now.setHours(18, 0, 0, 0)), end: new Date(now.setHours(18, 30, 0, 0)) },
+  };
+  const defaultProps = {
+    sunPosition: { azimuth: 0, altitude: 0 },
+    moonPosition: { azimuth: 0, altitude: 0, phase: 0, illumination: 0, visible: true },
+    moonTimes: { rise: new Date(now.setHours(20, 0, 0, 0)), set: new Date(now.setHours(7, 0, 0, 0)), alwaysUp: false, alwaysDown: false },
+    nextFullMoon: new Date(now.setHours(12, 0, 0, 0)),
+    nextNewMoon: new Date(now.setHours(12, 0, 0, 0)),
+    sunTimes,
+    nextGoldenBlueHours,
+    location: { latitude: 0, longitude: 0, loaded: true },
+    manualPlaceName: null,
+    timeOfDay: 'midday' as TimeOfDay,
+    currentTime: new Date(),
+    weatherType: 'clear' as WeatherType,
+    weatherData: null,
+    isLoadingWeather: false,
+    useRealWeather: true,
+    isFullscreen: false,
+    onWeatherChange: () => {},
+    onWeatherModeToggle: () => {},
+    onWeatherRefresh: () => {},
+    onLocationChange: () => {},
+    onUseMyLocation: () => {},
+  };
+
+  it('renders the section after Moon Information and before the twilight times, collapsed at start', () => {
+    const { container } = render(<InfoPanel {...defaultProps} />);
+
+    const text = container.textContent ?? '';
+    const moonIndex = text.indexOf('Moon Information');
+    const goldenBlueIndex = text.indexOf('Golden & Blue Hour');
+    // "Upcoming Dawn/Dusk Times" - whichever applies at this currentTime/sunTimes.
+    const twilightIndex = text.indexOf('Upcoming');
+    expect(moonIndex).toBeGreaterThan(-1);
+    expect(goldenBlueIndex).toBeGreaterThan(moonIndex);
+    expect(twilightIndex).toBeGreaterThan(goldenBlueIndex);
+
+    // The heading (with the part of the day) stays visible while collapsed; the
+    // body below it is hidden via the same max-h-0/opacity-0 CSS transition as the
+    // Moon Information and Twilight sections use, not by unmounting.
+    expect(screen.getByText(/golden & blue hour · this evening/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/expand golden & blue hour/i)).toHaveAttribute('aria-expanded', 'false');
+    const collapsibleBody = screen.getByText(/golden hour:/i).closest('.transition-all');
+    expect(collapsibleBody?.className).toContain('max-h-0');
+  });
+
+  it('expands on click, showing the golden and blue hour windows', () => {
+    render(<InfoPanel {...defaultProps} />);
+
+    fireEvent.click(screen.getByLabelText(/expand golden & blue hour/i));
+
+    expect(screen.getByLabelText(/collapse golden & blue hour/i)).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText(/golden hour:/i)).toBeInTheDocument();
+    expect(screen.getByText(/blue hour:/i)).toBeInTheDocument();
+  });
+
+  it('is not part of the time-of-day auto-collapse effect: a time-of-day change leaves it as the user set it', () => {
+    const { rerender } = render(<InfoPanel {...defaultProps} timeOfDay={'night' as TimeOfDay} />);
+    fireEvent.click(screen.getByLabelText(/expand golden & blue hour/i));
+    expect(screen.getByLabelText(/collapse golden & blue hour/i)).toBeInTheDocument();
+
+    rerender(<InfoPanel {...defaultProps} timeOfDay={'astronomical-twilight' as TimeOfDay} />);
+    expect(screen.getByLabelText(/collapse golden & blue hour/i)).toBeInTheDocument();
+  });
+});
+
+describe('InfoPanel: line of sight as an icon at the sun and moon rows (ROADMAP item 30)', () => {
   const now = new Date();
   const sunTimes: SunTimes = {
     sunrise: new Date(now.setHours(6, 0, 0, 0)),
@@ -395,23 +540,49 @@ describe('InfoPanel: line of sight with terrain (ROADMAP item 13)', () => {
     onUseMyLocation: () => {},
   };
 
-  it('hides the terrain section when status is idle (feature disabled)', () => {
+  // Sun rows (Sunrise/Sunset) sit before the moon rows (Moon Information), so the
+  // first "Show line of sight" button is always the sun one, and the second (when
+  // present) the moon one.
+  const getSunLineOfSightButton = () => screen.getAllByRole('button', { name: /show line of sight/i })[0];
+  const getMoonLineOfSightButton = () => screen.getAllByRole('button', { name: /show line of sight/i })[1];
+
+  it('shows no Line of Sight section, and no icon buttons, when status is idle (feature disabled)', () => {
     render(<InfoPanel {...defaultProps} terrainStatus="idle" />);
     expect(screen.queryByText(/line of sight/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /show line of sight/i })).not.toBeInTheDocument();
   });
 
-  it('shows a loading note while the terrain profile is loading', () => {
+  it('shows a Mountain icon button at the sun rows, and one at the moon rows, closed by default', () => {
+    render(<InfoPanel {...defaultProps} terrainStatus="ready" />);
+    const buttons = screen.getAllByRole('button', { name: /show line of sight/i });
+    expect(buttons).toHaveLength(2);
+    for (const button of buttons) {
+      expect(button).toHaveAttribute('aria-expanded', 'false');
+    }
+    expect(screen.queryByText(/loading terrain/i)).not.toBeInTheDocument();
+  });
+
+  it('opens the sun details on click, independently of the moon details', () => {
     render(<InfoPanel {...defaultProps} terrainStatus="loading" />);
+
+    fireEvent.click(getSunLineOfSightButton());
+    expect(getSunLineOfSightButton()).toHaveAttribute('aria-expanded', 'true');
+    expect(getMoonLineOfSightButton()).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByText(/loading terrain/i)).toBeInTheDocument();
   });
 
-  it('shows a visible error message when the terrain profile fails to load', () => {
+  it('opens the moon details on click, independently of the sun details', () => {
     render(<InfoPanel {...defaultProps} terrainStatus="error" />);
+
+    fireEvent.click(getMoonLineOfSightButton());
+    expect(getMoonLineOfSightButton()).toHaveAttribute('aria-expanded', 'true');
+    expect(getSunLineOfSightButton()).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByRole('alert')).toHaveTextContent(/terrain unavailable/i);
   });
 
-  it('shows the attribution and an eye-height input whenever the section is visible', () => {
+  it('shows the attribution and an eye-height input once the sun details are opened', () => {
     render(<InfoPanel {...defaultProps} terrainStatus="loading" />);
+    fireEvent.click(getSunLineOfSightButton());
     expect(screen.getByText(/Mapzen \/ AWS Terrain Tiles/)).toBeInTheDocument();
     expect(screen.getByLabelText(/eye height/i)).toBeInTheDocument();
   });
@@ -426,11 +597,12 @@ describe('InfoPanel: line of sight with terrain (ROADMAP item 13)', () => {
         onEyeHeightChange={onEyeHeightChange}
       />
     );
+    fireEvent.click(getSunLineOfSightButton());
     fireEvent.change(screen.getByLabelText(/eye height/i), { target: { value: '12' } });
     expect(onEyeHeightChange).toHaveBeenCalledWith(12);
   });
 
-  it('shows terrain-adjusted sunrise/sunset next to the astronomical times when ready', () => {
+  it('shows short terrain-adjusted sunrise/sunset values, with "behind terrain" once as a note', () => {
     render(
       <InfoPanel
         {...defaultProps}
@@ -441,14 +613,20 @@ describe('InfoPanel: line of sight with terrain (ROADMAP item 13)', () => {
         }}
       />
     );
-    expect(screen.getByText(/behind terrain .* \(\+23 min\)/)).toBeInTheDocument();
-    expect(screen.getByText(/behind terrain .* \(-23 min\)/)).toBeInTheDocument();
+    fireEvent.click(getSunLineOfSightButton());
+
+    expect(screen.getByText(/\(\+23 min\)/)).toBeInTheDocument();
+    expect(screen.getByText(/\(-23 min\)/)).toBeInTheDocument();
+    // The values themselves are short, and don't each repeat "behind terrain".
+    expect(screen.queryByText(/behind terrain .*\+23 min/)).not.toBeInTheDocument();
+    expect(screen.getByText(/^behind terrain$/i)).toBeInTheDocument();
   });
 
   it('shows "sun stays behind terrain" when the sun never clears the terrain that day', () => {
     render(
       <InfoPanel {...defaultProps} terrainStatus="ready" terrainSunTimes={{ sunrise: null, sunset: null }} />
     );
+    fireEvent.click(getSunLineOfSightButton());
     expect(screen.getAllByText(/sun stays behind terrain/i)).toHaveLength(2);
   });
 
@@ -457,25 +635,26 @@ describe('InfoPanel: line of sight with terrain (ROADMAP item 13)', () => {
       <InfoPanel
         {...defaultProps}
         terrainStatus="ready"
-        terrainSunTimes={{ sunrise: sunTimes.sunrise, sunset: sunTimes.sunset }}
         terrainMoonTimes={{
           rise: new Date(defaultProps.moonTimes.rise.getTime() + 10 * 60000),
           set: null,
         }}
       />
     );
-    expect(screen.getByText(/behind terrain .* \(\+10 min\)/)).toBeInTheDocument();
+    fireEvent.click(getMoonLineOfSightButton());
+
+    expect(screen.getByText(/\(\+10 min\)/)).toBeInTheDocument();
     expect(screen.getByText(/moon stays behind terrain/i)).toBeInTheDocument();
   });
 });
 
-describe('formatTerrainDelta (ROADMAP item 13)', () => {
+describe('formatTerrainDelta (ROADMAP items 13 & 30)', () => {
   const astronomical = new Date(2026, 0, 1, 18, 0, 0);
 
-  it('formats a later terrain time with a positive sign', () => {
+  it('formats a later terrain time with a positive sign, as a short value', () => {
     const terrain = new Date(astronomical.getTime() + 23 * 60000);
     const result = formatTerrainDelta('sun', terrain, astronomical);
-    expect(result).toContain('behind terrain');
+    expect(result).not.toContain('behind terrain');
     expect(result).toContain('(+23 min)');
   });
 
