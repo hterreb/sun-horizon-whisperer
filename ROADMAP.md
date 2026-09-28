@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-09-28. Done: items 1–13 and 17–21 (marked **✅ Done** in the heading; real-device checks for 17 and 19 and the Sentry release to-dos are still open). Open: items 14–16, 22–29 (Sentry feedback), easter eggs, backlog.
+Status: last updated 2026-09-28. Done: items 1–13 and 17–21 (marked **✅ Done** in the heading; real-device checks for 17 and 19 and the Sentry release to-dos are still open). Open: items 14–16, 22–30 (Sentry feedback), easter eggs, backlog.
 
 ## Priority rules
 
@@ -179,7 +179,7 @@ Found on a real phone after items 8–11 shipped. Items 17–20 are bugs or UX f
 
 ### Sentry feedback (2026-09-28)
 
-Six feedback reports from production (Ravensburg, releases `afb9e52` and `f490f32`) and one test error, analyzed on `main` at `f490f32` with code reading and a 390×844 browser check at 47.78° N, 9.61° E. Items 22–28 map one-to-one to Sentry issues. Put `Fixes SUN-CHASER-n` in each commit, so Sentry closes the issue on merge. Item 29 was seen during the check and has no Sentry issue.
+Eight feedback reports from production (Ravensburg, releases `afb9e52` and `f490f32`) and one test error, analyzed on `main` at `f490f32` with code reading and a 390×844 browser check at 47.78° N, 9.61° E. Items 22–30 map one-to-one to Sentry issues (29 and 30 added in a second check at 21:45). Put `Fixes SUN-CHASER-n` in each commit, so Sentry closes the issue on merge.
 
 **Dependency:** item 15 (redesign) is in progress in worktrees and changes `InfoPanel.tsx`, `FullscreenButton.tsx`, `CompassToggle.tsx`, `SunVisualization.tsx` and `sunUtils.ts`. Merge item 15 first, or build these items on top of it, to prevent conflicts.
 
@@ -252,6 +252,7 @@ Six feedback reports from production (Ravensburg, releases `afb9e52` and `f490f3
   - Draw the sea after the terrain, so the wave line always sits on top of the terrain base.
   - Give the sea a visible night color that differs from `--brand-night` and the night sky, for example a dark blue scene token, plus a thin lighter line on the wave crest. Take the colors from the item 15 scene tokens when they are merged, not new hex values.
   - Keep the terrain silhouette above the horizon line unchanged.
+  - Check first after item 15 merges: `feat/redesign` adds water and ridge colour tokens and a water reflection, which can fix part of this.
 - **Done when:** at 390×844, at night and by day, with and without terrain, the sea and its wave line are visible below the horizon.
 
 ### 28. Sentry scrub: filter location values anywhere in a string — S — [SUN-CHASER-1](https://ainabler.sentry.io/issues/SUN-CHASER-1)
@@ -263,11 +264,28 @@ Six feedback reports from production (Ravensburg, releases `afb9e52` and `f490f3
   - Resolve SUN-CHASER-1 in Sentry after the merge (it is a test event from `localhost`).
 - **Done when:** the test shows `latitude=[Filtered]&longitude=[Filtered]` for the test string, and the existing tests still pass.
 
-### 29. Line of Sight rows fit the panel width — S *(seen during the check)*
+### 29. Direction labels fade out in fullscreen — S — [SUN-CHASER-9](https://ainabler.sentry.io/issues/SUN-CHASER-9)
 
-- **Finding:** at 390 px, the Line of Sight values ("behind terrain 07:44 (+27 min)") are wider than the value column. They break across lines and move the labels out of line.
-- **Spec:** put the label above the value, or shorten the value to "07:44 (+27 min)" and show "behind terrain" once as a note under the section heading.
-- **Done when:** at 360 px width, each Line of Sight row fits on one line.
+- **Feedback:** "Direction labels should also fade out in full screen."
+- **Cause:** the cardinal labels (item 8) in `SunVisualization.tsx` are always drawn. `SunVisualization` gets neither `isFullscreen` nor the idle state `showCursor` from `SunTracker`, so the labels cannot fade with the buttons.
+- **Spec:**
+  - Pass `isFullscreen` and `showCursor` from `SunTracker` to `SunVisualization`.
+  - In fullscreen, when idle, fade the label container (`data-testid="cardinal-labels"`) to `opacity-0` with the same `transition-opacity duration-300` as the buttons (item 22). A tap or mouse move shows the labels again.
+  - Keep the labels visible in compass mode, where they are needed to aim the phone.
+- **Done when:** in fullscreen, the labels fade out together with the buttons and come back on a tap. A test covers the visible and hidden states.
+
+### 30. Line of Sight as an icon at the sun and moon times — S — [SUN-CHASER-8](https://ainabler.sentry.io/issues/SUN-CHASER-8)
+
+- **Feedback:** "Line of sight should be a separate icon that adds that info panel when clicked on at the moon or at the sun times."
+- **Now:** Line of Sight is its own panel section (between the sun times and Golden & Blue Hour) with four rows: terrain sunrise, sunset, moonrise and moonset. At 390 px the values ("behind terrain 07:44 (+27 min)") are wider than the value column, wrap and move the labels out of line (seen in the browser).
+- **Spec:**
+  - Remove the separate Line of Sight section.
+  - Add a small icon button (lucide `Mountain`, `aria-label="Show line of sight"`, `aria-expanded`) next to the sunrise/sunset rows and next to the moonrise/moonset rows. Show it only when `terrainStatus` is not `idle`.
+  - A click opens the Line of Sight details below those rows: for the sun, the terrain sunrise and sunset; for the moon, the terrain moonrise and moonset. Show "Loading terrain…" and "Terrain unavailable" there, as the section does now.
+  - Show the eye-height input and the terrain attribution inside the opened details (once per opened block).
+  - Keep the values short, for example "07:44 (+27 min)", with "behind terrain" once as a note, so each row fits on one line at 360 px.
+  - Closed by default. The sun and moon details open and close separately.
+- **Done when:** a test shows no Line of Sight section at start, and a click on the sun icon shows the terrain sunrise and sunset. At 360 px width each row fits on one line.
 
 ---
 
