@@ -274,6 +274,44 @@ export const getBlueHourTimes = (date: Date, latitude: number, longitude: number
   };
 };
 
+export interface NextGoldenBlueHours {
+  part: 'morning' | 'evening';
+  day: 'today' | 'tomorrow';
+  golden: TimeWindow | null;
+  blue: TimeWindow | null;
+}
+
+// The InfoPanel used to show all 4 golden/blue hour windows at once (ROADMAP item
+// 11); item 20 narrows that to the single upcoming pair, from the same part of the
+// day. Follows the "which window is still ahead" pattern of getRelevantTwilightTimes:
+// before the morning golden hour ends, today's morning pair is still ahead; before
+// the evening blue hour ends, today's evening pair is still ahead; otherwise the next
+// pair is tomorrow morning's. At polar day/night a window is null (see
+// getGoldenHourTimes/getBlueHourTimes) and simply falls through to the next check.
+export const getNextGoldenBlueHours = (
+  now: Date,
+  latitude: number,
+  longitude: number
+): NextGoldenBlueHours => {
+  const todayGolden = getGoldenHourTimes(now, latitude, longitude);
+  const todayBlue = getBlueHourTimes(now, latitude, longitude);
+  const nowMs = now.getTime();
+
+  if (todayGolden.morning !== null && nowMs < todayGolden.morning.end.getTime()) {
+    return { part: 'morning', day: 'today', golden: todayGolden.morning, blue: todayBlue.morning };
+  }
+
+  if (todayBlue.evening !== null && nowMs < todayBlue.evening.end.getTime()) {
+    return { part: 'evening', day: 'today', golden: todayGolden.evening, blue: todayBlue.evening };
+  }
+
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowGolden = getGoldenHourTimes(tomorrow, latitude, longitude);
+  const tomorrowBlue = getBlueHourTimes(tomorrow, latitude, longitude);
+  return { part: 'morning', day: 'tomorrow', golden: tomorrowGolden.morning, blue: tomorrowBlue.morning };
+};
+
 export interface RelevantTwilightTimes {
   type: 'dawn' | 'dusk';
   civil: Date;

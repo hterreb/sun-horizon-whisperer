@@ -7,14 +7,12 @@ import {
   getTimeOfDayLabel,
   getBackgroundGradient,
   shiftGradientBrightness,
-  getGoldenHourTimes,
-  getBlueHourTimes,
+  getNextGoldenBlueHours,
   type LocationData,
   type SunPosition,
   type SunTimes,
   type TimeOfDay,
-  type GoldenHourTimes,
-  type BlueHourTimes
+  type NextGoldenBlueHours
 } from '../utils/sunUtils';
 import {
   getMoonPosition,
@@ -93,8 +91,7 @@ const SunTracker: React.FC = () => {
     visible: false 
   });
   const [sunTimes, setSunTimes] = useState<SunTimes | null>(null);
-  const [goldenHourTimes, setGoldenHourTimes] = useState<GoldenHourTimes | null>(null);
-  const [blueHourTimes, setBlueHourTimes] = useState<BlueHourTimes | null>(null);
+  const [nextGoldenBlueHours, setNextGoldenBlueHours] = useState<NextGoldenBlueHours | null>(null);
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('midday');
   const [weatherType, setWeatherType] = useState<WeatherType>('clear');
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
@@ -260,8 +257,7 @@ const SunTracker: React.FC = () => {
         setSunPosition(sunPos);
         setMoonPosition(moonPos);
         setSunTimes(times);
-        setGoldenHourTimes(getGoldenHourTimes(currentDate, location.latitude, location.longitude));
-        setBlueHourTimes(getBlueHourTimes(currentDate, location.latitude, location.longitude));
+        setNextGoldenBlueHours(getNextGoldenBlueHours(currentDate, location.latitude, location.longitude));
 
         if (times) {
           const tod = getTimeOfDay(currentDate, times);
@@ -372,8 +368,7 @@ const SunTracker: React.FC = () => {
     setSunPosition(sunPos);
     setMoonPosition(moonPos);
     setSunTimes(times);
-    setGoldenHourTimes(getGoldenHourTimes(date, location.latitude, location.longitude));
-    setBlueHourTimes(getBlueHourTimes(date, location.latitude, location.longitude));
+    setNextGoldenBlueHours(getNextGoldenBlueHours(date, location.latitude, location.longitude));
 
     if (times) {
       setTimeOfDay(getTimeOfDay(date, times));
@@ -472,8 +467,7 @@ const SunTracker: React.FC = () => {
             nextFullMoon={moonExtras.nextFullMoon}
             nextNewMoon={moonExtras.nextNewMoon}
             sunTimes={sunTimes}
-            goldenHourTimes={goldenHourTimes}
-            blueHourTimes={blueHourTimes}
+            nextGoldenBlueHours={nextGoldenBlueHours}
             location={location}
             manualPlaceName={manualPlaceName}
             timeOfDay={timeOfDay}
