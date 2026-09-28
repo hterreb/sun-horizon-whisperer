@@ -156,6 +156,13 @@ describe('CloudLayer', () => {
       expect(container.querySelectorAll('[data-testid="scene-boat"]').length).toBe(2);
     });
 
+    it('sails near boats lower in fullscreen, where the chrome fades away', () => {
+      const waterline = (props: Partial<React.ComponentProps<typeof CloudLayer>>) =>
+        (spawn(props, 6000).querySelector('[data-testid="scene-boat"]')?.parentElement?.parentElement as HTMLElement | null)?.style.top;
+      expect(waterline({})).toBe('87%');
+      expect(waterline({ isFullscreen: true })).toBe('94%');
+    });
+
     it('sends out only the big boats in rain', () => {
       const container = spawn({ weatherType: 'rain' }, 121000);
       expect(container.querySelector('[data-testid="scene-boat"]')?.getAttribute('data-kind')).toBe('ferry');

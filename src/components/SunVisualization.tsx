@@ -790,6 +790,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         cloudCoverPercent={cloudCoverPercent}
         windSpeedKmh={windSpeedKmh}
         windDirectionDeg={windDirectionDeg}
+        isFullscreen={isFullscreen}
       />
       <WeatherEffects
         weatherType={weatherType}
