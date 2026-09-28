@@ -12,6 +12,12 @@ export interface WeatherData {
   // data didn't cover it.
   sunsetScoreToday: SunsetScoreResult | null;
   sunsetScoreTomorrow: SunsetScoreResult | null;
+  // Cloud/wind (ROADMAP item 10), for the cloud layer's count/opacity/drift. Null
+  // when the API's `current` block didn't include them (e.g. an older cache entry,
+  // or the fallback weather on a fetch error).
+  cloudCoverPercent: number | null;
+  windSpeedKmh: number | null;
+  windDirectionDeg: number | null;
 }
 
 interface OpenMeteoResponse {
@@ -21,6 +27,13 @@ interface OpenMeteoResponse {
     windspeed: number;
     winddirection: number;
     time: string;
+  };
+  // Open-Meteo's newer `current` block (ROADMAP item 10) - requested alongside the
+  // legacy `current_weather` block above, which has no cloud_cover field.
+  current?: {
+    cloud_cover: number;
+    wind_speed_10m: number;
+    wind_direction_10m: number;
   };
   hourly?: {
     time: string[];
@@ -42,24 +55,43 @@ interface WeatherCache {
 const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes in milliseconds
 const CACHE_KEY = 'weather_cache';
 
-// Map Open-Meteo weather codes to our WeatherType
-const mapWeatherCode = (code: number): { type: WeatherType; description: string } => {
-  if (code === 0) return { type: 'clear', description: 'Clear sky' };
-  if (code <= 3) {
-    if (code === 1) return { type: 'cloudy', description: 'Mainly clear' };
-    if (code === 2) return { type: 'cloudy', description: 'Partly cloudy' };
-    return { type: 'overcast', description: 'Overcast' };
-  }
-  if (code <= 48) return { type: 'overcast', description: 'Foggy' };
-  if (code <= 55) return { type: 'rain', description: 'Drizzle' };
-  if (code <= 65) return { type: 'rain', description: 'Rain' };
-  if (code <= 77) return { type: 'snow', description: 'Snow' };
-  if (code <= 82) return { type: 'rain', description: 'Rain showers' };
-  if (code <= 86) return { type: 'snow', description: 'Snow showers' };
-  if (code <= 99) return { type: 'storm', description: 'Thunderstorm' };
-  
-  return { type: 'clear', description: 'Unknown' };
+// Map every Open-Meteo WMO weather code to exactly one WeatherType (ROADMAP item 10).
+// WMO has no plain "hail" code (96/99 are thunderstorm *with* hail) - the lightning is
+// the more safety-relevant fact, so those stay 'storm'; 'hail' is reachable via manual
+// weather mode only. See tests/utils.weatherUtils.test.ts for full code coverage.
+export const WMO_CODE_MAP: Record<number, { type: WeatherType; description: string }> = {
+  0: { type: 'clear', description: 'Clear sky' },
+  1: { type: 'partly', description: 'Mainly clear' },
+  2: { type: 'cloudy', description: 'Partly cloudy' },
+  3: { type: 'overcast', description: 'Overcast' },
+  45: { type: 'fog', description: 'Fog' },
+  48: { type: 'fog', description: 'Depositing rime fog' },
+  51: { type: 'drizzle', description: 'Light drizzle' },
+  53: { type: 'drizzle', description: 'Moderate drizzle' },
+  55: { type: 'drizzle', description: 'Dense drizzle' },
+  56: { type: 'drizzle', description: 'Light freezing drizzle' },
+  57: { type: 'drizzle', description: 'Dense freezing drizzle' },
+  61: { type: 'rain', description: 'Slight rain' },
+  63: { type: 'rain', description: 'Moderate rain' },
+  65: { type: 'rain', description: 'Heavy rain' },
+  66: { type: 'rain', description: 'Light freezing rain' },
+  67: { type: 'rain', description: 'Heavy freezing rain' },
+  71: { type: 'snow', description: 'Slight snow' },
+  73: { type: 'snow', description: 'Moderate snow' },
+  75: { type: 'snow', description: 'Heavy snow' },
+  77: { type: 'snow', description: 'Snow grains' },
+  80: { type: 'rain', description: 'Slight rain showers' },
+  81: { type: 'rain', description: 'Moderate rain showers' },
+  82: { type: 'rain', description: 'Violent rain showers' },
+  85: { type: 'snow', description: 'Slight snow showers' },
+  86: { type: 'snow', description: 'Heavy snow showers' },
+  95: { type: 'storm', description: 'Thunderstorm' },
+  96: { type: 'storm', description: 'Thunderstorm with slight hail' },
+  99: { type: 'storm', description: 'Thunderstorm with heavy hail' },
 };
+
+const mapWeatherCode = (code: number): { type: WeatherType; description: string } =>
+  WMO_CODE_MAP[code] ?? { type: 'clear', description: 'Unknown' };
 
 export interface SunsetScoreInput {
   low: number; // cloud cover %, 0-100
@@ -216,13 +248,17 @@ const getCachedWeather = (latitude: number, longitude: number): WeatherData | nu
     const lonDiff = Math.abs(cacheData.longitude - longitude);
     if (latDiff > 0.01 || lonDiff > 0.01) return null;
     
-    // Convert lastUpdated back to Date object. Also normalize the sunset score
-    // fields: a cache entry written before ROADMAP item 11 won't have them.
+    // Convert lastUpdated back to Date object. Also normalize the sunset score and
+    // cloud/wind fields: a cache entry written before ROADMAP item 11/10 won't have
+    // them.
     return {
       ...cacheData.data,
       lastUpdated: new Date(cacheData.data.lastUpdated),
       sunsetScoreToday: cacheData.data.sunsetScoreToday ?? null,
-      sunsetScoreTomorrow: cacheData.data.sunsetScoreTomorrow ?? null
+      sunsetScoreTomorrow: cacheData.data.sunsetScoreTomorrow ?? null,
+      cloudCoverPercent: cacheData.data.cloudCoverPercent ?? null,
+      windSpeedKmh: cacheData.data.windSpeedKmh ?? null,
+      windDirectionDeg: cacheData.data.windDirectionDeg ?? null
     };
   } catch (error) {
     console.error('Error reading weather cache:', error);
@@ -269,6 +305,7 @@ export const fetchCurrentWeather = async (
     const url =
       `https://api.open-meteo.com/v1/forecast?latitude=${roundedLatitude}&longitude=${roundedLongitude}` +
       `&current_weather=true` +
+      `&current=cloud_cover,wind_speed_10m,wind_direction_10m` +
       `&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility` +
       `&timezone=UTC&forecast_days=2`;
 
@@ -288,7 +325,10 @@ export const fetchCurrentWeather = async (
       lastUpdated: new Date(),
       isRealWeather: true,
       sunsetScoreToday: scoreSunsetAt(data.hourly, sunsetToday),
-      sunsetScoreTomorrow: scoreSunsetAt(data.hourly, sunsetTomorrow)
+      sunsetScoreTomorrow: scoreSunsetAt(data.hourly, sunsetTomorrow),
+      cloudCoverPercent: data.current?.cloud_cover ?? null,
+      windSpeedKmh: data.current?.wind_speed_10m ?? null,
+      windDirectionDeg: data.current?.wind_direction_10m ?? null
     };
 
     // Cache the result
@@ -306,7 +346,10 @@ export const fetchCurrentWeather = async (
       lastUpdated: new Date(),
       isRealWeather: false,
       sunsetScoreToday: null,
-      sunsetScoreTomorrow: null
+      sunsetScoreTomorrow: null,
+      cloudCoverPercent: null,
+      windSpeedKmh: null,
+      windDirectionDeg: null
     };
   }
 };

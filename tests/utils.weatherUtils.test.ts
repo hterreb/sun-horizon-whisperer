@@ -1,4 +1,5 @@
-import { fetchCurrentWeather, getSunsetScore } from '../src/utils/weatherUtils';
+import { fetchCurrentWeather, getSunsetScore, WMO_CODE_MAP } from '../src/utils/weatherUtils';
+import { type WeatherType } from '../src/components/CloudLayer';
 describe('weatherUtils', () => {
   it('fetches weather data (mocked)', async () => {
     global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current_weather: { temperature: 20, weathercode: 0, windspeed: 0, winddirection: 0, time: '' } }) })) as unknown as typeof fetch;
@@ -115,6 +116,139 @@ describe('weatherUtils', () => {
     const data = await fetchCurrentWeather(31.44, 41.55);
     expect(data.sunsetScoreToday).toBeNull();
     expect(data.sunsetScoreTomorrow).toBeNull();
+  });
+});
+
+describe('WMO_CODE_MAP (ROADMAP item 10)', () => {
+  // Every WMO weather code Open-Meteo can return, per the roadmap spec.
+  const ALL_WMO_CODES = [
+    0, 1, 2, 3, 45, 48, 51, 53, 55, 56, 57, 61, 63, 65, 66, 67,
+    71, 73, 75, 77, 80, 81, 82, 85, 86, 95, 96, 99
+  ];
+
+  const VALID_TYPES: WeatherType[] = [
+    'clear', 'partly', 'cloudy', 'overcast', 'fog', 'drizzle', 'rain', 'storm', 'snow', 'hail'
+  ];
+
+  it('maps every WMO code to exactly one valid WeatherType', () => {
+    for (const code of ALL_WMO_CODES) {
+      const mapping = WMO_CODE_MAP[code];
+      expect(mapping, `code ${code} should have a mapping`).toBeDefined();
+      expect(VALID_TYPES).toContain(mapping.type);
+    }
+  });
+
+  it('maps the clear-sky code to clear', () => {
+    expect(WMO_CODE_MAP[0].type).toBe('clear');
+  });
+
+  it('maps fog codes (45, 48) to fog', () => {
+    expect(WMO_CODE_MAP[45].type).toBe('fog');
+    expect(WMO_CODE_MAP[48].type).toBe('fog');
+  });
+
+  it('maps drizzle codes (51-57) to drizzle', () => {
+    for (const code of [51, 53, 55, 56, 57]) {
+      expect(WMO_CODE_MAP[code].type).toBe('drizzle');
+    }
+  });
+
+  it('maps rain codes (61-67, 80-82) to rain', () => {
+    for (const code of [61, 63, 65, 66, 67, 80, 81, 82]) {
+      expect(WMO_CODE_MAP[code].type).toBe('rain');
+    }
+  });
+
+  it('maps snow codes (71-77, 85-86) to snow', () => {
+    for (const code of [71, 73, 75, 77, 85, 86]) {
+      expect(WMO_CODE_MAP[code].type).toBe('snow');
+    }
+  });
+
+  it('maps thunderstorm codes (95, 96, 99) to storm', () => {
+    for (const code of [95, 96, 99]) {
+      expect(WMO_CODE_MAP[code].type).toBe('storm');
+    }
+  });
+
+  it('falls back to clear for an unknown code', async () => {
+    global.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ current_weather: { temperature: 20, weathercode: 12345, windspeed: 0, winddirection: 0, time: '' } }),
+      })
+    ) as unknown as typeof fetch;
+
+    const data = await fetchCurrentWeather(2, 2);
+    expect(data.weatherType).toBe('clear');
+    expect(data.weatherDescription).toBe('Unknown');
+  });
+});
+
+describe('fetchCurrentWeather cloud/wind fields (ROADMAP item 10)', () => {
+  it('requests cloud_cover, wind_speed_10m and wind_direction_10m in the current block', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ current_weather: { temperature: 20, weathercode: 0, windspeed: 0, winddirection: 0, time: '' } }),
+      })
+    ) as unknown as typeof fetch;
+    global.fetch = fetchMock;
+
+    await fetchCurrentWeather(3, 3);
+
+    const calledUrl = String((fetchMock as ReturnType<typeof vi.fn>).mock.calls[0][0]);
+    expect(calledUrl).toContain('current=cloud_cover,wind_speed_10m,wind_direction_10m');
+  });
+
+  it('exposes cloud_cover/wind fields from the current block', async () => {
+    global.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          current_weather: { temperature: 20, weathercode: 0, windspeed: 0, winddirection: 0, time: '' },
+          current: { cloud_cover: 42, wind_speed_10m: 18, wind_direction_10m: 270 }
+        }),
+      })
+    ) as unknown as typeof fetch;
+
+    const data = await fetchCurrentWeather(4, 4);
+    expect(data.cloudCoverPercent).toBe(42);
+    expect(data.windSpeedKmh).toBe(18);
+    expect(data.windDirectionDeg).toBe(270);
+  });
+
+  it('is null when the current block is missing (backward compatible)', async () => {
+    global.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ current_weather: { temperature: 20, weathercode: 0, windspeed: 0, winddirection: 0, time: '' } }),
+      })
+    ) as unknown as typeof fetch;
+
+    const data = await fetchCurrentWeather(5, 5);
+    expect(data.cloudCoverPercent).toBeNull();
+    expect(data.windSpeedKmh).toBeNull();
+    expect(data.windDirectionDeg).toBeNull();
+  });
+
+  it('normalizes a pre-item-10 cache entry without cloud/wind fields', async () => {
+    const legacyCached = {
+      temperature: 15,
+      weatherType: 'clear',
+      weatherDescription: 'Clear sky',
+      lastUpdated: new Date().toISOString(),
+      isRealWeather: true,
+      sunsetScoreToday: null,
+      sunsetScoreTomorrow: null
+      // no cloudCoverPercent/windSpeedKmh/windDirectionDeg - written before item 10
+    };
+    localStorage.setItem('weather_cache', JSON.stringify({ data: legacyCached, timestamp: Date.now(), latitude: 6, longitude: 6 }));
+
+    const data = await fetchCurrentWeather(6, 6);
+    expect(data.cloudCoverPercent).toBeNull();
+    expect(data.windSpeedKmh).toBeNull();
+    expect(data.windDirectionDeg).toBeNull();
   });
 });
 
