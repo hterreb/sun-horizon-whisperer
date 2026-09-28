@@ -459,10 +459,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     }
   };
 
-  // The width cap keeps the panel clear of the top-left buttons (7rem) on narrow phones.
+  // Below 480 px the top-left button row (up to 9.5rem: fullscreen, compass, feedback) and
+  // the 300 px panel don't fit side by side, so the panel starts below the row.
   return (
     <div
-      className={`absolute top-0 right-0 z-30 w-full max-w-[min(300px,calc(100vw-7rem))] sm:w-[300px] bg-[hsl(var(--panel-background)/0.45)] backdrop-blur-md border border-[hsl(var(--panel-border)/0.14)] text-white rounded-bl-panel overflow-hidden transition-opacity duration-300 max-h-dvh ${
+      className={`absolute top-0 max-[479px]:top-[calc(4rem+env(safe-area-inset-top))] right-0 z-30 w-full max-w-[min(300px,calc(100vw-2rem))] sm:w-[300px] bg-[hsl(var(--panel-background)/0.45)] backdrop-blur-md border border-[hsl(var(--panel-border)/0.14)] text-white rounded-bl-panel max-[479px]:rounded-tl-panel overflow-hidden transition-opacity duration-300 max-h-dvh max-[479px]:max-h-[calc(100dvh-4rem-env(safe-area-inset-top))] ${
         isVisible ? 'opacity-100' : 'opacity-0'
       } ${
         // Frost (ROADMAP item 10): a subtle icy glow on the panel edges, CSS only.
@@ -608,7 +609,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
       {/* Collapsible content */}
       {!isCollapsed && (
         <div className="flex-1 min-h-0">
-          <ScrollArea className="max-h-[calc(100dvh-120px)]">
+          <ScrollArea className="max-h-[calc(100dvh-120px)] max-[479px]:max-h-[calc(100dvh-184px-env(safe-area-inset-top))]">
             <div
               className="px-4 pb-4"
               style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
