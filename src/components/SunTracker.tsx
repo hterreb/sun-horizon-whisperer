@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   getSunPosition,
   getSunTimes,
+  getSunPathAround,
   formatTime,
   getTimeOfDay,
   getTimeOfDayLabel,
@@ -380,14 +381,16 @@ const SunTracker: React.FC = () => {
     }
   }
 
-  // Moonrise/moonset, next full/new moon, and the moon's arc (for SunVisualization,
-  // a ±12 h window around now) change slowly, unlike sun/moon position above which
-  // update every 30s. Keying the memo on the hour rather than `date` itself (which
-  // ticks every second) avoids recomputing these on every render.
+  // Moonrise/moonset, next full/new moon, and the sun's and moon's arcs (for
+  // SunVisualization, a ±12 h window around now - ROADMAP item 17) change slowly,
+  // unlike sun/moon position above which update every 30s. Keying the memo on the
+  // hour rather than `date` itself (which ticks every second) avoids recomputing
+  // these on every render.
   const moonHourKey = `${date.toDateString()} ${date.getHours()}`;
   const moonExtras = useMemo(() => {
     if (!location.loaded) {
       return {
+        sunPath: [] as SunPosition[],
         moonPath: [] as MoonPosition[],
         moonTimes: { rise: null, set: null, alwaysUp: false, alwaysDown: false } as MoonTimes,
         nextFullMoon: date,
@@ -395,6 +398,7 @@ const SunTracker: React.FC = () => {
       };
     }
     return {
+      sunPath: getSunPathAround(date, location.latitude, location.longitude),
       moonPath: getMoonPathAround(date, location.latitude, location.longitude),
       moonTimes: getMoonTimes(date, location.latitude, location.longitude),
       nextFullMoon: getNextFullMoon(date),
@@ -453,6 +457,7 @@ const SunTracker: React.FC = () => {
           <SunVisualization
             sunPosition={sunPosition}
             moonPosition={moonPosition}
+            sunPath={moonExtras.sunPath}
             moonPath={moonExtras.moonPath}
             timeOfDay={timeOfDay}
             weatherType={weatherType}

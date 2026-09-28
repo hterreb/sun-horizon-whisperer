@@ -54,6 +54,27 @@ export const getSunPosition = (date: Date, latitude: number, longitude: number):
   };
 };
 
+// Samples the sun's altitude/azimuth across the sun's current pass (date − 12 h …
+// date + 12 h), for drawing the sun's arc in the sky (ROADMAP item 17). Same shape as
+// moonUtils.getMoonPathAround; pure and stateless, callers map each point to screen
+// coordinates themselves. With the default `steps`, the center sample (index steps/2)
+// is `date` itself.
+export const getSunPathAround = (
+  date: Date,
+  latitude: number,
+  longitude: number,
+  steps = 48
+): SunPosition[] => {
+  const start = date.getTime() - 12 * 60 * 60 * 1000;
+
+  const points: SunPosition[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = new Date(start + (i / steps) * 24 * 60 * 60 * 1000);
+    points.push(getSunPosition(t, latitude, longitude));
+  }
+  return points;
+};
+
 const isValidDate = (date: Date | null | undefined): date is Date => {
   return date instanceof Date && !isNaN(date.getTime());
 };
