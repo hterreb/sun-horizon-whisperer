@@ -499,6 +499,65 @@ describe('SunVisualization (rendered): terrain silhouette (ROADMAP item 13)', ()
   });
 });
 
+describe('SunVisualization (rendered): sea visible at the horizon (ROADMAP item 27)', () => {
+  const originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+  const originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
+
+  const setMockedContainerSize = (width: number, height: number) => {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { value: width, configurable: true });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { value: height, configurable: true });
+  };
+
+  afterEach(() => {
+    if (originalClientWidth) Object.defineProperty(HTMLElement.prototype, 'clientWidth', originalClientWidth);
+    if (originalClientHeight) Object.defineProperty(HTMLElement.prototype, 'clientHeight', originalClientHeight);
+  });
+
+  const ridgeProfile: HorizonProfile = { angles: new Array(360).fill(15), observerElevation: 500, eyeHeight: 1.7 };
+
+  const baseProps = {
+    sunPosition: { azimuth: 180, altitude: 30 },
+    moonPosition: { azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false },
+    sunPath: [],
+    moonPath: [],
+    timeOfDay: 'midday' as const,
+    weatherType: 'clear' as const,
+    latitude: 51,
+  };
+
+  it('draws the sea after the ridge in DOM order, so the wave crest sits on top of it', () => {
+    setMockedContainerSize(800, 600);
+    render(<SunVisualization {...baseProps} horizonProfile={ridgeProfile} />);
+
+    const ridge = screen.getByTestId('terrain-silhouette');
+    const sea = screen.getByTestId('sea');
+    expect(ridge.compareDocumentPosition(sea) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('gives the sea a thin, lighter wave-crest stroke, distinct from its own fill', () => {
+    setMockedContainerSize(800, 600);
+    render(<SunVisualization {...baseProps} />);
+
+    const sea = screen.getByTestId('sea');
+    expect(sea.getAttribute('stroke')).toBeTruthy();
+    expect(sea.getAttribute('stroke')).not.toBe(sea.getAttribute('fill'));
+  });
+
+  it('the night wave-crest color differs from the night ridge and uses an existing scene token', () => {
+    setMockedContainerSize(800, 600);
+
+    const { unmount } = render(
+      <SunVisualization {...baseProps} timeOfDay="night" horizonProfile={ridgeProfile} />
+    );
+    const seaStroke = screen.getByTestId('sea').getAttribute('stroke');
+    const ridgeFill = screen.getByTestId('terrain-silhouette').getAttribute('fill');
+    unmount();
+
+    expect(seaStroke).toBe('hsl(var(--scene-moon))');
+    expect(seaStroke).not.toBe(ridgeFill);
+  });
+});
+
 describe('SunVisualization source (ROADMAP item 15, scene colour refactor)', () => {
   it('has no raw hex/rgb color literal outside of comments - scene colors are tokens', () => {
     const source = fs.readFileSync(

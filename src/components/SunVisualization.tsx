@@ -599,6 +599,19 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     return 'hsl(var(--scene-ridge-golden))'; // civil-twilight/dawn/morning/evening
   };
 
+  // Wave-crest highlight color (ROADMAP item 27): a thin lighter line traced on the
+  // sea's own path, reusing the same night/day split and tokens as the water
+  // reflection below (--scene-moon by night, a bright glint by day) so the crest and
+  // reflection read as one light source. Needed because at night the plain water fill
+  // (getHorizonColor/getWaterDeepColor) is too close to the ridge and night sky to read
+  // as a sea on its own.
+  const getWaveCrestColor = () => {
+    if (timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight') {
+      return 'hsl(var(--scene-moon))';
+    }
+    return 'hsl(var(--scene-glow-white))';
+  };
+
   const moonRadius = 18 + moonPosition.illumination * 6; // same footprint as the old 36 + illumination*12 diameter
   const moonPhasePath = useMemo(
     () => getMoonPhasePath(moonPosition.illumination, moonPosition.phase, latitude, moonRadius),
@@ -763,15 +776,12 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             <stop offset="100%" stopColor={getWaterDeepColor()} />
           </linearGradient>
         </defs>
-        <path
-          d={svgPath}
-          fill="url(#horizonGradient)"
-          className="transition-all duration-1000"
-        />
         {terrainFillPath && (
           // Line-of-sight ridge (ROADMAP item 13), colored per time-of-day like the
           // style book's soft ridge (ROADMAP item 15 deliverable 2) and drawn at .85
-          // opacity so it reads as distance rather than a flat cutout.
+          // opacity so it reads as distance rather than a flat cutout. Drawn *before*
+          // the sea (ROADMAP item 27), so the sea's wave crests sit on top of the
+          // ridge's base instead of being covered by it.
           <path
             d={terrainFillPath}
             fill={getRidgeColor()}
@@ -779,6 +789,15 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             data-testid="terrain-silhouette"
           />
         )}
+        <path
+          d={svgPath}
+          fill="url(#horizonGradient)"
+          stroke={getWaveCrestColor()}
+          strokeOpacity={0.5}
+          strokeWidth={1.5}
+          className="transition-all duration-1000"
+          data-testid="sea"
+        />
       </svg>
 
       {containerDimensions.height > 0 && weatherType !== 'storm' && (() => {
