@@ -533,6 +533,8 @@ const SunTracker: React.FC = () => {
             windDirectionDeg={weatherData?.windDirectionDeg ?? null}
             compassHeading={activeCompassHeading}
             horizonProfile={horizonProfile}
+            isFullscreen={isFullscreen}
+            showCursor={showCursor}
           />
           <InfoPanel
             sunPosition={sunPosition}
