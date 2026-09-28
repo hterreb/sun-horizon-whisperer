@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-09-28. Done: items 1–13, 15 and 17–30 (marked **✅ Done** in the heading; real-device checks for 17 and 19 and the Sentry release to-dos are still open). Open: items 14–16, easter eggs, backlog.
+Status: last updated 2026-09-28. Done: items 1–13, 15 and 17–35 (marked **✅ Done** in the heading; real-device checks for 17 and 19 and the Sentry release to-dos are still open). Open: items 14–16, easter eggs, backlog.
 
 ## Priority rules
 
@@ -287,6 +287,43 @@ Eight feedback reports from production (Ravensburg, releases `afb9e52` and `f490
   - Closed by default. The sun and moon details open and close separately.
 - **Done when:** a test shows no Line of Sight section at start, and a click on the sun icon shows the terrain sunrise and sunset. At 360 px width each row fits on one line.
 
+### Field feedback, round 2 (2026-09-28)
+
+Five findings from use after items 22–30, checked on `main` at `046abff` with a 390×844 and 1280×800 browser check at 47.78° N, 9.61° E.
+
+### 31. Top-left buttons in a vertical column, and a working fade in fullscreen — S — **✅ Done**
+
+- **Feedback:** "The three icons for full-screen, compass and feedback need to be vertical not horizontal and should fade out when in full-screen."
+- **Cause (confirmed in the browser):** the row's `focus-within:opacity-100` also matches after a mouse click or tap. The clicked fullscreen button keeps focus, so the row never faded out in fullscreen.
+- **Fix:**
+  - `TopLeftButtons` is a `flex-col` column.
+  - Keyboard focus only brings the column back: `has-[:focus-visible]:opacity-100` replaces `focus-within:opacity-100`.
+  - The column (3.5rem wide) fits beside the 300 px panel from 364 px width. The panel offset under the buttons now applies only below 364 px (10rem instead of 4rem), not below 480 px.
+- **Checked:** after a click on "Enter fullscreen" the button has focus, and the column goes to opacity 0 after the 10 s idle timeout. Tab shows it again.
+
+### 32. Sea without an outline — S — **✅ Done**
+
+- **Feedback:** "Remove the outline of the sea."
+- **Fix:** removed the item-27 wave-crest stroke (`getWaveCrestColor`) from the sea path. The dark-navy night sea (item 27 follow-up) already reads apart from the ridge and the sky.
+
+### 33. Golden & Blue Hour: no tag line in the heading — S — **✅ Done**
+
+- **Feedback:** "Golden & blue hours needs no additional tag line in the heading, the line break does not look good. Move it into the collapsed space."
+- **Fix:** the heading is only "Golden & Blue Hour". "This evening" / "Tomorrow morning" is the first line of the collapsible body.
+
+### 34. Line-of-sight icon with a premium feel — S — **✅ Done**
+
+- **Feedback:** "The terrain logo needs a more premium feel, add a little gold plus to it to make it pop out."
+- **Fix:** the `Mountain` buttons get the gold plus of item 35 at the top-right corner.
+
+### 35. Premium features marked with a gold plus, still free — S — **✅ Done**
+
+- **Feedback:** "Change location, manual weather, the scores, line of sight and compass should all be premium features and get a little golden plus icon, but are free as of now."
+- **Fix:**
+  - New `PremiumBadge` component: a small gold-gradient circle with a dark plus and a soft gold glow. New tokens `--brand-gold` and `--brand-gold-light`.
+  - Badge on: "Change location", the "Manual" weather toggle, "Sunset score", both line-of-sight buttons and the compass button.
+  - Decorative only (`aria-hidden`, tooltip "Premium feature, free for now"). No feature is gated. `PREMIUM_ENFORCED` stays `false`; item 14 gates this list later.
+
 ---
 
 ## P1 — Core sky features
@@ -420,7 +457,7 @@ Eight feedback reports from production (Ravensburg, releases `afb9e52` and `f490
   1. Supabase Auth in the frontend (sign-in, session handling, `@supabase/supabase-js` client).
   2. Upgrade UI: pricing dialog → call `create-checkout` → redirect to Stripe.
   3. Handle the return URLs `/?checkout=success` and `/?checkout=cancel` (toast + call `check-subscription`).
-  4. Gate line of sight (and maybe the sunset score) on `check-subscription` (`subscribed: true`) when `PREMIUM_ENFORCED` is true.
+  4. Gate the premium features on `check-subscription` (`subscribed: true`) when `PREMIUM_ENFORCED` is true. The features marked with the gold plus (item 35): change location, manual weather, the sunset score, line of sight and compass.
   5. A "Manage subscription" button → `customer-portal`.
   6. Optional: a Stripe webhook function that updates `subscribers` without polling.
   7. Tests for the edge functions (Deno test with mocked Stripe).
