@@ -1,6 +1,7 @@
 import { renderHook, act } from '@testing-library/react';
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { useCompassHeading } from '../src/hooks/useCompassHeading';
+import { smoothHeading } from '../src/utils/compassUtils';
 
 // Dispatches a device-orientation-ish event on window with the given extra fields
 // (alpha/absolute/webkitCompassHeading), the same shape a real DeviceOrientationEvent
@@ -15,6 +16,27 @@ const dispatchOrientationEvent = (
 
 describe('useCompassHeading', () => {
   const originalDescriptor = Object.getOwnPropertyDescriptor(window, 'DeviceOrientationEvent');
+  // jsdom doesn't define requestAnimationFrame/cancelAnimationFrame, so these are
+  // assigned directly rather than via vi.spyOn (which requires the property to
+  // already exist).
+  const originalRAF = window.requestAnimationFrame;
+  const originalCAF = window.cancelAnimationFrame;
+  let rafMock: ReturnType<typeof vi.fn>;
+  let cafMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    // The hook throttles heading commits to once per animation frame (ROADMAP item
+    // 19, see useCompassHeading's rafIdRef) - run the callback synchronously by
+    // default so the existing act()-wrapped assertions below don't need to wait a
+    // real frame. The dedicated throttling test further down overrides this locally.
+    rafMock = vi.fn((cb: FrameRequestCallback) => {
+      cb(0);
+      return 1;
+    });
+    cafMock = vi.fn();
+    window.requestAnimationFrame = rafMock as unknown as typeof window.requestAnimationFrame;
+    window.cancelAnimationFrame = cafMock as unknown as typeof window.cancelAnimationFrame;
+  });
 
   afterEach(() => {
     if (originalDescriptor) {
@@ -22,6 +44,8 @@ describe('useCompassHeading', () => {
     } else {
       Reflect.deleteProperty(window, 'DeviceOrientationEvent');
     }
+    window.requestAnimationFrame = originalRAF;
+    window.cancelAnimationFrame = originalCAF;
     vi.useRealTimers();
   });
 
@@ -142,5 +166,42 @@ describe('useCompassHeading', () => {
       dispatchOrientationEvent('deviceorientationabsolute', { alpha: 10, absolute: true });
     });
     expect(result.current.status).toBe('idle');
+  });
+
+  it('throttles heading commits to once per animation frame (ROADMAP item 19)', async () => {
+    Object.defineProperty(window, 'DeviceOrientationEvent', {
+      value: function DeviceOrientationEvent() {},
+      configurable: true,
+    });
+    // Override the default (synchronous) rAF mock: capture the callback instead of
+    // running it immediately, so several events before a frame fires collapse into
+    // a single scheduled commit.
+    let pendingFrame: FrameRequestCallback | null = null;
+    rafMock.mockImplementation((cb: FrameRequestCallback) => {
+      pendingFrame = cb;
+      return 1;
+    });
+
+    const { result } = renderHook(() => useCompassHeading());
+    await act(async () => {
+      await result.current.enable();
+    });
+
+    act(() => {
+      dispatchOrientationEvent('deviceorientationabsolute', { alpha: 90, absolute: true }); // raw heading 270
+      dispatchOrientationEvent('deviceorientationabsolute', { alpha: 80, absolute: true }); // raw heading 280
+    });
+
+    // Only one frame was scheduled for both events, and the heading hasn't committed yet.
+    expect(rafMock).toHaveBeenCalledTimes(1);
+    expect(result.current.heading).toBeNull();
+
+    act(() => {
+      pendingFrame?.(0);
+    });
+
+    // The committed heading reflects the smoothed value after both readings, not just the first.
+    const expectedHeading = smoothHeading(smoothHeading(null, 270), 280, 0.15);
+    expect(result.current.heading).toBeCloseTo(expectedHeading);
   });
 });

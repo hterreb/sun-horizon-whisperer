@@ -43,7 +43,6 @@ import { useWakeLock } from '@/hooks/useWakeLock';
 import { useCompassHeading } from '@/hooks/useCompassHeading';
 import { loadManualLocation, saveManualLocation, clearManualLocation } from '../utils/manualLocation';
 import {
-  headingToAzimuthOffset,
   hasSeenCompassCalibrationHint,
   markCompassCalibrationHintSeen
 } from '../utils/compassUtils';
@@ -110,14 +109,12 @@ const SunTracker: React.FC = () => {
   // Use wake lock when in fullscreen mode
   useWakeLock(isFullscreen);
 
-  // Live compass mode (ROADMAP item 8): heading -> azimuth offset needs `location`,
-  // which only SunTracker holds, so the offset is computed here and handed down as
-  // a prop rather than SunVisualization reading the heading itself.
-  const { status: compassStatus, heading: compassHeading, enable: enableCompass, disable: disableCompass } = useCompassHeading();
-  const compassAzimuthOffset =
-    compassStatus === 'active' && compassHeading !== null
-      ? headingToAzimuthOffset(compassHeading, location.latitude)
-      : 0;
+  // Live compass mode (ROADMAP item 8, field-of-view mapping in item 19): the raw
+  // (smoothed) heading is handed straight down to SunVisualization, which does its own
+  // field-of-view mapping - null while compass mode isn't active reproduces the
+  // static, full-circle view.
+  const { status: compassStatus, heading: rawCompassHeading, enable: enableCompass, disable: disableCompass } = useCompassHeading();
+  const activeCompassHeading = compassStatus === 'active' ? rawCompassHeading : null;
 
   const handleCompassEnable = useCallback(() => {
     if (!hasSeenCompassCalibrationHint()) {
@@ -478,7 +475,7 @@ const SunTracker: React.FC = () => {
             cloudCoverPercent={weatherData?.cloudCoverPercent ?? null}
             windSpeedKmh={weatherData?.windSpeedKmh ?? null}
             windDirectionDeg={weatherData?.windDirectionDeg ?? null}
-            azimuthOffset={compassAzimuthOffset}
+            compassHeading={activeCompassHeading}
           />
           <InfoPanel
             sunPosition={sunPosition}
