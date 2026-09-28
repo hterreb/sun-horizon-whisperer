@@ -305,6 +305,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     };
   }, [weatherType, timeOfDay, prefersReducedMotion, isNightTime, effects.showLeaves, effects.birdSpeedFactor]);
 
+  // The grey/wet-weather cloud tints below (storm/hail/rain/drizzle/fog/snow/
+  // overcast) are ROADMAP item 10's weather-conditioned matrix, unchanged by the
+  // item 15 D redesign - it doesn't restyle the weather illustrations, only the
+  // brand/scene palette, so these stay as component-local literals rather than
+  // scene design tokens (a day/night x 7-weather-type matrix that isn't part of
+  // the style book's D palette).
   const getCloudColor = () => {
     switch(weatherType) {
       case 'clear':
@@ -351,19 +357,21 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       case 'cloudy':
       case 'partly':
       default:
+        // Fair-weather clouds: the style book's D cloud tint per time-of-day,
+        // already scene tokens (ROADMAP item 15) - brand-peach for the golden
+        // hours, the night-sky tokens after dark, plain white by day.
         switch(timeOfDay) {
           case 'dawn':
-            return 'rgba(255, 198, 161, 0.6)';
           case 'morning':
           case 'evening':
-            return 'rgba(254, 198, 161, 0.7)';
+            return 'hsl(var(--brand-peach) / 0.7)';
           case 'night':
-            return 'rgba(26, 31, 44, 0.4)';
+            return 'hsl(var(--scene-sky-night-2) / 0.4)';
           case 'astronomical-twilight':
           case 'nautical-twilight':
-            return 'rgba(34, 31, 38, 0.5)';
+            return 'hsl(var(--scene-sky-night-3) / 0.5)';
           default:
-            return 'rgba(255, 255, 255, 0.8)';
+            return 'hsl(var(--scene-glow-white) / 0.8)';
         }
     }
   };
@@ -413,6 +421,10 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             left: `${cloud.x}%`,
             top: `${cloud.y}%`,
             opacity: cloudOpacity,
+            // Soft blurred clouds (ROADMAP item 15 D polish, style book scene()
+            // k==='d'). On the wrapper, not the <svg>, so it doesn't touch the
+            // snapshot in tests/CloudLayer.test.tsx.
+            filter: 'blur(1.5px)',
             ['--cloud-scale' as string]: cloud.scale,
             ['--cloud-dx' as string]: `${CLOUD_DRIFT_AMPLITUDE_VW * cloudDriftDirection}vw`,
             animation: `cloudDrift ${cloudDriftDurationSec}s ease-in-out infinite alternate`,
@@ -526,7 +538,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
                     c0.159,0.643,0.747,1.086,1.403,1.06c0.657-0.019,1.215-0.497,1.334-1.149c3.503-18.931-9.008-37.12-27.939-40.618
                     c-8.798-1.623-17.407,0.233-24.475,4.558c-5.056-6.564-12.441-11.381-21.229-13.003c-18.941-3.499-37.125,9.012-40.629,27.948
                     C93.544,36.776,93.892,37.424,94.51,37.677z"
-                    fill="rgba(0, 0, 0, 0.6)"
+                    fill="hsl(var(--scene-critter-silhouette) / 0.6)"
                   />
                 </g>
               </svg>
