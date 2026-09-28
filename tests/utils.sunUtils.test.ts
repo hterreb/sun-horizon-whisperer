@@ -1,4 +1,4 @@
-import { getSunPosition, getSunTimes, getTimeOfDay, getRelevantTwilightTimes, formatTime, getGoldenHourTimes, getBlueHourTimes, shiftGradientBrightness } from '../src/utils/sunUtils';
+import { getSunPosition, getSunTimes, getTimeOfDay, getRelevantTwilightTimes, formatTime, getGoldenHourTimes, getBlueHourTimes, getNextGoldenBlueHours, shiftGradientBrightness } from '../src/utils/sunUtils';
 describe('sunUtils', () => {
   it('calculates sun position', () => {
     const pos = getSunPosition(new Date(), 0, 0);
@@ -159,6 +159,70 @@ describe('sunUtils', () => {
       const originalTime = date.getTime();
       getBlueHourTimes(date, 51.5, 0);
       expect(date.getTime()).toBe(originalTime);
+    });
+  });
+
+  describe('getNextGoldenBlueHours (ROADMAP item 20)', () => {
+    const latitude = 51.5;
+    const longitude = 0;
+
+    it('before sunrise: returns today\'s morning pair', () => {
+      const now = new Date(2026, 5, 21, 1, 0, 0, 0);
+      const golden = getGoldenHourTimes(now, latitude, longitude);
+      const blue = getBlueHourTimes(now, latitude, longitude);
+      const next = getNextGoldenBlueHours(now, latitude, longitude);
+
+      expect(next.part).toBe('morning');
+      expect(next.day).toBe('today');
+      expect(next.golden?.end.getTime()).toBe(golden.morning?.end.getTime());
+      expect(next.blue?.end.getTime()).toBe(blue.morning?.end.getTime());
+    });
+
+    it('at midday: returns today\'s evening pair', () => {
+      const now = new Date(2026, 5, 21, 12, 0, 0, 0);
+      const golden = getGoldenHourTimes(now, latitude, longitude);
+      const blue = getBlueHourTimes(now, latitude, longitude);
+      const next = getNextGoldenBlueHours(now, latitude, longitude);
+
+      expect(next.part).toBe('evening');
+      expect(next.day).toBe('today');
+      expect(next.golden?.end.getTime()).toBe(golden.evening?.end.getTime());
+      expect(next.blue?.end.getTime()).toBe(blue.evening?.end.getTime());
+    });
+
+    it('during the evening golden hour: still returns today\'s evening pair, with the golden window running now', () => {
+      const golden = getGoldenHourTimes(new Date(2026, 5, 21, 12, 0, 0, 0), latitude, longitude);
+      const now = new Date(golden.evening!.start.getTime() + 5 * 60 * 1000); // 5 min into evening golden hour
+      const next = getNextGoldenBlueHours(now, latitude, longitude);
+
+      expect(next.part).toBe('evening');
+      expect(next.day).toBe('today');
+      expect(next.golden?.start.getTime()).toBeLessThanOrEqual(now.getTime());
+      expect(next.golden?.end.getTime()).toBeGreaterThan(now.getTime());
+    });
+
+    it('after dusk: returns tomorrow\'s morning pair', () => {
+      const blue = getBlueHourTimes(new Date(2026, 5, 21, 12, 0, 0, 0), latitude, longitude);
+      const now = new Date(blue.evening!.end.getTime() + 30 * 60 * 1000); // 30 min after dusk
+      const next = getNextGoldenBlueHours(now, latitude, longitude);
+
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowGolden = getGoldenHourTimes(tomorrow, latitude, longitude);
+      const tomorrowBlue = getBlueHourTimes(tomorrow, latitude, longitude);
+
+      expect(next.part).toBe('morning');
+      expect(next.day).toBe('tomorrow');
+      expect(next.golden?.end.getTime()).toBe(tomorrowGolden.morning?.end.getTime());
+      expect(next.blue?.end.getTime()).toBe(tomorrowBlue.morning?.end.getTime());
+    });
+
+    it('polar day: no golden/blue windows exist today or tomorrow, so both come back null', () => {
+      const now = new Date(2026, 5, 21, 12, 0, 0, 0); // polar day at lat 78 in June
+      const next = getNextGoldenBlueHours(now, 78, 15);
+
+      expect(next.golden).toBeNull();
+      expect(next.blue).toBeNull();
     });
   });
 
