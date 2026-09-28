@@ -1,4 +1,4 @@
-import { getSunPosition, getSunTimes, getTimeOfDay, getRelevantTwilightTimes, formatTime, getGoldenHourTimes, getBlueHourTimes } from '../src/utils/sunUtils';
+import { getSunPosition, getSunTimes, getTimeOfDay, getRelevantTwilightTimes, formatTime, getGoldenHourTimes, getBlueHourTimes, shiftGradientBrightness } from '../src/utils/sunUtils';
 describe('sunUtils', () => {
   it('calculates sun position', () => {
     const pos = getSunPosition(new Date(), 0, 0);
@@ -159,6 +159,35 @@ describe('sunUtils', () => {
       const originalTime = date.getTime();
       getBlueHourTimes(date, 51.5, 0);
       expect(date.getTime()).toBe(originalTime);
+    });
+  });
+
+  describe('shiftGradientBrightness (ROADMAP item 10, weather sky tint)', () => {
+    it('darkens every #rrggbb color by the same amount per channel', () => {
+      const result = shiftGradientBrightness('linear-gradient(to bottom, #0F1016 0%, #1A1F2C 100%)', -10);
+      expect(result).toBe('linear-gradient(to bottom, #05060c 0%, #101522 100%)');
+    });
+
+    it('brightens colors with a positive delta', () => {
+      const result = shiftGradientBrightness('#000000', 15);
+      expect(result).toBe('#0f0f0f');
+    });
+
+    it('clamps channels to [0, 255]', () => {
+      expect(shiftGradientBrightness('#000000', -50)).toBe('#000000');
+      expect(shiftGradientBrightness('#ffffff', 50)).toBe('#ffffff');
+    });
+
+    it('returns the input unchanged for a zero shift', () => {
+      const gradient = 'linear-gradient(to bottom, #0EA5E9 0%, #33C3F0 100%)';
+      expect(shiftGradientBrightness(gradient, 0)).toBe(gradient);
+    });
+
+    it('leaves non-color text untouched', () => {
+      const result = shiftGradientBrightness('linear-gradient(to bottom, #FFFFFF 0%, #000000 100%)', -1);
+      expect(result).toContain('linear-gradient(to bottom,');
+      expect(result).toContain('0%');
+      expect(result).toContain('100%)');
     });
   });
 });

@@ -1,5 +1,13 @@
-import { describe, it, expect } from 'vitest';
-import { getAzimuthScreenFraction, crossesHorizon, buildArcPath } from '../src/components/SunVisualization';
+import React from 'react';
+import { render, screen } from '@testing-library/react';
+import { describe, it, expect, afterEach } from 'vitest';
+import SunVisualization, {
+  getAzimuthScreenFraction,
+  getVisibleCardinalLabels,
+  crossesHorizon,
+  buildArcPath,
+  getRainbowGeometry,
+} from '../src/components/SunVisualization';
 
 describe('getAzimuthScreenFraction (C-3)', () => {
   it('northern hemisphere: culmination (180°, South) stays centered', () => {
@@ -16,6 +24,37 @@ describe('getAzimuthScreenFraction (C-3)', () => {
   it('southern hemisphere: shifts other azimuths by 180° too', () => {
     expect(getAzimuthScreenFraction(90, -33)).toBeCloseTo(0.75);
     expect(getAzimuthScreenFraction(270, -33)).toBeCloseTo(0.25);
+  });
+
+  it('applies a compass-mode azimuthOffset on top of the hemisphere shift (ROADMAP item 8)', () => {
+    expect(getAzimuthScreenFraction(180, 51, 0)).toBeCloseTo(getAzimuthScreenFraction(180, 51));
+    expect(getAzimuthScreenFraction(180, 51, 90)).toBeCloseTo(0.75);
+    // Wraps correctly past 360/0.
+    expect(getAzimuthScreenFraction(350, 51, 20)).toBeCloseTo((350 + 20 - 360) / 360);
+  });
+});
+
+describe('getVisibleCardinalLabels (ROADMAP item 8, C-8 style label visibility per hemisphere)', () => {
+  it('northern hemisphere: N is at the left edge, S is centered', () => {
+    const labels = getVisibleCardinalLabels(51);
+    expect(labels.find((l) => l.label === 'N')?.fraction).toBeCloseTo(0);
+    expect(labels.find((l) => l.label === 'S')?.fraction).toBeCloseTo(0.5);
+  });
+
+  it('southern hemisphere: N is centered instead (matches the culmination shift)', () => {
+    const labels = getVisibleCardinalLabels(-33);
+    expect(labels.find((l) => l.label === 'N')?.fraction).toBeCloseTo(0.5);
+  });
+
+  it('always returns all 8 labels with a finite fraction (the mapping wraps the full circle)', () => {
+    const labels = getVisibleCardinalLabels(51);
+    expect(labels.map((l) => l.label)).toEqual(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']);
+    expect(labels.every((l) => Number.isFinite(l.fraction))).toBe(true);
+  });
+
+  it('shifts together with a compass-mode azimuthOffset', () => {
+    const withOffset = getVisibleCardinalLabels(51, 90);
+    expect(withOffset.find((l) => l.label === 'N')?.fraction).toBeCloseTo(0.25);
   });
 });
 
@@ -61,5 +100,70 @@ describe('buildArcPath (moon arc)', () => {
 
   it('is empty when the moon stays below the horizon', () => {
     expect(buildArcPath([{ altitude: -3, azimuth: 0 }], toXY)).toBe('');
+  });
+});
+
+describe('getRainbowGeometry (ROADMAP item 10)', () => {
+  it('is not visible when it is not raining/drizzling', () => {
+    expect(getRainbowGeometry(false, 20, 90, 51).visible).toBe(false);
+  });
+
+  it('is not visible when the sun is below the horizon', () => {
+    expect(getRainbowGeometry(true, -1, 90, 51).visible).toBe(false);
+  });
+
+  it('is not visible once the sun is at or above 42° altitude', () => {
+    expect(getRainbowGeometry(true, 42, 90, 51).visible).toBe(false);
+    expect(getRainbowGeometry(true, 50, 90, 51).visible).toBe(false);
+  });
+
+  it('is visible while raining/drizzling with the sun between 0° and 42°', () => {
+    const geometry = getRainbowGeometry(true, 20, 90, 51);
+    expect(geometry.visible).toBe(true);
+    expect(geometry.apexHeightDeg).toBeCloseTo(22);
+  });
+
+  it('sits opposite the sun\'s azimuth, using the same mapping as the sun/moon', () => {
+    const geometry = getRainbowGeometry(true, 10, 90, 51);
+    expect(geometry.xFraction).toBeCloseTo(getAzimuthScreenFraction(270, 51));
+  });
+
+  it('pans together with a compass-mode azimuthOffset', () => {
+    const withOffset = getRainbowGeometry(true, 10, 90, 51, 45);
+    expect(withOffset.xFraction).toBeCloseTo(getAzimuthScreenFraction(270, 51, 45));
+  });
+});
+
+describe('SunVisualization (rendered): static cardinal direction labels (ROADMAP item 8)', () => {
+  const originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+  const originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
+
+  const setMockedContainerSize = (width: number, height: number) => {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { value: width, configurable: true });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { value: height, configurable: true });
+  };
+
+  afterEach(() => {
+    if (originalClientWidth) Object.defineProperty(HTMLElement.prototype, 'clientWidth', originalClientWidth);
+    if (originalClientHeight) Object.defineProperty(HTMLElement.prototype, 'clientHeight', originalClientHeight);
+  });
+
+  it('renders all 8 cardinal labels on the horizon', () => {
+    setMockedContainerSize(800, 600);
+    render(
+      <SunVisualization
+        sunPosition={{ azimuth: 180, altitude: 30 }}
+        moonPosition={{ azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false }}
+        moonPath={[]}
+        timeOfDay="midday"
+        weatherType="clear"
+        latitude={51}
+      />
+    );
+
+    const labelsContainer = screen.getByTestId('cardinal-labels');
+    for (const label of ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']) {
+      expect(labelsContainer).toHaveTextContent(label);
+    }
   });
 });

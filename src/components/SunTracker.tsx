@@ -6,6 +6,7 @@ import {
   getTimeOfDay,
   getTimeOfDayLabel,
   getBackgroundGradient,
+  shiftGradientBrightness,
   getGoldenHourTimes,
   getBlueHourTimes,
   type LocationData,
@@ -34,10 +35,33 @@ import PWAInstallPrompt from './PWAInstallPrompt';
 import MidnightGhost from './MidnightGhost';
 import TemperatureIceberg from './TemperatureIceberg';
 import { type WeatherType } from './CloudLayer';
+import CompassToggle from './CompassToggle';
 import { toast } from '@/components/ui/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useWakeLock } from '@/hooks/useWakeLock';
+import { useCompassHeading } from '@/hooks/useCompassHeading';
 import { loadManualLocation, saveManualLocation, clearManualLocation } from '../utils/manualLocation';
+import {
+  headingToAzimuthOffset,
+  hasSeenCompassCalibrationHint,
+  markCompassCalibrationHintSeen
+} from '../utils/compassUtils';
+
+// Sky gradient brightness shift per weather type (ROADMAP item 10), in per-channel
+// RGB units - see shiftGradientBrightness. Grey/wet weather darkens the sky; snow
+// brightens it slightly; clear/partly/cloudy are left alone.
+const WEATHER_GRADIENT_SHIFT: Record<WeatherType, number> = {
+  clear: 0,
+  partly: 0,
+  cloudy: 0,
+  overcast: -10,
+  fog: -5,
+  drizzle: -10,
+  rain: -20,
+  storm: -40,
+  hail: -25,
+  snow: 15,
+};
 
 const SunTracker: React.FC = () => {
   const [date, setDate] = useState<Date>(new Date());
@@ -84,6 +108,26 @@ const SunTracker: React.FC = () => {
 
   // Use wake lock when in fullscreen mode
   useWakeLock(isFullscreen);
+
+  // Live compass mode (ROADMAP item 8): heading -> azimuth offset needs `location`,
+  // which only SunTracker holds, so the offset is computed here and handed down as
+  // a prop rather than SunVisualization reading the heading itself.
+  const { status: compassStatus, heading: compassHeading, enable: enableCompass, disable: disableCompass } = useCompassHeading();
+  const compassAzimuthOffset =
+    compassStatus === 'active' && compassHeading !== null
+      ? headingToAzimuthOffset(compassHeading, location.latitude)
+      : 0;
+
+  const handleCompassEnable = useCallback(() => {
+    if (!hasSeenCompassCalibrationHint()) {
+      markCompassCalibrationHintSeen();
+      toast({
+        title: "Calibrating compass",
+        description: "Move your phone in a figure 8 for a more accurate heading."
+      });
+    }
+    enableCompass();
+  }, [enableCompass]);
 
   // Whenever fullscreen mode toggles (either direction), the cursor should be shown
   // immediately; the effect below then re-arms the auto-hide timer for fullscreen.
@@ -360,21 +404,13 @@ const SunTracker: React.FC = () => {
   }, [moonHourKey, location.loaded, location.latitude, location.longitude]);
 
   const getBackgroundStyle = useCallback(() => {
-    let baseGradient = getBackgroundGradient(timeOfDay);
-    
-    if (weatherType === 'storm') {
-      baseGradient = baseGradient.replace(/rgb\(([^)]+)\)/g, (match, rgb) => {
-        const values = rgb.split(',').map((v: string) => Math.max(0, parseInt(v.trim()) - 40));
-        return `rgb(${values.join(',')})`;
-      });
-    } else if (weatherType === 'rain') {
-      baseGradient = baseGradient.replace(/rgb\(([^)]+)\)/g, (match, rgb) => {
-        const values = rgb.split(',').map((v: string) => Math.max(0, parseInt(v.trim()) - 20));
-        return `rgb(${values.join(',')})`;
-      });
-    }
-    
-    return { background: baseGradient };
+    const baseGradient = getBackgroundGradient(timeOfDay);
+    // Per-channel brightness shift (ROADMAP item 10): darker for grey/wet weather,
+    // a touch brighter for snow. `shiftGradientBrightness` works on the #rrggbb
+    // colors getBackgroundGradient actually returns (the old code here matched
+    // "rgb(...)", which never appears in that gradient and so never applied).
+    const shift = WEATHER_GRADIENT_SHIFT[weatherType];
+    return { background: shiftGradientBrightness(baseGradient, shift) };
   }, [timeOfDay, weatherType]);
 
   const handleWeatherChange = (newWeather: WeatherType) => {
@@ -404,6 +440,7 @@ const SunTracker: React.FC = () => {
       <NightStars timeOfDay={timeOfDay} moonPosition={moonPosition} />
       <MusicPlayer isFullscreen={isFullscreen} />
       <FullscreenButton onFullscreenChange={setIsFullscreen} />
+      <CompassToggle status={compassStatus} onEnable={handleCompassEnable} onDisable={disableCompass} />
       <PWAInstallPrompt />
       <MidnightGhost currentTime={date} />
       <TemperatureIceberg 
@@ -420,6 +457,13 @@ const SunTracker: React.FC = () => {
             timeOfDay={timeOfDay}
             weatherType={weatherType}
             latitude={location.latitude}
+            longitude={location.longitude}
+            date={date}
+            temperatureC={weatherData?.temperature ?? null}
+            cloudCoverPercent={weatherData?.cloudCoverPercent ?? null}
+            windSpeedKmh={weatherData?.windSpeedKmh ?? null}
+            windDirectionDeg={weatherData?.windDirectionDeg ?? null}
+            azimuthOffset={compassAzimuthOffset}
           />
           <InfoPanel
             sunPosition={sunPosition}
