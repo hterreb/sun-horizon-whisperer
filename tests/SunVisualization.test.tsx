@@ -81,7 +81,7 @@ describe('crossesHorizon (C-8)', () => {
 });
 
 
-describe('buildArcPath (moon arc)', () => {
+describe('buildArcPath (sun/moon arcs, ROADMAP item 17)', () => {
   const toXY = (p: { altitude: number; azimuth: number }) => ({ x: p.azimuth, y: -p.altitude });
 
   it('skips below-horizon points and starts a new segment after the gap', () => {
@@ -100,6 +100,46 @@ describe('buildArcPath (moon arc)', () => {
 
   it('is empty when the moon stays below the horizon', () => {
     expect(buildArcPath([{ altitude: -3, azimuth: 0 }], toXY)).toBe('');
+  });
+
+  it('starts a new segment when the x jumps by more than half the width (an azimuth wrap)', () => {
+    // Two above-horizon points whose screen x jumps from near the right edge to near
+    // the left edge (a 0°/360° wrap) - before the fix this drew one straight line
+    // across the whole screen.
+    const path = buildArcPath(
+      [
+        { altitude: 10, azimuth: 0 }, // x = 790
+        { altitude: 10, azimuth: 1 }, // x = 10
+      ],
+      (p) => ({ x: p.azimuth === 0 ? 790 : 10, y: -p.altitude }),
+      800
+    );
+    expect(path).toBe('M790,-10 M10,-10');
+  });
+
+  it('does not break on an ordinary sweep across the screen (no width given)', () => {
+    // Without a width, the wrap check never trips - matches the pre-item-17 behavior
+    // for callers that don't pass one.
+    const path = buildArcPath(
+      [
+        { altitude: 10, azimuth: 0 },
+        { altitude: 10, azimuth: 100 },
+      ],
+      (p) => ({ x: p.azimuth, y: -p.altitude })
+    );
+    expect(path).toBe('M0,-10 L100,-10');
+  });
+
+  it('treats a toXY returning null as a gap', () => {
+    const path = buildArcPath(
+      [
+        { altitude: 10, azimuth: 0 },
+        { altitude: 10, azimuth: 1 },
+        { altitude: 10, azimuth: 2 },
+      ],
+      (p) => (p.azimuth === 1 ? null : { x: p.azimuth, y: -p.altitude })
+    );
+    expect(path).toBe('M0,-10 M2,-10');
   });
 });
 
@@ -154,6 +194,7 @@ describe('SunVisualization (rendered): static cardinal direction labels (ROADMAP
       <SunVisualization
         sunPosition={{ azimuth: 180, altitude: 30 }}
         moonPosition={{ azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false }}
+        sunPath={[]}
         moonPath={[]}
         timeOfDay="midday"
         weatherType="clear"
@@ -165,5 +206,32 @@ describe('SunVisualization (rendered): static cardinal direction labels (ROADMAP
     for (const label of ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']) {
       expect(labelsContainer).toHaveTextContent(label);
     }
+  });
+
+  it('draws a sun arc by day and does not draw a moon arc when the moon is not shown (ROADMAP item 17)', () => {
+    setMockedContainerSize(800, 600);
+    const { container } = render(
+      <SunVisualization
+        sunPosition={{ azimuth: 180, altitude: 30 }}
+        moonPosition={{ azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false }}
+        sunPath={[
+          { azimuth: 170, altitude: 20 },
+          { azimuth: 180, altitude: 30 },
+          { azimuth: 190, altitude: 20 },
+        ]}
+        moonPath={[
+          { azimuth: 170, altitude: 20, phase: 0.5, illumination: 0.5, visible: true },
+          { azimuth: 180, altitude: 30, phase: 0.5, illumination: 0.5, visible: true },
+        ]}
+        timeOfDay="midday"
+        weatherType="clear"
+        latitude={51}
+      />
+    );
+
+    const paths = container.querySelectorAll('path[stroke]');
+    const strokes = Array.from(paths).map((p) => p.getAttribute('stroke'));
+    expect(strokes).toContain('hsl(var(--brand-sunset))'); // the sun arc
+    expect(strokes).not.toContain('hsl(var(--scene-moon))'); // no moon arc while it's midday
   });
 });

@@ -13,8 +13,10 @@ const DEFAULT_SEED_DATE = new Date(0);
 interface SunVisualizationProps {
   sunPosition: SunPosition;
   moonPosition: MoonPosition;
-  // The moon's altitude/azimuth sampled across the current day (see
-  // moonUtils.getMoonPathAround), used to draw its arc across the sky.
+  // The sun's and moon's altitude/azimuth sampled across the current pass (see
+  // sunUtils.getSunPathAround / moonUtils.getMoonPathAround), used to draw their arcs
+  // across the sky (ROADMAP item 17).
+  sunPath: SunPosition[];
   moonPath: MoonPosition[];
   timeOfDay: TimeOfDay;
   weatherType: WeatherType;
@@ -89,7 +91,7 @@ export interface RainbowGeometry {
 
 // Rainbow geometry (ROADMAP item 10): visible while it's raining/drizzling and the sun
 // sits low (0-42° altitude), opposite the sun's azimuth - using the same azimuth->x
-// mapping (and compass offset) as the sun/moon, so it pans together with them.
+// mapping (and compass offset) as the sun/moon.
 // eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
 export const getRainbowGeometry = (
   isRainingOrDrizzling: boolean,
@@ -116,9 +118,19 @@ export const getRainbowGeometry = (
 export const crossesHorizon = (prevAltitude: number, currentAltitude: number): boolean =>
   (prevAltitude < 0) !== (currentAltitude < 0);
 
+// The altitude->y part of the mapping, shared by the clamped (dot) and unclamped
+// (arc) screen positions below.
+const altitudeToY = (altitude: number, height: number): number => {
+  const horizonY = height * 0.65;
+  const altitudeRadians = altitude * (Math.PI / 180);
+  const maxAltitudeHeight = horizonY - 30;
+  return horizonY - Math.sin(altitudeRadians) * maxAltitudeHeight;
+};
+
 // Maps a sky position (altitude/azimuth, in degrees) to screen x/y for the given
-// container size and latitude. Shared by the sun and moon's current-position dots and
-// by each sampled point of the moon's day arc, so they all agree on the same mapping.
+// container size and latitude, clamped to the screen edges - used for the sun and
+// moon's current-position dots. See getArcScreenPosition below for the arcs, which
+// stay unclamped (ROADMAP item 17).
 const getScreenPosition = (
   altitude: number,
   azimuth: number,
@@ -129,11 +141,8 @@ const getScreenPosition = (
 ): { x: number; y: number } => {
   if (width === 0 || height === 0) return { x: 0, y: 0 };
 
-  const horizonY = height * 0.65;
-  const altitudeRadians = altitude * (Math.PI / 180);
-  const maxAltitudeHeight = horizonY - 30;
-  const y = horizonY - Math.sin(altitudeRadians) * maxAltitudeHeight;
   const x = width * getAzimuthScreenFraction(azimuth, latitude, azimuthOffset);
+  const y = altitudeToY(altitude, height);
 
   return {
     x: Math.max(30, Math.min(width - 30, x)),
@@ -141,20 +150,53 @@ const getScreenPosition = (
   };
 };
 
-// SVG path through the above-horizon points only; a gap below the horizon starts a new segment.
+// Same mapping as getScreenPosition, but unclamped: arc points run off-screen
+// cleanly instead of flattening into the screen edge (ROADMAP item 17).
+const getArcScreenPosition = (
+  altitude: number,
+  azimuth: number,
+  width: number,
+  height: number,
+  latitude: number,
+  azimuthOffset = 0
+): { x: number; y: number } | null => {
+  if (width === 0 || height === 0) return null;
+
+  return {
+    x: width * getAzimuthScreenFraction(azimuth, latitude, azimuthOffset),
+    y: altitudeToY(altitude, height)
+  };
+};
+
+// SVG path through the above-horizon points only; a gap (below the horizon, or a wrap
+// in `toXY`'s screen x) starts a new segment instead of drawing a line across the
+// screen (ROADMAP item 17).
 type SkyPoint = { altitude: number; azimuth: number };
 // eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
-export const buildArcPath = (points: SkyPoint[], toXY: (p: SkyPoint) => { x: number; y: number }): string => {
+export const buildArcPath = (
+  points: SkyPoint[],
+  toXY: (p: SkyPoint) => { x: number; y: number } | null,
+  width = Infinity
+): string => {
   let path = '';
   let penDown = false;
+  let prevX: number | null = null;
   for (const point of points) {
-    if (point.altitude < 0) {
+    const xy = point.altitude < 0 ? null : toXY(point);
+    if (xy === null) {
       penDown = false;
+      prevX = null;
       continue;
     }
-    const { x, y } = toXY(point);
+    const { x, y } = xy;
+    if (penDown && prevX !== null && Math.abs(x - prevX) > width / 2) {
+      // The x jumped by more than half the width: an azimuth wrap (0°/360°), not a
+      // real sweep across the screen - start a new segment.
+      penDown = false;
+    }
     path += `${penDown ? 'L' : 'M'}${x},${y} `;
     penDown = true;
+    prevX = x;
   }
   return path.trim();
 };
@@ -162,6 +204,7 @@ export const buildArcPath = (points: SkyPoint[], toXY: (p: SkyPoint) => { x: num
 const SunVisualization: React.FC<SunVisualizationProps> = ({
   sunPosition,
   moonPosition,
+  sunPath,
   moonPath,
   timeOfDay,
   weatherType,
@@ -187,13 +230,13 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     // Trigger fireworks on a sign change (crossing the horizon in either direction).
     if (crossesHorizon(prevAltitude, currentAltitude)) {
       setShowFireworks(true);
-      
+
       // Reset fireworks trigger after a short delay
       setTimeout(() => {
         setShowFireworks(false);
       }, 100);
     }
-    
+
     prevAltitudeRef.current = sunPosition.altitude;
   }, [sunPosition.altitude]);
 
@@ -251,15 +294,39 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   const { x: sunX, y: sunY } = getSunPosition();
   const { x: moonX, y: moonY } = getMoonPosition();
 
-  // The moon's arc for its current pass (above-horizon points only): same screen mapping as its current-position
-  // dot, just applied to every sampled point in `moonPath`. Paler than the moon itself
-  // (lower stroke opacity), using the scene.moon token (see index.css/tailwind.config).
+  const isSunVisible = sunPosition.altitude > -18 && weatherType !== 'storm';
+  const isMoonVisible = moonPosition.visible && (
+    timeOfDay === 'night' ||
+    timeOfDay === 'astronomical-twilight' ||
+    timeOfDay === 'nautical-twilight'
+  );
+
+  // The sun's and moon's arcs for their current pass (above-horizon points only):
+  // same screen mapping as their current-position dots, just unclamped and applied to
+  // every sampled point (ROADMAP item 17). The sun arc is a stronger, warm token
+  // color; the moon's is paler, and only drawn while the moon is actually shown (it
+  // used to also draw during the day, when the moon isn't shown at all).
+  const sunArcPath = useMemo(() => {
+    const { width, height } = containerDimensions;
+    if (width === 0 || height === 0 || sunPath.length === 0) return '';
+
+    return buildArcPath(
+      sunPath,
+      (p) => getArcScreenPosition(p.altitude, p.azimuth, width, height, latitude, azimuthOffset),
+      width
+    );
+  }, [sunPath, containerDimensions, latitude, azimuthOffset]);
+
   const moonArcPath = useMemo(() => {
     const { width, height } = containerDimensions;
-    if (width === 0 || height === 0 || moonPath.length === 0) return '';
+    if (width === 0 || height === 0 || moonPath.length === 0 || !isMoonVisible) return '';
 
-    return buildArcPath(moonPath, (p) => getScreenPosition(p.altitude, p.azimuth, width, height, latitude, azimuthOffset));
-  }, [moonPath, containerDimensions, latitude, azimuthOffset]);
+    return buildArcPath(
+      moonPath,
+      (p) => getArcScreenPosition(p.altitude, p.azimuth, width, height, latitude, azimuthOffset),
+      width
+    );
+  }, [moonPath, containerDimensions, latitude, azimuthOffset, isMoonVisible]);
 
   const getSunColor = () => {
     if (sunPosition.altitude > 10) {
@@ -278,14 +345,14 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
                      weatherType === 'fog' ? 0.25 :
                      weatherType === 'drizzle' || weatherType === 'overcast' ? 0.5 :
                      weatherType === 'snow' ? 0.5 : 1;
-    
+
     if (sunPosition.altitude > 10) {
       return `drop-shadow-[0_0_15px_rgba(255,255,0,${0.8 * baseGlow})]`;
     } else if (sunPosition.altitude > 0) {
       return `drop-shadow-[0_0_10px_rgba(255,165,0,${0.6 * baseGlow})]`;
     } else if (sunPosition.altitude > -10) {
       return `drop-shadow-[0_0_5px_rgba(255,99,71,${0.4 * baseGlow})]`;
-    } 
+    }
     return '';
   };
 
@@ -307,13 +374,6 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   const getReflectionOpacity = () => {
     return timeOfDay === 'night' ? 0.1 : 0.3;
   };
-
-  const isSunVisible = sunPosition.altitude > -18 && weatherType !== 'storm';
-  const isMoonVisible = moonPosition.visible && (
-    timeOfDay === 'night' ||
-    timeOfDay === 'astronomical-twilight' ||
-    timeOfDay === 'nautical-twilight'
-  );
 
   const moonRadius = 18 + moonPosition.illumination * 6; // same footprint as the old 36 + illumination*12 diameter
   const moonPhasePath = useMemo(
@@ -366,24 +426,35 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       />
       <Fireworks trigger={showFireworks} />
 
-      {moonArcPath && (
+      {(sunArcPath || moonArcPath) && (
         <svg className="absolute inset-0 w-full h-full pointer-events-none">
-          <path
-            d={moonArcPath}
-            fill="none"
-            stroke="hsl(var(--scene-moon))"
-            strokeOpacity={0.25}
-            strokeWidth={1.5}
-          />
+          {sunArcPath && (
+            <path
+              d={sunArcPath}
+              fill="none"
+              stroke="hsl(var(--brand-sunset))"
+              strokeOpacity={0.45}
+              strokeWidth={2}
+            />
+          )}
+          {moonArcPath && (
+            <path
+              d={moonArcPath}
+              fill="none"
+              stroke="hsl(var(--scene-moon))"
+              strokeOpacity={0.25}
+              strokeWidth={1.5}
+            />
+          )}
         </svg>
       )}
 
       {isSunVisible && (
-        <div 
+        <div
           className={`absolute transition-transform duration-1000 ${getSunColor()} ${getGlowIntensity()} animate-glow`}
-          style={{ 
-            left: `${sunX}px`, 
-            top: `${sunY}px`, 
+          style={{
+            left: `${sunX}px`,
+            top: `${sunY}px`,
             transform: 'translate(-50%, -50%)',
             opacity: weatherType === 'rain' ? 0.7 : 1
           }}
@@ -391,7 +462,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           <Sun size={sunPosition.altitude > 0 ? 96 : 80} strokeWidth={1} />
         </div>
       )}
-      
+
       {isMoonVisible && (
         <div
           className="absolute transition-all duration-1000"
@@ -413,7 +484,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           </svg>
         </div>
       )}
-      
+
       <svg className="absolute inset-0 w-full h-full pointer-events-none">
         <defs>
           <linearGradient id="horizonGradient" x1="0" y1="0" x2="0" y2="1">
@@ -450,18 +521,18 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       )}
 
       <div
-        className="absolute left-1/2 transform -translate-x-1/2 bottom-1/3 -translate-y-12 
+        className="absolute left-1/2 transform -translate-x-1/2 bottom-1/3 -translate-y-12
                    bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm"
       >
-        {sunPosition.altitude > 0 
-          ? `+${sunPosition.altitude.toFixed(1)}°` 
+        {sunPosition.altitude > 0
+          ? `+${sunPosition.altitude.toFixed(1)}°`
           : `${sunPosition.altitude.toFixed(1)}°`
         }
       </div>
-      
+
       {isMoonVisible && (
-        <div 
-          className="absolute left-1/2 transform -translate-x-1/2 bottom-1/4 -translate-y-12 
+        <div
+          className="absolute left-1/2 transform -translate-x-1/2 bottom-1/4 -translate-y-12
                      bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-xs"
         >
           Moon: {moonPosition.altitude.toFixed(1)}° | {(moonPosition.illumination * 100).toFixed(0)}%
