@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   getSunPosition,
   getSunTimes,
+  getSunPathAround,
   formatTime,
   getTimeOfDay,
   getTimeOfDayLabel,
@@ -40,7 +41,6 @@ import { useWakeLock } from '@/hooks/useWakeLock';
 import { useCompassHeading } from '@/hooks/useCompassHeading';
 import { loadManualLocation, saveManualLocation, clearManualLocation } from '../utils/manualLocation';
 import {
-  headingToAzimuthOffset,
   hasSeenCompassCalibrationHint,
   markCompassCalibrationHintSeen
 } from '../utils/compassUtils';
@@ -106,14 +106,12 @@ const SunTracker: React.FC = () => {
   // Use wake lock when in fullscreen mode
   useWakeLock(isFullscreen);
 
-  // Live compass mode (ROADMAP item 8): heading -> azimuth offset needs `location`,
-  // which only SunTracker holds, so the offset is computed here and handed down as
-  // a prop rather than SunVisualization reading the heading itself.
-  const { status: compassStatus, heading: compassHeading, enable: enableCompass, disable: disableCompass } = useCompassHeading();
-  const compassAzimuthOffset =
-    compassStatus === 'active' && compassHeading !== null
-      ? headingToAzimuthOffset(compassHeading, location.latitude)
-      : 0;
+  // Live compass mode (ROADMAP item 8, field-of-view mapping in item 19): the raw
+  // (smoothed) heading is handed straight down to SunVisualization, which does its own
+  // field-of-view mapping - null while compass mode isn't active reproduces the
+  // static, full-circle view.
+  const { status: compassStatus, heading: rawCompassHeading, enable: enableCompass, disable: disableCompass } = useCompassHeading();
+  const activeCompassHeading = compassStatus === 'active' ? rawCompassHeading : null;
 
   const handleCompassEnable = useCallback(() => {
     if (!hasSeenCompassCalibrationHint()) {
@@ -154,10 +152,14 @@ const SunTracker: React.FC = () => {
       }, 10000);
     };
 
+    // A tap should bring the cursor (and the fullscreen/compass toggles, which fade
+    // together with it - ROADMAP item 18) back too; mobile taps don't fire mousemove.
     document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('touchstart', handleMouseMove);
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('touchstart', handleMouseMove);
       if (cursorTimeoutRef.current) {
         clearTimeout(cursorTimeoutRef.current);
       }
@@ -375,14 +377,16 @@ const SunTracker: React.FC = () => {
     }
   }
 
-  // Moonrise/moonset, next full/new moon, and the moon's arc (for SunVisualization,
-  // a ±12 h window around now) change slowly, unlike sun/moon position above which
-  // update every 30s. Keying the memo on the hour rather than `date` itself (which
-  // ticks every second) avoids recomputing these on every render.
+  // Moonrise/moonset, next full/new moon, and the sun's and moon's arcs (for
+  // SunVisualization, a ±12 h window around now - ROADMAP item 17) change slowly,
+  // unlike sun/moon position above which update every 30s. Keying the memo on the
+  // hour rather than `date` itself (which ticks every second) avoids recomputing
+  // these on every render.
   const moonHourKey = `${date.toDateString()} ${date.getHours()}`;
   const moonExtras = useMemo(() => {
     if (!location.loaded) {
       return {
+        sunPath: [] as SunPosition[],
         moonPath: [] as MoonPosition[],
         moonTimes: { rise: null, set: null, alwaysUp: false, alwaysDown: false } as MoonTimes,
         nextFullMoon: date,
@@ -390,6 +394,7 @@ const SunTracker: React.FC = () => {
       };
     }
     return {
+      sunPath: getSunPathAround(date, location.latitude, location.longitude),
       moonPath: getMoonPathAround(date, location.latitude, location.longitude),
       moonTimes: getMoonTimes(date, location.latitude, location.longitude),
       nextFullMoon: getNextFullMoon(date),
@@ -435,7 +440,13 @@ const SunTracker: React.FC = () => {
       <NightStars timeOfDay={timeOfDay} moonPosition={moonPosition} />
       <MusicPlayer isFullscreen={isFullscreen} />
       <FullscreenButton onFullscreenChange={setIsFullscreen} />
-      <CompassToggle status={compassStatus} onEnable={handleCompassEnable} onDisable={disableCompass} />
+      <CompassToggle
+        status={compassStatus}
+        onEnable={handleCompassEnable}
+        onDisable={disableCompass}
+        isFullscreen={isFullscreen}
+        showCursor={showCursor}
+      />
       <PWAInstallPrompt />
       <MidnightGhost currentTime={date} />
       <TemperatureIceberg 
@@ -448,6 +459,7 @@ const SunTracker: React.FC = () => {
           <SunVisualization
             sunPosition={sunPosition}
             moonPosition={moonPosition}
+            sunPath={moonExtras.sunPath}
             moonPath={moonExtras.moonPath}
             timeOfDay={timeOfDay}
             weatherType={weatherType}
@@ -458,7 +470,7 @@ const SunTracker: React.FC = () => {
             cloudCoverPercent={weatherData?.cloudCoverPercent ?? null}
             windSpeedKmh={weatherData?.windSpeedKmh ?? null}
             windDirectionDeg={weatherData?.windDirectionDeg ?? null}
-            azimuthOffset={compassAzimuthOffset}
+            compassHeading={activeCompassHeading}
           />
           <InfoPanel
             sunPosition={sunPosition}

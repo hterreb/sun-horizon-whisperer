@@ -1,4 +1,4 @@
-import { getSunPosition, getSunTimes, getTimeOfDay, getRelevantTwilightTimes, formatTime, getGoldenHourTimes, getBlueHourTimes, getNextGoldenBlueHours, shiftGradientBrightness } from '../src/utils/sunUtils';
+import { getSunPosition, getSunTimes, getTimeOfDay, getRelevantTwilightTimes, formatTime, getGoldenHourTimes, getBlueHourTimes, getNextGoldenBlueHours, shiftGradientBrightness, getSunPathAround } from '../src/utils/sunUtils';
 describe('sunUtils', () => {
   it('calculates sun position', () => {
     const pos = getSunPosition(new Date(), 0, 0);
@@ -252,6 +252,31 @@ describe('sunUtils', () => {
       expect(result).toContain('linear-gradient(to bottom,');
       expect(result).toContain('0%');
       expect(result).toContain('100%)');
+    });
+  });
+
+  describe('getSunPathAround (ROADMAP item 17, sun arc)', () => {
+    it('returns 49 samples spanning date - 12h .. date + 12h, the same shape as getMoonPathAround', () => {
+      const date = new Date('2026-06-21T12:00:00Z');
+      const path = getSunPathAround(date, 51.5, 0);
+      expect(path).toHaveLength(49);
+      path.forEach((point) => {
+        expect(point).toHaveProperty('azimuth');
+        expect(point).toHaveProperty('altitude');
+      });
+    });
+
+    it('the center sample is the sun position at `date` itself', () => {
+      const date = new Date('2026-06-21T12:00:00Z');
+      const path = getSunPathAround(date, 51.5, 0);
+      const expected = getSunPosition(date, 51.5, 0);
+      expect(path[24].azimuth).toBeCloseTo(expected.azimuth);
+      expect(path[24].altitude).toBeCloseTo(expected.altitude);
+    });
+
+    it('honors a custom step count', () => {
+      const date = new Date('2026-06-21T12:00:00Z');
+      expect(getSunPathAround(date, 51.5, 0, 4)).toHaveLength(5);
     });
   });
 });

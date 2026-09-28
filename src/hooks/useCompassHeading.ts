@@ -38,6 +38,12 @@ export const useCompassHeading = (): UseCompassHeadingResult => {
   const smoothedHeadingRef = useRef<number | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handlerRef = useRef<((event: Event) => void) | null>(null);
+  // Throttles committing the heading to state to at most once per animation frame
+  // (ROADMAP item 19): orientation events can fire up to 60 Hz, which would otherwise
+  // re-render the whole scene that often. The rAF id lives in a ref (CLAUDE.md), so
+  // cleanup can always cancel a still-pending frame.
+  const rafIdRef = useRef<number | null>(null);
+  const pendingHeadingRef = useRef<number | null>(null);
 
   const clearNoEventTimeout = () => {
     if (timeoutRef.current) {
@@ -46,8 +52,25 @@ export const useCompassHeading = (): UseCompassHeadingResult => {
     }
   };
 
+  const cancelPendingHeadingCommit = () => {
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+  };
+
+  const scheduleHeadingCommit = (nextHeading: number) => {
+    pendingHeadingRef.current = nextHeading;
+    if (rafIdRef.current !== null) return; // a frame is already scheduled
+    rafIdRef.current = requestAnimationFrame(() => {
+      rafIdRef.current = null;
+      setHeading(pendingHeadingRef.current);
+    });
+  };
+
   const stopListening = useCallback(() => {
     clearNoEventTimeout();
+    cancelPendingHeadingCommit();
     if (handlerRef.current) {
       window.removeEventListener('deviceorientationabsolute', handlerRef.current);
       window.removeEventListener('deviceorientation', handlerRef.current);
@@ -77,7 +100,7 @@ export const useCompassHeading = (): UseCompassHeadingResult => {
 
       const smoothed = smoothHeading(smoothedHeadingRef.current, rawHeading, SMOOTHING_FACTOR);
       smoothedHeadingRef.current = smoothed;
-      setHeading(smoothed);
+      scheduleHeadingCommit(smoothed);
       setStatus('active');
     };
 

@@ -3,7 +3,7 @@ import {
   normalizeHeading,
   smoothHeading,
   headingFromDeviceOrientationEvent,
-  headingToAzimuthOffset,
+  shortestHeadingDelta,
   hasSeenCompassCalibrationHint,
   markCompassCalibrationHintSeen,
 } from '../src/utils/compassUtils';
@@ -73,23 +73,44 @@ describe('headingFromDeviceOrientationEvent', () => {
       headingFromDeviceOrientationEvent({ alpha: 12, absolute: false, webkitCompassHeading: 200 })
     ).toBeCloseTo(200);
   });
+
+  it('Android, phone upright (beta ~90°): heading changes smoothly across beta 80°-100° (ROADMAP item 19)', () => {
+    // Holding a fixed alpha/gamma and only sweeping beta through the "phone upright"
+    // range that Euler alpha alone is unstable at - the -z back-camera vector this
+    // formula uses should stay stable there instead. Any two neighboring samples
+    // should differ by only a small fraction of a degree, for a range of gammas
+    // (including a non-zero left/right tilt).
+    for (const gamma of [-60, -30, 0, 30, 60]) {
+      let previous: number | null = null;
+      for (let beta = 80; beta <= 100; beta += 1) {
+        const heading = headingFromDeviceOrientationEvent({ alpha: 30, beta, gamma, absolute: true });
+        expect(heading).not.toBeNull();
+        if (previous !== null && heading !== null) {
+          const delta = Math.abs(shortestHeadingDelta(previous, heading));
+          expect(delta).toBeLessThan(1);
+        }
+        previous = heading;
+      }
+    }
+  });
 });
 
-describe('headingToAzimuthOffset', () => {
-  it('northern hemisphere: facing South (the default centered azimuth) needs no offset', () => {
-    expect(headingToAzimuthOffset(180, 51)).toBeCloseTo(0);
+describe('shortestHeadingDelta (used by SunVisualization\'s field-of-view mapping, ROADMAP item 19)', () => {
+  it('is 0 for the same heading', () => {
+    expect(shortestHeadingDelta(180, 180)).toBeCloseTo(0);
   });
 
-  it('northern hemisphere: facing North centers North instead (180° offset)', () => {
-    expect(headingToAzimuthOffset(0, 51)).toBeCloseTo(180);
+  it('is positive when `to` is clockwise of `from`, the short way', () => {
+    expect(shortestHeadingDelta(10, 30)).toBeCloseTo(20);
   });
 
-  it('southern hemisphere: facing North (the default centered azimuth there) needs no offset', () => {
-    expect(headingToAzimuthOffset(0, -33)).toBeCloseTo(0);
+  it('is negative when `to` is counter-clockwise of `from`, the short way', () => {
+    expect(shortestHeadingDelta(30, 10)).toBeCloseTo(-20);
   });
 
-  it('southern hemisphere: facing South centers South instead (180° offset)', () => {
-    expect(headingToAzimuthOffset(180, -33)).toBeCloseTo(180);
+  it('takes the short way across the 0°/360° wrap', () => {
+    expect(shortestHeadingDelta(350, 10)).toBeCloseTo(20);
+    expect(shortestHeadingDelta(10, 350)).toBeCloseTo(-20);
   });
 });
 

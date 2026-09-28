@@ -1,8 +1,9 @@
-// Pure heading math for the live compass mode (ROADMAP item 8): circular smoothing,
-// device-orientation-event -> heading conversion (Android absolute alpha / iOS
-// webkitCompassHeading), heading -> azimuth-mapping offset, and the one-time
-// calibration hint flag. No DOM subscriptions here - see
-// src/hooks/useCompassHeading.ts for the event listener.
+// Pure heading math for the live compass mode (ROADMAP item 8, reworked in item 19):
+// circular smoothing, device-orientation-event -> heading conversion (Android
+// absolute alpha / iOS webkitCompassHeading), the shortest-signed-delta helper used
+// by SunVisualization's field-of-view mapping, and the one-time calibration hint
+// flag. No DOM subscriptions here - see src/hooks/useCompassHeading.ts for the event
+// listener.
 
 // Minimal shape of the fields we read off a DeviceOrientationEvent, so this module
 // (and its tests) never needs a real one.
@@ -23,8 +24,9 @@ export const normalizeHeading = (heading: number): number => {
 };
 
 // Shortest signed delta from `from` to `to`, in (-180, 180] - the short way around
-// the circle (e.g. 359 -> 1 is +2, not -358).
-const shortestHeadingDelta = (from: number, to: number): number => {
+// the circle (e.g. 359 -> 1 is +2, not -358). Exported for SunVisualization's
+// field-of-view compass mapping (ROADMAP item 19).
+export const shortestHeadingDelta = (from: number, to: number): number => {
   const normalizedFrom = normalizeHeading(from);
   const normalizedTo = normalizeHeading(to);
   return ((normalizedTo - normalizedFrom + 540) % 360) - 180;
@@ -75,15 +77,6 @@ export const headingFromDeviceOrientationEvent = (
   // A plain, non-absolute `deviceorientation` reading has no fixed reference, so it
   // can't be turned into a compass heading.
   return null;
-};
-
-// The azimuth-mapping offset (degrees) that puts `heading` at screen centre, given
-// SunVisualization's existing hemisphere shift in getAzimuthScreenFraction (south
-// hemisphere culminates at 0°/North, north hemisphere at 180°/South - see that file).
-export const headingToAzimuthOffset = (heading: number, latitude: number): number => {
-  const normalizedHeading = normalizeHeading(heading);
-  const hemisphereShifted = latitude < 0 ? (normalizedHeading + 180) % 360 : normalizedHeading;
-  return normalizeHeading(180 - hemisphereShifted);
 };
 
 // One-time "move your phone in a figure 8" calibration hint, shown the first time
