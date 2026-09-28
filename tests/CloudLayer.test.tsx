@@ -107,4 +107,52 @@ describe('CloudLayer', () => {
     randomSpy.mockRestore();
     vi.useRealTimers();
   });
+
+  // ROADMAP item 36 (Bats & Boats lookbook picks N2, R1, S2-S6, V2-V4, L1).
+  describe('bats, boats and leaves (ROADMAP item 36)', () => {
+    // Math.random pinned to 0: every spawn chance passes and pickBoat takes the first boat in the mix.
+    const spawn = (props: Partial<React.ComponentProps<typeof CloudLayer>>, ms: number) => {
+      vi.useFakeTimers();
+      const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
+      const view = render(<CloudLayer weatherType="clear" timeOfDay="midday" {...props} />);
+      act(() => { vi.advanceTimersByTime(ms); });
+      randomSpy.mockRestore();
+      vi.useRealTimers();
+      return view.container;
+    };
+
+    it('draws bats as a line icon in twilight, not as the emoji', () => {
+      const container = spawn({ timeOfDay: 'nautical-twilight' }, 6000);
+      expect(container.querySelector('[data-testid="scene-bat"]')).not.toBeNull();
+      expect(container.textContent).not.toContain('🦇');
+    });
+
+    it('keeps the sky quiet in full night: no bats, no birds', () => {
+      const container = spawn({ timeOfDay: 'night' }, 6000);
+      expect(container.querySelector('[data-testid="scene-bat"]')).toBeNull();
+    });
+
+    it('sails a sailboat in fair weather, without lights by day', () => {
+      const container = spawn({}, 121000);
+      const boat = container.querySelector('[data-testid="scene-boat"]');
+      expect(boat?.getAttribute('data-kind')).toBe('sailboat');
+      expect(container.querySelector('[data-testid="boat-light"]')).toBeNull();
+    });
+
+    it('lights the boats once the sun is down', () => {
+      const container = spawn({ timeOfDay: 'civil-twilight' }, 121000);
+      expect(container.querySelectorAll('[data-testid="boat-light"]').length).toBeGreaterThan(0);
+    });
+
+    it('sends out only the big boats in rain', () => {
+      const container = spawn({ weatherType: 'rain' }, 121000);
+      expect(container.querySelector('[data-testid="scene-boat"]')?.getAttribute('data-kind')).toBe('ferry');
+    });
+
+    it('draws strong-wind leaves as a line icon, not as the emoji', () => {
+      const container = spawn({ windSpeedKmh: 50 }, 5000);
+      expect(container.querySelector('[data-testid="scene-leaf"]')).not.toBeNull();
+      expect(container.textContent).not.toContain('🍃');
+    });
+  });
 });

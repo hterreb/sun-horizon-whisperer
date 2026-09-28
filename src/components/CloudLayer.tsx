@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { Fish } from 'lucide-react';
-import { Ship } from 'lucide-react';
+import { Fish, Leaf, Sailboat, type LucideIcon } from 'lucide-react';
+import { Bat, FishingBoat, Freighter, LakeFerry, Rowboat } from './sceneIcons';
 import { type TimeOfDay } from '../utils/sunUtils';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import {
@@ -10,7 +10,7 @@ import {
   getCloudDriftDirection,
   getPrecipitationSlantPx,
 } from '../utils/cloudLayoutUtils';
-import { getWeatherEffects } from '../utils/weatherEffectsUtils';
+import { getWeatherEffects, pickBoat, type BoatKind } from '../utils/weatherEffectsUtils';
 
 // ROADMAP item 10: more than the original 6 types - fog, drizzle and hail join the
 // weather-dependent clouds/illustrations, and "partly" splits out the old single
@@ -79,6 +79,22 @@ interface MovingEntity {
   duration: number; // seconds
 }
 
+// ROADMAP item 36: a mixed fleet at a random distance. `y` is the boat's bottom edge.
+interface Boat extends MovingEntity {
+  kind: BoatKind;
+  depth: number; // 0 = near, 1 = far: far boats are smaller, paler and slower
+}
+
+// `lights` are the boat's warm lights after sunset, in the icon's 24 px grid.
+const BOATS: Record<BoatKind, { Icon: LucideIcon; scale: number; lights: [number, number][] }> = {
+  sailboat: { Icon: Sailboat, scale: 0.95, lights: [[10, 2]] },
+  ferry: { Icon: LakeFerry, scale: 1.1, lights: [[8, 13], [12, 13], [16, 13]] },
+  fishing: { Icon: FishingBoat, scale: 0.95, lights: [[15, 3], [7.5, 11]] },
+  rowboat: { Icon: Rowboat, scale: 0.7, lights: [[19.5, 14.5]] },
+  freighter: { Icon: Freighter, scale: 1.25, lights: [[5, 6.5], [5.25, 11]] },
+};
+const FAR_SHRINK = 0.45; // the farthest boat is 55% of the size, opacity and speed of the nearest
+
 // Deterministic pseudo-random value in [0, 1), seeded by an integer. Lets raindrop/
 // snowflake/hail layouts be derived during render (pure, no `Math.random()`) while
 // still looking randomly scattered; the classic fract(sin(x)) trick.
@@ -106,7 +122,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
 }) => {
   const [birds, setBirds] = useState<MovingEntity[]>([]);
   const [fish, setFish] = useState<MovingEntity[]>([]);
-  const [ships, setShips] = useState<MovingEntity[]>([]);
+  const [ships, setShips] = useState<Boat[]>([]);
   const [leaves, setLeaves] = useState<MovingEntity[]>([]);
 
   // Spawn-timing refs (not movement — movement is CSS now). Seeded with a placeholder
@@ -188,6 +204,10 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   const isNightTime = timeOfDay === 'night' ||
                       timeOfDay === 'astronomical-twilight' ||
                       timeOfDay === 'nautical-twilight';
+  // Boats show their lights once the sun is below the horizon.
+  const boatLightsOn = isNightTime || timeOfDay === 'civil-twilight';
+  // Line icons (boats, leaves) share today's ship tone.
+  const lineInk = timeOfDay === 'night' ? 'text-gray-300 text-opacity-60' : 'text-gray-600 text-opacity-80';
 
   // Spawn loop: periodically checks whether a new bird/fish/ship/leaf is due, and
   // clears each group when the weather/time no longer supports it. This is the only
@@ -199,9 +219,11 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     // Reduced motion: skip spawning birds, fish, ships and leaves entirely (static sky).
     if (prefersReducedMotion) return;
 
-    // Fair-weather flyers: birds tuck away once it's wet, foggy or stormy.
-    const shouldShowBirds = weatherType === 'clear' || weatherType === 'partly' ||
-                          weatherType === 'cloudy' || weatherType === 'overcast';
+    // Fair-weather flyers: birds tuck away once it's wet, foggy or stormy. Bats fly in
+    // nautical and astronomical twilight only; full night stays quiet (ROADMAP item 36).
+    const shouldShowBirds = (weatherType === 'clear' || weatherType === 'partly' ||
+                          weatherType === 'cloudy' || weatherType === 'overcast') &&
+                          timeOfDay !== 'night';
     const shouldShowFish = (weatherType === 'clear' || weatherType === 'partly' || weatherType === 'cloudy' ||
                           weatherType === 'overcast' || weatherType === 'rain' || weatherType === 'drizzle') &&
                           timeOfDay !== 'night' &&
@@ -262,12 +284,15 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
           if (Math.random() < 0.9) { // 90% chance to spawn
             const startX = -8;
             const endX = 108;
-            const newShip: MovingEntity = {
+            const depth = Math.random();
+            const newShip: Boat = {
               id: Date.now() + Math.random(),
               x: startX,
-              y: 65 + Math.random() * 5,
+              y: 67 + (1 - depth) * 10, // far boats sit right at the horizon (65%)
               dx: endX - startX,
-              duration: (endX - startX) / WATER_RATE_PERCENT_PER_SEC,
+              duration: (endX - startX) / (WATER_RATE_PERCENT_PER_SEC * (1 - FAR_SHRINK * depth)),
+              kind: pickBoat(weatherType, windSpeedKmh, Math.random()),
+              depth,
             };
             setShips(prev => [...prev, newShip]);
           }
@@ -303,7 +328,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     return () => {
       clearInterval(intervalId);
     };
-  }, [weatherType, timeOfDay, prefersReducedMotion, isNightTime, effects.showLeaves, effects.birdSpeedFactor]);
+  }, [weatherType, windSpeedKmh, timeOfDay, prefersReducedMotion, isNightTime, effects.showLeaves, effects.birdSpeedFactor]);
 
   // The grey/wet-weather cloud tints below (storm/hail/rain/drizzle/fog/snow/
   // overcast) are ROADMAP item 10's weather-conditioned matrix, unchanged by the
@@ -516,7 +541,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         >
           <div style={{ transform: `${isNightTime ? 'scale(0.5)' : 'scale(0.3)'} translateX(-100%)` }}>
             {isNightTime ? (
-              <div className="text-4xl">🦇</div>
+              <Bat size={76} strokeWidth={1.5} className="text-gray-300 text-opacity-60" data-testid="scene-bat" />
             ) : (
               <svg
                 version="1.1"
@@ -572,36 +597,50 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         </div>
       ))}
 
-      {/* Ships */}
-      {ships.map((ship) => (
-        <div
-          key={ship.id}
-          className="absolute"
-          style={{
-            left: `${ship.x}%`,
-            top: `${ship.y}%`,
-            zIndex: 7,
-            ['--dx' as string]: `${ship.dx}vw`,
-            animation: `moveAcrossX ${ship.duration}s linear forwards`,
-          }}
-          onAnimationEnd={() => setShips(prev => prev.filter(s => s.id !== ship.id))}
-        >
-          <div style={{ transform: 'scale(1.4)' }}>
-            <Ship
-              size={48}
-              className={`transition-colors duration-1000 ${
-                timeOfDay === 'night' ? 'text-gray-300 text-opacity-60' : 'text-gray-600 text-opacity-80'
-              }`}
-            />
+      {/* Boats (ROADMAP item 36) */}
+      {ships.map((ship) => {
+        const { Icon, scale, lights } = BOATS[ship.kind];
+        const nearness = 1 - FAR_SHRINK * ship.depth;
+        return (
+          <div
+            key={ship.id}
+            className="absolute"
+            style={{
+              left: `${ship.x}%`,
+              top: `${ship.y}%`,
+              zIndex: 7,
+              opacity: nearness,
+              ['--dx' as string]: `${ship.dx}vw`,
+              animation: `moveAcrossX ${ship.duration}s linear forwards`,
+            }}
+            onAnimationEnd={() => setShips(prev => prev.filter(s => s.id !== ship.id))}
+          >
+            {/* Scale from the bottom-left corner, then lift by the icon's height, so `top` is the waterline. */}
+            <div style={{ transform: `translateY(-100%) scale(${1.4 * scale * nearness})`, transformOrigin: 'bottom left' }}>
+              <Icon size={48} className={`transition-colors duration-1000 ${lineInk}`} data-testid="scene-boat" data-kind={ship.kind}>
+                {boatLightsOn && lights.map(([cx, cy]) => (
+                  <circle
+                    key={`${cx}-${cy}`}
+                    cx={cx}
+                    cy={cy}
+                    r={1.1}
+                    stroke="none"
+                    className="fill-brand-gold-light"
+                    style={{ filter: 'drop-shadow(0 0 2px hsl(var(--brand-gold)))' }}
+                    data-testid="boat-light"
+                  />
+                ))}
+              </Icon>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
 
       {/* Leaves - strong wind only (> 40 km/h), gliding across like birds/fish. */}
       {leaves.map((leaf) => (
         <div
           key={leaf.id}
-          className="absolute text-lg"
+          className="absolute"
           style={{
             left: `${leaf.x}%`,
             top: `${leaf.y}%`,
@@ -611,7 +650,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
           }}
           onAnimationEnd={() => setLeaves(prev => prev.filter(l => l.id !== leaf.id))}
         >
-          🍃
+          <Leaf size={18} className={`transition-colors duration-1000 ${lineInk}`} data-testid="scene-leaf" />
         </div>
       ))}
 

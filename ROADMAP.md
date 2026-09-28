@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-09-28. Done: items 1–13, 15 and 17–35 (marked **✅ Done** in the heading; real-device checks for 17 and 19 and the Sentry release to-dos are still open). Open: items 14–16, easter eggs, backlog.
+Status: last updated 2026-09-28. Done: items 1–13, 15 and 17–36 (marked **✅ Done** in the heading; real-device checks for 17 and 19 and the Sentry release to-dos are still open). Open: items 14–16, easter eggs, backlog.
 
 ## Priority rules
 
@@ -323,6 +323,21 @@ Five findings from use after items 22–30, checked on `main` at `046abff` with 
   - New `PremiumBadge` component: a small gold-gradient circle with a dark plus and a soft gold glow. New tokens `--brand-gold` and `--brand-gold-light`.
   - Badge on: "Change location", the "Manual" weather toggle, "Sunset score", both line-of-sight buttons and the compass button.
   - Decorative only (`aria-hidden`, tooltip "Premium feature, free for now"). No feature is gated. `PREMIUM_ENFORCED` stays `false`; item 14 gates this list later.
+
+### 36. Bats and boats: line icons and a mixed fleet — S — **✅ Done**
+
+- **Feedback:** "The bat emojis seem weird on macOS, and I like the style of the ship, but it still could use a little diversity."
+- **Lookbook:** [Bats & Boats](https://claude.ai/artifact/PQH9vEKvGh49GNAd82yXFd) (private). Picks: N2, R1, S2, S3, S4, S5, S6, V2, V3, V4, L1.
+- **Fix** (all motion stays a slow, straight glide):
+  - **N2 Line bat:** the 🦇 emoji is replaced by a `Bat` line icon (`src/components/sceneIcons.ts`, lucide's 24 px grid) in the night-ship tone.
+  - **R1 Bats at twilight only:** bats fly in nautical and astronomical twilight. Full night (`'night'`) has no flyers.
+  - **S2–S6 Fleet:** lucide `Sailboat` plus new `LakeFerry`, `FishingBoat`, `Rowboat` and `Freighter` icons. The old `Ship` (S1) is out. Mix: sailboat 35, ferry 15, fishing boat 15, rowboat 10, freighter 5 (`pickBoat` in `weatherEffectsUtils`).
+  - **V2 Distance:** each boat gets a random distance. The farthest boat sits on the horizon at 55 % of the size, opacity and speed.
+  - **V3 Lights:** once the sun is below the horizon (civil twilight to night), each boat shows small gold lights (`--brand-gold-light`).
+  - **V4 Weather-aware mix:** rain, drizzle, fog and snow leave only the ferry and the freighter. Wind above 40 km/h keeps the rowboat ashore. Storm and hail still have no boats.
+  - **L1 Line leaf:** the 🍃 emoji is replaced by lucide `Leaf` in the boat tone.
+  - Not picked: V1 (both directions). Boats still sail from left to right.
+- **Checked:** in the browser at 20:05 in Ravensburg (nautical twilight), the line bats flew, a ferry and a sailboat sailed with gold lights, and a far freighter sat on the horizon. No emoji was rendered.
 
 ---
 
