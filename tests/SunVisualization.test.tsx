@@ -6,6 +6,7 @@ import SunVisualization, {
   getVisibleCardinalLabels,
   crossesHorizon,
   buildArcPath,
+  getRainbowGeometry,
 } from '../src/components/SunVisualization';
 
 describe('getAzimuthScreenFraction (C-3)', () => {
@@ -99,6 +100,37 @@ describe('buildArcPath (moon arc)', () => {
 
   it('is empty when the moon stays below the horizon', () => {
     expect(buildArcPath([{ altitude: -3, azimuth: 0 }], toXY)).toBe('');
+  });
+});
+
+describe('getRainbowGeometry (ROADMAP item 10)', () => {
+  it('is not visible when it is not raining/drizzling', () => {
+    expect(getRainbowGeometry(false, 20, 90, 51).visible).toBe(false);
+  });
+
+  it('is not visible when the sun is below the horizon', () => {
+    expect(getRainbowGeometry(true, -1, 90, 51).visible).toBe(false);
+  });
+
+  it('is not visible once the sun is at or above 42° altitude', () => {
+    expect(getRainbowGeometry(true, 42, 90, 51).visible).toBe(false);
+    expect(getRainbowGeometry(true, 50, 90, 51).visible).toBe(false);
+  });
+
+  it('is visible while raining/drizzling with the sun between 0° and 42°', () => {
+    const geometry = getRainbowGeometry(true, 20, 90, 51);
+    expect(geometry.visible).toBe(true);
+    expect(geometry.apexHeightDeg).toBeCloseTo(22);
+  });
+
+  it('sits opposite the sun\'s azimuth, using the same mapping as the sun/moon', () => {
+    const geometry = getRainbowGeometry(true, 10, 90, 51);
+    expect(geometry.xFraction).toBeCloseTo(getAzimuthScreenFraction(270, 51));
+  });
+
+  it('pans together with a compass-mode azimuthOffset', () => {
+    const withOffset = getRainbowGeometry(true, 10, 90, 51, 45);
+    expect(withOffset.xFraction).toBeCloseTo(getAzimuthScreenFraction(270, 51, 45));
   });
 });
 

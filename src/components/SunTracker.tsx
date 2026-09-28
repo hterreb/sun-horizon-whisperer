@@ -6,6 +6,7 @@ import {
   getTimeOfDay,
   getTimeOfDayLabel,
   getBackgroundGradient,
+  shiftGradientBrightness,
   getGoldenHourTimes,
   getBlueHourTimes,
   type LocationData,
@@ -45,6 +46,22 @@ import {
   hasSeenCompassCalibrationHint,
   markCompassCalibrationHintSeen
 } from '../utils/compassUtils';
+
+// Sky gradient brightness shift per weather type (ROADMAP item 10), in per-channel
+// RGB units - see shiftGradientBrightness. Grey/wet weather darkens the sky; snow
+// brightens it slightly; clear/partly/cloudy are left alone.
+const WEATHER_GRADIENT_SHIFT: Record<WeatherType, number> = {
+  clear: 0,
+  partly: 0,
+  cloudy: 0,
+  overcast: -10,
+  fog: -5,
+  drizzle: -10,
+  rain: -20,
+  storm: -40,
+  hail: -25,
+  snow: 15,
+};
 
 const SunTracker: React.FC = () => {
   const [date, setDate] = useState<Date>(new Date());
@@ -387,21 +404,13 @@ const SunTracker: React.FC = () => {
   }, [moonHourKey, location.loaded, location.latitude, location.longitude]);
 
   const getBackgroundStyle = useCallback(() => {
-    let baseGradient = getBackgroundGradient(timeOfDay);
-    
-    if (weatherType === 'storm') {
-      baseGradient = baseGradient.replace(/rgb\(([^)]+)\)/g, (match, rgb) => {
-        const values = rgb.split(',').map((v: string) => Math.max(0, parseInt(v.trim()) - 40));
-        return `rgb(${values.join(',')})`;
-      });
-    } else if (weatherType === 'rain') {
-      baseGradient = baseGradient.replace(/rgb\(([^)]+)\)/g, (match, rgb) => {
-        const values = rgb.split(',').map((v: string) => Math.max(0, parseInt(v.trim()) - 20));
-        return `rgb(${values.join(',')})`;
-      });
-    }
-    
-    return { background: baseGradient };
+    const baseGradient = getBackgroundGradient(timeOfDay);
+    // Per-channel brightness shift (ROADMAP item 10): darker for grey/wet weather,
+    // a touch brighter for snow. `shiftGradientBrightness` works on the #rrggbb
+    // colors getBackgroundGradient actually returns (the old code here matched
+    // "rgb(...)", which never appears in that gradient and so never applied).
+    const shift = WEATHER_GRADIENT_SHIFT[weatherType];
+    return { background: shiftGradientBrightness(baseGradient, shift) };
   }, [timeOfDay, weatherType]);
 
   const handleWeatherChange = (newWeather: WeatherType) => {
@@ -448,6 +457,12 @@ const SunTracker: React.FC = () => {
             timeOfDay={timeOfDay}
             weatherType={weatherType}
             latitude={location.latitude}
+            longitude={location.longitude}
+            date={date}
+            temperatureC={weatherData?.temperature ?? null}
+            cloudCoverPercent={weatherData?.cloudCoverPercent ?? null}
+            windSpeedKmh={weatherData?.windSpeedKmh ?? null}
+            windDirectionDeg={weatherData?.windDirectionDeg ?? null}
             azimuthOffset={compassAzimuthOffset}
           />
           <InfoPanel

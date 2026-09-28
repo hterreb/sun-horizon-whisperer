@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, CloudRain, CloudSnow, CloudSun, Sun, CloudLightning, Moon, RefreshCw, Thermometer } from 'lucide-react';
+import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Moon, RefreshCw, Thermometer } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import { Button } from './ui/button';
 import {
@@ -323,6 +323,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
       ? 'Sun does not rise'
       : null;
 
+  // Frost (< -5°C, ROADMAP item 10): a subtle, CSS-only icy edge on the panel itself.
+  const isFrost = weatherData != null && weatherData.temperature < -5;
+
   // Golden/blue hour windows (ROADMAP item 11): null at polar day/night, or
   // before SunTracker has computed them yet.
   const formatWindow = (window: TimeWindow | null | undefined): string =>
@@ -330,11 +333,15 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
   const weatherOptions: { type: WeatherType; label: string; icon: React.ReactNode }[] = [
     { type: 'clear', label: 'Clear', icon: <Sun size={16} /> },
-    { type: 'cloudy', label: 'Cloudy', icon: <CloudSun size={16} /> },
-    { type: 'overcast', label: 'Overcast', icon: <CloudSun size={16} className="opacity-60" /> },
+    { type: 'partly', label: 'Partly', icon: <CloudSun size={16} /> },
+    { type: 'cloudy', label: 'Cloudy', icon: <Cloudy size={16} /> },
+    { type: 'overcast', label: 'Overcast', icon: <Cloud size={16} /> },
+    { type: 'fog', label: 'Fog', icon: <CloudFog size={16} /> },
+    { type: 'drizzle', label: 'Drizzle', icon: <CloudDrizzle size={16} /> },
     { type: 'rain', label: 'Rain', icon: <CloudRain size={16} /> },
     { type: 'storm', label: 'Storm', icon: <CloudLightning size={16} /> },
     { type: 'snow', label: 'Snow', icon: <CloudSnow size={16} /> },
+    { type: 'hail', label: 'Hail', icon: <CloudHail size={16} /> },
   ];
 
   const getDegreeInfo = (twilightType: string) => {
@@ -367,6 +374,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     <div
       className={`absolute top-0 right-0 z-30 w-full max-w-[300px] sm:w-[300px] bg-black bg-opacity-40 backdrop-blur-md text-white rounded-bl-lg overflow-hidden transition-opacity duration-300 max-h-dvh ${
         isVisible ? 'opacity-100' : 'opacity-0'
+      } ${
+        // Frost (ROADMAP item 10): a subtle icy glow on the panel edges, CSS only.
+        isFrost ? 'shadow-[inset_0_0_22px_4px_rgba(191,219,254,0.35),inset_0_0_2px_1px_rgba(255,255,255,0.6)]' : ''
       }`}
       style={{ paddingTop: 'env(safe-area-inset-top)', paddingRight: 'env(safe-area-inset-right)' }}
       onMouseEnter={handleMouseEnter}
