@@ -42,6 +42,11 @@ interface SunVisualizationProps {
   // feature is disabled/loading/unavailable - null draws the flat horizon only, same
   // as before the feature existed.
   horizonProfile?: HorizonProfile | null;
+  // Fade the cardinal labels out together with the top-left buttons while idle in
+  // fullscreen (ROADMAP item 29); both default to their non-fullscreen values so
+  // existing callers/tests that don't pass them keep the labels always visible.
+  isFullscreen?: boolean;
+  showCursor?: boolean;
 }
 
 // Maps an azimuth (0-360°, 0 = North) to a horizontal screen fraction (0-1), for the
@@ -337,12 +342,18 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   windSpeedKmh = null,
   windDirectionDeg = null,
   compassHeading = null,
-  horizonProfile = null
+  horizonProfile = null,
+  isFullscreen = false,
+  showCursor = true
 }) => {
   // Compass mode (ROADMAP item 19): a real field of view centered on the heading,
   // replacing the static full-circle mapping - also turns off the CSS transitions
   // below (the heading's own low-pass filter already smooths the motion).
   const compassActive = compassHeading !== null;
+  // Cardinal labels fade out together with the top-left buttons while idle in
+  // fullscreen (ROADMAP item 29), but stay visible in compass mode, where they're
+  // needed to aim the phone.
+  const cardinalLabelsVisible = compassActive || !isFullscreen || showCursor;
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerDimensions, setContainerDimensions] = useState({ width: 0, height: 0 });
   const [showFireworks, setShowFireworks] = useState(false);
@@ -777,7 +788,12 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       })()}
 
       {containerDimensions.width > 0 && (
-        <div className="absolute inset-0 pointer-events-none" data-testid="cardinal-labels">
+        <div
+          className={`absolute inset-0 pointer-events-none transition-opacity duration-300 ${
+            cardinalLabelsVisible ? 'opacity-100' : 'opacity-0'
+          }`}
+          data-testid="cardinal-labels"
+        >
           {cardinalLabels.map(({ label, fraction }) => (
             <div
               key={label}
