@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 import InfoPanel, { formatTerrainDelta } from '../src/components/InfoPanel';
-import { type TimeOfDay, type SunTimes } from '../src/utils/sunUtils';
+import { type TimeOfDay, type SunTimes, type NextGoldenBlueHours } from '../src/utils/sunUtils';
 import { type WeatherType } from '../src/components/CloudLayer';
 import { type WeatherData } from '../src/utils/weatherUtils';
 
@@ -409,6 +409,91 @@ describe('InfoPanel', () => {
         { timeout: 2000 }
       );
     });
+  });
+});
+
+describe('InfoPanel: Golden & Blue Hour after Moon Information, collapsed by default (ROADMAP item 24)', () => {
+  const now = new Date();
+  const sunTimes: SunTimes = {
+    sunrise: new Date(now.setHours(6, 0, 0, 0)),
+    sunset: new Date(now.setHours(18, 0, 0, 0)),
+    solarNoon: new Date(now.setHours(12, 0, 0, 0)),
+    dawn: new Date(now.setHours(5, 30, 0, 0)),
+    dusk: new Date(now.setHours(18, 30, 0, 0)),
+    nauticalDawn: new Date(now.setHours(5, 0, 0, 0)),
+    nauticalDusk: new Date(now.setHours(19, 0, 0, 0)),
+    astronomicalDawn: new Date(now.setHours(4, 30, 0, 0)),
+    astronomicalDusk: new Date(now.setHours(19, 30, 0, 0)),
+    polar: null,
+  };
+  const nextGoldenBlueHours: NextGoldenBlueHours = {
+    part: 'evening',
+    day: 'today',
+    golden: { start: new Date(now.setHours(17, 0, 0, 0)), end: new Date(now.setHours(18, 0, 0, 0)) },
+    blue: { start: new Date(now.setHours(18, 0, 0, 0)), end: new Date(now.setHours(18, 30, 0, 0)) },
+  };
+  const defaultProps = {
+    sunPosition: { azimuth: 0, altitude: 0 },
+    moonPosition: { azimuth: 0, altitude: 0, phase: 0, illumination: 0, visible: true },
+    moonTimes: { rise: new Date(now.setHours(20, 0, 0, 0)), set: new Date(now.setHours(7, 0, 0, 0)), alwaysUp: false, alwaysDown: false },
+    nextFullMoon: new Date(now.setHours(12, 0, 0, 0)),
+    nextNewMoon: new Date(now.setHours(12, 0, 0, 0)),
+    sunTimes,
+    nextGoldenBlueHours,
+    location: { latitude: 0, longitude: 0, loaded: true },
+    manualPlaceName: null,
+    timeOfDay: 'midday' as TimeOfDay,
+    currentTime: new Date(),
+    weatherType: 'clear' as WeatherType,
+    weatherData: null,
+    isLoadingWeather: false,
+    useRealWeather: true,
+    isFullscreen: false,
+    onWeatherChange: () => {},
+    onWeatherModeToggle: () => {},
+    onWeatherRefresh: () => {},
+    onLocationChange: () => {},
+    onUseMyLocation: () => {},
+  };
+
+  it('renders the section after Moon Information and before the twilight times, collapsed at start', () => {
+    const { container } = render(<InfoPanel {...defaultProps} />);
+
+    const text = container.textContent ?? '';
+    const moonIndex = text.indexOf('Moon Information');
+    const goldenBlueIndex = text.indexOf('Golden & Blue Hour');
+    // "Upcoming Dawn/Dusk Times" - whichever applies at this currentTime/sunTimes.
+    const twilightIndex = text.indexOf('Upcoming');
+    expect(moonIndex).toBeGreaterThan(-1);
+    expect(goldenBlueIndex).toBeGreaterThan(moonIndex);
+    expect(twilightIndex).toBeGreaterThan(goldenBlueIndex);
+
+    // The heading (with the part of the day) stays visible while collapsed; the
+    // body below it is hidden via the same max-h-0/opacity-0 CSS transition as the
+    // Moon Information and Twilight sections use, not by unmounting.
+    expect(screen.getByText(/golden & blue hour · this evening/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/expand golden & blue hour/i)).toHaveAttribute('aria-expanded', 'false');
+    const collapsibleBody = screen.getByText(/golden hour:/i).closest('.transition-all');
+    expect(collapsibleBody?.className).toContain('max-h-0');
+  });
+
+  it('expands on click, showing the golden and blue hour windows', () => {
+    render(<InfoPanel {...defaultProps} />);
+
+    fireEvent.click(screen.getByLabelText(/expand golden & blue hour/i));
+
+    expect(screen.getByLabelText(/collapse golden & blue hour/i)).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText(/golden hour:/i)).toBeInTheDocument();
+    expect(screen.getByText(/blue hour:/i)).toBeInTheDocument();
+  });
+
+  it('is not part of the time-of-day auto-collapse effect: a time-of-day change leaves it as the user set it', () => {
+    const { rerender } = render(<InfoPanel {...defaultProps} timeOfDay={'night' as TimeOfDay} />);
+    fireEvent.click(screen.getByLabelText(/expand golden & blue hour/i));
+    expect(screen.getByLabelText(/collapse golden & blue hour/i)).toBeInTheDocument();
+
+    rerender(<InfoPanel {...defaultProps} timeOfDay={'astronomical-twilight' as TimeOfDay} />);
+    expect(screen.getByLabelText(/collapse golden & blue hour/i)).toBeInTheDocument();
   });
 });
 
