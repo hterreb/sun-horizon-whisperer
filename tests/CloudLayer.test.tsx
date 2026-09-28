@@ -144,6 +144,25 @@ describe('CloudLayer', () => {
       expect(container.querySelectorAll('[data-testid="boat-light"]').length).toBeGreaterThan(0);
     });
 
+    it('sends the first boat, lit at night, within seconds of load', () => {
+      const container = spawn({ timeOfDay: 'night' }, 6000);
+      expect(container.querySelector('[data-testid="scene-boat"]')).not.toBeNull();
+      expect(container.querySelectorAll('[data-testid="boat-light"]').length).toBeGreaterThan(0);
+    });
+
+    it('can have more than one boat on the lake at once', () => {
+      // Two spawns 30 s apart, within the 46 s a near boat takes to cross.
+      const container = spawn({}, 40000);
+      expect(container.querySelectorAll('[data-testid="scene-boat"]').length).toBe(2);
+    });
+
+    it('sails near boats lower in fullscreen, where the chrome fades away', () => {
+      const waterline = (props: Partial<React.ComponentProps<typeof CloudLayer>>) =>
+        (spawn(props, 6000).querySelector('[data-testid="scene-boat"]')?.parentElement?.parentElement as HTMLElement | null)?.style.top;
+      expect(waterline({})).toBe('87%');
+      expect(waterline({ isFullscreen: true })).toBe('94%');
+    });
+
     it('sends out only the big boats in rain', () => {
       const container = spawn({ weatherType: 'rain' }, 121000);
       expect(container.querySelector('[data-testid="scene-boat"]')?.getAttribute('data-kind')).toBe('ferry');
