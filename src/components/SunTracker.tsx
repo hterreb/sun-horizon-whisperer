@@ -35,7 +35,7 @@ import MidnightGhost from './MidnightGhost';
 import TemperatureIceberg from './TemperatureIceberg';
 import LoadingScreen, { FAST_START_MS } from './LoadingScreen';
 import { type WeatherType } from './CloudLayer';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useWakeLock } from '@/hooks/useWakeLock';
 import { useCompassHeading } from '@/hooks/useCompassHeading';
@@ -47,6 +47,7 @@ import {
   markCompassCalibrationHintSeen
 } from '../utils/compassUtils';
 import { getTerrainSunTimes, getTerrainMoonTimes } from '../utils/horizonUtils';
+import { getSunArcLabels, getMoonArcLabels } from '../utils/arcLabels';
 import { isLineOfSightEnabled } from '../utils/premium';
 
 // Sky gradient brightness shift per weather type (ROADMAP item 10), in per-channel
@@ -488,11 +489,35 @@ const SunTracker: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on moonHourKey (the hour), not `date` itself
   }, [moonHourKey, location.loaded, location.latitude, location.longitude]);
 
+  // The panel's rise/set times follow the pass the arcs draw (AUDIT C-17): after sunset
+  // the next sunrise/sunset, after moonset the next moonrise/moonset. Same arcLabels calls
+  // as SunVisualization, so panel and arc labels cannot disagree. Keyed on the minute.
+  const passMinuteKey = Math.floor(date.getTime() / 60_000);
+  const passTimes = useMemo(() => {
+    if (!location.loaded) return null;
+    const sun = getSunArcLabels(date, location.latitude, location.longitude);
+    const moon = getMoonArcLabels(date, location.latitude, location.longitude);
+    return {
+      sunrise: sun.rise?.time ?? null,
+      sunset: sun.set?.time ?? null,
+      moonrise: moon.rise?.time ?? null,
+      moonset: moon.set?.time ?? null,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on passMinuteKey, not `date` itself
+  }, [passMinuteKey, location.loaded, location.latitude, location.longitude]);
+  // No moon pass (up or down all day): keep getMoonTimes' alwaysUp/alwaysDown flags.
+  const panelMoonTimes: MoonTimes = passTimes && (passTimes.moonrise || passTimes.moonset)
+    ? { rise: passTimes.moonrise, set: passTimes.moonset, alwaysUp: false, alwaysDown: false }
+    : moonExtras.moonTimes;
+
   // Terrain-adjusted sun/moon times (ROADMAP item 13) only change per day/location/
-  // profile, unlike sun/moon position - keyed on the date string plus the profile's
-  // own identity (a new object each time the horizon profile (re)loads), not `date`
-  // itself.
-  const terrainDateKey = date.toDateString();
+  // profile, unlike sun/moon position - keyed on the days of the passes the panel shows
+  // plus the profile's own identity (a new object each time the horizon profile
+  // (re)loads), not `date` itself.
+  const sunPassDay = passTimes?.sunrise ?? date;
+  const moonRiseDay = passTimes?.moonrise ?? date;
+  const moonSetDay = passTimes?.moonset ?? date;
+  const terrainDateKey = [sunPassDay, moonRiseDay, moonSetDay].map((d) => d.toDateString()).join('|');
   const terrainExtras = useMemo(() => {
     if (!horizonProfile) {
       return {
@@ -501,8 +526,11 @@ const SunTracker: React.FC = () => {
       };
     }
     return {
-      terrainSunTimes: getTerrainSunTimes(date, location.latitude, location.longitude, horizonProfile),
-      terrainMoonTimes: getTerrainMoonTimes(date, location.latitude, location.longitude, horizonProfile),
+      terrainSunTimes: getTerrainSunTimes(sunPassDay, location.latitude, location.longitude, horizonProfile),
+      terrainMoonTimes: {
+        rise: getTerrainMoonTimes(moonRiseDay, location.latitude, location.longitude, horizonProfile).rise,
+        set: getTerrainMoonTimes(moonSetDay, location.latitude, location.longitude, horizonProfile).set,
+      },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on terrainDateKey (the day) and the profile identity, not `date` itself
   }, [terrainDateKey, horizonProfile, location.latitude, location.longitude]);
@@ -593,10 +621,11 @@ const SunTracker: React.FC = () => {
           <InfoPanel
             sunPosition={sunPosition}
             moonPosition={moonPosition}
-            moonTimes={moonExtras.moonTimes}
+            moonTimes={panelMoonTimes}
             nextFullMoon={moonExtras.nextFullMoon}
             nextNewMoon={moonExtras.nextNewMoon}
             sunTimes={sunTimes}
+            passSunTimes={passTimes}
             nextGoldenBlueHours={nextGoldenBlueHours}
             location={location}
             manualPlaceName={manualPlaceName}

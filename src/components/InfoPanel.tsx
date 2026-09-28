@@ -72,6 +72,9 @@ interface InfoPanelProps {
   nextFullMoon: Date;
   nextNewMoon: Date;
   sunTimes: SunTimes | null;
+  // Sunrise/sunset of the pass the sun arc draws (AUDIT C-17): after sunset, the next
+  // ones. Null or missing falls back to `sunTimes` (today's).
+  passSunTimes?: { sunrise: Date | null; sunset: Date | null } | null;
   nextGoldenBlueHours: NextGoldenBlueHours | null;
   location: LocationData;
   // The place name chosen via search, when the current location came from one; takes
@@ -106,6 +109,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   nextFullMoon,
   nextNewMoon,
   sunTimes,
+  passSunTimes = null,
   nextGoldenBlueHours,
   location,
   manualPlaceName,
@@ -340,6 +344,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     : sunTimes.polar === 'night'
       ? 'Sun does not rise'
       : null;
+  const shownSunrise = passSunTimes?.sunrise ?? sunTimes.sunrise;
+  const shownSunset = passSunTimes?.sunset ?? sunTimes.sunset;
 
   // Frost (< -5°C, ROADMAP item 10): a subtle, CSS-only icy edge on the panel itself.
   const isFrost = weatherData != null && weatherData.temperature < -5;
@@ -630,7 +636,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   </button>
                 )}
               </div>
-              <span className="font-semibold text-body tabular-nums">{polarSunLabel ?? formatTime(sunTimes.sunrise)}</span>
+              <span className="font-semibold text-body tabular-nums">{polarSunLabel ?? formatTime(shownSunrise)}</span>
             </div>
 
             <div className={ROW}>
@@ -638,7 +644,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 <Sunset size={18} className="mr-2" />
                 <span className="text-body">Sunset</span>
               </div>
-              <span className="font-semibold text-body tabular-nums">{polarSunLabel ?? formatTime(sunTimes.sunset)}</span>
+              <span className="font-semibold text-body tabular-nums">{polarSunLabel ?? formatTime(shownSunset)}</span>
             </div>
 
             {terrainStatus !== 'idle' && isSunTerrainOpen && (
@@ -648,8 +654,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 eyeHeightMeters={eyeHeightMeters}
                 onEyeHeightChange={onEyeHeightChange}
                 rows={[
-                  { label: 'Sunrise', value: formatTerrainDelta('sun', terrainSunTimes?.sunrise ?? null, sunTimes.sunrise) },
-                  { label: 'Sunset', value: formatTerrainDelta('sun', terrainSunTimes?.sunset ?? null, sunTimes.sunset) },
+                  { label: 'Sunrise', value: formatTerrainDelta('sun', terrainSunTimes?.sunrise ?? null, shownSunrise) },
+                  { label: 'Sunset', value: formatTerrainDelta('sun', terrainSunTimes?.sunset ?? null, shownSunset) },
                 ]}
               />
             )}
