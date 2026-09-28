@@ -23,7 +23,8 @@ const LIGHTNING_CHECK_INTERVAL_MS = 1000;
 const LIGHTNING_FLASH_CHANCE = 0.15;
 const LIGHTNING_FLASH_DURATION_MS = 150;
 
-// Rainbow bands, outermost first, drawn as concentric arcs.
+// Rainbow bands, outermost first, drawn as concentric arcs. Deliberately not scene
+// tokens: a rainbow is the fixed spectrum, not a theme colour (AUDIT A-9).
 const RAINBOW_BANDS = ['#dc2626', '#f97316', '#eab308', '#22c55e', '#0ea5e9', '#7c3aed'];
 const RAINBOW_BAND_GAP_PX = 7;
 

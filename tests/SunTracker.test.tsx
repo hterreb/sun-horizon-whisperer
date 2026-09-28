@@ -5,10 +5,10 @@ import { vi } from 'vitest';
 import { loadManualLocation, saveManualLocation } from '../src/utils/manualLocation';
 
 // Mock the toast function
-vi.mock('@/components/ui/use-toast', () => ({
+vi.mock('@/hooks/use-toast', () => ({
   toast: vi.fn(),
 }));
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 
 describe('SunTracker', () => {
   beforeEach(() => {
