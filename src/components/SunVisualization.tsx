@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { Sun, ChevronLeft, ChevronRight } from 'lucide-react';
-import { type SunPosition, type TimeOfDay } from '../utils/sunUtils';
+import { Sun, ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp } from 'lucide-react';
+import { type SunPosition, type TimeOfDay, formatTime } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
+import { getSunArcLabels, getMoonArcLabels, type ArcLabels, type ArcLabelPoint } from '../utils/arcLabels';
 import { shortestHeadingDelta } from '../utils/compassUtils';
 import { type HorizonProfile, horizonAngleAt } from '../utils/horizonUtils';
 import CloudLayer, { type WeatherType } from './CloudLayer';
@@ -129,6 +130,41 @@ export const getVisibleCardinalLabels = (
       return { ...direction, fraction, visible };
     })
     .filter((direction) => Number.isFinite(direction.fraction) && direction.visible);
+
+export type ArcLabelKind = 'rise' | 'zenith' | 'set';
+
+export interface ArcLabelGeometry {
+  kind: ArcLabelKind;
+  time: Date;
+  fraction: number; // screen x fraction, same azimuth mapping as everything else
+  // The altitude to plot the label at: forced to 0 for rise/set (they sit on the
+  // horizon, not at the sun/moon's own altitude at that SunCalc time, which is a
+  // fraction of a degree off zero) and the true zenith altitude for the apex label.
+  altitude: number;
+}
+
+// Resolves an arcLabels.ts result (rise/zenith/set) to on-screen label geometry, the
+// same way getVisibleCardinalLabels resolves the 8 cardinal directions: dropped when
+// outside the compass field of view (ROADMAP item 19) instead of clamped to the edge.
+// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
+export const getArcLabelGeometry = (
+  labels: ArcLabels,
+  latitude: number,
+  compassHeading?: number | null
+): ArcLabelGeometry[] =>
+  (
+    [
+      { kind: 'rise', point: labels.rise, altitude: 0 },
+      { kind: 'zenith', point: labels.zenith, altitude: labels.zenith?.altitude ?? 0 },
+      { kind: 'set', point: labels.set, altitude: 0 },
+    ] as { kind: ArcLabelKind; point: ArcLabelPoint | null; altitude: number }[]
+  )
+    .filter((entry): entry is { kind: ArcLabelKind; point: ArcLabelPoint; altitude: number } => entry.point !== null)
+    .map((entry) => {
+      const { fraction, visible } = resolveAzimuth(entry.point.azimuth, latitude, compassHeading);
+      return { kind: entry.kind, time: entry.point.time, fraction, altitude: entry.altitude, visible };
+    })
+    .filter((entry) => Number.isFinite(entry.fraction) && entry.visible);
 
 export interface RainbowGeometry {
   visible: boolean;
@@ -366,6 +402,17 @@ export const buildTerrainFillPath = (
     })
     .join(' ');
 
+// Approximate arc-label pill footprint in px, used both for the edge nudge and the
+// sun/moon label collision check below.
+const ARC_LABEL_HALF_WIDTH = 32;
+const ARC_LABEL_HEIGHT = 22;
+
+const ARC_LABEL_ICONS: Record<ArcLabelKind, typeof Sunrise> = {
+  rise: Sunrise,
+  zenith: ArrowUp,
+  set: Sunset,
+};
+
 const SunVisualization: React.FC<SunVisualizationProps> = ({
   sunPosition,
   moonPosition,
@@ -522,6 +569,33 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     );
   }, [moonPath, containerDimensions, latitude, compassHeading, moonAltitudeVisible]);
 
+  // Rise/zenith/set arc labels: pure time/position math lives in arcLabels.ts, recomputed
+  // straight from `date`/lat/lon (sunPath/moonPath carry no timestamps to search - see
+  // arcLabels.ts's own comment) so the labels always match the panel's own times.
+  // Keyed on the minute: `date` ticks every second, the labels only change by the minute.
+  const arcLabelMinuteKey = Math.floor(date.getTime() / 60_000);
+  const sunArcLabels = useMemo(
+    () => getSunArcLabels(date, latitude, longitude),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on arcLabelMinuteKey, not `date` itself
+    [arcLabelMinuteKey, latitude, longitude]
+  );
+  const moonArcLabels = useMemo(
+    () => getMoonArcLabels(date, latitude, longitude),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on arcLabelMinuteKey, not `date` itself
+    [arcLabelMinuteKey, latitude, longitude]
+  );
+
+  const sunArcLabelGeometry = useMemo(
+    () => getArcLabelGeometry(sunArcLabels, latitude, compassHeading),
+    [sunArcLabels, latitude, compassHeading]
+  );
+  // Only while the moon arc is actually drawn (moonArcPath's own gate above), not just
+  // while getMoonArcLabels happens to find a pass.
+  const moonArcLabelGeometry = useMemo(
+    () => (moonArcPath ? getArcLabelGeometry(moonArcLabels, latitude, compassHeading) : []),
+    [moonArcPath, moonArcLabels, latitude, compassHeading]
+  );
+
   const getSunColor = () => {
     if (sunPosition.altitude > 10) {
       return 'text-yellow-300';
@@ -636,6 +710,32 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     [latitude, compassHeading]
   );
   const horizonLabelY = containerDimensions.height * 0.65;
+
+  // Arc label pixel positions: rise/set sit just above the horizon at their endpoint x,
+  // zenith just below the apex - nudged inward (half a label width) so they stay on
+  // screen. Collision rule: when a sun and a moon label would overlap, shift the moon
+  // label up by one label height - a simple bounding-box check, not a general layout
+  // solver (both arcs only ever carry 3 labels each).
+  const toArcLabelPosition = (geometry: ArcLabelGeometry) => {
+    const { width, height } = containerDimensions;
+    const x = Math.max(ARC_LABEL_HALF_WIDTH, Math.min(width - ARC_LABEL_HALF_WIDTH, geometry.fraction * width));
+    // Zenith sits just BELOW the apex, inside the arc: above it, the collapsed InfoPanel
+    // covers it on phones, where the apex is near the top of the screen.
+    const y = geometry.kind === 'zenith'
+      ? altitudeToY(geometry.altitude, height) + ARC_LABEL_HEIGHT
+      : horizonLabelY - ARC_LABEL_HEIGHT;
+    return { kind: geometry.kind, time: geometry.time, x, y };
+  };
+
+  const sunArcLabelPositions = sunArcLabelGeometry.map(toArcLabelPosition);
+  const moonArcLabelPositions = moonArcLabelGeometry.map(toArcLabelPosition).map((moonLabel) => {
+    const overlapsSunLabel = sunArcLabelPositions.some(
+      (sunLabel) =>
+        Math.abs(sunLabel.x - moonLabel.x) < ARC_LABEL_HALF_WIDTH * 2 &&
+        Math.abs(sunLabel.y - moonLabel.y) < ARC_LABEL_HEIGHT
+    );
+    return overlapsSunLabel ? { ...moonLabel, y: moonLabel.y - ARC_LABEL_HEIGHT } : moonLabel;
+  });
 
   // Rainbow (ROADMAP item 10): raining/drizzling, opposite the sun's azimuth, using the
   // same azimuth->x mapping as the sun/moon.
@@ -789,14 +889,13 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         </defs>
         {terrainFillPath && (
           // Line-of-sight ridge (ROADMAP item 13), colored per time-of-day like the
-          // style book's soft ridge (ROADMAP item 15 deliverable 2) and drawn at .85
-          // opacity so it reads as distance rather than a flat cutout. Drawn *before*
+          // style book's soft ridge (ROADMAP item 15 deliverable 2). Opaque: at .85 the
+          // stars and a sun behind the ridge showed through. Drawn *before*
           // the sea (ROADMAP item 27), so the sea's wave crests sit on top of the
           // ridge's base instead of being covered by it.
           <path
             d={terrainFillPath}
             fill={getRidgeColor()}
-            fillOpacity={0.85}
             data-testid="terrain-silhouette"
           />
         )}
@@ -868,6 +967,49 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
               </span>
             </div>
           ))}
+        </div>
+      )}
+
+      {containerDimensions.width > 0 && (sunArcLabelPositions.length > 0 || moonArcLabelPositions.length > 0) && (
+        // Rise/zenith/set labels for the arcs above: subtler pills than the cardinal
+        // labels, tinted with each arc's own color, fading together with them in
+        // fullscreen (same `cardinalLabelsVisible` condition as ROADMAP item 29). The
+        // panel carries the same times for assistive tech, so these pills are decorative.
+        <div
+          className={`absolute inset-0 pointer-events-none transition-opacity duration-300 ${
+            cardinalLabelsVisible ? 'opacity-100' : 'opacity-0'
+          }`}
+          data-testid="arc-labels"
+          aria-hidden="true"
+        >
+          {sunArcLabelPositions.map((label) => {
+            const Icon = ARC_LABEL_ICONS[label.kind];
+            return (
+              <div
+                key={`sun-${label.kind}`}
+                data-testid={`arc-label-sun-${label.kind}`}
+                className="absolute flex items-center gap-1 text-caption tabular-nums bg-panel-background/70 border border-panel-border/40 px-1.5 py-0.5 rounded-full"
+                style={{ left: `${label.x}px`, top: `${label.y}px`, transform: 'translate(-50%, -50%)', color: 'hsl(var(--brand-sunset))' }}
+              >
+                <Icon size={10} />
+                {formatTime(label.time)}
+              </div>
+            );
+          })}
+          {moonArcLabelPositions.map((label) => {
+            const Icon = ARC_LABEL_ICONS[label.kind];
+            return (
+              <div
+                key={`moon-${label.kind}`}
+                data-testid={`arc-label-moon-${label.kind}`}
+                className="absolute flex items-center gap-1 text-caption tabular-nums bg-panel-background/70 border border-panel-border/40 px-1.5 py-0.5 rounded-full"
+                style={{ left: `${label.x}px`, top: `${label.y}px`, transform: 'translate(-50%, -50%)', color: 'hsl(var(--scene-moon))' }}
+              >
+                <Icon size={10} />
+                {formatTime(label.time)}
+              </div>
+            );
+          })}
         </div>
       )}
 

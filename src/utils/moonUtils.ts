@@ -79,8 +79,9 @@ interface SkyPass {
 // `date` to the next one after, when the moon is currently up; otherwise the next full
 // pass (next rise, then the following set). Bounded to +-24h per search, so an
 // alwaysUp/alwaysDown stretch (no crossing at all within that range) safely comes back
-// null instead of searching forever.
-const findMoonPass = (date: Date, latitude: number, longitude: number): SkyPass | null => {
+// null instead of searching forever. Exported for arcLabels.ts, which needs the same
+// pass boundaries to match rise/set/zenith labels to the arc actually drawn.
+export const findMoonPass = (date: Date, latitude: number, longitude: number): SkyPass | null => {
   const altitudeAt = (ms: number) => getMoonPosition(new Date(ms), latitude, longitude).altitude;
   const dateMs = date.getTime();
 
