@@ -5,12 +5,12 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-09-28. Done: items 1–13, 15 and 17–30 (marked **✅ Done** in the heading; all re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14, 16 and 31–33, the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
+Status: last updated 2026-09-28. Done: items 1–13, 15 and 17–36 (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14, 16 and 37–39, the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
 
 ## Verification (2026-09-28)
 
 - **Method:** each done item was checked against its Spec and Done-when in the code and the tests (`main` at `a9882c4`: 487 tests, lint, typecheck and build pass). It was also checked in the running app with Playwright: 390×844 and 360×640, Ravensburg by day and at night, Sydney, fullscreen idle and wake, compass mode with synthetic headings, denied geolocation, place search.
-- **Result:** items 1–13, 15 and 17–30 are built as specified, or as a later item changed them. The check found two new bugs (items 31 and 32).
+- **Result:** items 1–13, 15 and 17–30 are built as specified, or as a later item changed them. The check found two new bugs (items 37 and 38). Items 31–36 were built after this check and are not part of it.
 - **Still open:**
 
 | Item | Open point | Needs |
@@ -24,8 +24,8 @@ Status: last updated 2026-09-28. Done: items 1–13, 15 and 17–30 (marked **�
 | 21 | A thrown test error has readable stack frames and no coordinates; a feedback message has no name or email. Sentry in the privacy policy (item 16). | Sentry dashboard |
 | 23 | In fullscreen on a phone, a tap shows the feedback button and it opens the form. | Real device |
 | 14, 16 | Not started. Decide Stripe or Google Play Billing before item 16. | Decision |
-| 31, 32 | New bugs, see below (AUDIT C-14, C-15). | Fix |
-| 33 | New loading screen, variant A (Rising Mark) chosen. | Build |
+| 37, 38 | New bugs, see below (AUDIT C-14, C-15). | Fix |
+| 39 | New loading screen, variant A (Rising Mark) chosen. | Build |
 
 ## Priority rules
 
@@ -307,11 +307,63 @@ Eight feedback reports from production (Ravensburg, releases `afb9e52` and `f490
   - Closed by default. The sun and moon details open and close separately.
 - **Done when:** a test shows no Line of Sight section at start, and a click on the sun icon shows the terrain sunrise and sunset. At 360 px width each row fits on one line.
 
+### Field feedback, round 2 (2026-09-28)
+
+Five findings from use after items 22–30, checked on `main` at `046abff` with a 390×844 and 1280×800 browser check at 47.78° N, 9.61° E.
+
+### 31. Top-left buttons in a vertical column, and a working fade in fullscreen — S — **✅ Done**
+
+- **Feedback:** "The three icons for full-screen, compass and feedback need to be vertical not horizontal and should fade out when in full-screen."
+- **Cause (confirmed in the browser):** the row's `focus-within:opacity-100` also matches after a mouse click or tap. The clicked fullscreen button keeps focus, so the row never faded out in fullscreen.
+- **Fix:**
+  - `TopLeftButtons` is a `flex-col` column.
+  - Keyboard focus only brings the column back: `has-[:focus-visible]:opacity-100` replaces `focus-within:opacity-100`.
+  - The column (3.5rem wide) fits beside the 300 px panel from 364 px width. The panel offset under the buttons now applies only below 364 px (10rem instead of 4rem), not below 480 px.
+- **Checked:** after a click on "Enter fullscreen" the button has focus, and the column goes to opacity 0 after the 10 s idle timeout. Tab shows it again.
+
+### 32. Sea without an outline — S — **✅ Done**
+
+- **Feedback:** "Remove the outline of the sea."
+- **Fix:** removed the item-27 wave-crest stroke (`getWaveCrestColor`) from the sea path. The dark-navy night sea (item 27 follow-up) already reads apart from the ridge and the sky.
+
+### 33. Golden & Blue Hour: no tag line in the heading — S — **✅ Done**
+
+- **Feedback:** "Golden & blue hours needs no additional tag line in the heading, the line break does not look good. Move it into the collapsed space."
+- **Fix:** the heading is only "Golden & Blue Hour". "This evening" / "Tomorrow morning" is the first line of the collapsible body.
+
+### 34. Line-of-sight icon with a premium feel — S — **✅ Done**
+
+- **Feedback:** "The terrain logo needs a more premium feel, add a little gold plus to it to make it pop out."
+- **Fix:** the `Mountain` buttons get the gold plus of item 35 at the top-right corner.
+
+### 35. Premium features marked with a gold plus, still free — S — **✅ Done**
+
+- **Feedback:** "Change location, manual weather, the scores, line of sight and compass should all be premium features and get a little golden plus icon, but are free as of now."
+- **Fix:**
+  - New `PremiumBadge` component: a small gold-gradient circle with a dark plus and a soft gold glow. New tokens `--brand-gold` and `--brand-gold-light`.
+  - Badge on: "Change location", the "Manual" weather toggle, "Sunset score", both line-of-sight buttons and the compass button.
+  - Decorative only (`aria-hidden`, tooltip "Premium feature, free for now"). No feature is gated. `PREMIUM_ENFORCED` stays `false`; item 14 gates this list later.
+
+### 36. Bats and boats: line icons and a mixed fleet — S — **✅ Done**
+
+- **Feedback:** "The bat emojis seem weird on macOS, and I like the style of the ship, but it still could use a little diversity."
+- **Lookbook:** [Bats & Boats](https://claude.ai/artifact/PQH9vEKvGh49GNAd82yXFd) (private). Picks: N2, R1, S2, S3, S4, S5, S6, V2, V3, V4, L1.
+- **Fix** (all motion stays a slow, straight glide):
+  - **N2 Line bat:** the 🦇 emoji is replaced by a `Bat` line icon (`src/components/sceneIcons.ts`, lucide's 24 px grid) in the night-ship tone.
+  - **R1 Bats at twilight only:** bats fly in nautical and astronomical twilight. Full night (`'night'`) has no flyers.
+  - **S2–S6 Fleet:** lucide `Sailboat` plus new `LakeFerry`, `FishingBoat`, `Rowboat` and `Freighter` icons. The old `Ship` (S1) is out. Mix: sailboat 35, ferry 15, fishing boat 15, rowboat 10, freighter 5 (`pickBoat` in `weatherEffectsUtils`).
+  - **V2 Distance:** each boat gets a random distance. The farthest boat sits on the horizon at 55 % of the size, opacity and speed.
+  - **V3 Lights:** once the sun is below the horizon (civil twilight to night), each boat shows small gold lights (`--brand-gold-light`).
+  - **V4 Weather-aware mix:** rain, drizzle, fog and snow leave only the ferry and the freighter. Wind above 40 km/h keeps the rowboat ashore. Storm and hail still have no boats.
+  - **L1 Line leaf:** the 🍃 emoji is replaced by lucide `Leaf` in the boat tone.
+  - Not picked: V1 (both directions). Boats still sail from left to right.
+- **Checked:** in the browser at 20:05 in Ravensburg (nautical twilight), the line bats flew, a ferry and a sailboat sailed with gold lights, and a far freighter sat on the horizon. No emoji was rendered.
+
 ### Verification findings (2026-09-28)
 
-Items 31 and 32 were found in the browser check of the verification above. Item 33 is the new loading screen, requested in the same check.
+Items 37 and 38 were found in the browser check of the verification above (on `a9882c4`, before items 31–36). Item 39 is the new loading screen, requested in the same check.
 
-### 31. Sun arc drops out at night every other minute — S — AUDIT C-14
+### 37. Sun arc drops out at night every other minute — S — AUDIT C-14
 
 - **Found:** Ravensburg, 22:30, 390×844. After a reload the sun arc has its zenith label (13:13). One minute later the label is gone.
 - **Cause:** `findSunPass` (`sunUtils.ts`) and `findMoonPass` (`moonUtils.ts`) have the same bug. When the body is below the horizon, the set search starts at the bisected rise time. That time is only within ±5 s of the crossing. When it lands just below 0°, the search finds the same rise again and returns a pass of zero length (for example 05:22–05:22 UTC). `getSunPathAround` then returns 49 identical points (no arc), and `getSunArcLabels` finds no zenith. The result changes from minute to minute.
@@ -320,13 +372,13 @@ Items 31 and 32 were found in the browser check of the verification above. Item 
   - Add a test: for each minute of one night, the sun pass is longer than 6 h and the arc labels have a zenith.
 - **Done when:** the test passes, and at night the sun arc and its zenith label stay on screen across minute changes.
 
-### 32. Moon zenith label under the collapsed panel — S — AUDIT C-15
+### 38. Moon zenith label under the collapsed panel — S — AUDIT C-15
 
-- **Found:** Ravensburg, 22:30, 390×844. The moon culminates high (02:56). Its zenith label is at y ≈ 112 px, under the collapsed panel (y 65–175 px, x ≥ 90 px). The sun label was moved below the apex for this reason, but a high moon apex still falls under the panel.
+- **Found:** Ravensburg, 390×844. When the moon culminates high, its zenith label falls under the collapsed panel. Rechecked after item 31 (panel at the top from 364 px, `main` at `499ce9e`): the collapsed panel covers y 0–112 px at x ≥ 90 px, and the moon zenith label is at y 78–100 px on 30 Sep, 21:30, and at y 72–94 px on 1 Oct, 22:00. The sun label was moved below the apex for this reason, but a high moon apex still falls under the panel.
 - **Spec:** move an arc label that overlaps the collapsed panel's box below the panel's bottom edge, or place it beside the apex. Do not hide it.
 - **Done when:** at 390×844, day and night, the collapsed panel covers no arc label.
 
-### 33. Loading screen: Rising Mark (variant A) — S — AUDIT A-6, A-7, C-16
+### 39. Loading screen: Rising Mark (variant A) — S — AUDIT A-6, A-7, C-16
 
 - **Why:** the loading screen always shows a daytime sky, but the Android splash before it is Night (`#0F1016`). A start at night goes dark, then bright blue, then dark again. The top-left buttons and the radio show before there is a scene. When the location prompt stays open, "Locating…" never ends, and there is no way to choose a place. The spinner has no brand.
 - **Decision (2026-09-28):** variant **A, Rising Mark**. Design: <https://claude.ai/artifact/YbVzMgv8ncwoh7TEah1Dfk> (private artifact, variants A–D; open it with `#locating`, `#waiting` or `#found-night` to see one state).
@@ -478,7 +530,7 @@ Items 31 and 32 were found in the browser check of the verification above. Item 
   1. Supabase Auth in the frontend (sign-in, session handling, `@supabase/supabase-js` client).
   2. Upgrade UI: pricing dialog → call `create-checkout` → redirect to Stripe.
   3. Handle the return URLs `/?checkout=success` and `/?checkout=cancel` (toast + call `check-subscription`).
-  4. Gate line of sight (and maybe the sunset score) on `check-subscription` (`subscribed: true`) when `PREMIUM_ENFORCED` is true.
+  4. Gate the premium features on `check-subscription` (`subscribed: true`) when `PREMIUM_ENFORCED` is true. The features marked with the gold plus (item 35): change location, manual weather, the sunset score, line of sight and compass.
   5. A "Manage subscription" button → `customer-portal`.
   6. Optional: a Stripe webhook function that updates `subscribers` without polling.
   7. Tests for the edge functions (Deno test with mocked Stripe).

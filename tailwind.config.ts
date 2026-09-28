@@ -83,7 +83,9 @@ export default {
 					sky: 'hsl(var(--brand-sky))',
 					cyan: 'hsl(var(--brand-cyan))',
 					night: 'hsl(var(--brand-night))',
-					coral: 'hsl(var(--brand-coral))'
+					coral: 'hsl(var(--brand-coral))',
+					gold: 'hsl(var(--brand-gold))',
+					'gold-light': 'hsl(var(--brand-gold-light))'
 				},
 				scene: {
 					sky: {

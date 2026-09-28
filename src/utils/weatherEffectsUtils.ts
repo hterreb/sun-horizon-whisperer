@@ -64,3 +64,28 @@ export const LIGHTNING_MIN_GAP_MS = 8000;
 // hard frequency cap is pure/testable here.
 export const canFlashLightning = (lastFlashAtMs: number | null, nowMs: number): boolean =>
   lastFlashAtMs === null || nowMs - lastFlashAtMs >= LIGHTNING_MIN_GAP_MS;
+
+// Boat mix (ROADMAP item 36): which boat sails out next, weighted. Sailboats are the
+// most common. Wet or foggy weather leaves only the big boats (ferry, freighter), and
+// strong wind keeps the rowboat ashore. Storm and hail (no boats at all) stay in
+// CloudLayer's shouldShowShips.
+export type BoatKind = 'sailboat' | 'ferry' | 'fishing' | 'rowboat' | 'freighter';
+
+const BOAT_WEIGHTS: [BoatKind, number][] = [
+  ['sailboat', 35],
+  ['ferry', 15],
+  ['fishing', 15],
+  ['rowboat', 10],
+  ['freighter', 5],
+];
+const BIG_BOATS: BoatKind[] = ['ferry', 'freighter'];
+
+// `r` is a random number in [0, 1), passed in so the pick stays pure and testable.
+export const pickBoat = (type: WeatherType, windKmh: number | null | undefined, r: number): BoatKind => {
+  const fair = type === 'clear' || type === 'partly' || type === 'cloudy' || type === 'overcast';
+  const strongWind = (windKmh ?? 0) > STRONG_WIND_KMH;
+  const mix = BOAT_WEIGHTS.filter(([kind]) =>
+    (fair || BIG_BOATS.includes(kind)) && !(strongWind && kind === 'rowboat'));
+  let left = r * mix.reduce((sum, [, weight]) => sum + weight, 0);
+  return (mix.find(([, weight]) => (left -= weight) < 0) ?? mix[mix.length - 1])[0];
+};
