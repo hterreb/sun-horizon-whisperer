@@ -29,11 +29,14 @@ export const elevationAngleDeg = (heightDiffM: number, distanceM: number): numbe
   return Math.atan((heightDiffM - curvatureDropM) / distanceM) * RAD2DEG;
 };
 
-const NEAR_DISTANCE_M = 50;
+// ponytail: starts at 200 m, not 50 m. Closer samples sit within a few z12 DEM pixels (~26 m)
+// of the observer, so DEM noise and GPS error (a pixel beside a summit, a small knoll) block
+// the horizon by several degrees. Lower this only with a finer DEM.
+const NEAR_DISTANCE_M = 200;
 const FAR_DISTANCE_M = 50_000;
 const DISTANCE_SAMPLE_COUNT = 100;
 
-// Log-spaced sample distances from 50 m to 50 km: dense close to the observer (where a
+// Log-spaced sample distances from 200 m to 50 km: dense close to the observer (where a
 // nearby ridge dominates), sparse far away (where only very tall/distant terrain can
 // still raise the horizon).
 const logSpacedDistances = (): number[] => {

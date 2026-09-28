@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-09-28. Done: items 1–12 and 17–21 (marked **✅ Done** in the heading; real-device checks for 17 and 19 and the Sentry release to-dos are still open). Open: items 13–16, easter eggs, backlog.
+Status: last updated 2026-09-28. Done: items 1–13 and 17–21 (marked **✅ Done** in the heading; real-device checks for 17 and 19 and the Sentry release to-dos are still open). Open: items 14–16, easter eggs, backlog.
 
 ## Priority rules
 
@@ -262,7 +262,7 @@ Found on a real phone after items 8–11 shipped. Items 17–20 are bugs or UX f
 
 ## P2 — Flagship: line of sight (Premium later, free now)
 
-### 13. Line of sight with terrain — L
+### 13. Line of sight with terrain — L — **✅ Done** (alpine 5-min reference check still open)
 
 - **Why:** the astronomical sunset is for a flat horizon. In the mountains, the sun disappears behind a ridge much earlier. At a high viewpoint, it sets later. No free web app shows this well.
 - **Spec:**
@@ -289,6 +289,13 @@ Found on a real phone after items 8–11 shipped. Items 17–20 are bugs or UX f
 - **Done when:**
   - At a known alpine location, the adjusted sunset matches a reference (PeakFinder or a real observation) within 5 minutes.
   - At the coast, the adjusted and astronomical sunset times differ by less than 2 minutes.
+
+- **Built (2026-09-28), differences from the spec:**
+  - Samples start at 200 m, not 50 m. Closer samples sit within a few z12 DEM pixels (~26 m), so DEM noise blocked the horizon by several degrees (a pixel beside the Zugspitze summit read as 8°).
+  - Checked with real tiles: beaches (Guincho, Sylt) differ from the astronomical sunset by 0 min. Zugspitze summit sets 9 min later. Innsbruck sets 31 min earlier.
+  - Viganella: no sun from 5 Nov to 6 Feb (documented: about 11 Nov to 2 Feb). Rattenberg: no sun on 21 Dec.
+  - Tiles are not cached by the service worker. Only the computed profile is cached (`localStorage`).
+- **Open:** compare an alpine sunset with PeakFinder or a real observation (5-min target).
 
 ### 14. Premium gating (deferred) — M
 
