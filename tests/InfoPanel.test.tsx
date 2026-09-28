@@ -52,6 +52,19 @@ describe('InfoPanel', () => {
     expect(screen.getByText(/weather mode/i)).toBeInTheDocument();
   });
 
+  it('shows the sunrise and sunset of the pass the arc draws, not today\'s past ones (AUDIT C-17)', () => {
+    const tomorrowAt = (h: number, m: number) => {
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      d.setHours(h, m, 0, 0);
+      return d;
+    };
+    render(<InfoPanel {...defaultProps} passSunTimes={{ sunrise: tomorrowAt(7, 18), sunset: tomorrowAt(19, 7) }} />);
+    expect(screen.getByText('07:18')).toBeInTheDocument();
+    expect(screen.getByText('19:07')).toBeInTheDocument();
+    expect(screen.queryByText('06:00')).not.toBeInTheDocument();
+  });
+
   it('stays above the scene (z-30) and fits within the dynamic viewport height on mobile (ROADMAP items 1 & 2)', () => {
     const { container } = render(<InfoPanel {...defaultProps} />);
     const panel = container.firstChild as HTMLElement;
