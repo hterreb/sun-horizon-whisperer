@@ -22,7 +22,6 @@ import { type WeatherData } from '../utils/weatherUtils';
 import { isValidLatitude, isValidLongitude } from '../utils/manualLocation';
 import { type HorizonProfileStatus } from '../hooks/useHorizonProfile';
 import { type WeatherType } from './CloudLayer';
-import { format } from 'date-fns';
 
 // Direction D "Polished Classic" (ROADMAP items 7 & 15): shared classes so every
 // row/section/focus ring in the panel reads as one system. ROW, ICON_TOGGLE and
@@ -55,6 +54,10 @@ export const formatTerrainDelta = (
   const sign = diffMinutes >= 0 ? '+' : '';
   return `${formatTime(terrainDate)} (${sign}${diffMinutes} min)`;
 };
+
+// "Oct 7, 14:05", as date-fns 'MMM d, HH:mm' did, with Intl instead (AUDIT P-7).
+const formatMoonDate = (date: Date): string =>
+  `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${formatTime(date)}`;
 
 // Highlights "now, until 19:42" in peach, the same D `--panel-hi` treatment as the
 // terrain delta above, without changing formatWindow's own text.
@@ -616,7 +619,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 <Clock size={18} className="mr-2" />
                 <span className="text-body">Current Time</span>
               </div>
-              <span className="font-semibold text-body tabular-nums">{format(currentTime, 'HH:mm:ss')}</span>
+              <span className="font-semibold text-body tabular-nums">{currentTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })}</span>
             </div>
 
             <div className={ROW}>
@@ -777,11 +780,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
                   <div className={ROW}>
                     <span className="text-caption">Next full moon:</span>
-                    <span className="text-caption tabular-nums">{format(nextFullMoon, 'MMM d, HH:mm')}</span>
+                    <span className="text-caption tabular-nums">{formatMoonDate(nextFullMoon)}</span>
                   </div>
                   <div className={ROW}>
                     <span className="text-caption">Next new moon:</span>
-                    <span className="text-caption tabular-nums">{format(nextNewMoon, 'MMM d, HH:mm')}</span>
+                    <span className="text-caption tabular-nums">{formatMoonDate(nextNewMoon)}</span>
                   </div>
                 </div>
               </div>
