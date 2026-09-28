@@ -572,13 +572,17 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   // Rise/zenith/set arc labels: pure time/position math lives in arcLabels.ts, recomputed
   // straight from `date`/lat/lon (sunPath/moonPath carry no timestamps to search - see
   // arcLabels.ts's own comment) so the labels always match the panel's own times.
+  // Keyed on the minute: `date` ticks every second, the labels only change by the minute.
+  const arcLabelMinuteKey = Math.floor(date.getTime() / 60_000);
   const sunArcLabels = useMemo(
     () => getSunArcLabels(date, latitude, longitude),
-    [date, latitude, longitude]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on arcLabelMinuteKey, not `date` itself
+    [arcLabelMinuteKey, latitude, longitude]
   );
   const moonArcLabels = useMemo(
     () => getMoonArcLabels(date, latitude, longitude),
-    [date, latitude, longitude]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on arcLabelMinuteKey, not `date` itself
+    [arcLabelMinuteKey, latitude, longitude]
   );
 
   const sunArcLabelGeometry = useMemo(
@@ -708,15 +712,17 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   const horizonLabelY = containerDimensions.height * 0.65;
 
   // Arc label pixel positions: rise/set sit just above the horizon at their endpoint x,
-  // zenith just above the apex - nudged inward (half a label width) so they stay on
+  // zenith just below the apex - nudged inward (half a label width) so they stay on
   // screen. Collision rule: when a sun and a moon label would overlap, shift the moon
   // label up by one label height - a simple bounding-box check, not a general layout
   // solver (both arcs only ever carry 3 labels each).
   const toArcLabelPosition = (geometry: ArcLabelGeometry) => {
     const { width, height } = containerDimensions;
     const x = Math.max(ARC_LABEL_HALF_WIDTH, Math.min(width - ARC_LABEL_HALF_WIDTH, geometry.fraction * width));
+    // Zenith sits just BELOW the apex, inside the arc: above it, the collapsed InfoPanel
+    // covers it on phones, where the apex is near the top of the screen.
     const y = geometry.kind === 'zenith'
-      ? altitudeToY(geometry.altitude, height) - ARC_LABEL_HEIGHT
+      ? altitudeToY(geometry.altitude, height) + ARC_LABEL_HEIGHT
       : horizonLabelY - ARC_LABEL_HEIGHT;
     return { kind: geometry.kind, time: geometry.time, x, y };
   };
