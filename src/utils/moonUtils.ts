@@ -93,7 +93,9 @@ export const findMoonPass = (date: Date, latitude: number, longitude: number): S
 
   const startMs = findHorizonCrossingMs(altitudeAt, dateMs, 1, ONE_DAY_MS);
   if (startMs === null) return null;
-  const endMs = findHorizonCrossingMs(altitudeAt, startMs, 1, ONE_DAY_MS);
+  // The rise is only bisected to +-half the tolerance, so it may sit just below 0 deg;
+  // searching from it could find the same rise again (AUDIT C-14). Start past it.
+  const endMs = findHorizonCrossingMs(altitudeAt, startMs + HORIZON_BISECT_TOLERANCE_MS, 1, ONE_DAY_MS);
   return endMs !== null ? { start: new Date(startMs), end: new Date(endMs) } : null;
 };
 

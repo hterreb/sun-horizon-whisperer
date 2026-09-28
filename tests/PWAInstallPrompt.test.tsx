@@ -69,4 +69,24 @@ describe('PWAInstallPrompt', () => {
 
     vi.useRealTimers();
   });
+
+  it('shows the iOS install steps in the card, without alert() (AUDIT C-7)', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X)' });
+    const alertSpy = vi.fn();
+    vi.stubGlobal('alert', alertSpy);
+
+    render(<PWAInstallPrompt />);
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+    fireEvent.click(screen.getByRole('button', { name: /install/i }));
+
+    expect(screen.getByText(/add to home screen/i)).toBeInTheDocument();
+    expect(alertSpy).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /got it/i }));
+    expect(screen.queryByRole('heading', { name: /install sun chaser/i })).not.toBeInTheDocument();
+    vi.useRealTimers();
+  });
 });

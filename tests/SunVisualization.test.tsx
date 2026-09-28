@@ -14,6 +14,7 @@ import SunVisualization, {
   getRainbowGeometry,
   COMPASS_FOV_DEG,
   buildTerrainSegments,
+  avoidCollapsedPanel,
 } from '../src/components/SunVisualization';
 import type { HorizonProfile } from '../src/utils/horizonUtils';
 import { getSunTimes, formatTime } from '../src/utils/sunUtils';
@@ -304,6 +305,23 @@ describe('SunVisualization (rendered): static cardinal direction labels (ROADMAP
     for (const label of ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']) {
       expect(labelsContainer).toHaveTextContent(label);
     }
+  });
+
+  it('keeps the edge label (N at 0°) whole inside a 390 px screen (AUDIT A-8)', () => {
+    setMockedContainerSize(390, 844);
+    render(
+      <SunVisualization
+        sunPosition={{ azimuth: 180, altitude: 30 }}
+        moonPosition={{ azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false }}
+        sunPath={[]}
+        moonPath={[]}
+        timeOfDay="midday"
+        weatherType="clear"
+        latitude={51}
+      />
+    );
+    const north = screen.getByText('N').parentElement as HTMLElement;
+    expect(parseFloat(north.style.left)).toBeGreaterThanOrEqual(18);
   });
 
   it('fades out together with the top-left buttons while idle in fullscreen (ROADMAP item 29)', () => {
@@ -736,5 +754,20 @@ describe('SunVisualization source (ROADMAP item 15, scene colour refactor)', () 
 
     expect(codeOnly).not.toMatch(/#[0-9a-fA-F]{6}/);
     expect(codeOnly).not.toMatch(/rgba?\(/);
+  });
+});
+
+describe('avoidCollapsedPanel (AUDIT C-15, ROADMAP item 38)', () => {
+  it('moves a label under the collapsed panel to just below it, keeping x', () => {
+    // 390 px wide: panel box x >= 90, y 0-112. Moon zenith label seen at y ~89.
+    expect(avoidCollapsedPanel({ x: 250, y: 89 }, 390)).toEqual({ x: 250, y: 127 });
+  });
+  it('leaves labels left of or below the panel alone', () => {
+    expect(avoidCollapsedPanel({ x: 40, y: 89 }, 390)).toEqual({ x: 40, y: 89 });
+    expect(avoidCollapsedPanel({ x: 250, y: 400 }, 390)).toEqual({ x: 250, y: 400 });
+  });
+  it('uses the lower panel position below 364 px width', () => {
+    expect(avoidCollapsedPanel({ x: 200, y: 89 }, 360)).toEqual({ x: 200, y: 89 });
+    expect(avoidCollapsedPanel({ x: 200, y: 200 }, 360)).toEqual({ x: 200, y: 287 });
   });
 });
