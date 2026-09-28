@@ -207,6 +207,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
       return () => clearTimeout(timeoutId);
     }
 
+    // Set on cleanup: a response for an old location (or after unmount) must not set state.
+    let cancelled = false;
+
     const fetchLocationName = async () => {
       setLoadingLocation(true);
       try {
@@ -217,7 +220,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${roundedLat}&longitude=${roundedLon}&localityLanguage=en`
         );
         const data = await response.json();
-        
+        if (cancelled) return;
+
         if (data.city && data.countryName) {
           setLocationName(`${data.city}, ${data.countryName}`);
         } else if (data.locality && data.countryName) {
@@ -228,14 +232,18 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           setLocationName('Unknown Location');
         }
       } catch (error) {
+        if (cancelled) return;
         console.error('Error fetching location name:', error);
         setLocationName('Unknown Location');
       } finally {
-        setLoadingLocation(false);
+        if (!cancelled) setLoadingLocation(false);
       }
     };
 
     fetchLocationName();
+    return () => {
+      cancelled = true;
+    };
   }, [location.latitude, location.longitude, location.loaded, manualPlaceName]);
 
   // Debounced place-name search (ROADMAP item 12): waits 300ms after typing stops,
