@@ -448,9 +448,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     }
   };
 
+  // The width cap keeps the panel clear of the top-left buttons (7rem) on narrow phones.
   return (
     <div
-      className={`absolute top-0 right-0 z-30 w-full max-w-[300px] sm:w-[300px] bg-[hsl(var(--panel-background)/0.45)] backdrop-blur-md border border-[hsl(var(--panel-border)/0.14)] text-white rounded-bl-panel overflow-hidden transition-opacity duration-300 max-h-dvh ${
+      className={`absolute top-0 right-0 z-30 w-full max-w-[min(300px,calc(100vw-7rem))] sm:w-[300px] bg-[hsl(var(--panel-background)/0.45)] backdrop-blur-md border border-[hsl(var(--panel-border)/0.14)] text-white rounded-bl-panel overflow-hidden transition-opacity duration-300 max-h-dvh ${
         isVisible ? 'opacity-100' : 'opacity-0'
       } ${
         // Frost (ROADMAP item 10): a subtle icy glow on the panel edges, CSS only.
