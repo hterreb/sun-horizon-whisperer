@@ -195,6 +195,23 @@ export const getBackgroundGradient = (timeOfDay: TimeOfDay): string => {
   }
 };
 
+// Shifts every #rrggbb color in a CSS gradient string by the same amount per channel
+// (negative = darker, positive = brighter), clamped to [0, 255]. Used to tint the sky
+// gradient for weather (ROADMAP item 10) without hardcoding a second gradient per
+// weather type. Pure and independent of WeatherType, so it's testable on its own.
+export const shiftGradientBrightness = (gradient: string, deltaPerChannel: number): string => {
+  if (deltaPerChannel === 0) return gradient;
+
+  return gradient.replace(/#([0-9a-fA-F]{6})/g, (_match, hex: string) => {
+    const num = parseInt(hex, 16);
+    const clamp = (channel: number): number => Math.max(0, Math.min(255, channel));
+    const r = clamp(((num >> 16) & 0xff) + deltaPerChannel);
+    const g = clamp(((num >> 8) & 0xff) + deltaPerChannel);
+    const b = clamp((num & 0xff) + deltaPerChannel);
+    return `#${(((r << 16) | (g << 8) | b) >>> 0).toString(16).padStart(6, '0')}`;
+  });
+};
+
 export interface TimeWindow {
   start: Date;
   end: Date;

@@ -4,6 +4,11 @@ import { type SunPosition, type TimeOfDay } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
 import CloudLayer, { type WeatherType } from './CloudLayer';
 import Fireworks from './Fireworks';
+import WeatherEffects from './WeatherEffects';
+
+// A fixed fallback seed date for callers that don't pass one (e.g. existing tests) -
+// a stable constant, not `new Date()`, so it never changes identity across renders.
+const DEFAULT_SEED_DATE = new Date(0);
 
 interface SunVisualizationProps {
   sunPosition: SunPosition;
@@ -14,6 +19,16 @@ interface SunVisualizationProps {
   timeOfDay: TimeOfDay;
   weatherType: WeatherType;
   latitude: number;
+  // Longitude, current date, and live cloud_cover/wind/temperature (ROADMAP item 10):
+  // longitude+date seed the cloud layout, the rest drive cloud drift and the weather
+  // illustrations (fog/lightning/heat shimmer/rainbow/leaves). All optional/nullable so
+  // existing callers/tests that only pass the original props still work.
+  longitude?: number;
+  date?: Date;
+  temperatureC?: number | null;
+  cloudCoverPercent?: number | null;
+  windSpeedKmh?: number | null;
+  windDirectionDeg?: number | null;
   // Live compass mode (ROADMAP item 8): shifts the azimuth->x mapping so the
   // current device heading sits at screen center. 0 (the default) reproduces the
   // static mapping. See compassUtils.headingToAzimuthOffset.
@@ -65,6 +80,34 @@ export const getVisibleCardinalLabels = (
       fraction: getAzimuthScreenFraction(direction.azimuth, latitude, azimuthOffset),
     }))
     .filter((direction) => Number.isFinite(direction.fraction));
+
+export interface RainbowGeometry {
+  visible: boolean;
+  xFraction: number; // 0-1 screen fraction of the arc's apex, same mapping as the sun/moon
+  apexHeightDeg: number; // 0-42, how high the arc's apex sits
+}
+
+// Rainbow geometry (ROADMAP item 10): visible while it's raining/drizzling and the sun
+// sits low (0-42° altitude), opposite the sun's azimuth - using the same azimuth->x
+// mapping (and compass offset) as the sun/moon, so it pans together with them.
+// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
+export const getRainbowGeometry = (
+  isRainingOrDrizzling: boolean,
+  sunAltitude: number,
+  sunAzimuth: number,
+  latitude: number,
+  azimuthOffset = 0
+): RainbowGeometry => {
+  const visible = isRainingOrDrizzling && sunAltitude > 0 && sunAltitude < 42;
+  if (!visible) return { visible: false, xFraction: 0, apexHeightDeg: 0 };
+
+  const oppositeAzimuth = (sunAzimuth + 180) % 360;
+  return {
+    visible: true,
+    xFraction: getAzimuthScreenFraction(oppositeAzimuth, latitude, azimuthOffset),
+    apexHeightDeg: 42 - sunAltitude
+  };
+};
 
 // True when the sun's altitude crosses the horizon (0°) between two samples, i.e. it
 // was on one side and is now on the other. A rounded `altitude === 0.0` check can miss
@@ -123,6 +166,12 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   timeOfDay,
   weatherType,
   latitude,
+  longitude = 0,
+  date = DEFAULT_SEED_DATE,
+  temperatureC = null,
+  cloudCoverPercent = null,
+  windSpeedKmh = null,
+  windDirectionDeg = null,
   azimuthOffset = 0
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -277,9 +326,41 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   );
   const horizonLabelY = containerDimensions.height * 0.65;
 
+  // Rainbow (ROADMAP item 10): raining/drizzling, opposite the sun's azimuth, using the
+  // same azimuth->x mapping (and compass offset) as the sun/moon.
+  const rainbowGeometry = useMemo(
+    () => getRainbowGeometry(
+      weatherType === 'rain' || weatherType === 'drizzle',
+      sunPosition.altitude,
+      sunPosition.azimuth,
+      latitude,
+      azimuthOffset
+    ),
+    [weatherType, sunPosition.altitude, sunPosition.azimuth, latitude, azimuthOffset]
+  );
+
   return (
     <div ref={containerRef} className="w-full h-dvh relative overflow-hidden" data-testid="sun-visualization">
-      <CloudLayer timeOfDay={timeOfDay} weatherType={weatherType} />
+      <CloudLayer
+        timeOfDay={timeOfDay}
+        weatherType={weatherType}
+        date={date}
+        latitude={latitude}
+        longitude={longitude}
+        cloudCoverPercent={cloudCoverPercent}
+        windSpeedKmh={windSpeedKmh}
+        windDirectionDeg={windDirectionDeg}
+      />
+      <WeatherEffects
+        weatherType={weatherType}
+        timeOfDay={timeOfDay}
+        temperatureC={temperatureC}
+        windSpeedKmh={windSpeedKmh}
+        sunAltitude={sunPosition.altitude}
+        rainbow={rainbowGeometry}
+        containerWidth={containerDimensions.width}
+        containerHeight={containerDimensions.height}
+      />
       <Fireworks trigger={showFireworks} />
 
       {moonArcPath && (
