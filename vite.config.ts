@@ -43,21 +43,23 @@ export default defineConfig(({ mode }) => {
           },
         ],
       },
-      includeAssets: ['favicon.ico', 'icon-192.png', 'icon-512.png', 'icon-144.png'],
+      includeAssets: ['favicon.ico', 'favicon.svg', 'icon-192.png', 'icon-512.png', 'icon-144.png', 'icon-maskable-192.png', 'icon-maskable-512.png', 'apple-touch-icon.png'],
       manifest: {
         id: '/',
         name: 'Sun Chaser',
         short_name: 'Sun Chaser',
         description: 'Track the sun and moon positions with real-time weather',
-        theme_color: '#33C3F0',
-        background_color: '#0F0E11',
+        theme_color: '#0F1016',
+        background_color: '#0F1016',
         display: 'standalone',
         display_override: ['fullscreen', 'standalone'],
         orientation: 'any',
         scope: '/',
         start_url: '/',
-        // The source PNGs have no safe-zone padding, so the maskable entries reuse the
-        // same files as the 'any' ones; some OS masks may crop into the icon artwork.
+        // 'any' icons are the round mark (public/logo-mark.svg) on a transparent
+        // square. The maskable icons are a separate full-bleed source
+        // (public/logo-mark-maskable.svg) with the mark inside the 80% safe
+        // zone, so OS adaptive-icon masks don't crop into the artwork.
         icons: [
           {
             src: '/icon-192.png',
@@ -72,13 +74,13 @@ export default defineConfig(({ mode }) => {
             purpose: 'any'
           },
           {
-            src: '/icon-192.png',
+            src: '/icon-maskable-192.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'maskable'
           },
           {
-            src: '/icon-512.png',
+            src: '/icon-maskable-512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable'
