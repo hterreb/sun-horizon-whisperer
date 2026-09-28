@@ -14,6 +14,13 @@ describe('sentryScrub', () => {
     expect(scrubLocationString(url)).toBe('https://geocoding-api.open-meteo.com/v1/search?name=[Filtered]&count=5');
   });
 
+  it('filters a key that is not right after ?/& (ROADMAP item 28, SUN-CHASER-1)', () => {
+    const message = 'Sentry test from sun-chaser setup (latitude=47.65&longitude=9.48';
+    expect(scrubLocationString(message)).toBe(
+      'Sentry test from sun-chaser setup (latitude=[Filtered]&longitude=[Filtered]'
+    );
+  });
+
   it('scrubs nested event fields without mutating the input', () => {
     const event = {
       request: { url: 'https://x.test/?lat=1.5&lon=-2' },
