@@ -19,6 +19,9 @@ export default defineConfig(({ mode }) => {
   },
   build: {
     sourcemap: uploadSourceMaps ? 'hidden' : false,
+    // ponytail: one chunk of ~524 kB (171 kB gzip) is accepted (AUDIT P-7): React DOM and
+    // Sentry are most of it. Load Sentry after first paint if the bundle grows past this.
+    chunkSizeWarningLimit: 600,
   },
   plugins: [
     react(),
