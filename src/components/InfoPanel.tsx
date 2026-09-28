@@ -5,6 +5,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { Button } from './ui/button';
 import LineOfSightDetails from './LineOfSightDetails';
 import PremiumBadge from './PremiumBadge';
+import PlaceSearch from './PlaceSearch';
 import {
   type SunPosition,
   type SunTimes,
@@ -19,7 +20,6 @@ import {
 import { type MoonPosition, type MoonTimes, getMoonPhaseLabel } from '../utils/moonUtils';
 import { type WeatherData } from '../utils/weatherUtils';
 import { isValidLatitude, isValidLongitude } from '../utils/manualLocation';
-import { searchPlaces, formatGeocodeResultLabel, type GeocodeResult } from '../utils/geocodeUtils';
 import { type HorizonProfileStatus } from '../hooks/useHorizonProfile';
 import { type WeatherType } from './CloudLayer';
 import { format } from 'date-fns';
@@ -134,10 +134,6 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   const [latInput, setLatInput] = useState('');
   const [lonInput, setLonInput] = useState('');
   const [locationError, setLocationError] = useState<string | null>(null);
-  const [placeQuery, setPlaceQuery] = useState('');
-  const [placeResults, setPlaceResults] = useState<GeocodeResult[]>([]);
-  const [placeSearchStatus, setPlaceSearchStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
-  const placeAbortRef = useRef<AbortController | null>(null);
   const latInputRef = useRef<HTMLInputElement>(null);
   const changeLocationButtonRef = useRef<HTMLButtonElement>(null);
   const [isMoonCollapsed, setIsMoonCollapsed] = useState(true);
@@ -278,50 +274,6 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     };
   }, [location.latitude, location.longitude, location.loaded, manualPlaceName]);
 
-  // Debounced place-name search (ROADMAP item 12): waits 300ms after typing stops,
-  // ignores queries under 2 characters, and aborts a request superseded by a newer
-  // one so a slow response can never clobber the results of a later query.
-  useEffect(() => {
-    const trimmed = placeQuery.trim();
-    if (trimmed.length < 2) {
-      placeAbortRef.current?.abort();
-      const timeoutId = setTimeout(() => {
-        setPlaceResults([]);
-        setPlaceSearchStatus('idle');
-      }, 0);
-      return () => clearTimeout(timeoutId);
-    }
-
-    const timeoutId = setTimeout(() => {
-      placeAbortRef.current?.abort();
-      const controller = new AbortController();
-      placeAbortRef.current = controller;
-      setPlaceSearchStatus('loading');
-
-      searchPlaces(trimmed, controller.signal)
-        .then((results) => {
-          if (controller.signal.aborted) return;
-          setPlaceResults(results);
-          setPlaceSearchStatus('done');
-        })
-        .catch((error) => {
-          if (controller.signal.aborted) return;
-          console.error('Error searching places:', error);
-          setPlaceResults([]);
-          setPlaceSearchStatus('error');
-        });
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [placeQuery]);
-
-  // Abort any in-flight search when the panel unmounts.
-  useEffect(() => {
-    return () => {
-      placeAbortRef.current?.abort();
-    };
-  }, []);
-
   // Focus the latitude field when the manual-location form opens.
   useEffect(() => {
     if (isLocationFormOpen) {
@@ -329,25 +281,16 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     }
   }, [isLocationFormOpen]);
 
-  const resetPlaceSearch = () => {
-    placeAbortRef.current?.abort();
-    setPlaceQuery('');
-    setPlaceResults([]);
-    setPlaceSearchStatus('idle');
-  };
-
   const openLocationForm = () => {
     setLatInput(location.latitude.toFixed(4));
     setLonInput(location.longitude.toFixed(4));
     setLocationError(null);
-    resetPlaceSearch();
     setIsLocationFormOpen(true);
   };
 
   const closeLocationForm = () => {
     setIsLocationFormOpen(false);
     setLocationError(null);
-    resetPlaceSearch();
     changeLocationButtonRef.current?.focus();
   };
 
@@ -369,9 +312,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     closeLocationForm();
   };
 
-  const handleSelectPlace = (result: GeocodeResult) => {
-    const label = formatGeocodeResultLabel(result);
-    onLocationChange(result.latitude, result.longitude, label);
+  const handleSelectPlace = (latitude: number, longitude: number, name: string) => {
+    onLocationChange(latitude, longitude, name);
     closeLocationForm();
   };
 
@@ -525,52 +467,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
       {isLocationFormOpen && (
         <form onSubmit={handleSubmitLocation} noValidate className="mx-4 mb-3 p-2 space-y-2 text-caption bg-white bg-opacity-10 rounded">
-          <div className="flex flex-col gap-1">
-            <label htmlFor="manual-location-search" className="opacity-80">Search for a place</label>
-            <input
-              id="manual-location-search"
-              type="text"
-              value={placeQuery}
-              onChange={(e) => setPlaceQuery(e.target.value)}
-              placeholder="e.g. Friedrichshafen"
-              className={`bg-black bg-opacity-30 rounded px-2 py-1 text-white ${FOCUS_RING}`}
-              role="combobox"
-              aria-expanded={placeResults.length > 0}
-              aria-controls="manual-location-search-results"
-              aria-autocomplete="list"
-            />
-            {placeSearchStatus === 'loading' && (
-              <p className="opacity-70">Searching…</p>
-            )}
-            {placeSearchStatus === 'error' && (
-              <p role="alert" className="text-brand-coral">Could not search for places.</p>
-            )}
-            {placeSearchStatus === 'done' && placeResults.length === 0 && (
-              <p className="opacity-70">No results</p>
-            )}
-            {placeResults.length > 0 && (
-              <ul
-                id="manual-location-search-results"
-                role="listbox"
-                aria-label="Search results"
-                className="space-y-1"
-              >
-                {placeResults.map((result, index) => (
-                  <li key={`${result.latitude}-${result.longitude}-${index}`}>
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={false}
-                      onClick={() => handleSelectPlace(result)}
-                      className={`w-full text-left px-2 py-1 rounded bg-white bg-opacity-5 hover:bg-opacity-20 transition-colors ${FOCUS_RING}`}
-                    >
-                      {formatGeocodeResultLabel(result)}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <PlaceSearch onSelect={handleSelectPlace} />
           <div className="flex flex-col gap-1">
             <label htmlFor="manual-location-lat" className="opacity-80">Latitude</label>
             <input

@@ -184,6 +184,30 @@ export default {
 				'glow': {
 					'0%, 100%': { opacity: '1' },
 					'50%': { opacity: '0.8' }
+				},
+				'fade-in': {
+					from: { opacity: '0' },
+					to: { opacity: '1' }
+				},
+				'fade-out': {
+					from: { opacity: '1' },
+					to: { opacity: '0' }
+				},
+				// Loading screen (ROADMAP item 39). The mark's sun moves in SVG user units
+				// (viewBox 0 0 120 120): 44 puts it fully under the water line at y 84,
+				// 18 is half-risen.
+				'mark-rise': {
+					from: { transform: 'translateY(44px)' },
+					to: { transform: 'translateY(0)' }
+				},
+				'mark-sink': {
+					from: { transform: 'translateY(0)' },
+					to: { transform: 'translateY(18px)' }
+				},
+				// The scene opens from the 136 px mark, centred at 36 % of the height.
+				'scene-iris': {
+					from: { clipPath: 'circle(68px at 50% 36%)' },
+					to: { clipPath: 'circle(150vmax at 50% 36%)' }
 				}
 			},
 			animation: {
@@ -191,7 +215,15 @@ export default {
 				'accordion-up': 'accordion-up 0.2s ease-out',
 				'sun-rise': 'sun-rise 3s ease-out',
 				'sun-set': 'sun-set 3s ease-out',
-				'glow': 'glow 5s ease-in-out infinite'
+				'glow': 'glow 5s ease-in-out infinite',
+				'fade-in': 'fade-in 0.5s ease-out',
+				// The rise waits 0.4 s, so a location that arrives sooner never shows it.
+				'mark-rise': 'mark-rise 2.6s cubic-bezier(0.22, 0.8, 0.3, 1) 0.4s both',
+				'mark-sink': 'mark-sink 1s ease-in-out both',
+				'mark-glint': 'fade-in 1s ease-out 1.7s both',
+				'mark-glint-out': 'fade-out 1s ease-in-out both',
+				'scene-iris': 'scene-iris 1s cubic-bezier(0.65, 0, 0.25, 1) both',
+				'scene-fade': 'fade-in 0.2s ease-out both'
 			}
 		}
 	},

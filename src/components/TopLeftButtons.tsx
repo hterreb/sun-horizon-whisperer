@@ -36,7 +36,7 @@ const TopLeftButtons: React.FC<TopLeftButtonsProps> = ({
 
   return (
     <div
-      className={`fixed z-40 flex flex-col items-center gap-2 transition-opacity duration-300 has-[:focus-visible]:opacity-100 ${
+      className={`animate-fade-in fixed z-40 flex flex-col items-center gap-2 transition-opacity duration-300 has-[:focus-visible]:opacity-100 ${
         isVisible ? 'opacity-100' : 'opacity-0'
       }`}
       style={{

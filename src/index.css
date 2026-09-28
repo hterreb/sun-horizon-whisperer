@@ -76,6 +76,10 @@
     /* Premium gold (PremiumBadge): gradient from light to deep gold */
     --brand-gold: 43 90% 55%;
     --brand-gold-light: 48 100% 75%;
+    /* App mark (public/logo-mark.svg) colours the palette above lacks: the sky's top
+       stop and the sun. The loading screen draws the mark from tokens (item 39). */
+    --brand-mark-dusk: 254.5 30.8% 42%;
+    --brand-mark-sun: 46.9 100% 65.1%;
 
     /* Scene palette — sky gradient stops, 3 per time-of-day bucket */
     --scene-sky-night-1: 231.4 18.9% 7.3%;
@@ -203,8 +207,10 @@
     @apply border-border;
   }
 
+  /* Night, like the manifest background_color: the first paint before the app
+     mounts continues the splash screen (ROADMAP item 39). */
   body {
-    @apply bg-background text-foreground;
+    @apply bg-brand-night text-foreground;
     overflow: hidden;
     overscroll-behavior: none;
   }
@@ -227,5 +233,10 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+
+  /* The loading screen's hand-off keeps its short fade (ROADMAP item 39). */
+  .animate-scene-fade {
+    animation-duration: 0.2s !important;
   }
 }
