@@ -1,5 +1,9 @@
 import React from 'react';
+import { MessageSquare } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { type CompassStatus } from '@/hooks/useCompassHeading';
+import { GLASS_ICON_BUTTON } from '@/utils/glassChrome';
+import { isFeedbackAvailable, openFeedbackForm } from '@/utils/feedback';
 import FullscreenButton from './FullscreenButton';
 import CompassToggle from './CompassToggle';
 
@@ -12,12 +16,12 @@ interface TopLeftButtonsProps {
   onCompassDisable: () => void;
 }
 
-// The top-left button row (ROADMAP item 22): FullscreenButton and CompassToggle in
-// one fixed flex row so they can't drift apart (fixes SUN-CHASER-2, "compass under
-// the fullscreen button, not next to it"). One visibility rule for the whole row:
-// visible when not in fullscreen, or the idle timer hasn't fired (`showCursor`), or
-// a button in the row has keyboard focus - the last case needs no JS state,
-// `focus-within` covers it.
+// The top-left button row (ROADMAP item 22: FullscreenButton + CompassToggle in one
+// fixed flex row; ROADMAP item 23 adds a "Send feedback" button, shown only when
+// Sentry feedback is set up, so it's reachable in fullscreen too - see
+// isFeedbackAvailable). One visibility rule for the whole row: visible when not in
+// fullscreen, or the idle timer hasn't fired (`showCursor`), or a button in the row
+// has keyboard focus - the last case needs no JS state, `focus-within` covers it.
 const TopLeftButtons: React.FC<TopLeftButtonsProps> = ({
   isFullscreen,
   showCursor,
@@ -40,6 +44,18 @@ const TopLeftButtons: React.FC<TopLeftButtonsProps> = ({
     >
       <FullscreenButton onFullscreenChange={onFullscreenChange} />
       <CompassToggle status={compassStatus} onEnable={onCompassEnable} onDisable={onCompassDisable} />
+      {isFeedbackAvailable() && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={openFeedbackForm}
+          aria-label="Send feedback"
+          className={`${GLASS_ICON_BUTTON} text-white`}
+          title="Send feedback"
+        >
+          <MessageSquare className="h-4 w-4" />
+        </Button>
+      )}
     </div>
   );
 };
