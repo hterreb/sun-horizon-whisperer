@@ -73,6 +73,17 @@ describe('horizonUtils', () => {
       expect(first).toBeLessThan(0);
     });
 
+    it('ignores DEM noise within 200 m of the observer (a pixel beside a summit)', () => {
+      // A 10 m bump 50-150 m away would read as ~9° at 50 m; beyond it the terrain drops away.
+      const summitSampler: ElevationSampler = (lat, lon) => {
+        if (lat === 0 && lon === 0) return 0;
+        const distanceM = Math.sqrt((lat * 111320) ** 2 + (lon * 111320) ** 2);
+        return distanceM < 150 ? 10 : -distanceM / 10;
+      };
+      const profile = computeHorizonProfile(0, 0, EYE_HEIGHT, summitSampler);
+      for (const angle of profile.angles) expect(angle).toBeLessThan(0);
+    });
+
     it('runs the full 360x100-sample sweep in well under 200ms', () => {
       const sampler: ElevationSampler = (lat) => Math.sin(lat) * 50;
       const start = performance.now();
