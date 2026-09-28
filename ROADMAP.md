@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-09-27. Done: items 1–7, 9, 11, 12 (marked **✅ Done** in the heading). Open: items 8, 10, 13–16, easter eggs, backlog.
+Status: last updated 2026-09-27. Done: items 1–12 (marked **✅ Done** in the heading). Open: items 13–16, easter eggs, backlog.
 
 ## Priority rules
 
@@ -94,7 +94,7 @@ Status: last updated 2026-09-27. Done: items 1–7, 9, 11, 12 (marked **✅ Done
   - The full restyle stays in item 15.
 - **Done when:** the tokens exist, and items 8–10 use them.
 
-### 8. Cardinal directions (Himmelsrichtungen) — M
+### 8. Cardinal directions (Himmelsrichtungen) — M — **✅ Done**
 
 - **Why:** the scene shows where the sun is, but not which direction that is. Azimuth only shows as numbers in the panel.
 - **Spec:**
@@ -123,7 +123,7 @@ Status: last updated 2026-09-27. Done: items 1–7, 9, 11, 12 (marked **✅ Done
   - **Line of sight:** covered by item 13.
 - **Done when:** the times match a reference source (for example timeanddate.com) within 2 minutes, and the phase shape is correct on 4 test dates (new, first quarter, full, last quarter).
 
-### 10. Weather-dependent clouds and weather illustrations — M
+### 10. Weather-dependent clouds and weather illustrations — M — **✅ Done**
 
 - **Why:** `WeatherType` has only 6 values (`CloudLayer.tsx:7`). Fog maps to `overcast` and thunder maps to `storm` (`weatherUtils.ts:34-47`). The clouds sit at fixed positions.
 - **Spec:**

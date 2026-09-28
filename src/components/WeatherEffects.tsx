@@ -76,12 +76,16 @@ const WeatherEffects: React.FC<WeatherEffectsProps> = ({
           through rather than being hidden behind them. */}
       {effects.showFog && (
         <div
-          className="absolute left-0 right-0 bottom-0 transition-opacity duration-[3000ms]"
+          data-testid="fog-band"
+          className="absolute left-0 right-0 transition-opacity duration-[3000ms]"
           style={{
-            height: '32%',
+            // Band straddles the horizon: densest just above it, fading up into the sky
+            // and a little down over the water.
+            top: `${horizonY - containerHeight * 0.25}px`,
+            height: `${containerHeight * 0.33}px`,
             background: isNight
-              ? 'linear-gradient(to top, rgba(150,155,165,0.5), rgba(150,155,165,0.12) 65%, transparent)'
-              : 'linear-gradient(to top, rgba(225,228,232,0.65), rgba(225,228,232,0.18) 65%, transparent)'
+              ? 'linear-gradient(to bottom, transparent, rgba(150,155,165,0.35) 55%, rgba(150,155,165,0.5) 76%, transparent)'
+              : 'linear-gradient(to bottom, transparent, rgba(225,228,232,0.5) 55%, rgba(225,228,232,0.7) 76%, transparent)'
           }}
         />
       )}

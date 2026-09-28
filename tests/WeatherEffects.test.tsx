@@ -30,10 +30,16 @@ const baseProps = {
 describe('WeatherEffects (ROADMAP item 10)', () => {
   it('shows a fog band for fog weather, not otherwise', () => {
     const { container, rerender } = render(<WeatherEffects {...baseProps} weatherType="fog" />);
-    expect(container.querySelector('.absolute.left-0.right-0.bottom-0')).not.toBeNull();
+    const fog = container.querySelector<HTMLElement>('[data-testid="fog-band"]');
+    expect(fog).not.toBeNull();
+    // Low over the horizon (at 65% of 600 px = 390 px), not down over the water.
+    const top = parseFloat(fog!.style.top);
+    const height = parseFloat(fog!.style.height);
+    expect(top).toBeLessThan(390);
+    expect(top + height).toBeGreaterThan(390);
 
     rerender(<WeatherEffects {...baseProps} weatherType="clear" />);
-    expect(container.querySelector('.absolute.left-0.right-0.bottom-0')).toBeNull();
+    expect(container.querySelector('[data-testid="fog-band"]')).toBeNull();
   });
 
   it('flashes lightning for storm within the frequency cap, none under reduced motion', () => {
