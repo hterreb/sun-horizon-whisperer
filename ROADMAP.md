@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-09-27. Done: items 1–12 (marked **✅ Done** in the heading). Open: items 13–16, easter eggs, backlog.
+Status: last updated 2026-09-28. Done: items 1–12 (marked **✅ Done** in the heading). Open: items 13–16, the P0 field findings 17–21 (do these first), easter eggs, backlog.
 
 ## Priority rules
 
@@ -80,6 +80,102 @@ Status: last updated 2026-09-27. Done: items 1–12 (marked **✅ Done** in the 
   - Delete the unused `public/mountain-day.svg`, `public/mountain-night.svg` and their references in `sunUtils.ts:202-205`.
   - Add maskable icons (`purpose: "maskable"`) to the manifest.
 - **Done when:** the build contains no third-party script, and a test shows that the moon icon and label match for all 8 phases.
+
+### Field findings (2026-09-28)
+
+Found on a real phone after items 8–11 shipped. Items 17–20 are bugs or UX fixes, item 21 is error reporting.
+
+### 17. Sun arc, and fix the arc line — S
+
+- **Why:**
+  - "Sun is not on the line": the only arc in the scene is the **moon's** path (`moonArcPath` in `SunVisualization.tsx`). There is no sun path. The moon arc is also drawn by day, when the moon is not shown.
+  - "Parabolic line is broken on portrait": `buildArcPath` connects consecutive points with `L`, also when the path crosses the azimuth wrap (0°/360°, or 180° in the southern hemisphere, or any angle with a compass offset). The line then jumps straight across the screen. The x/y clamp to `[30, size − 30]` in `getScreenPosition` also flattens the arc ends into the screen edge. Both show most on narrow (portrait) screens.
+- **Decision (2026-09-28):** add a sun arc and keep the moon arc.
+- **Spec:**
+  - Add `getSunPathAround(date, lat, lon, steps = 48)` to `sunUtils.ts`, the same shape as `moonUtils.getMoonPathAround` (±12 h around `date`). Compute it in `SunTracker` and pass it down as a prop, like `moonPath`.
+  - Draw the sun arc with `buildArcPath` and `getScreenPosition`, the same mapping as the sun dot, in a warm token color (for example `brand-sunset`), stronger than the moon arc.
+  - Draw the moon arc only while the moon is shown (`isMoonVisible`).
+  - `buildArcPath`: start a new segment (`M`) when the x distance between two neighbor points is more than half the width (a wrap).
+  - Do not clamp arc points. Clamp only the sun and moon dots, so the arc runs off-screen cleanly.
+- **Done when:**
+  - A test shows that the sun dot's x/y is a point on the sun arc path (the center sample of `getSunPathAround` is `date` itself).
+  - A test shows that a path across the wrap gives two segments and no line across the screen.
+  - At 390×844 (portrait), in both hemispheres and with a compass offset, no arc draws a straight line across the screen. If the portrait bug still shows after this, get a screenshot and reopen.
+
+### 18. Hide the compass toggle in fullscreen — S
+
+- **Why:** `FullscreenButton` fades out in fullscreen. `CompassToggle` has no hide logic, so it stays on screen.
+- **Spec:**
+  - Pass `isFullscreen` and the existing idle state `showCursor` from `SunTracker` to `CompassToggle`.
+  - In fullscreen, fade the toggle out with the same classes as `FullscreenButton` (`transition-opacity duration-300`, `opacity-0`). Show it again on mouse move, tap or keyboard focus.
+  - The toggle must stay reachable: `opacity-0` only, not `display: none`, and focus makes it visible.
+- **Done when:** in fullscreen both buttons fade out together, and a tap or mouse move brings both back.
+
+### 19. Compass mode rework — M
+
+- **Why:** "all the directions move quite a lot and cluster together". Three causes in the code:
+  1. **No real field of view.** The scene always maps 360° to the screen width. On a 390 px portrait phone, the 8 labels sit about 49 px apart, and 1° of phone turn moves the scene about 1 px. The labels do not match what the camera sees, except at screen center.
+  2. **CSS transition fights the live heading.** The sun, moon and labels have `transition-all duration-1000` (or `transition-transform`). The heading changes on each sensor event, so each update restarts a 1 s animation. At the 359°→0° wrap, the offset jumps by 360°, and all labels slide across the screen at the same time and pass over each other.
+  3. **Too many renders.** `useCompassHeading` calls `setHeading` on each event (up to 60 Hz), and the whole scene re-renders each time.
+- **Decision (2026-09-28):** in compass mode, show a real field of view of about 90°. The static mode keeps the 360° view.
+- **Spec:**
+  - **Field of view:**
+    - Add a compass-mode mapping in `SunVisualization.tsx`: `x = 0.5 + shortestDelta(heading, azimuth) / fov` with `fov = 90`. Use the signed shortest delta (from `compassUtils`), so there is no wrap jump.
+    - Use this mapping for all azimuth consumers: sun and moon dots, both arcs (item 17), cardinal labels, and the rainbow.
+    - Hide elements outside the field of view. Do not clamp them to the edge.
+    - Replace the offset-based `headingToAzimuthOffset` path with the new mapping. Delete what is then unused.
+    - Keep the value `COMPASS_FOV_DEG = 90` as a named constant, so it can be tuned on real devices.
+  - **Off-screen sun hint:** when the sun (by night: the moon) is outside the field of view, show a small arrow at the left or right edge that points the short way to it.
+  - **Smooth motion:**
+    - While compass mode is active, remove the CSS transitions from the moving elements. The low-pass filter does the smoothing.
+    - Update the heading state at most once per animation frame (keep the rAF id in a `useRef`, see CLAUDE.md).
+  - **Heading check on devices:** the Android formula in `headingFromDeviceOrientationEvent` uses beta and gamma. Test it with the phone upright (beta ≈ 90°), where Euler alpha is unstable. Add a unit test that the heading changes smoothly for beta from 80° to 100° at a fixed direction.
+- **Done when:**
+  - On a real Android phone and a real iPhone, in portrait: pointing the phone at the sun puts the sun at screen center. Turning the phone by 45° moves the sun to the screen edge.
+  - The labels match real directions (check against a hardware compass within about 10°), and they do not slide or bunch up at the 0°/360° wrap.
+  - Unit tests cover the field-of-view mapping, including the wrap and the hide-when-outside rule.
+
+### 20. Golden and blue hour: show only the next pair — S
+
+- **Why:** the InfoPanel shows 4 rows (morning and evening, golden and blue). Only the next ones are useful.
+- **Decision (2026-09-28):** show the next blue hour and the next golden hour, from the same part of the day.
+- **Spec:**
+  - Add a pure util `getNextGoldenBlueHours(now, lat, lon)` to `sunUtils.ts`. It returns `{ part: 'morning' | 'evening', day: 'today' | 'tomorrow', golden, blue }`. Follow the pattern of `getRelevantTwilightTimes`:
+    - Before the morning golden hour ends: today's morning pair.
+    - Before the evening blue hour ends: today's evening pair.
+    - Else: tomorrow's morning pair.
+  - InfoPanel: show 2 rows, in time order (morning: blue, then golden; evening: golden, then blue). Put the part in the heading, for example "Golden & Blue Hour · this evening" or "· tomorrow morning".
+  - Mark a window that is running now (for example "now, until 19:42").
+  - Polar day or night (a window is `null`): keep the current "—" output.
+- **Done when:** unit tests cover 4 times of day (before sunrise, midday, during the evening golden hour, after dusk) and one polar case, and the panel shows 2 rows.
+
+### 21. Sentry: error reports and anonymous feedback — S — **✅ Done** (except the release to-dos below)
+
+- **Why:** field bugs like 17–19 were found by hand. We need crash reports from real devices, and a simple way for users to report a problem.
+- **Decision (2026-09-28):** errors and anonymous user feedback only. No performance tracing, no session replay.
+- **Spec:**
+  - Add `@sentry/react`. Call `Sentry.init` in `src/main.tsx` only when `VITE_SENTRY_DSN` is set. With no DSN (local dev, tests), Sentry is off.
+  - Wrap the app in `Sentry.ErrorBoundary` with a simple fallback ("Something went wrong — reload").
+  - **Privacy (location is personal data):**
+    - `sendDefaultPii: false`. Do not call `setUser`.
+    - In `beforeSend` and `beforeBreadcrumb`, remove `latitude`/`longitude` query values from URLs (the Open-Meteo and geocoding requests carry them) and drop the manual-location `localStorage` values. Put the scrub logic in a pure function with a test.
+  - **Feedback:** add `Sentry.feedbackIntegration` with `showName: false`, `showEmail: false`, `isNameRequired: false`, `isEmailRequired: false`. Open it from a "Send feedback" entry in the InfoPanel, not a floating button (`autoInject: false`), so it doesn't cover the scene.
+  - **Source maps:** upload with `@sentry/vite-plugin` only when `SENTRY_AUTH_TOKEN` is set (CI). Keep the token out of git.
+  - Set `release` from the package version and `environment` from `import.meta.env.MODE`.
+  - Document `VITE_SENTRY_DSN` and `SENTRY_AUTH_TOKEN` in the README.
+  - Item 16: list Sentry in the privacy policy and the data-safety form ("crash logs, diagnostics", not linked to identity).
+- **Sentry project:** org `ainabler`, project `sun-chaser`, on sentry.io (SaaS). The project's region is still to be confirmed.
+- **Built (2026-09-28), differences from the spec:**
+  - Sentry v11 has no `sendDefaultPii`. `dataCollection` is used instead (no user info, cookies, headers or bodies; location query params denied).
+  - Sentry does not read `localStorage`, so there was nothing to drop for the manual location.
+  - `release` is not set by hand. The Vite plugin sets it (git SHA) when it uploads the source maps.
+  - The screenshot option in the feedback form is off, because a screenshot would show the location.
+- **Release to-dos:** set `VITE_SENTRY_DSN` and `SENTRY_AUTH_TOKEN` in the deploy/CI environment, and add Sentry to the privacy policy (item 16).
+- **Setup note:** do not use `npx @sentry/wizard -i reactRouter`. It is for React Router v7 *framework mode*, and this app uses the router as a plain library in a Vite SPA. Add `@sentry/react` by hand as specified above. For the source-map upload only, use `npx @sentry/wizard@latest -i sourcemaps --saas --org ainabler --project sun-chaser`.
+- **Done when:**
+  - A thrown test error shows up in Sentry with readable stack frames and no coordinates in the event.
+  - A feedback message sent from the InfoPanel shows up in Sentry with no name or email.
+  - With no DSN set, the app makes no request to Sentry.
 
 ---
 
