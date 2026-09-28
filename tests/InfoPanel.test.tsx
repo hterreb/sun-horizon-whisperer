@@ -193,6 +193,66 @@ describe('InfoPanel', () => {
     vi.unstubAllGlobals();
   });
 
+  describe('coordinates and weather update time (ROADMAP item 25)', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('hides the coordinates once a place name is known, and shows them again in the "Change location" form', async () => {
+      const fetchMock = vi.fn(() =>
+        Promise.resolve({ json: () => Promise.resolve({ city: 'Test City', countryName: 'Testland' }) })
+      );
+      vi.stubGlobal('fetch', fetchMock);
+
+      render(<InfoPanel {...defaultProps} location={{ latitude: 12.3456, longitude: -65.4321, loaded: true }} />);
+
+      await screen.findByText('Test City, Testland');
+      expect(screen.queryByText(/12\.3456/)).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /change location/i }));
+      expect(screen.getByLabelText(/latitude/i)).toHaveValue(12.3456);
+      expect(screen.getByLabelText(/longitude/i)).toHaveValue(-65.4321);
+    });
+
+    it('shows the coordinates while the place name is still loading', () => {
+      // A fetch that never resolves keeps the panel in the "loading" state.
+      vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+
+      render(<InfoPanel {...defaultProps} location={{ latitude: 12.3456, longitude: -65.4321, loaded: true }} />);
+      expect(screen.getByText(/loading location/i)).toBeInTheDocument();
+      expect(screen.getByText(/12\.3456.*-65\.4321/)).toBeInTheDocument();
+    });
+
+    it('shows the coordinates when the reverse geocode fails', async () => {
+      vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('network down'))));
+
+      render(<InfoPanel {...defaultProps} location={{ latitude: 12.3456, longitude: -65.4321, loaded: true }} />);
+
+      await screen.findByText('Unknown Location');
+      expect(screen.getByText(/12\.3456.*-65\.4321/)).toBeInTheDocument();
+    });
+
+    it('removes the "Updated: HH:mm" line, and keeps the "Real weather unavailable" warning and the refresh button', () => {
+      const weatherData: WeatherData = {
+        temperature: 10,
+        weatherType: 'clear',
+        weatherDescription: 'Clear',
+        lastUpdated: new Date(),
+        isRealWeather: false,
+        sunsetScoreToday: null,
+        sunsetScoreTomorrow: null,
+        cloudCoverPercent: null,
+        windSpeedKmh: null,
+        windDirectionDeg: null,
+      };
+      render(<InfoPanel {...defaultProps} weatherData={weatherData} />);
+
+      expect(screen.queryByText(/updated:/i)).not.toBeInTheDocument();
+      expect(screen.getByText(/real weather unavailable/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/refresh weather/i)).toBeInTheDocument();
+    });
+  });
+
   describe('manual location (A-4)', () => {
     it('opens a labeled, pre-filled form from "Change location" and closes on Cancel', () => {
       render(<InfoPanel {...defaultProps} location={{ latitude: 12.3456, longitude: -65.4321, loaded: true }} />);
