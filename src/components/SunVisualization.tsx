@@ -272,8 +272,11 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   };
 
   const getGlowIntensity = () => {
-    // Reduce glow intensity for stormy/rainy weather
-    const baseGlow = weatherType === 'storm' || weatherType === 'rain' ? 0.3 : 
+    // Reduce glow intensity for grey/wet weather - fog scatters it the most, snow
+    // the least (ROADMAP item 10).
+    const baseGlow = weatherType === 'storm' || weatherType === 'rain' || weatherType === 'hail' ? 0.3 :
+                     weatherType === 'fog' ? 0.25 :
+                     weatherType === 'drizzle' || weatherType === 'overcast' ? 0.5 :
                      weatherType === 'snow' ? 0.5 : 1;
     
     if (sunPosition.altitude > 10) {
