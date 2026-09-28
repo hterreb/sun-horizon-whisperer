@@ -158,10 +158,14 @@ const SunTracker: React.FC = () => {
       }, 10000);
     };
 
+    // A tap should bring the cursor (and the fullscreen/compass toggles, which fade
+    // together with it - ROADMAP item 18) back too; mobile taps don't fire mousemove.
     document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('touchstart', handleMouseMove);
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('touchstart', handleMouseMove);
       if (cursorTimeoutRef.current) {
         clearTimeout(cursorTimeoutRef.current);
       }
@@ -444,7 +448,13 @@ const SunTracker: React.FC = () => {
       <NightStars timeOfDay={timeOfDay} moonPosition={moonPosition} />
       <MusicPlayer isFullscreen={isFullscreen} />
       <FullscreenButton onFullscreenChange={setIsFullscreen} />
-      <CompassToggle status={compassStatus} onEnable={handleCompassEnable} onDisable={disableCompass} />
+      <CompassToggle
+        status={compassStatus}
+        onEnable={handleCompassEnable}
+        onDisable={disableCompass}
+        isFullscreen={isFullscreen}
+        showCursor={showCursor}
+      />
       <PWAInstallPrompt />
       <MidnightGhost currentTime={date} />
       <TemperatureIceberg 
