@@ -103,8 +103,9 @@ interface SkyPass {
 // `date` to the next one after, when the sun is currently up; otherwise the next full
 // pass (next rise, then the following set). Bounded to +-24h per search, so polar
 // day/night (no crossing at all within that range) safely comes back null instead of
-// searching forever.
-const findSunPass = (date: Date, latitude: number, longitude: number): SkyPass | null => {
+// searching forever. Exported for arcLabels.ts, which needs the same pass boundaries
+// to match rise/set/zenith labels to the arc actually drawn.
+export const findSunPass = (date: Date, latitude: number, longitude: number): SkyPass | null => {
   const altitudeAt = (ms: number) => getSunPosition(new Date(ms), latitude, longitude).altitude;
   const dateMs = date.getTime();
 
