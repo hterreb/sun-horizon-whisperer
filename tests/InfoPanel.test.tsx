@@ -4,6 +4,7 @@ import { vi } from 'vitest';
 import InfoPanel from '../src/components/InfoPanel';
 import { type TimeOfDay, type SunTimes } from '../src/utils/sunUtils';
 import { type WeatherType } from '../src/components/CloudLayer';
+import { type WeatherData } from '../src/utils/weatherUtils';
 
 describe('InfoPanel', () => {
   const now = new Date();
@@ -57,6 +58,36 @@ describe('InfoPanel', () => {
     const panel = container.firstChild as HTMLElement;
     expect(panel.className).toContain('z-30');
     expect(panel.className).toContain('max-h-dvh');
+  });
+
+  it('shows a frost edge below -5°C, not otherwise (ROADMAP item 10)', () => {
+    const weatherAt = (temperature: number): WeatherData => ({
+      temperature,
+      weatherType: 'snow',
+      weatherDescription: 'Snow',
+      lastUpdated: new Date(),
+      isRealWeather: true,
+      sunsetScoreToday: null,
+      sunsetScoreTomorrow: null,
+      cloudCoverPercent: null,
+      windSpeedKmh: null,
+      windDirectionDeg: null,
+    });
+
+    const { container, rerender } = render(<InfoPanel {...defaultProps} weatherData={weatherAt(-6)} />);
+    let panel = container.firstChild as HTMLElement;
+    expect(panel.className).toContain('shadow-[inset_0_0_22px_4px_rgba(191,219,254,0.35)');
+
+    rerender(<InfoPanel {...defaultProps} weatherData={weatherAt(-4)} />);
+    panel = container.firstChild as HTMLElement;
+    expect(panel.className).not.toContain('shadow-[inset_0_0_22px_4px_rgba(191,219,254,0.35)');
+  });
+
+  it('offers all 10 weather types in the manual picker (ROADMAP item 10)', () => {
+    render(<InfoPanel {...defaultProps} useRealWeather={false} />);
+    for (const label of ['Clear', 'Partly', 'Cloudy', 'Overcast', 'Fog', 'Drizzle', 'Rain', 'Storm', 'Snow', 'Hail']) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
   });
 
   // More tests for collapse/expand, weather options, etc.
