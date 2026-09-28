@@ -39,11 +39,14 @@ import { toast } from '@/components/ui/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useWakeLock } from '@/hooks/useWakeLock';
 import { useCompassHeading } from '@/hooks/useCompassHeading';
+import { useHorizonProfile } from '@/hooks/useHorizonProfile';
 import { loadManualLocation, saveManualLocation, clearManualLocation } from '../utils/manualLocation';
 import {
   hasSeenCompassCalibrationHint,
   markCompassCalibrationHintSeen
 } from '../utils/compassUtils';
+import { getTerrainSunTimes, getTerrainMoonTimes } from '../utils/horizonUtils';
+import { isLineOfSightEnabled } from '../utils/premium';
 
 // Sky gradient brightness shift per weather type (ROADMAP item 10), in per-channel
 // RGB units - see shiftGradientBrightness. Grey/wet weather darkens the sky; snow
@@ -59,6 +62,26 @@ const WEATHER_GRADIENT_SHIFT: Record<WeatherType, number> = {
   storm: -40,
   hail: -25,
   snow: 15,
+};
+
+// Eye height above ground for line of sight with terrain (ROADMAP item 13): e.g. a
+// building floor or a tower, clamped to a sane 0-1000 m range and persisted like
+// manualLocation.ts's try/catch-wrapped localStorage pattern.
+const EYE_HEIGHT_STORAGE_KEY = 'eye-height-m';
+const DEFAULT_EYE_HEIGHT_M = 1.7;
+const MAX_EYE_HEIGHT_M = 1000;
+
+const clampEyeHeight = (value: number): number =>
+  Number.isFinite(value) ? Math.min(MAX_EYE_HEIGHT_M, Math.max(0, value)) : DEFAULT_EYE_HEIGHT_M;
+
+const loadStoredEyeHeight = (): number => {
+  try {
+    const raw = localStorage.getItem(EYE_HEIGHT_STORAGE_KEY);
+    return raw === null ? DEFAULT_EYE_HEIGHT_M : clampEyeHeight(Number(raw));
+  } catch (error) {
+    console.error('Error reading eye height:', error);
+    return DEFAULT_EYE_HEIGHT_M;
+  }
 };
 
 const SunTracker: React.FC = () => {
@@ -112,6 +135,26 @@ const SunTracker: React.FC = () => {
   // static, full-circle view.
   const { status: compassStatus, heading: rawCompassHeading, enable: enableCompass, disable: disableCompass } = useCompassHeading();
   const activeCompassHeading = compassStatus === 'active' ? rawCompassHeading : null;
+
+  // Line of sight with terrain (ROADMAP item 13): eye height is user-editable (via
+  // InfoPanel) and persisted, and gates/feeds the horizon profile load below.
+  const [eyeHeight, setEyeHeight] = useState<number>(loadStoredEyeHeight);
+  const handleEyeHeightChange = useCallback((value: number) => {
+    const clamped = clampEyeHeight(value);
+    setEyeHeight(clamped);
+    try {
+      localStorage.setItem(EYE_HEIGHT_STORAGE_KEY, String(clamped));
+    } catch (error) {
+      console.error('Error saving eye height:', error);
+    }
+  }, []);
+
+  const { profile: horizonProfile, status: terrainStatus } = useHorizonProfile(
+    location.latitude,
+    location.longitude,
+    eyeHeight,
+    isLineOfSightEnabled() && location.loaded
+  );
 
   const handleCompassEnable = useCallback(() => {
     if (!hasSeenCompassCalibrationHint()) {
@@ -403,6 +446,25 @@ const SunTracker: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on moonHourKey (the hour), not `date` itself
   }, [moonHourKey, location.loaded, location.latitude, location.longitude]);
 
+  // Terrain-adjusted sun/moon times (ROADMAP item 13) only change per day/location/
+  // profile, unlike sun/moon position - keyed on the date string plus the profile's
+  // own identity (a new object each time the horizon profile (re)loads), not `date`
+  // itself.
+  const terrainDateKey = date.toDateString();
+  const terrainExtras = useMemo(() => {
+    if (!horizonProfile) {
+      return {
+        terrainSunTimes: null as { sunrise: Date | null; sunset: Date | null } | null,
+        terrainMoonTimes: null as { rise: Date | null; set: Date | null } | null,
+      };
+    }
+    return {
+      terrainSunTimes: getTerrainSunTimes(date, location.latitude, location.longitude, horizonProfile),
+      terrainMoonTimes: getTerrainMoonTimes(date, location.latitude, location.longitude, horizonProfile),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on terrainDateKey (the day) and the profile identity, not `date` itself
+  }, [terrainDateKey, horizonProfile, location.latitude, location.longitude]);
+
   const getBackgroundStyle = useCallback(() => {
     const baseGradient = getBackgroundGradient(timeOfDay);
     // Per-channel brightness shift (ROADMAP item 10): darker for grey/wet weather,
@@ -471,6 +533,7 @@ const SunTracker: React.FC = () => {
             windSpeedKmh={weatherData?.windSpeedKmh ?? null}
             windDirectionDeg={weatherData?.windDirectionDeg ?? null}
             compassHeading={activeCompassHeading}
+            horizonProfile={horizonProfile}
           />
           <InfoPanel
             sunPosition={sunPosition}
@@ -494,6 +557,11 @@ const SunTracker: React.FC = () => {
             onWeatherRefresh={handleWeatherRefresh}
             onLocationChange={handleLocationChange}
             onUseMyLocation={handleUseMyLocation}
+            terrainStatus={terrainStatus}
+            terrainSunTimes={terrainExtras.terrainSunTimes}
+            terrainMoonTimes={terrainExtras.terrainMoonTimes}
+            eyeHeightMeters={eyeHeight}
+            onEyeHeightChange={handleEyeHeightChange}
           />
         </>
       ) : (

@@ -9,7 +9,9 @@ import SunVisualization, {
   buildArcPath,
   getRainbowGeometry,
   COMPASS_FOV_DEG,
+  buildTerrainSegments,
 } from '../src/components/SunVisualization';
+import type { HorizonProfile } from '../src/utils/horizonUtils';
 
 describe('getAzimuthScreenFraction (C-3, static/non-compass mode)', () => {
   it('northern hemisphere: culmination (180°, South) stays centered', () => {
@@ -319,5 +321,87 @@ describe('SunVisualization (rendered): static cardinal direction labels (ROADMAP
     );
 
     expect(screen.queryByTestId('compass-off-fov-hint')).not.toBeInTheDocument();
+  });
+});
+
+describe('buildTerrainSegments (ROADMAP item 13, line of sight with terrain)', () => {
+  const flatProfile: HorizonProfile = { angles: new Array(360).fill(0), observerElevation: 0, eyeHeight: 1.7 };
+  const ridgeProfile: HorizonProfile = { angles: new Array(360).fill(10), observerElevation: 0, eyeHeight: 1.7 };
+  const valleyProfile: HorizonProfile = { angles: new Array(360).fill(-10), observerElevation: 0, eyeHeight: 1.7 };
+
+  it('static mode samples the full 360° circle', () => {
+    const segments = buildTerrainSegments(flatProfile, 800, 600, 51, null);
+    const totalPoints = segments.reduce((sum, s) => sum + s.length, 0);
+    expect(totalPoints).toBe(360);
+  });
+
+  it('compass FOV mode samples only the visible azimuth range, not the full circle', () => {
+    const segments = buildTerrainSegments(flatProfile, 800, 600, 51, 180);
+    const totalPoints = segments.reduce((sum, s) => sum + s.length, 0);
+    expect(totalPoints).toBe(COMPASS_FOV_DEG + 1);
+  });
+
+  it('clamps a valley (angle below 0°) to the same y as the flat horizon line', () => {
+    const flatSegments = buildTerrainSegments(flatProfile, 800, 600, 51, 180);
+    const valleySegments = buildTerrainSegments(valleyProfile, 800, 600, 51, 180);
+    expect(valleySegments[0].map((p) => p.y)).toEqual(flatSegments[0].map((p) => p.y));
+  });
+
+  it('places a ridge (positive angle) higher on screen (smaller y) than the flat horizon', () => {
+    const flatSegments = buildTerrainSegments(flatProfile, 800, 600, 51, 180);
+    const ridgeSegments = buildTerrainSegments(ridgeProfile, 800, 600, 51, 180);
+    expect(ridgeSegments[0][0].y).toBeLessThan(flatSegments[0][0].y);
+  });
+
+  it('returns nothing for a zero-sized container', () => {
+    expect(buildTerrainSegments(ridgeProfile, 0, 600, 51, null)).toEqual([]);
+  });
+});
+
+describe('SunVisualization (rendered): terrain silhouette (ROADMAP item 13)', () => {
+  const originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+  const originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
+
+  const setMockedContainerSize = (width: number, height: number) => {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { value: width, configurable: true });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { value: height, configurable: true });
+  };
+
+  afterEach(() => {
+    if (originalClientWidth) Object.defineProperty(HTMLElement.prototype, 'clientWidth', originalClientWidth);
+    if (originalClientHeight) Object.defineProperty(HTMLElement.prototype, 'clientHeight', originalClientHeight);
+  });
+
+  const ridgeProfile: HorizonProfile = { angles: new Array(360).fill(15), observerElevation: 500, eyeHeight: 1.7 };
+
+  const baseProps = {
+    sunPosition: { azimuth: 180, altitude: 30 },
+    moonPosition: { azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false },
+    sunPath: [],
+    moonPath: [],
+    timeOfDay: 'midday' as const,
+    weatherType: 'clear' as const,
+    latitude: 51,
+  };
+
+  it('draws the terrain silhouette when a profile is present', () => {
+    setMockedContainerSize(800, 600);
+    render(<SunVisualization {...baseProps} horizonProfile={ridgeProfile} />);
+    expect(screen.getByTestId('terrain-silhouette')).toBeInTheDocument();
+  });
+
+  it('draws no terrain silhouette without a profile', () => {
+    setMockedContainerSize(800, 600);
+    render(<SunVisualization {...baseProps} />);
+    expect(screen.queryByTestId('terrain-silhouette')).not.toBeInTheDocument();
+  });
+
+  it('draws the sun before the ridge in DOM order, so the ridge visually occludes it', () => {
+    setMockedContainerSize(800, 600);
+    render(<SunVisualization {...baseProps} horizonProfile={ridgeProfile} />);
+
+    const sunDot = screen.getByTestId('sun-dot');
+    const ridge = screen.getByTestId('terrain-silhouette');
+    expect(sunDot.compareDocumentPosition(ridge) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
