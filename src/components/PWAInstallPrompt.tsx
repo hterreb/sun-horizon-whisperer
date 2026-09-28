@@ -12,6 +12,7 @@ interface BeforeInstallPromptEvent extends Event {
 const PWAInstallPrompt: React.FC = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
+  const [manualSteps, setManualSteps] = useState<string[] | null>(null);
 
   // Both are plain reads of the current browser environment, so they're derived
   // during render instead of synced into state via an effect.
@@ -87,30 +88,27 @@ const PWAInstallPrompt: React.FC = () => {
     }
   };
 
+  // Manual steps show inside this card, not in a blocking alert() (AUDIT C-7).
   const showManualInstructions = () => {
-    let message = 'To install Sun Chaser as an app:\n\n';
-    
     if (isIOS) {
-      message += '📱 On iPhone/iPad:\n';
-      message += '1. Tap the Share button (⬆️) at the bottom\n';
-      message += '2. Scroll down and tap "Add to Home Screen"\n';
-      message += '3. Tap "Add" to confirm\n\n';
-      message += 'The app will appear on your home screen!';
+      setManualSteps([
+        'Tap the Share button (⬆️) at the bottom',
+        'Scroll down and tap "Add to Home Screen"',
+        'Tap "Add" to confirm',
+      ]);
     } else if (/Android/.test(navigator.userAgent)) {
-      message += '📱 On Android:\n';
-      message += '1. Tap the menu (⋮) in your browser\n';
-      message += '2. Look for "Add to Home Screen" or "Install App"\n';
-      message += '3. Tap "Add" or "Install"\n\n';
-      message += 'The app will be added to your home screen!';
+      setManualSteps([
+        'Tap the menu (⋮) in your browser',
+        'Look for "Add to Home Screen" or "Install App"',
+        'Tap "Add" or "Install"',
+      ]);
     } else {
-      message += '💻 On Desktop:\n';
-      message += '1. Look for an install icon in your address bar\n';
-      message += '2. Or check your browser menu for "Install Sun Chaser"\n';
-      message += '3. Click "Install" to add it as a desktop app';
+      setManualSteps([
+        'Look for an install icon in your address bar',
+        'Or check your browser menu for "Install Sun Chaser"',
+        'Click "Install" to add it as a desktop app',
+      ]);
     }
-    
-    alert(message);
-    setShowPrompt(false);
   };
 
   const handleDismiss = () => {
@@ -138,20 +136,30 @@ const PWAInstallPrompt: React.FC = () => {
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="font-bold text-title mb-1">Install Sun Chaser</h3>
-            <p className="text-body text-white/80 leading-relaxed">
-              Get the full app experience! Install Sun Chaser for offline access,
-              faster loading, and easy access from your home screen.
-            </p>
+            {manualSteps ? (
+              <ol className="list-decimal pl-5 text-body text-white/80 leading-relaxed">
+                {manualSteps.map((step) => <li key={step}>{step}</li>)}
+              </ol>
+            ) : (
+              <p className="text-body text-white/80 leading-relaxed">
+                Get the full app experience! Install Sun Chaser for offline access,
+                faster loading, and easy access from your home screen.
+              </p>
+            )}
           </div>
         </div>
         <div className="flex gap-2 flex-shrink-0">
           <Button
             size="sm"
-            onClick={handleInstall}
+            onClick={manualSteps ? () => setShowPrompt(false) : handleInstall}
             className="rounded-full bg-brand-sunset text-brand-night hover:bg-brand-sunset/90 font-semibold px-4 py-2"
           >
-            <Download className="h-4 w-4 mr-2" />
-            Install
+            {manualSteps ? 'Got it' : (
+              <>
+                <Download className="h-4 w-4 mr-2" />
+                Install
+              </>
+            )}
           </Button>
           <Button
             size="sm"

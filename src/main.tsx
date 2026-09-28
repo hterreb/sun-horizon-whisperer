@@ -54,7 +54,10 @@ createRoot(document.getElementById("root")!).render(
 const updateSW = registerSW({
   immediate: true,
   onNeedRefresh() {
-    updateSW(true)
+    // Reload when the user leaves the tab, not under them (AUDIT P-6).
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) updateSW(true)
+    })
   },
   onOfflineReady() {
   },
