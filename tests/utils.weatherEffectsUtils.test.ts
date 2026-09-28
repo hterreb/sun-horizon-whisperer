@@ -1,4 +1,4 @@
-import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS } from '../src/utils/weatherEffectsUtils';
+import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat } from '../src/utils/weatherEffectsUtils';
 
 describe('getWeatherEffects (ROADMAP item 10)', () => {
   it('shows fog only for the fog type', () => {
@@ -72,5 +72,27 @@ describe('canFlashLightning (ROADMAP item 10)', () => {
 
   it('allows a flash once the minimum gap has passed', () => {
     expect(canFlashLightning(1000, 1000 + LIGHTNING_MIN_GAP_MS)).toBe(true);
+  });
+});
+
+describe('pickBoat (ROADMAP item 36)', () => {
+  const picks = (type: Parameters<typeof pickBoat>[0], windKmh: number | null) =>
+    new Set(Array.from({ length: 100 }, (_, i) => pickBoat(type, windKmh, i / 100)));
+
+  it('sends out every boat in fair, calm weather, the sailboat most often', () => {
+    expect(picks('clear', 0)).toEqual(new Set(['sailboat', 'ferry', 'fishing', 'rowboat', 'freighter']));
+    const sailboats = Array.from({ length: 100 }, (_, i) => pickBoat('partly', 0, i / 100)).filter(k => k === 'sailboat');
+    expect(sailboats.length).toBe(44); // 35 of 80
+  });
+
+  it('keeps only the ferry and the freighter out in rain, drizzle, fog and snow', () => {
+    for (const type of ['rain', 'drizzle', 'fog', 'snow'] as const) {
+      expect(picks(type, 0)).toEqual(new Set(['ferry', 'freighter']));
+    }
+  });
+
+  it('keeps the rowboat ashore above 40 km/h wind', () => {
+    expect(picks('clear', 41).has('rowboat')).toBe(false);
+    expect(picks('clear', 40).has('rowboat')).toBe(true);
   });
 });
