@@ -79,21 +79,23 @@ const MidnightGhost: React.FC<MidnightGhostProps> = ({ currentTime }) => {
         opacity: isVisible ? 0.8 : 0
       }}
     >
-      {/* Ghost Icon with effects */}
+      {/* Ghost Icon with effects - the style book's D ghost: a soft white glow
+          (ROADMAP item 15 D polish, ghostTile('d')). */}
       <div className="relative animate-pulse">
-        <Ghost 
-          size={64} 
-          className="text-white drop-shadow-lg"
+        <Ghost
+          size={64}
+          className="drop-shadow-lg"
           style={{
-            filter: 'drop-shadow(0 0 20px rgba(255,255,255,0.6))'
+            color: 'hsl(var(--scene-glow-white))',
+            filter: 'drop-shadow(0 0 20px hsl(var(--scene-glow-white) / 0.6))'
           }}
         />
-        
+
         {/* Spooky glow effect */}
-        <div 
+        <div
           className="absolute inset-0 rounded-full blur-xl opacity-30"
           style={{
-            background: 'radial-gradient(circle, rgba(255,255,255,0.6) 0%, rgba(200,200,255,0.3) 50%, transparent 70%)',
+            background: 'radial-gradient(circle, hsl(var(--scene-glow-white) / 0.6) 0%, hsl(var(--scene-ghost-halo) / 0.3) 50%, transparent 70%)',
             transform: 'scale(1.5)'
           }}
         />

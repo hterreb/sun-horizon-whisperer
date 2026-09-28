@@ -1,4 +1,4 @@
-import { getSunPosition, getSunTimes, getTimeOfDay, getRelevantTwilightTimes, formatTime, getGoldenHourTimes, getBlueHourTimes, getNextGoldenBlueHours, shiftGradientBrightness, getSunPathAround } from '../src/utils/sunUtils';
+import { getSunPosition, getSunTimes, getTimeOfDay, getRelevantTwilightTimes, formatTime, getGoldenHourTimes, getBlueHourTimes, getNextGoldenBlueHours, shiftGradientBrightness, getSunPathAround, getBackgroundGradient } from '../src/utils/sunUtils';
 describe('sunUtils', () => {
   it('calculates sun position', () => {
     const pos = getSunPosition(new Date(), 0, 0);
@@ -252,6 +252,34 @@ describe('sunUtils', () => {
       expect(result).toContain('linear-gradient(to bottom,');
       expect(result).toContain('0%');
       expect(result).toContain('100%)');
+    });
+  });
+
+  describe('getBackgroundGradient (ROADMAP item 15 D polish, third sky-gradient stop)', () => {
+    it('returns a 3-stop gradient (not the old 2-stop) for every time of day', () => {
+      const timesOfDay = [
+        'night', 'astronomical-twilight', 'nautical-twilight', 'civil-twilight',
+        'dawn', 'morning', 'midday', 'afternoon', 'evening',
+      ] as const;
+      for (const timeOfDay of timesOfDay) {
+        const gradient = getBackgroundGradient(timeOfDay);
+        const hexStops = gradient.match(/#[0-9a-fA-F]{6}/g) ?? [];
+        expect(hexStops).toHaveLength(3);
+      }
+    });
+
+    it('keeps literal #rrggbb hex (not a CSS var) so shiftGradientBrightness (ROADMAP item 10) still applies', () => {
+      const gradient = getBackgroundGradient('midday');
+      const shifted = shiftGradientBrightness(gradient, -10);
+      expect(shifted).not.toBe(gradient);
+      expect(shifted).toMatch(/^linear-gradient\(to bottom, #[0-9a-fA-F]{6} 0%, #[0-9a-fA-F]{6} 62%, #[0-9a-fA-F]{6} 100%\)$/);
+    });
+
+    it("'midday' matches the --scene-sky-day-* bucket tokens (index.css/tailwind.config.ts)", () => {
+      // --scene-sky-day-1/2/3: brand-sky #0EA5E9, brand-cyan #33C3F0, brand-peach #FEC6A1.
+      expect(getBackgroundGradient('midday')).toBe(
+        'linear-gradient(to bottom, #0EA5E9 0%, #33C3F0 62%, #FEC6A1 100%)'
+      );
     });
   });
 

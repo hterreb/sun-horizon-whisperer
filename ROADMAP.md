@@ -320,7 +320,7 @@ Found on a real phone after items 8–11 shipped. Items 17–20 are bugs or UX f
 
 ## P3 — Brand and distribution
 
-### 15. Redesign: logo, CI and look & feel — L
+### 15. Redesign: logo, CI and look & feel — L — **✅ Done** (badge unreadable at 48 px → app icon uses the text-free mark)
 
 - **Status quo:**
   - UI colors are the stock shadcn tokens (`index.css`, `tailwind.config.ts`). The app has no palette of its own.

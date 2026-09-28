@@ -25,7 +25,10 @@ interface FireworksProps {
   trigger: boolean;
 }
 
-const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff'];
+// A celebratory rainbow burst, deliberately not tied to the D brand/scene palette
+// (ROADMAP item 15): fireworks are a once-a-crossing special effect, not part of the
+// everyday sky, so they keep their own saturated confetti colors.
+const FIREWORK_COLORS = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff'];
 
 const Fireworks: React.FC<FireworksProps> = ({ trigger }) => {
   const [fireworks, setFireworks] = useState<Firework[]>([]);
@@ -49,7 +52,7 @@ const Fireworks: React.FC<FireworksProps> = ({ trigger }) => {
         y,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
-        color: colors[Math.floor(Math.random() * colors.length)],
+        color: FIREWORK_COLORS[Math.floor(Math.random() * FIREWORK_COLORS.length)],
         life: 400 + Math.random() * 200, // 6-10 seconds at 60fps
         maxLife: 400 + Math.random() * 200
       });
