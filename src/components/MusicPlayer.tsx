@@ -206,7 +206,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
 
   return (
     <div 
-      className={`fixed z-20 ${GLASS_SURFACE} rounded-full px-3 py-2 flex items-center gap-2 transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'}`}
+      className={`animate-fade-in fixed z-20 ${GLASS_SURFACE} rounded-full px-3 py-2 flex items-center gap-2 transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'}`}
       style={{
         bottom: `calc(${isMobile ? '4rem' : '1rem'} + env(safe-area-inset-bottom))`,
         left: 'calc(1rem + env(safe-area-inset-left))',
