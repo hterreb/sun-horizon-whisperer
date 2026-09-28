@@ -32,6 +32,26 @@ describe('tailwind design tokens (ROADMAP item 7)', () => {
     expect(scene.water).toBeTruthy();
   });
 
+  it('defines the item 15 D-polish scene tokens (water-deep, ridge, ghost, iceberg, critter)', () => {
+    const scene = colors.scene as Record<string, unknown>;
+    const waterDeep = scene.waterDeep as Record<string, string>;
+    for (const bucket of ['night', 'astro-twilight', 'nautical-twilight', 'dawn', 'day']) {
+      expect(waterDeep[bucket]).toBeTruthy();
+    }
+    const ridge = scene.ridge as Record<string, string>;
+    for (const bucket of ['night', 'day', 'golden']) {
+      expect(ridge[bucket]).toBeTruthy();
+    }
+    expect(scene.glowWhite).toBeTruthy();
+    expect(scene.ghostHalo).toBeTruthy();
+    expect(scene.moonDark).toBeTruthy();
+    expect(scene.critter).toBeTruthy();
+    const iceberg = scene.iceberg as Record<string, string>;
+    for (const key of ['fill', 'shade', 'glow']) {
+      expect(iceberg[key]).toBeTruthy();
+    }
+  });
+
   it('defines glass panel tokens including the 18px radius', () => {
     const panel = colors.panel as Record<string, string>;
     expect(panel.background).toBeTruthy();
