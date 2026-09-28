@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Download, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { GLASS_SURFACE } from '@/utils/glassChrome';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -123,7 +124,7 @@ const PWAInstallPrompt: React.FC = () => {
 
   return (
     <div
-      className="fixed z-50 bg-gradient-to-r from-blue-900/95 to-purple-900/95 backdrop-blur-md text-white p-4 rounded-xl border border-white/20 shadow-2xl animate-in slide-in-from-bottom-2 duration-500"
+      className={`fixed z-50 ${GLASS_SURFACE} rounded-panel text-white p-4 animate-in slide-in-from-bottom-2 duration-500`}
       style={{
         bottom: 'calc(1rem + env(safe-area-inset-bottom))',
         left: 'calc(1rem + env(safe-area-inset-left))',
@@ -133,12 +134,12 @@ const PWAInstallPrompt: React.FC = () => {
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 flex-1">
           <div className="flex-shrink-0">
-            <Smartphone className="h-8 w-8 text-blue-300" />
+            <Smartphone className="h-8 w-8 text-brand-peach" />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-bold text-lg mb-1 text-blue-100">Install Sun Chaser</h3>
-            <p className="text-sm text-gray-200 leading-relaxed">
-              Get the full app experience! Install Sun Chaser for offline access, 
+            <h3 className="font-bold text-title mb-1">Install Sun Chaser</h3>
+            <p className="text-body text-white/80 leading-relaxed">
+              Get the full app experience! Install Sun Chaser for offline access,
               faster loading, and easy access from your home screen.
             </p>
           </div>
@@ -147,7 +148,7 @@ const PWAInstallPrompt: React.FC = () => {
           <Button
             size="sm"
             onClick={handleInstall}
-            className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold px-4 py-2 shadow-lg"
+            className="rounded-full bg-brand-sunset text-brand-night hover:bg-brand-sunset/90 font-semibold px-4 py-2"
           >
             <Download className="h-4 w-4 mr-2" />
             Install
@@ -156,7 +157,8 @@ const PWAInstallPrompt: React.FC = () => {
             size="sm"
             variant="ghost"
             onClick={handleDismiss}
-            className="text-gray-300 hover:text-white hover:bg-white/10 px-3 py-2"
+            aria-label="Dismiss"
+            className="rounded-full text-white/70 hover:text-white hover:bg-white/10 px-3 py-2"
           >
             <X className="h-4 w-4" />
           </Button>

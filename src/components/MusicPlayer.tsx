@@ -4,6 +4,7 @@ import { Music, SkipForward, Volume2, VolumeX } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { GLASS_SURFACE } from '@/utils/glassChrome';
 
 interface MusicPlayerProps {
   isFullscreen?: boolean;
@@ -205,7 +206,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
 
   return (
     <div 
-      className={`fixed z-20 bg-black/30 backdrop-blur-lg rounded-full px-3 py-2 flex items-center gap-2 transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'}`}
+      className={`fixed z-20 ${GLASS_SURFACE} rounded-full px-3 py-2 flex items-center gap-2 transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'}`}
       style={{
         bottom: `calc(${isMobile ? '4rem' : '1rem'} + env(safe-area-inset-bottom))`,
         left: 'calc(1rem + env(safe-area-inset-left))',
@@ -221,14 +222,14 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
         aria-label="Play lo-fi music"
       />
       <Music className="h-4 w-4 text-white" />
-      <span className="hidden sm:inline max-w-[100px] truncate text-xs text-white/80">
+      <span className="hidden sm:inline max-w-[100px] truncate text-caption text-white/80">
         {STREAMS[stationIndex].name}
       </span>
       <button
         type="button"
         onClick={handleNext}
         aria-label="Next station"
-        className="text-white/80 hover:text-white transition-colors"
+        className="text-white/80 hover:text-white transition-colors rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
       >
         <SkipForward className="h-4 w-4" />
       </button>

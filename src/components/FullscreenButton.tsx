@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Fullscreen, Minimize } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { GLASS_ICON_BUTTON } from '@/utils/glassChrome';
 
 interface FullscreenButtonProps {
   onFullscreenChange?: (isFullscreen: boolean) => void;
@@ -95,7 +96,7 @@ const FullscreenButton: React.FC<FullscreenButtonProps> = ({ onFullscreenChange 
       onMouseLeave={handleMouseLeave}
       onFocus={handleFocus}
       onTouchStart={handleTouchStart}
-      className={`fixed z-40 bg-black/20 backdrop-blur-sm hover:bg-black/40 text-white border border-white/20 transition-opacity duration-300 ${
+      className={`fixed z-40 ${GLASS_ICON_BUTTON} text-white transition-opacity duration-300 ${
         isVisible ? 'opacity-100' : 'opacity-0'
       }`}
       style={{
