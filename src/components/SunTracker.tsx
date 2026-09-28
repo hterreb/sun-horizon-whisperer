@@ -33,12 +33,14 @@ import TopLeftButtons from './TopLeftButtons';
 import PWAInstallPrompt from './PWAInstallPrompt';
 import MidnightGhost from './MidnightGhost';
 import TemperatureIceberg from './TemperatureIceberg';
+import LoadingScreen, { FAST_START_MS } from './LoadingScreen';
 import { type WeatherType } from './CloudLayer';
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useWakeLock } from '@/hooks/useWakeLock';
 import { useCompassHeading } from '@/hooks/useCompassHeading';
 import { useHorizonProfile } from '@/hooks/useHorizonProfile';
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { loadManualLocation, saveManualLocation, clearManualLocation } from '../utils/manualLocation';
 import {
   hasSeenCompassCalibrationHint,
@@ -73,6 +75,19 @@ const MAX_EYE_HEIGHT_M = 1000;
 
 const clampEyeHeight = (value: number): number =>
   Number.isFinite(value) ? Math.min(MAX_EYE_HEIGHT_M, Math.max(0, value)) : DEFAULT_EYE_HEIGHT_M;
+
+// The scene's side of the loading hand-off (ROADMAP item 39). While loading, the scene
+// is clipped to nothing so the loading screen underneath shows; it then opens through
+// a circle from the mark ('iris'), or fades in ('fade': reduced motion, or a location
+// known within FAST_START_MS).
+type Reveal = 'loading' | 'iris' | 'fade' | 'done';
+const REVEAL_CLASS: Record<Reveal, string> = {
+  loading: '[clip-path:circle(0_at_50%_36%)]',
+  iris: 'animate-scene-iris',
+  fade: 'animate-scene-fade',
+  done: '',
+};
+const REVEAL_MS = { iris: 1000, fade: 200 };
 
 const loadStoredEyeHeight = (): number => {
   try {
@@ -123,6 +138,27 @@ const SunTracker: React.FC = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showCursor, setShowCursor] = useState(true);
   const isMobile = useIsMobile();
+
+  // Loading screen hand-off (ROADMAP item 39): the top-left buttons and the radio
+  // mount only at 'done' and fade in (their own `animate-fade-in`).
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const [reveal, setReveal] = useState<Reveal>(() => (location.loaded ? 'fade' : 'loading'));
+  const [isSlowStart, setIsSlowStart] = useState(false);
+  useEffect(() => {
+    const timeoutId = setTimeout(() => setIsSlowStart(true), FAST_START_MS);
+    return () => clearTimeout(timeoutId);
+  }, []);
+  if (location.loaded && reveal === 'loading') {
+    setReveal(isSlowStart && !prefersReducedMotion ? 'iris' : 'fade');
+  }
+  useEffect(() => {
+    if (reveal !== 'iris' && reveal !== 'fade') return;
+    const timeoutId = setTimeout(() => setReveal('done'), REVEAL_MS[reveal]);
+    return () => clearTimeout(timeoutId);
+  }, [reveal]);
+  // Set once the user picks a location, so a late answer to the startup geolocation
+  // request (or its timeout) can't replace that choice.
+  const locationChosenRef = React.useRef(false);
 
   const cursorTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
@@ -331,6 +367,7 @@ const SunTracker: React.FC = () => {
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        if (locationChosenRef.current) return;
         setLocation({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
@@ -339,6 +376,7 @@ const SunTracker: React.FC = () => {
       },
       (error) => {
         console.error("Error getting location:", error);
+        if (locationChosenRef.current) return;
         setLocation({
           latitude: 40.7128,
           longitude: -74.0060,
@@ -349,13 +387,18 @@ const SunTracker: React.FC = () => {
           description: "Using default location. Please enable location services for accurate data.",
           variant: "destructive"
         });
-      }
+      },
+      // AUDIT C-16: give up after 10 s and use the default location. Browsers start
+      // this timer once permission is granted; an open prompt is covered by the
+      // loading screen's "Choose a place".
+      { timeout: 10000 }
     );
   }, []);
 
   // Manual location form (InfoPanel): validated lat/lon submitted by the user, or a
   // place selected from search (in which case `name` is set alongside the coordinates).
   const handleLocationChange = useCallback((latitude: number, longitude: number, name?: string) => {
+    locationChosenRef.current = true;
     setLocation({ latitude, longitude, loaded: true });
     setManualPlaceName(name ?? null);
     saveManualLocation(latitude, longitude, name);
@@ -520,22 +563,33 @@ const SunTracker: React.FC = () => {
   };
 
   return (
+    <>
+    {reveal !== 'done' && (
+      <LoadingScreen
+        still={prefersReducedMotion || reveal !== 'loading'}
+        onSelectPlace={handleLocationChange}
+      />
+    )}
     <div 
-      className={`relative min-h-dvh w-full overflow-hidden ${
+      className={`relative min-h-dvh w-full overflow-hidden ${REVEAL_CLASS[reveal]} ${
         isFullscreen && !showCursor ? 'cursor-none' : ''
       }`} 
       style={getBackgroundStyle()}
     >
       <NightStars timeOfDay={timeOfDay} moonPosition={moonPosition} />
-      <MusicPlayer isFullscreen={isFullscreen} />
-      <TopLeftButtons
-        isFullscreen={isFullscreen}
-        showCursor={showCursor}
-        onFullscreenChange={setIsFullscreen}
-        compassStatus={compassStatus}
-        onCompassEnable={handleCompassEnable}
-        onCompassDisable={disableCompass}
-      />
+      {reveal === 'done' && (
+        <>
+          <MusicPlayer isFullscreen={isFullscreen} />
+          <TopLeftButtons
+            isFullscreen={isFullscreen}
+            showCursor={showCursor}
+            onFullscreenChange={setIsFullscreen}
+            compassStatus={compassStatus}
+            onCompassEnable={handleCompassEnable}
+            onCompassDisable={disableCompass}
+          />
+        </>
+      )}
       <PWAInstallPrompt />
       <MidnightGhost currentTime={date} />
       <TemperatureIceberg 
@@ -543,7 +597,7 @@ const SunTracker: React.FC = () => {
         isVisible={location.loaded && weatherData !== null} 
       />
       
-      {location.loaded ? (
+      {location.loaded && (
         <>
           <SunVisualization
             sunPosition={sunPosition}
@@ -594,15 +648,9 @@ const SunTracker: React.FC = () => {
             onEyeHeightChange={handleEyeHeightChange}
           />
         </>
-      ) : (
-        <div className="flex h-dvh items-center justify-center">
-          <div className="text-white text-center">
-            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-white mx-auto mb-4"></div>
-            <p>Locating…</p>
-          </div>
-        </div>
       )}
     </div>
+    </>
   );
 };
 

@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-09-28. Done: items 1–13, 15 and 17–38 (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14, 16 and 39, the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
+Status: last updated 2026-09-29. Done: items 1–13, 15 and 17–39 (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14 and 16, the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
 
 ## Verification (2026-09-28)
 
@@ -25,7 +25,7 @@ Status: last updated 2026-09-28. Done: items 1–13, 15 and 17–38 (marked **�
 | 23 | In fullscreen on a phone, a tap shows the feedback button and it opens the form. | Real device |
 | 14, 16 | Not started. Decide Stripe or Google Play Billing before item 16. | Decision |
 | 37, 38 | New bugs, see below (AUDIT C-14, C-15). | Fix |
-| 39 | New loading screen, variant A (Rising Mark) chosen. | Build |
+| 39 | Built. The hand-off from the Android splash to the loading screen on a phone. | Real device |
 
 ## Priority rules
 
@@ -378,7 +378,7 @@ Items 37 and 38 were found in the browser check of the verification above (on `a
 - **Spec:** move an arc label that overlaps the collapsed panel's box below the panel's bottom edge, or place it beside the apex. Do not hide it.
 - **Done when:** at 390×844, day and night, the collapsed panel covers no arc label.
 
-### 39. Loading screen: Rising Mark (variant A) — S — AUDIT A-6, A-7, C-16
+### 39. Loading screen: Rising Mark (variant A) — S — AUDIT A-6, A-7, C-16 — **✅ Done**
 
 - **Why:** the loading screen always shows a daytime sky, but the Android splash before it is Night (`#0F1016`). A start at night goes dark, then bright blue, then dark again. The top-left buttons and the radio show before there is a scene. When the location prompt stays open, "Locating…" never ends, and there is no way to choose a place. The spinner has no brand.
 - **Decision (2026-09-28):** variant **A, Rising Mark**. Design: <https://claude.ai/artifact/YbVzMgv8ncwoh7TEah1Dfk> (private artifact, variants A–D; open it with `#locating`, `#waiting` or `#found-night` to see one state).
@@ -396,6 +396,14 @@ Items 37 and 38 were found in the browser check of the verification above (on `a
 - **Done when:**
   - Tests show: the loading screen renders while the location is not loaded; the top-left buttons and the radio are not rendered then; after 3 s the "Choose a place" button shows and opens the place search; a timeout gives the default location and the toast; with reduced motion no rise or circle animation is applied.
   - At 390×844, a start at night shows no blue frame between the Android splash and the scene.
+- **Built:**
+  - "Choose a place" shows the place search on the loading screen. The search moved from InfoPanel's form into `PlaceSearch.tsx`, which both use. The chosen place starts the hand-off, and a late geolocation answer or timeout does not replace it.
+  - The rise starts after 0.4 s, so a location that arrives sooner never shows it. The rise then ends at 3 s: at that point the sun sinks to half-risen (1 s) and the reflection bars fade out.
+  - Two tokens for the mark colours that had none: `--brand-mark-dusk` and `--brand-mark-sun`.
+  - The `body` background is Night, so the first paint before the app mounts also continues the splash.
+  - The 200 ms fade stays 200 ms under reduced motion (the global rule in `index.css` cuts all other animations to 0).
+  - Browsers start the 10 s geolocation timeout only after permission is granted. An open prompt is covered by "Choose a place".
+- **Checked:** headless Chromium at 390×844, Ravensburg at 22:30, dev server and production build. The first paint (JavaScript off) is Night. The sun rises, the circle opens when the location arrives after 2 s, and the buttons and the radio fade in after it. With no location, "Waiting for location access" and "Choose a place" show at 3 s, and the place search opens with focus. With reduced motion the mark stands still and the scene fades in.
 
 ---
 
