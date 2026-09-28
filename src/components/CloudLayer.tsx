@@ -49,8 +49,10 @@ interface CloudLayerProps {
 const BIRD_RATE_PERCENT_PER_SEC = 5; // was 0.08%/16ms in the old rAF loop
 const WATER_RATE_PERCENT_PER_SEC = 2.5; // was 0.04%/16ms in the old rAF loop (fish + ships)
 const LEAF_RATE_PERCENT_PER_SEC = 6;
-// Boats come every 2-4 min; the first one sails out ~5 s after load instead.
-const FIRST_BOAT_HEAD_START_MS = 115000;
+// A new boat every 30-90 s: a crossing takes 46-84 s, so often 1-2 boats (now and then 3)
+// are out at once. The first one sails out ~5 s after load.
+const BOAT_GAP_MIN_MS = 30000;
+const BOAT_GAP_RANGE_MS = 60000;
 
 // A fixed fallback seed date for callers that don't pass one (e.g. existing tests) -
 // a stable constant, not `new Date()`, so it never changes identity across renders.
@@ -134,7 +136,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   const lastSpawnTimeRef = useRef({ birds: 0, fish: 0, ships: 0, leaves: 0 });
   useEffect(() => {
     const now = Date.now();
-    lastSpawnTimeRef.current = { birds: now, fish: now, ships: now - FIRST_BOAT_HEAD_START_MS, leaves: now };
+    lastSpawnTimeRef.current = { birds: now, fish: now, ships: now - BOAT_GAP_MIN_MS + 5000, leaves: now };
   }, []);
   const prefersReducedMotion = usePrefersReducedMotion();
 
@@ -282,7 +284,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       }
 
       if (shouldShowShips) {
-        if (currentTime - lastSpawnTimeRef.current.ships > 120000 + Math.random() * 120000) {
+        if (currentTime - lastSpawnTimeRef.current.ships > BOAT_GAP_MIN_MS + Math.random() * BOAT_GAP_RANGE_MS) {
           if (Math.random() < 0.9) { // 90% chance to spawn
             const startX = -8;
             const endX = 108;
@@ -290,13 +292,14 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             const newShip: Boat = {
               id: Date.now() + Math.random(),
               x: startX,
-              y: 67 + (1 - depth) * 10, // far boats sit right at the horizon (65%)
+              y: 67 + (1 - depth) * 20, // far boats sit at the horizon (65%), near ones low in front
               dx: endX - startX,
               duration: (endX - startX) / (WATER_RATE_PERCENT_PER_SEC * (1 - FAR_SHRINK * depth)),
               kind: pickBoat(weatherType, windSpeedKmh, Math.random()),
               depth,
             };
-            setShips(prev => [...prev, newShip]);
+            // Far boats first, so a near boat always sails in front of a far one.
+            setShips(prev => [...prev, newShip].sort((a, b) => b.depth - a.depth));
           }
           lastSpawnTimeRef.current.ships = currentTime;
         }
