@@ -5,7 +5,26 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-09-28. Done: items 1–13, 15 and 17–30 (marked **✅ Done** in the heading; real-device checks for 17 and 19 and the Sentry release to-dos are still open). Open: items 14–16, easter eggs, backlog.
+Status: last updated 2026-09-28. Done: items 1–13, 15 and 17–30 (marked **✅ Done** in the heading; all re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14, 16, 31 and 32, the checks listed under Verification, easter eggs, backlog.
+
+## Verification (2026-09-28)
+
+- **Method:** each done item was checked against its Spec and Done-when in the code and the tests (`main` at `a9882c4`: 487 tests, lint, typecheck and build pass). It was also checked in the running app with Playwright: 390×844 and 360×640, Ravensburg by day and at night, Sydney, fullscreen idle and wake, compass mode with synthetic headings, denied geolocation, place search.
+- **Result:** items 1–13, 15 and 17–30 are built as specified, or as a later item changed them. The check found two new bugs (items 31 and 32).
+- **Still open:**
+
+| Item | Open point | Needs |
+|---|---|---|
+| 2 | Touch scroll in the panel does not pan the scene. | Real device |
+| 4 | The installed PWA shows no browser bars and no gaps (Android); it draws under the status bar (iOS). | Real device |
+| 8, 19 | Labels match a hardware compass within about 10°. Pointing the phone at the sun puts it at screen centre; a 45° turn moves it to the edge. | Real Android phone and iPhone |
+| 9 | Moon times match timeanddate.com within 2 minutes. | External reference |
+| 13 | An alpine sunset matches PeakFinder or an observation within 5 minutes. | External reference |
+| 15 | The maskable icon is not cropped on a launcher. | Real Android device |
+| 21 | A thrown test error has readable stack frames and no coordinates; a feedback message has no name or email. Sentry in the privacy policy (item 16). | Sentry dashboard |
+| 23 | In fullscreen on a phone, a tap shows the feedback button and it opens the form. | Real device |
+| 14, 16 | Not started. Decide Stripe or Google Play Billing before item 16. | Decision |
+| 31, 32 | New bugs, see below. | Fix |
 
 ## Priority rules
 
@@ -286,6 +305,25 @@ Eight feedback reports from production (Ravensburg, releases `afb9e52` and `f490
   - Keep the values short, for example "07:44 (+27 min)", with "behind terrain" once as a note, so each row fits on one line at 360 px.
   - Closed by default. The sun and moon details open and close separately.
 - **Done when:** a test shows no Line of Sight section at start, and a click on the sun icon shows the terrain sunrise and sunset. At 360 px width each row fits on one line.
+
+### Verification findings (2026-09-28)
+
+Found in the browser check of the verification above.
+
+### 31. Sun arc drops out at night every other minute — S
+
+- **Found:** Ravensburg, 22:30, 390×844. After a reload the sun arc has its zenith label (13:13). One minute later the label is gone.
+- **Cause:** `findSunPass` (`sunUtils.ts`) and `findMoonPass` (`moonUtils.ts`) have the same bug. When the body is below the horizon, the set search starts at the bisected rise time. That time is only within ±5 s of the crossing. When it lands just below 0°, the search finds the same rise again and returns a pass of zero length (for example 05:22–05:22 UTC). `getSunPathAround` then returns 49 identical points (no arc), and `getSunArcLabels` finds no zenith. The result changes from minute to minute.
+- **Spec:**
+  - In both functions, start the set search after the rise crossing (for example at `startMs + HORIZON_BISECT_TOLERANCE_MS`).
+  - Add a test: for each minute of one night, the sun pass is longer than 6 h and the arc labels have a zenith.
+- **Done when:** the test passes, and at night the sun arc and its zenith label stay on screen across minute changes.
+
+### 32. Moon zenith label under the collapsed panel — S
+
+- **Found:** Ravensburg, 22:30, 390×844. The moon culminates high (02:56). Its zenith label is at y ≈ 112 px, under the collapsed panel (y 65–175 px, x ≥ 90 px). The sun label was moved below the apex for this reason, but a high moon apex still falls under the panel.
+- **Spec:** move an arc label that overlaps the collapsed panel's box below the panel's bottom edge, or place it beside the apex. Do not hide it.
+- **Done when:** at 390×844, day and night, the collapsed panel covers no arc label.
 
 ---
 
