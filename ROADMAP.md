@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-09-28. Done: items 1–13, 15 and 17–36 (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14, 16 and 37–39, the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
+Status: last updated 2026-09-28. Done: items 1–13, 15 and 17–37 (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14, 16, 38 and 39, the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
 
 ## Verification (2026-09-28)
 
@@ -363,7 +363,7 @@ Five findings from use after items 22–30, checked on `main` at `046abff` with 
 
 Items 37 and 38 were found in the browser check of the verification above (on `a9882c4`, before items 31–36). Item 39 is the new loading screen, requested in the same check.
 
-### 37. Sun arc drops out at night every other minute — S — AUDIT C-14
+### 37. Sun arc drops out at night every other minute — S — AUDIT C-14 — **✅ Done**
 
 - **Found:** Ravensburg, 22:30, 390×844. After a reload the sun arc has its zenith label (13:13). One minute later the label is gone.
 - **Cause:** `findSunPass` (`sunUtils.ts`) and `findMoonPass` (`moonUtils.ts`) have the same bug. When the body is below the horizon, the set search starts at the bisected rise time. That time is only within ±5 s of the crossing. When it lands just below 0°, the search finds the same rise again and returns a pass of zero length (for example 05:22–05:22 UTC). `getSunPathAround` then returns 49 identical points (no arc), and `getSunArcLabels` finds no zenith. The result changes from minute to minute.

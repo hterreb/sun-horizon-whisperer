@@ -1,4 +1,4 @@
-import { getSunPosition, getSunTimes, getTimeOfDay, getRelevantTwilightTimes, formatTime, getGoldenHourTimes, getBlueHourTimes, getNextGoldenBlueHours, shiftGradientBrightness, getSunPathAround, getBackgroundGradient } from '../src/utils/sunUtils';
+import { getSunPosition, getSunTimes, getTimeOfDay, getRelevantTwilightTimes, formatTime, getGoldenHourTimes, getBlueHourTimes, getNextGoldenBlueHours, shiftGradientBrightness, getSunPathAround, getBackgroundGradient, findSunPass } from '../src/utils/sunUtils';
 describe('sunUtils', () => {
   it('calculates sun position', () => {
     const pos = getSunPosition(new Date(), 0, 0);
@@ -342,6 +342,18 @@ describe('sunUtils', () => {
         expect(Number.isFinite(point.altitude)).toBe(true);
         expect(Number.isFinite(point.azimuth)).toBe(true);
       });
+    });
+  });
+
+  describe('findSunPass at night (AUDIT C-14, ROADMAP item 37)', () => {
+    it('returns a full pass for every minute of a night, never the same rise twice', () => {
+      // Ravensburg, the night the zero-length pass was seen (22:30 local).
+      const start = Date.UTC(2026, 8, 27, 18, 0);
+      for (let ms = start; ms < start + 10 * 60 * 60 * 1000; ms += 60 * 1000) {
+        const pass = findSunPass(new Date(ms), 47.78, 9.61);
+        expect(pass).not.toBeNull();
+        expect(pass!.end.getTime() - pass!.start.getTime()).toBeGreaterThan(6 * 60 * 60 * 1000);
+      }
     });
   });
 });
