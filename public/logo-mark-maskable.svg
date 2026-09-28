@@ -5,12 +5,14 @@
       <stop offset=".55" stop-color="#F97316"/>
       <stop offset="1" stop-color="#FEC6A1"/>
     </linearGradient>
+    <clipPath id="sun-clip"><circle cx="60" cy="66" r="24"/></clipPath>
   </defs>
-  <rect width="120" height="120" fill="#F97316"/>
-  <rect width="120" height="40" fill="url(#mask-sky)" opacity=".55"/>
+  <rect width="120" height="84" fill="url(#mask-sky)"/>
   <circle cx="60" cy="66" r="24" fill="#FFD84D"/>
-  <rect x="30" y="70" width="60" height="3" fill="#F97316"/>
-  <rect x="30" y="77" width="60" height="4" fill="#F97316"/>
+  <g clip-path="url(#sun-clip)">
+    <rect x="30" y="70" width="60" height="3" fill="#F97316"/>
+    <rect x="30" y="77" width="60" height="4" fill="#F97316"/>
+  </g>
   <rect y="84" width="120" height="36" fill="#0EA5E9"/>
   <rect x="44" y="92" width="32" height="3" rx="1.5" fill="#FFD84D"/>
   <rect x="50" y="100" width="20" height="3" rx="1.5" fill="#FFD84D" opacity=".7"/>
