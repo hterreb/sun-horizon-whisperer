@@ -406,6 +406,31 @@ export const buildTerrainFillPath = (
 // sun/moon label collision check below.
 const ARC_LABEL_HALF_WIDTH = 32;
 const ARC_LABEL_HEIGHT = 22;
+// Half the widest cardinal pill ("NW"), so a label at the 0°/360° edge stays whole (AUDIT A-8).
+const CARDINAL_LABEL_HALF_WIDTH = 18;
+const COLLAPSED_PANEL_HEIGHT = 112;
+
+// The collapsed InfoPanel's box (InfoPanel.tsx root classes): top-right, 300 px wide or
+// the screen minus 2rem, 10rem lower below 364 px width. Height measured at 390x844
+// (ROADMAP item 38). ponytail: fixed numbers, not a DOM measurement - update them when
+// the panel header changes; measure the panel element if it starts to move.
+// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
+export const getCollapsedPanelBox = (width: number) => {
+  const top = width < 364 ? 160 : 0;
+  return { left: width - Math.min(300, width - 32), top, bottom: top + COLLAPSED_PANEL_HEIGHT };
+};
+
+// Moves an arc label that the collapsed panel would cover to just below the panel
+// (AUDIT C-15). Not hidden: the label keeps its x.
+// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
+export const avoidCollapsedPanel = <T extends { x: number; y: number }>(label: T, width: number): T => {
+  const box = getCollapsedPanelBox(width);
+  const covered =
+    label.x + ARC_LABEL_HALF_WIDTH > box.left &&
+    label.y + ARC_LABEL_HEIGHT / 2 > box.top &&
+    label.y - ARC_LABEL_HEIGHT / 2 < box.bottom;
+  return covered ? { ...label, y: box.bottom + ARC_LABEL_HEIGHT / 2 + 4 } : label;
+};
 
 const ARC_LABEL_ICONS: Record<ArcLabelKind, typeof Sunrise> = {
   rise: Sunrise,
@@ -714,14 +739,17 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     return { kind: geometry.kind, time: geometry.time, x, y };
   };
 
-  const sunArcLabelPositions = sunArcLabelGeometry.map(toArcLabelPosition);
+  const sunArcLabelPositions = sunArcLabelGeometry
+    .map(toArcLabelPosition)
+    .map((label) => avoidCollapsedPanel(label, containerDimensions.width));
   const moonArcLabelPositions = moonArcLabelGeometry.map(toArcLabelPosition).map((moonLabel) => {
     const overlapsSunLabel = sunArcLabelPositions.some(
       (sunLabel) =>
         Math.abs(sunLabel.x - moonLabel.x) < ARC_LABEL_HALF_WIDTH * 2 &&
         Math.abs(sunLabel.y - moonLabel.y) < ARC_LABEL_HEIGHT
     );
-    return overlapsSunLabel ? { ...moonLabel, y: moonLabel.y - ARC_LABEL_HEIGHT } : moonLabel;
+    const shifted = overlapsSunLabel ? { ...moonLabel, y: moonLabel.y - ARC_LABEL_HEIGHT } : moonLabel;
+    return avoidCollapsedPanel(shifted, containerDimensions.width);
   });
 
   // Rainbow (ROADMAP item 10): raining/drizzling, opposite the sun's azimuth, using the
@@ -942,7 +970,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
               key={label}
               className={`absolute flex flex-col items-center gap-1 ${compassActive ? '' : 'transition-all duration-1000'}`}
               style={{
-                left: `${fraction * containerDimensions.width}px`,
+                left: `${Math.max(CARDINAL_LABEL_HALF_WIDTH, Math.min(containerDimensions.width - CARDINAL_LABEL_HALF_WIDTH, fraction * containerDimensions.width))}px`,
                 top: `${horizonLabelY}px`,
                 transform: 'translate(-50%, -50%)'
               }}
