@@ -3,6 +3,7 @@ import { Sun, ChevronLeft, ChevronRight } from 'lucide-react';
 import { type SunPosition, type TimeOfDay } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
 import { shortestHeadingDelta } from '../utils/compassUtils';
+import { type HorizonProfile, horizonAngleAt } from '../utils/horizonUtils';
 import CloudLayer, { type WeatherType } from './CloudLayer';
 import Fireworks from './Fireworks';
 import WeatherEffects from './WeatherEffects';
@@ -37,6 +38,10 @@ interface SunVisualizationProps {
   // mapped through a real field of view centered on this heading (getCompassScreenFraction)
   // instead of the full-circle static mapping, and out-of-view elements are hidden.
   compassHeading?: number | null;
+  // The current location's terrain silhouette (ROADMAP item 13), or null while the
+  // feature is disabled/loading/unavailable - null draws the flat horizon only, same
+  // as before the feature existed.
+  horizonProfile?: HorizonProfile | null;
 }
 
 // Maps an azimuth (0-360°, 0 = North) to a horizontal screen fraction (0-1), for the
@@ -243,6 +248,80 @@ export const buildArcPath = (
   return path.trim();
 };
 
+// The azimuths to sample for the terrain silhouette (ROADMAP item 13): the full
+// circle in static mode, or just the visible field-of-view range in compass mode -
+// sampled in left-to-right screen order so no extra wrap handling is needed for that
+// case (getCompassScreenFraction has no 0°/360° jump within one FOV span).
+const getTerrainAzimuths = (compassHeading: number | null): number[] => {
+  if (compassHeading === null) {
+    return Array.from({ length: 360 }, (_, i) => i);
+  }
+  const half = COMPASS_FOV_DEG / 2;
+  const start = compassHeading - half;
+  return Array.from({ length: COMPASS_FOV_DEG + 1 }, (_, i) => (((start + i) % 360) + 360) % 360);
+};
+
+// Builds the terrain silhouette as one or more contiguous point runs (screen x/y),
+// splitting into a new run wherever a point is outside the compass field of view or
+// the azimuth->x mapping wraps (same idea as buildArcPath's gap detection, ROADMAP
+// item 17/13) - static mode's southern-hemisphere shift can otherwise jump straight
+// across the screen at the 0°/360° seam. Angles below 0 (a valley dipping under the
+// flat horizon) clamp to 0, i.e. the flat horizon line itself.
+// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
+export const buildTerrainSegments = (
+  profile: HorizonProfile,
+  width: number,
+  height: number,
+  latitude: number,
+  compassHeading: number | null
+): { x: number; y: number }[][] => {
+  if (width === 0 || height === 0) return [];
+
+  const azimuths = getTerrainAzimuths(compassHeading);
+  const segments: { x: number; y: number }[][] = [];
+  let current: { x: number; y: number }[] = [];
+  let prevX: number | null = null;
+
+  for (const azimuth of azimuths) {
+    const { fraction, visible } = resolveAzimuth(azimuth, latitude, compassHeading);
+    if (!visible) {
+      if (current.length > 1) segments.push(current);
+      current = [];
+      prevX = null;
+      continue;
+    }
+
+    const x = width * fraction;
+    if (prevX !== null && Math.abs(x - prevX) > width / 2) {
+      if (current.length > 1) segments.push(current);
+      current = [];
+    }
+
+    const angle = Math.max(0, horizonAngleAt(profile, azimuth));
+    current.push({ x, y: altitudeToY(angle, height) });
+    prevX = x;
+  }
+  if (current.length > 1) segments.push(current);
+
+  return segments;
+};
+
+// Fills each silhouette run from the ridge line down to the flat horizon y, so the
+// terrain reads as solid ground rather than just an outline.
+// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
+export const buildTerrainFillPath = (
+  segments: { x: number; y: number }[][],
+  horizonY: number
+): string =>
+  segments
+    .map((segment) => {
+      const first = segment[0];
+      const last = segment[segment.length - 1];
+      const ridge = segment.map((p) => `L${p.x},${p.y}`).join(' ');
+      return `M${first.x},${horizonY} ${ridge} L${last.x},${horizonY} Z`;
+    })
+    .join(' ');
+
 const SunVisualization: React.FC<SunVisualizationProps> = ({
   sunPosition,
   moonPosition,
@@ -257,7 +336,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   cloudCoverPercent = null,
   windSpeedKmh = null,
   windDirectionDeg = null,
-  compassHeading = null
+  compassHeading = null,
+  horizonProfile = null
 }) => {
   // Compass mode (ROADMAP item 19): a real field of view centered on the heading,
   // replacing the static full-circle mapping - also turns off the CSS transitions
@@ -330,6 +410,18 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     path += `L${width},${horizonY} L${width},${height} L0,${height} Z`;
     return path;
   }, [containerDimensions]);
+
+  // Terrain silhouette (ROADMAP item 13): replaces the flat horizon line with the
+  // real profile when one is loaded, using the same altitude->y mapping as the sun/
+  // moon dots and the same azimuth->x mapping (static full circle or compass FOV).
+  const terrainFillPath = useMemo(() => {
+    const { width, height } = containerDimensions;
+    if (!horizonProfile || width === 0 || height === 0) return '';
+
+    const horizonY = height * 0.65;
+    const segments = buildTerrainSegments(horizonProfile, width, height, latitude, compassHeading);
+    return buildTerrainFillPath(segments, horizonY);
+  }, [horizonProfile, containerDimensions, latitude, compassHeading]);
 
   const getSunPosition = () =>
     getScreenPosition(sunPosition.altitude, sunPosition.azimuth, containerDimensions.width, containerDimensions.height, latitude, compassHeading);
@@ -517,6 +609,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
       {isSunVisible && (
         <div
+          data-testid="sun-dot"
           className={`absolute ${compassActive ? '' : 'transition-transform duration-1000'} ${getSunColor()} ${getGlowIntensity()} animate-glow`}
           style={{
             left: `${sunX}px`,
@@ -574,6 +667,13 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           fill="url(#horizonGradient)"
           className="transition-all duration-1000"
         />
+        {terrainFillPath && (
+          <path
+            d={terrainFillPath}
+            fill="hsl(var(--brand-night))"
+            data-testid="terrain-silhouette"
+          />
+        )}
       </svg>
 
       {containerDimensions.width > 0 && (
