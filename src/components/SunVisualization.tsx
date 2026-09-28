@@ -789,14 +789,13 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         </defs>
         {terrainFillPath && (
           // Line-of-sight ridge (ROADMAP item 13), colored per time-of-day like the
-          // style book's soft ridge (ROADMAP item 15 deliverable 2) and drawn at .85
-          // opacity so it reads as distance rather than a flat cutout. Drawn *before*
+          // style book's soft ridge (ROADMAP item 15 deliverable 2). Opaque: at .85 the
+          // stars and a sun behind the ridge showed through. Drawn *before*
           // the sea (ROADMAP item 27), so the sea's wave crests sit on top of the
           // ridge's base instead of being covered by it.
           <path
             d={terrainFillPath}
             fill={getRidgeColor()}
-            fillOpacity={0.85}
             data-testid="terrain-silhouette"
           />
         )}
