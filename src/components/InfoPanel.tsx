@@ -4,6 +4,7 @@ import { isFeedbackAvailable, openFeedbackForm } from '@/utils/feedback';
 import { ScrollArea } from './ui/scroll-area';
 import { Button } from './ui/button';
 import LineOfSightDetails from './LineOfSightDetails';
+import PremiumBadge from './PremiumBadge';
 import {
   type SunPosition,
   type SunTimes,
@@ -413,11 +414,13 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     return `${formatTime(window.start)} – ${formatTime(window.end)}`;
   };
 
-  // "this morning" / "this evening" / "tomorrow morning" (ROADMAP item 20).
-  const goldenBlueHeading = nextGoldenBlueHours
+  // "This morning" / "This evening" / "Tomorrow morning" (ROADMAP item 20). First line
+  // of the collapsible body, not part of the heading, so the heading never wraps
+  // (ROADMAP item 33).
+  const goldenBlueDayPart = nextGoldenBlueHours
     ? nextGoldenBlueHours.day === 'today'
-      ? `this ${nextGoldenBlueHours.part}`
-      : `tomorrow ${nextGoldenBlueHours.part}`
+      ? `This ${nextGoldenBlueHours.part}`
+      : `Tomorrow ${nextGoldenBlueHours.part}`
     : null;
 
   const weatherOptions: { type: WeatherType; label: string; icon: React.ReactNode }[] = [
@@ -459,11 +462,12 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     }
   };
 
-  // Below 480 px the top-left button row (up to 9.5rem: fullscreen, compass, feedback) and
-  // the 300 px panel don't fit side by side, so the panel starts below the row.
+  // The top-left button column (3.5rem wide, down to 9.5rem: fullscreen, compass,
+  // feedback - ROADMAP item 31) fits beside the 300 px panel from 364 px up; below
+  // that the panel starts under the column.
   return (
     <div
-      className={`absolute top-0 max-[479px]:top-[calc(4rem+env(safe-area-inset-top))] right-0 z-30 w-full max-w-[min(300px,calc(100vw-2rem))] sm:w-[300px] bg-[hsl(var(--panel-background)/0.45)] backdrop-blur-md border border-[hsl(var(--panel-border)/0.14)] text-white rounded-bl-panel max-[479px]:rounded-tl-panel overflow-hidden transition-opacity duration-300 max-h-dvh max-[479px]:max-h-[calc(100dvh-4rem-env(safe-area-inset-top))] ${
+      className={`absolute top-0 max-[363px]:top-[calc(10rem+env(safe-area-inset-top))] right-0 z-30 w-full max-w-[min(300px,calc(100vw-2rem))] sm:w-[300px] bg-[hsl(var(--panel-background)/0.45)] backdrop-blur-md border border-[hsl(var(--panel-border)/0.14)] text-white rounded-bl-panel max-[363px]:rounded-tl-panel overflow-hidden transition-opacity duration-300 max-h-dvh max-[363px]:max-h-[calc(100dvh-10rem-env(safe-area-inset-top))] ${
         isVisible ? 'opacity-100' : 'opacity-0'
       } ${
         // Frost (ROADMAP item 10): a subtle icy glow on the panel edges, CSS only.
@@ -500,11 +504,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 type="button"
                 variant="link"
                 size="sm"
-                className={`h-auto p-0 mt-1 text-caption opacity-80 hover:opacity-100 text-white justify-start ${FOCUS_RING}`}
+                className={`h-auto p-0 mt-1 gap-1 text-caption opacity-80 hover:opacity-100 text-white justify-start ${FOCUS_RING}`}
                 onClick={() => (isLocationFormOpen ? closeLocationForm() : openLocationForm())}
                 aria-expanded={isLocationFormOpen}
               >
-                {isLocationFormOpen ? 'Cancel' : 'Change location'}
+                {isLocationFormOpen ? 'Cancel' : <>Change location<PremiumBadge /></>}
               </Button>
             </div>
           </div>
@@ -609,7 +613,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
       {/* Collapsible content */}
       {!isCollapsed && (
         <div className="flex-1 min-h-0">
-          <ScrollArea className="max-h-[calc(100dvh-120px)] max-[479px]:max-h-[calc(100dvh-184px-env(safe-area-inset-top))]">
+          <ScrollArea className="max-h-[calc(100dvh-120px)] max-[363px]:max-h-[calc(100dvh-280px-env(safe-area-inset-top))]">
             <div
               className="px-4 pb-4"
               style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
@@ -673,7 +677,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                       : 'text-white opacity-60'
                   }`}
                 >
-                  Manual
+                  <span className="inline-flex items-center gap-1">Manual<PremiumBadge /></span>
                 </button>
               </div>
             </div>
@@ -720,11 +724,12 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsSunTerrainOpen(!isSunTerrainOpen)}
-                    className={`${INLINE_ICON_TOGGLE} ml-1`}
+                    className={`${INLINE_ICON_TOGGLE} relative ml-1`}
                     aria-label="Show line of sight"
                     aria-expanded={isSunTerrainOpen}
                   >
                     <Mountain size={14} />
+                    <PremiumBadge className="absolute -right-1 -top-1 h-2.5 w-2.5" />
                   </button>
                 )}
               </div>
@@ -756,7 +761,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             {weatherData?.sunsetScoreToday && (
               <div className="text-caption opacity-80 mt-1 space-y-0.5">
                 <div className="flex items-center gap-2">
-                  <span>Sunset score</span>
+                  <span className="inline-flex flex-shrink-0 items-center gap-1">Sunset score<PremiumBadge /></span>
                   <span className="inline-flex items-center rounded-full bg-brand-peach text-brand-night px-2 py-0.5 font-semibold tabular-nums">
                     {weatherData.sunsetScoreToday.score}/10
                   </span>
@@ -822,11 +827,12 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                         <button
                           type="button"
                           onClick={() => setIsMoonTerrainOpen(!isMoonTerrainOpen)}
-                          className={`${INLINE_ICON_TOGGLE} ml-1`}
+                          className={`${INLINE_ICON_TOGGLE} relative ml-1`}
                           aria-label="Show line of sight"
                           aria-expanded={isMoonTerrainOpen}
                         >
                           <Mountain size={14} />
+                          <PremiumBadge className="absolute -right-1 -top-1 h-2.5 w-2.5" />
                         </button>
                       )}
                     </span>
@@ -886,7 +892,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           <div className="mt-6 pt-4 border-t border-white border-opacity-20">
             <div className="flex items-center justify-between mb-2">
               <h3 className={SECTION_HEADING}>
-                Golden &amp; Blue Hour{goldenBlueHeading ? ` · ${goldenBlueHeading}` : ''}
+                Golden &amp; Blue Hour
               </h3>
               <button
                 onClick={() => setIsGoldenBlueCollapsed(!isGoldenBlueCollapsed)}
@@ -901,6 +907,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             <div className={`transition-all duration-300 ease-in-out ${
               isGoldenBlueCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-32 opacity-100'
             }`}>
+              {goldenBlueDayPart && (
+                <p className="text-caption opacity-70 mb-1">{goldenBlueDayPart}</p>
+              )}
               <div className="space-y-1">
                 {nextGoldenBlueHours?.part === 'morning' ? (
                   <>

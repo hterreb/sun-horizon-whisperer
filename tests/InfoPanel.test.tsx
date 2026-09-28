@@ -468,13 +468,15 @@ describe('InfoPanel: Golden & Blue Hour after Moon Information, collapsed by def
     expect(goldenBlueIndex).toBeGreaterThan(moonIndex);
     expect(twilightIndex).toBeGreaterThan(goldenBlueIndex);
 
-    // The heading (with the part of the day) stays visible while collapsed; the
-    // body below it is hidden via the same max-h-0/opacity-0 CSS transition as the
-    // Moon Information and Twilight sections use, not by unmounting.
-    expect(screen.getByText(/golden & blue hour · this evening/i)).toBeInTheDocument();
+    // The heading stays visible while collapsed, with no part-of-day tag line (ROADMAP
+    // item 33); the part of the day and the windows below it are hidden via the same
+    // max-h-0/opacity-0 CSS transition as the Moon Information and Twilight sections
+    // use, not by unmounting.
+    expect(screen.getByRole('heading', { name: 'Golden & Blue Hour' })).toBeInTheDocument();
     expect(screen.getByLabelText(/expand golden & blue hour/i)).toHaveAttribute('aria-expanded', 'false');
     const collapsibleBody = screen.getByText(/golden hour:/i).closest('.transition-all');
     expect(collapsibleBody?.className).toContain('max-h-0');
+    expect(screen.getByText('This evening').closest('.transition-all')).toBe(collapsibleBody);
   });
 
   it('expands on click, showing the golden and blue hour windows', () => {
@@ -645,6 +647,29 @@ describe('InfoPanel: line of sight as an icon at the sun and moon rows (ROADMAP 
 
     expect(screen.getByText(/\(\+10 min\)/)).toBeInTheDocument();
     expect(screen.getByText(/moon stays behind terrain/i)).toBeInTheDocument();
+  });
+
+  it('marks the premium features with a gold plus (ROADMAP item 35): change location, manual weather, sunset score, line of sight', () => {
+    const weatherData: WeatherData = {
+      temperature: 10,
+      weatherType: 'clear',
+      weatherDescription: 'Clear',
+      lastUpdated: new Date(),
+      isRealWeather: true,
+      sunsetScoreToday: { score: 7, reason: 'High cloud' },
+      sunsetScoreTomorrow: null,
+      cloudCoverPercent: null,
+      windSpeedKmh: null,
+      windDirectionDeg: null,
+    };
+    render(<InfoPanel {...defaultProps} weatherData={weatherData} terrainStatus="ready" />);
+
+    const hasBadge = (el: HTMLElement) => el.querySelector('[data-testid="premium-badge"]') !== null;
+    expect(hasBadge(screen.getByRole('button', { name: /change location/i }))).toBe(true);
+    expect(hasBadge(screen.getByRole('button', { name: 'Manual' }))).toBe(true);
+    expect(hasBadge(screen.getByText('Sunset score'))).toBe(true);
+    expect(hasBadge(getSunLineOfSightButton())).toBe(true);
+    expect(hasBadge(getMoonLineOfSightButton())).toBe(true);
   });
 });
 

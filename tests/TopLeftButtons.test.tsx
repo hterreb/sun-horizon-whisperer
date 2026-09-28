@@ -40,6 +40,19 @@ describe('TopLeftButtons (ROADMAP items 22 and 23)', () => {
     }
   });
 
+  it('stacks the buttons vertically (ROADMAP item 31)', () => {
+    const { container } = renderRow(false, true);
+    expect(container.firstChild).toHaveClass('flex-col');
+  });
+
+  // ROADMAP item 31: `focus-within` also matched after a mouse click or tap (the
+  // clicked fullscreen button keeps focus), so the column never faded out.
+  it('comes back for keyboard focus only, not for the focus a click leaves behind', () => {
+    const { container } = renderRow(true, false);
+    expect(container.firstChild).toHaveClass('has-[:focus-visible]:opacity-100');
+    expect(container.firstChild).not.toHaveClass('focus-within:opacity-100');
+  });
+
   it('is fully opaque outside fullscreen, regardless of showCursor', () => {
     const { container } = renderRow(false, false);
     expect(container.firstChild).toHaveClass('opacity-100');
