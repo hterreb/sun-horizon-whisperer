@@ -482,6 +482,16 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     }
   };
 
+  // Sun glow color, by altitude band (ROADMAP item 15 D polish: the style book's
+  // soft glowing sun) - the same 3 tokens/bands as getGlowIntensity below, also used
+  // for the radial halo behind the sun icon.
+  const getSunGlowToken = (): string | null => {
+    if (sunPosition.altitude > 10) return '--scene-sun-glow-high';
+    if (sunPosition.altitude > 0) return '--scene-sun-glow-low';
+    if (sunPosition.altitude > -10) return '--scene-sun-glow-horizon';
+    return null;
+  };
+
   const getGlowIntensity = () => {
     // Reduce glow intensity for grey/wet weather - fog scatters it the most, snow
     // the least (ROADMAP item 10).
@@ -491,32 +501,63 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
                      weatherType === 'snow' ? 0.5 : 1;
 
     if (sunPosition.altitude > 10) {
-      return `drop-shadow-[0_0_15px_rgba(255,255,0,${0.8 * baseGlow})]`;
+      return `drop-shadow-[0_0_15px_hsl(var(--scene-sun-glow-high)_/_${0.8 * baseGlow})]`;
     } else if (sunPosition.altitude > 0) {
-      return `drop-shadow-[0_0_10px_rgba(255,165,0,${0.6 * baseGlow})]`;
+      return `drop-shadow-[0_0_10px_hsl(var(--scene-sun-glow-low)_/_${0.6 * baseGlow})]`;
     } else if (sunPosition.altitude > -10) {
-      return `drop-shadow-[0_0_5px_rgba(255,99,71,${0.4 * baseGlow})]`;
+      return `drop-shadow-[0_0_5px_hsl(var(--scene-sun-glow-horizon)_/_${0.4 * baseGlow})]`;
     }
     return '';
   };
 
+  // Horizon/water surface color (top gradient stop) per time-of-day - the D style
+  // book's soft sky-glow-over-water tones, already defined as --scene-horizon-* by
+  // item 7 (values matching one-for-one with the old hex here, so this is a pure
+  // "wire it in" swap, no visual change to this stop).
   const getHorizonColor = () => {
     switch(timeOfDay) {
       case 'night':
-        return '#0F0E11';
+        return 'hsl(var(--scene-horizon-night))';
       case 'astronomical-twilight':
-        return '#1A1F2C';
+        return 'hsl(var(--scene-horizon-astro-twilight))';
       case 'nautical-twilight':
-        return '#221F26';
+        return 'hsl(var(--scene-horizon-nautical-twilight))';
       case 'dawn':
-        return '#403E43';
+        return 'hsl(var(--scene-horizon-dawn))';
       default:
-        return '#33C3F0';
+        return 'hsl(var(--scene-horizon-day))';
     }
   };
 
-  const getReflectionOpacity = () => {
-    return timeOfDay === 'night' ? 0.1 : 0.3;
+  // Water - bottom (deep) gradient stop, paired with getHorizonColor's top/surface
+  // stop (ROADMAP item 15 deliverable 2: "the water gradient"). Same time-of-day
+  // buckets as getHorizonColor, one darker --scene-water-deep-* token each.
+  const getWaterDeepColor = () => {
+    switch(timeOfDay) {
+      case 'night':
+        return 'hsl(var(--scene-water-deep-night))';
+      case 'astronomical-twilight':
+        return 'hsl(var(--scene-water-deep-astro-twilight))';
+      case 'nautical-twilight':
+        return 'hsl(var(--scene-water-deep-nautical-twilight))';
+      case 'dawn':
+        return 'hsl(var(--scene-water-deep-dawn))';
+      default:
+        return 'hsl(var(--scene-water-deep-day))';
+    }
+  };
+
+  // Line-of-sight ridge (terrain-silhouette) color, the style book's "soft ridge"
+  // per time-of-day bucket (ROADMAP item 15 deliverable 2), drawn semi-transparent
+  // (see fillOpacity below) so it reads as distance rather than a flat cutout.
+  const getRidgeColor = () => {
+    if (timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight') {
+      return 'hsl(var(--scene-ridge-night))';
+    }
+    if (timeOfDay === 'midday' || timeOfDay === 'afternoon') {
+      return 'hsl(var(--scene-ridge-day))';
+    }
+    return 'hsl(var(--scene-ridge-golden))'; // civil-twilight/dawn/morning/evening
   };
 
   const moonRadius = 18 + moonPosition.illumination * 6; // same footprint as the old 36 + illumination*12 diameter
@@ -607,6 +648,24 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         </svg>
       )}
 
+      {isSunVisible && getSunGlowToken() && (
+        // Soft glowing sun (ROADMAP item 15 D polish): a radial halo behind the sun
+        // icon, colored by the same altitude band as getGlowIntensity's drop-shadow.
+        <div
+          aria-hidden="true"
+          className={`absolute rounded-full pointer-events-none ${compassActive ? '' : 'transition-transform duration-1000'}`}
+          style={{
+            left: `${sunX}px`,
+            top: `${sunY}px`,
+            width: sunPosition.altitude > 0 ? 200 : 160,
+            height: sunPosition.altitude > 0 ? 200 : 160,
+            transform: 'translate(-50%, -50%)',
+            opacity: weatherType === 'rain' ? 0.7 : 1,
+            background: `radial-gradient(circle, hsl(var(${getSunGlowToken()}) / 0.55) 0%, transparent 70%)`
+          }}
+        />
+      )}
+
       {isSunVisible && (
         <div
           data-testid="sun-dot"
@@ -641,7 +700,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             top: `${moonY}px`,
             transform: 'translate(-50%, -50%)',
             opacity: weatherType === 'storm' ? 0.3 : moonPosition.illumination * 0.8 + 0.2,
-            filter: `drop-shadow(0 0 ${moonPosition.illumination * 15}px rgba(255,255,255,0.4))`
+            filter: `drop-shadow(0 0 ${moonPosition.illumination * 15}px hsl(var(--scene-glow-white) / 0.4))`
           }}
         >
           <svg
@@ -649,7 +708,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             height={moonRadius * 2}
             viewBox={`${-moonRadius} ${-moonRadius} ${moonRadius * 2} ${moonRadius * 2}`}
           >
-            <circle cx={0} cy={0} r={moonRadius - 0.5} fill="#2b2f3a" stroke="hsl(var(--scene-moon))" strokeOpacity={0.3} />
+            <circle cx={0} cy={0} r={moonRadius - 0.5} fill="hsl(var(--scene-moon-dark))" stroke="hsl(var(--scene-moon))" strokeOpacity={0.3} />
             <path d={moonPhasePath} fill="hsl(var(--scene-moon))" />
           </svg>
         </div>
@@ -657,9 +716,12 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
       <svg className="absolute inset-0 w-full h-full pointer-events-none">
         <defs>
+          {/* Water gradient (ROADMAP item 15 D polish): surface stop from
+              getHorizonColor, a distinct deeper stop from getWaterDeepColor - a real
+              two-tone body of water instead of the old same-color opacity fade. */}
           <linearGradient id="horizonGradient" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={getHorizonColor()} />
-            <stop offset="100%" stopColor={getHorizonColor()} stopOpacity={getReflectionOpacity()} />
+            <stop offset="100%" stopColor={getWaterDeepColor()} />
           </linearGradient>
         </defs>
         <path
@@ -668,13 +730,51 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           className="transition-all duration-1000"
         />
         {terrainFillPath && (
+          // Line-of-sight ridge (ROADMAP item 13), colored per time-of-day like the
+          // style book's soft ridge (ROADMAP item 15 deliverable 2) and drawn at .85
+          // opacity so it reads as distance rather than a flat cutout.
           <path
             d={terrainFillPath}
-            fill="hsl(var(--brand-night))"
+            fill={getRidgeColor()}
+            fillOpacity={0.85}
             data-testid="terrain-silhouette"
           />
         )}
       </svg>
+
+      {containerDimensions.height > 0 && weatherType !== 'storm' && (() => {
+        // Sun/moon reflection on the water (ROADMAP item 15 deliverable 2): a few
+        // short glinting bars under whichever body is currently shown, fading out
+        // with depth - the style book's water reflection streaks.
+        const nightReflection = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
+        const reflectionVisible = nightReflection ? isMoonVisible : isSunVisible;
+        if (!reflectionVisible) return null;
+
+        const reflectX = nightReflection ? moonX : sunX;
+        const reflectColor = nightReflection ? 'hsl(var(--scene-moon))' : 'hsl(var(--scene-sun-glow-low))';
+        const baseOpacity = nightReflection ? 0.35 : 0.6;
+        const bandHeight = (containerDimensions.height - horizonLabelY) * 0.07;
+
+        return (
+          <svg className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true" data-testid="water-reflection">
+            {Array.from({ length: 7 }, (_, i) => {
+              const barWidth = Math.max(4, 26 - i * 3);
+              return (
+                <rect
+                  key={i}
+                  x={reflectX - barWidth / 2 + (i % 2 ? 3 : -3)}
+                  y={horizonLabelY + 6 + i * bandHeight}
+                  width={barWidth}
+                  height={1.6}
+                  rx={0.8}
+                  fill={reflectColor}
+                  opacity={Math.max(0, baseOpacity - i * 0.05)}
+                />
+              );
+            })}
+          </svg>
+        );
+      })()}
 
       {containerDimensions.width > 0 && (
         <div className="absolute inset-0 pointer-events-none" data-testid="cardinal-labels">

@@ -1,4 +1,6 @@
 import React from 'react';
+import fs from 'node:fs';
+import path from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, afterEach } from 'vitest';
 import SunVisualization, {
@@ -403,5 +405,40 @@ describe('SunVisualization (rendered): terrain silhouette (ROADMAP item 13)', ()
     const sunDot = screen.getByTestId('sun-dot');
     const ridge = screen.getByTestId('terrain-silhouette');
     expect(sunDot.compareDocumentPosition(ridge) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('colors the ridge per time of day (ROADMAP item 15 D polish), semi-transparent', () => {
+    setMockedContainerSize(800, 600);
+
+    const { unmount } = render(
+      <SunVisualization {...baseProps} timeOfDay="night" horizonProfile={ridgeProfile} />
+    );
+    const nightFill = screen.getByTestId('terrain-silhouette').getAttribute('fill');
+    unmount();
+
+    render(<SunVisualization {...baseProps} timeOfDay="midday" horizonProfile={ridgeProfile} />);
+    const dayFill = screen.getByTestId('terrain-silhouette').getAttribute('fill');
+
+    expect(nightFill).toBe('hsl(var(--scene-ridge-night))');
+    expect(dayFill).toBe('hsl(var(--scene-ridge-day))');
+    expect(nightFill).not.toBe(dayFill);
+  });
+});
+
+describe('SunVisualization source (ROADMAP item 15, scene colour refactor)', () => {
+  it('has no raw hex/rgb color literal outside of comments - scene colors are tokens', () => {
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../src/components/SunVisualization.tsx'),
+      'utf-8'
+    );
+    // Strip //-comments (all the hex this file mentions - e.g. explaining which
+    // token mirrors which old hex - live in comments) before scanning code lines.
+    const codeOnly = source
+      .split('\n')
+      .map((line) => line.replace(/\/\/.*$/, ''))
+      .join('\n');
+
+    expect(codeOnly).not.toMatch(/#[0-9a-fA-F]{6}/);
+    expect(codeOnly).not.toMatch(/rgba?\(/);
   });
 });
