@@ -18,8 +18,27 @@ import { type MoonPosition, type MoonTimes, getMoonPhaseLabel } from '../utils/m
 import { type WeatherData } from '../utils/weatherUtils';
 import { isValidLatitude, isValidLongitude } from '../utils/manualLocation';
 import { searchPlaces, formatGeocodeResultLabel, type GeocodeResult } from '../utils/geocodeUtils';
+import { TERRAIN_ATTRIBUTION } from '../utils/terrainTiles';
+import { type HorizonProfileStatus } from '../hooks/useHorizonProfile';
 import { type WeatherType } from './CloudLayer';
 import { format } from 'date-fns';
+
+// Line-of-sight terrain rows (ROADMAP item 13): formats the terrain-adjusted rise/set
+// time against the astronomical one, e.g. "behind terrain 18:42 (-23 min)" - or a
+// plain-language fallback when the body never clears the terrain that day, or when
+// the astronomical time itself is unknown (e.g. no moonrise on a given night).
+// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
+export const formatTerrainDelta = (
+  body: 'sun' | 'moon',
+  terrainDate: Date | null,
+  astronomicalDate: Date | null
+): string => {
+  if (!astronomicalDate) return '—';
+  if (!terrainDate) return `${body} stays behind terrain`;
+  const diffMinutes = Math.round((terrainDate.getTime() - astronomicalDate.getTime()) / 60000);
+  const sign = diffMinutes >= 0 ? '+' : '';
+  return `behind terrain ${formatTime(terrainDate)} (${sign}${diffMinutes} min)`;
+};
 
 interface InfoPanelProps {
   sunPosition: SunPosition;
@@ -45,6 +64,14 @@ interface InfoPanelProps {
   onWeatherRefresh: () => void;
   onLocationChange: (latitude: number, longitude: number, name?: string) => void;
   onUseMyLocation: () => void;
+  // Line of sight with terrain (ROADMAP item 13): hidden entirely while `idle` (the
+  // feature is off, or location isn't loaded yet). Defaults keep every existing
+  // caller/test working unchanged.
+  terrainStatus?: HorizonProfileStatus;
+  terrainSunTimes?: { sunrise: Date | null; sunset: Date | null } | null;
+  terrainMoonTimes?: { rise: Date | null; set: Date | null } | null;
+  eyeHeightMeters?: number;
+  onEyeHeightChange?: (meters: number) => void;
 }
 
 const InfoPanel: React.FC<InfoPanelProps> = ({
@@ -68,7 +95,12 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   onWeatherModeToggle,
   onWeatherRefresh,
   onLocationChange,
-  onUseMyLocation
+  onUseMyLocation,
+  terrainStatus = 'idle',
+  terrainSunTimes = null,
+  terrainMoonTimes = null,
+  eyeHeightMeters = 1.7,
+  onEyeHeightChange = () => {}
 }) => {
   const [locationName, setLocationName] = useState<string>('');
   const [loadingLocation, setLoadingLocation] = useState(false);
@@ -662,6 +694,69 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               </div>
             )}
           </div>
+
+          {/* Line of sight with terrain (ROADMAP item 13): hidden entirely while the
+              feature is idle (disabled, or location not loaded yet). */}
+          {terrainStatus !== 'idle' && (
+            <div className="mt-6 pt-4 border-t border-white border-opacity-20">
+              <h3 className="text-sm font-bold mb-2">Line of Sight (Terrain)</h3>
+
+              {terrainStatus === 'loading' && (
+                <p className="text-xs opacity-70">Loading terrain…</p>
+              )}
+              {terrainStatus === 'error' && (
+                <p role="alert" className="text-xs text-red-300">Terrain unavailable</p>
+              )}
+              {terrainStatus === 'ready' && (
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between">
+                    <span className="opacity-80">Sunrise:</span>
+                    <span className="font-mono">
+                      {formatTerrainDelta('sun', terrainSunTimes?.sunrise ?? null, sunTimes.sunrise)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="opacity-80">Sunset:</span>
+                    <span className="font-mono">
+                      {formatTerrainDelta('sun', terrainSunTimes?.sunset ?? null, sunTimes.sunset)}
+                    </span>
+                  </div>
+                  {moonPosition.visible && (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="opacity-80">Moonrise:</span>
+                        <span className="font-mono">
+                          {formatTerrainDelta('moon', terrainMoonTimes?.rise ?? null, moonTimes.rise)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="opacity-80">Moonset:</span>
+                        <span className="font-mono">
+                          {formatTerrainDelta('moon', terrainMoonTimes?.set ?? null, moonTimes.set)}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              <div className="flex flex-col gap-1 mt-3 text-xs">
+                <label htmlFor="eye-height" className="opacity-80">Eye height (m) — e.g. floor, tower</label>
+                <input
+                  id="eye-height"
+                  type="number"
+                  min={0}
+                  max={1000}
+                  step="any"
+                  value={eyeHeightMeters}
+                  onChange={(e) => onEyeHeightChange(Number(e.target.value))}
+                  className="bg-black bg-opacity-30 rounded px-2 py-1 text-white w-24"
+                />
+              </div>
+
+              <p className="text-[10px] opacity-50 mt-2">{TERRAIN_ATTRIBUTION}</p>
+            </div>
+          )}
 
           {/* Golden & blue hour: only the next pair, from the same part of the day
               (ROADMAP item 20) */}
