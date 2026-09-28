@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Compass } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { type CompassStatus } from '@/hooks/useCompassHeading';
+import { GLASS_ICON_BUTTON } from '@/utils/glassChrome';
 
 interface CompassToggleProps {
   status: CompassStatus;
@@ -56,7 +57,7 @@ const CompassToggle: React.FC<CompassToggleProps> = ({
       onBlur={() => setIsFocused(false)}
       aria-label={isActive ? 'Disable compass' : 'Enable compass'}
       aria-pressed={isActive}
-      className={`fixed z-40 bg-black/20 backdrop-blur-sm hover:bg-black/40 border border-white/20 transition-colors transition-opacity duration-300 ${
+      className={`fixed z-40 ${GLASS_ICON_BUTTON} transition-colors transition-opacity duration-300 ${
         isActive ? 'text-brand-sky' : 'text-white'
       } ${isVisible ? 'opacity-100' : 'opacity-0'}`}
       style={{

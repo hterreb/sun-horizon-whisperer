@@ -191,29 +191,43 @@ export const getTimeOfDayLabel = (timeOfDay: TimeOfDay): string => {
   }
 };
 
+// Brand hex values (ROADMAP item 15, direction D "Polished Classic"). These mirror
+// the HSL custom properties in index.css (--brand-*, --scene-sky-*-*) - kept here as
+// literal #rrggbb, not `hsl(var(--x))`, because shiftGradientBrightness below only
+// rewrites literal hex inside the gradient string it walks (ROADMAP item 10); a CSS
+// var reference would silently stop getting the weather brightness shift.
+const SUNSET = '#F97316'; // --brand-sunset
+const PEACH = '#FEC6A1'; // --brand-peach
+const SKY = '#0EA5E9'; // --brand-sky
+const CYAN = '#33C3F0'; // --brand-cyan
+const NIGHT = '#0F1016'; // --brand-night
+const NIGHT_2 = '#1A1F2C'; // --scene-sky-night-2 / --scene-sky-dusk-3
+const NIGHT_3 = '#221F26'; // --scene-sky-night-3
+const TWILIGHT_CIVIL = '#403E43'; // unchanged legacy civil-twilight tone (not one of the 6 brand colors)
+const TWILIGHT_CIVIL_2 = '#E5DEFF'; // ditto - tailwind's `dusk` color, kept for the civil-twilight bridge
+
+// Each time-of-day's sky gradient, top to bottom (ROADMAP item 15 deliverable 2: the
+// D style book's sky gradients get a third stop). The first two stops of every state
+// are exactly the pre-item-15 2-stop gradient; the added third stop is simply the
+// next state's own start color, so the gradient hints at what's coming (a glow at the
+// horizon) instead of ending in a hard band. The 'night'/'midday'/'evening' entries
+// match the --scene-sky-night-*/--scene-sky-day-*/--scene-sky-dusk-* bucket tokens in
+// index.css/tailwind.config.ts exactly; 'dawn' matches --scene-sky-dawn-*.
+const SKY_GRADIENT_STOPS: Record<TimeOfDay, [string, string, string]> = {
+  'night': [NIGHT, NIGHT_2, NIGHT_3],
+  'astronomical-twilight': [NIGHT_2, NIGHT_3, TWILIGHT_CIVIL],
+  'nautical-twilight': [NIGHT_3, TWILIGHT_CIVIL, TWILIGHT_CIVIL_2],
+  'civil-twilight': [TWILIGHT_CIVIL, TWILIGHT_CIVIL_2, SUNSET],
+  'dawn': [SUNSET, PEACH, CYAN],
+  'morning': [PEACH, CYAN, SKY],
+  'midday': [SKY, CYAN, PEACH],
+  'afternoon': [CYAN, PEACH, SUNSET],
+  'evening': [PEACH, SUNSET, NIGHT_2],
+};
+
 export const getBackgroundGradient = (timeOfDay: TimeOfDay): string => {
-  switch(timeOfDay) {
-    case 'night':
-      return 'linear-gradient(to bottom, #0F1016 0%, #1A1F2C 100%)';
-    case 'astronomical-twilight':
-      return 'linear-gradient(to bottom, #1A1F2C 0%, #221F26 100%)';
-    case 'nautical-twilight':
-      return 'linear-gradient(to bottom, #221F26 0%, #403E43 100%)';
-    case 'civil-twilight':
-      return 'linear-gradient(to bottom, #403E43 0%, #E5DEFF 100%)';
-    case 'dawn':
-      return 'linear-gradient(180deg, #F97316 0%, #FEC6A1 100%)';
-    case 'morning':
-      return 'linear-gradient(to bottom, #FEC6A1 0%, #33C3F0 100%)';
-    case 'midday':
-      return 'linear-gradient(to bottom, #0EA5E9 0%, #33C3F0 100%)';
-    case 'afternoon':
-      return 'linear-gradient(to bottom, #33C3F0 0%, #FEC6A1 100%)';
-    case 'evening':
-      return 'linear-gradient(180deg, #FEC6A1 0%, #F97316 100%)';
-    default:
-      return 'linear-gradient(to bottom, #0EA5E9 0%, #33C3F0 100%)';
-  }
+  const [start, mid, end] = SKY_GRADIENT_STOPS[timeOfDay] ?? SKY_GRADIENT_STOPS.midday;
+  return `linear-gradient(to bottom, ${start} 0%, ${mid} 62%, ${end} 100%)`;
 };
 
 // Shifts every #rrggbb color in a CSS gradient string by the same amount per channel

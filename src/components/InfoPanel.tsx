@@ -23,6 +23,15 @@ import { type HorizonProfileStatus } from '../hooks/useHorizonProfile';
 import { type WeatherType } from './CloudLayer';
 import { format } from 'date-fns';
 
+// Direction D "Polished Classic" (ROADMAP items 7 & 15): shared classes so every
+// row/section/focus ring in the panel reads as one system. Kept file-local (not a
+// shared helper across components), so no separate test file - see glassChrome.ts
+// for the one style helper that *is* shared, and its test.
+const ROW = 'flex justify-between items-center gap-2 border-t border-[hsl(var(--panel-border)/0.12)] pt-1';
+const SECTION_HEADING = 'text-title font-bold flex items-center';
+const ICON_TOGGLE = 'p-1.5 rounded-full hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70';
+const FOCUS_RING = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70';
+
 // Line-of-sight terrain rows (ROADMAP item 13): formats the terrain-adjusted rise/set
 // time against the astronomical one, e.g. "behind terrain 18:42 (-23 min)" - or a
 // plain-language fallback when the body never clears the terrain that day, or when
@@ -38,6 +47,23 @@ export const formatTerrainDelta = (
   const diffMinutes = Math.round((terrainDate.getTime() - astronomicalDate.getTime()) / 60000);
   const sign = diffMinutes >= 0 ? '+' : '';
   return `behind terrain ${formatTime(terrainDate)} (${sign}${diffMinutes} min)`;
+};
+
+// Highlights a terrain-adjusted rise/set line in the D palette's peach `--panel-hi`
+// (ROADMAP item 15). Kept as a single text node (not split around the "(+23 min)"
+// part) so it stays one direct text child - Testing Library's getByText matches
+// only an element's own direct text nodes, not text spread across child elements.
+const renderTerrainDelta = (text: string): React.ReactNode => (
+  <span className="text-brand-peach">{text}</span>
+);
+
+// Highlights "now, until 19:42" in peach, the same D `--panel-hi` treatment as the
+// terrain delta above, without changing formatWindow's own text.
+const renderWindow = (text: string): React.ReactNode => {
+  if (text.startsWith('now, until')) {
+    return <span className="text-brand-peach">{text}</span>;
+  }
+  return text;
 };
 
 interface InfoPanelProps {
@@ -171,11 +197,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
   // Auto-adjust collapsed states based on time of day
   useEffect(() => {
-    const isNightTime = timeOfDay === 'night' || 
-                       timeOfDay === 'astronomical-twilight' || 
-                       timeOfDay === 'nautical-twilight' || 
+    const isNightTime = timeOfDay === 'night' ||
+                       timeOfDay === 'astronomical-twilight' ||
+                       timeOfDay === 'nautical-twilight' ||
                        timeOfDay === 'civil-twilight';
-    
+
     if (isNightTime) {
       // During night/twilight: collapse twilight times and sun position, expand moon
       if (!userToggledTwilightRef.current) setIsTwilightCollapsed(true);
@@ -422,13 +448,18 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     }
   };
 
+  // The width cap keeps the panel clear of the top-left buttons (7rem) on narrow phones.
   return (
     <div
-      className={`absolute top-0 right-0 z-30 w-full max-w-[300px] sm:w-[300px] bg-black bg-opacity-40 backdrop-blur-md text-white rounded-bl-lg overflow-hidden transition-opacity duration-300 max-h-dvh ${
+      className={`absolute top-0 right-0 z-30 w-full max-w-[min(300px,calc(100vw-7rem))] sm:w-[300px] bg-[hsl(var(--panel-background)/0.45)] backdrop-blur-md border border-[hsl(var(--panel-border)/0.14)] text-white rounded-bl-panel overflow-hidden transition-opacity duration-300 max-h-dvh ${
         isVisible ? 'opacity-100' : 'opacity-0'
       } ${
         // Frost (ROADMAP item 10): a subtle icy glow on the panel edges, CSS only.
-        isFrost ? 'shadow-[inset_0_0_22px_4px_rgba(191,219,254,0.35),inset_0_0_2px_1px_rgba(255,255,255,0.6)]' : ''
+        // Only one `shadow-[...]` utility can win per element, so the frost glow
+        // (when present) replaces the plain D panel shadow rather than fighting it.
+        isFrost
+          ? 'shadow-[inset_0_0_22px_4px_rgba(191,219,254,0.35),inset_0_0_2px_1px_rgba(255,255,255,0.6)]'
+          : 'shadow-[0_8px_30px_rgba(0,0,0,0.25)]'
       }`}
       style={{ paddingTop: 'env(safe-area-inset-top)', paddingRight: 'env(safe-area-inset-right)' }}
       onMouseEnter={handleMouseEnter}
@@ -438,8 +469,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
       {/* Header with toggle button */}
       <div className="p-4 pb-2 flex items-start justify-between flex-shrink-0">
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">{getTimeOfDayLabel(timeOfDay)}</h1>
-          <div className="flex items-start text-sm opacity-80 mt-1">
+          <h1 className="text-display font-bold tracking-tight">{getTimeOfDayLabel(timeOfDay)}</h1>
+          <div className="flex items-start text-body opacity-80 mt-1">
             <MapPin size={14} className="mr-1 mt-0.5 flex-shrink-0" />
             <div className="flex flex-col min-w-0">
               {loadingLocation ? (
@@ -447,7 +478,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               ) : (
                 locationName && <span className="mb-1 truncate">{locationName}</span>
               )}
-              <span className="text-xs opacity-70">
+              <span className="text-caption opacity-70 tabular-nums">
                 {location.latitude.toFixed(4)}°, {location.longitude.toFixed(4)}°
               </span>
               <Button
@@ -455,7 +486,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 type="button"
                 variant="link"
                 size="sm"
-                className="h-auto p-0 mt-1 text-xs opacity-80 hover:opacity-100 text-white justify-start"
+                className={`h-auto p-0 mt-1 text-caption opacity-80 hover:opacity-100 text-white justify-start ${FOCUS_RING}`}
                 onClick={() => (isLocationFormOpen ? closeLocationForm() : openLocationForm())}
                 aria-expanded={isLocationFormOpen}
               >
@@ -467,7 +498,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="ml-2 p-1 rounded hover:bg-white hover:bg-opacity-10 transition-colors flex-shrink-0"
+          className={`ml-2 ${ICON_TOGGLE} flex-shrink-0`}
           aria-label={isCollapsed ? "Expand info panel" : "Collapse info panel"}
         >
           {isCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
@@ -475,7 +506,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
       </div>
 
       {isLocationFormOpen && (
-        <form onSubmit={handleSubmitLocation} noValidate className="mx-4 mb-3 p-2 space-y-2 text-xs bg-white bg-opacity-10 rounded">
+        <form onSubmit={handleSubmitLocation} noValidate className="mx-4 mb-3 p-2 space-y-2 text-caption bg-white bg-opacity-10 rounded">
           <div className="flex flex-col gap-1">
             <label htmlFor="manual-location-search" className="opacity-80">Search for a place</label>
             <input
@@ -484,7 +515,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               value={placeQuery}
               onChange={(e) => setPlaceQuery(e.target.value)}
               placeholder="e.g. Friedrichshafen"
-              className="bg-black bg-opacity-30 rounded px-2 py-1 text-white"
+              className={`bg-black bg-opacity-30 rounded px-2 py-1 text-white ${FOCUS_RING}`}
               role="combobox"
               aria-expanded={placeResults.length > 0}
               aria-controls="manual-location-search-results"
@@ -494,7 +525,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               <p className="opacity-70">Searching…</p>
             )}
             {placeSearchStatus === 'error' && (
-              <p role="alert" className="text-red-300">Could not search for places.</p>
+              <p role="alert" className="text-brand-coral">Could not search for places.</p>
             )}
             {placeSearchStatus === 'done' && placeResults.length === 0 && (
               <p className="opacity-70">No results</p>
@@ -513,7 +544,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                       role="option"
                       aria-selected={false}
                       onClick={() => handleSelectPlace(result)}
-                      className="w-full text-left px-2 py-1 rounded bg-white bg-opacity-5 hover:bg-opacity-20 transition-colors"
+                      className={`w-full text-left px-2 py-1 rounded bg-white bg-opacity-5 hover:bg-opacity-20 transition-colors ${FOCUS_RING}`}
                     >
                       {formatGeocodeResultLabel(result)}
                     </button>
@@ -533,7 +564,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               max={90}
               value={latInput}
               onChange={(e) => setLatInput(e.target.value)}
-              className="bg-black bg-opacity-30 rounded px-2 py-1 text-white"
+              className={`bg-black bg-opacity-30 rounded px-2 py-1 text-white tabular-nums ${FOCUS_RING}`}
             />
           </div>
           <div className="flex flex-col gap-1">
@@ -546,15 +577,15 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               max={180}
               value={lonInput}
               onChange={(e) => setLonInput(e.target.value)}
-              className="bg-black bg-opacity-30 rounded px-2 py-1 text-white"
+              className={`bg-black bg-opacity-30 rounded px-2 py-1 text-white tabular-nums ${FOCUS_RING}`}
             />
           </div>
           {locationError && (
-            <p role="alert" className="text-red-300">{locationError}</p>
+            <p role="alert" className="text-brand-coral">{locationError}</p>
           )}
           <div className="flex flex-wrap gap-2 pt-1">
-            <Button type="submit" size="sm" variant="secondary">Set location</Button>
-            <Button type="button" size="sm" variant="outline" onClick={handleUseMyLocationClick}>
+            <Button type="submit" size="sm" variant="secondary" className="rounded-full">Set location</Button>
+            <Button type="button" size="sm" variant="outline" className="rounded-full" onClick={handleUseMyLocationClick}>
               Use my location
             </Button>
           </div>
@@ -573,36 +604,36 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           {weatherData && (
             <div className="mb-4 pt-2 border-t border-white border-opacity-20">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-bold flex items-center">
+                <h3 className={SECTION_HEADING}>
                   <Thermometer size={16} className="mr-2" />
                   Current Weather
                 </h3>
                 <button
                   onClick={onWeatherRefresh}
                   disabled={isLoadingWeather}
-                  className="p-1 rounded hover:bg-white hover:bg-opacity-10 transition-colors disabled:opacity-50"
+                  className={`${ICON_TOGGLE} disabled:opacity-50`}
                   aria-label="Refresh weather"
                 >
                   <RefreshCw size={14} className={isLoadingWeather ? 'animate-spin' : ''} />
                 </button>
               </div>
-              
-              <div className="space-y-1 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="opacity-80">Temperature:</span>
-                  <span className="font-semibold">{weatherData.temperature}°C</span>
+
+              <div className="space-y-1">
+                <div className={ROW}>
+                  <span className="opacity-80 text-body">Temperature:</span>
+                  <span className="font-semibold text-body tabular-nums">{weatherData.temperature}°C</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="opacity-80">Condition:</span>
-                  <span className="font-semibold">{weatherData.weatherDescription}</span>
+                <div className={ROW}>
+                  <span className="opacity-80 text-body">Condition:</span>
+                  <span className="font-semibold text-body">{weatherData.weatherDescription}</span>
                 </div>
                 {weatherData.isRealWeather && (
-                  <div className="text-xs opacity-60 mt-1">
+                  <div className="text-caption opacity-60 mt-1 tabular-nums">
                     Updated: {format(weatherData.lastUpdated, 'HH:mm')}
                   </div>
                 )}
                 {!weatherData.isRealWeather && (
-                  <div className="text-xs opacity-60 text-yellow-400 mt-1">
+                  <div className="text-caption opacity-60 text-brand-peach mt-1">
                     Real weather unavailable
                   </div>
                 )}
@@ -613,11 +644,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           {/* Weather Mode Toggle */}
           <div className="mb-4 pt-2 border-t border-white border-opacity-20">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-bold">Weather Mode</h3>
-              <div className="flex bg-white bg-opacity-10 rounded p-1">
+              <h3 className={SECTION_HEADING}>Weather Mode</h3>
+              <div className="flex bg-white bg-opacity-10 rounded-full p-1">
                 <button
                   onClick={() => onWeatherModeToggle(true)}
-                  className={`text-xs px-2 py-1 rounded transition-colors ${
+                  className={`text-caption px-2 py-1 rounded-full transition-colors ${FOCUS_RING} ${
                     useRealWeather
                       ? 'bg-white bg-opacity-20 text-white'
                       : 'text-white opacity-60'
@@ -627,7 +658,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 </button>
                 <button
                   onClick={() => onWeatherModeToggle(false)}
-                  className={`text-xs px-2 py-1 rounded transition-colors ${
+                  className={`text-caption px-2 py-1 rounded-full transition-colors ${FOCUS_RING} ${
                     !useRealWeather
                       ? 'bg-white bg-opacity-20 text-white'
                       : 'text-white opacity-60'
@@ -642,13 +673,13 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           {/* Manual Weather Selector - only show when not using real weather */}
           {!useRealWeather && (
             <div className="mb-4 pt-2 border-t border-white border-opacity-20">
-              <h3 className="text-sm font-bold mb-2">Manual Weather</h3>
+              <h3 className={`${SECTION_HEADING} mb-2`}>Manual Weather</h3>
               <div className="grid grid-cols-3 gap-1">
                 {weatherOptions.map((option) => (
                   <button
                     key={option.type}
                     onClick={() => onWeatherChange(option.type)}
-                    className={`flex items-center justify-center p-2 rounded text-xs transition-colors ${
+                    className={`flex items-center justify-center p-2 rounded-full text-caption transition-colors ${FOCUS_RING} ${
                       weatherType === option.type
                         ? 'bg-white bg-opacity-20 text-white'
                         : 'bg-white bg-opacity-5 text-white opacity-60 hover:opacity-80'
@@ -663,40 +694,48 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           )}
 
           {/* Time information */}
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
+          <div className="space-y-1">
+            <div className={ROW}>
               <div className="flex items-center">
                 <Clock size={18} className="mr-2" />
-                <span className="text-sm">Current Time</span>
+                <span className="text-body">Current Time</span>
               </div>
-              <span className="font-semibold text-sm sm:text-base">{format(currentTime, 'HH:mm:ss')}</span>
-            </div>
-            
-            <div className="flex justify-between items-center">
-              <div className="flex items-center">
-                <Sunrise size={18} className="mr-2" />
-                <span className="text-sm">Sunrise</span>
-              </div>
-              <span className="font-semibold text-sm sm:text-base">{polarSunLabel ?? formatTime(sunTimes.sunrise)}</span>
+              <span className="font-semibold text-body tabular-nums">{format(currentTime, 'HH:mm:ss')}</span>
             </div>
 
-            <div className="flex justify-between items-center">
+            <div className={ROW}>
+              <div className="flex items-center">
+                <Sunrise size={18} className="mr-2" />
+                <span className="text-body">Sunrise</span>
+              </div>
+              <span className="font-semibold text-body tabular-nums">{polarSunLabel ?? formatTime(sunTimes.sunrise)}</span>
+            </div>
+
+            <div className={ROW}>
               <div className="flex items-center">
                 <Sunset size={18} className="mr-2" />
-                <span className="text-sm">Sunset</span>
+                <span className="text-body">Sunset</span>
               </div>
-              <span className="font-semibold text-sm sm:text-base">{polarSunLabel ?? formatTime(sunTimes.sunset)}</span>
+              <span className="font-semibold text-body tabular-nums">{polarSunLabel ?? formatTime(sunTimes.sunset)}</span>
             </div>
 
             {/* Sunset score (ROADMAP item 11) */}
             {weatherData?.sunsetScoreToday && (
-              <div className="text-xs opacity-80 tabular-nums -mt-2">
-                <div>
-                  Sunset score {weatherData.sunsetScoreToday.score}/10 · {weatherData.sunsetScoreToday.reason}
+              <div className="text-caption opacity-80 mt-1 space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <span>Sunset score</span>
+                  <span className="inline-flex items-center rounded-full bg-brand-peach text-brand-night px-2 py-0.5 font-semibold tabular-nums">
+                    {weatherData.sunsetScoreToday.score}/10
+                  </span>
+                  <span className="opacity-80">· {weatherData.sunsetScoreToday.reason}</span>
                 </div>
                 {weatherData.sunsetScoreTomorrow && (
-                  <div className="opacity-70 mt-0.5">
-                    Tomorrow: {weatherData.sunsetScoreTomorrow.score}/10 · {weatherData.sunsetScoreTomorrow.reason}
+                  <div className="opacity-70 flex items-center gap-2">
+                    <span>Tomorrow:</span>
+                    <span className="inline-flex items-center rounded-full bg-brand-peach text-brand-night px-2 py-0.5 font-semibold tabular-nums">
+                      {weatherData.sunsetScoreTomorrow.score}/10
+                    </span>
+                    <span className="opacity-80">· {weatherData.sunsetScoreTomorrow.reason}</span>
                   </div>
                 )}
               </div>
@@ -707,40 +746,40 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               feature is idle (disabled, or location not loaded yet). */}
           {terrainStatus !== 'idle' && (
             <div className="mt-6 pt-4 border-t border-white border-opacity-20">
-              <h3 className="text-sm font-bold mb-2">Line of Sight (Terrain)</h3>
+              <h3 className={`${SECTION_HEADING} mb-2`}>Line of Sight (Terrain)</h3>
 
               {terrainStatus === 'loading' && (
-                <p className="text-xs opacity-70">Loading terrain…</p>
+                <p className="text-caption opacity-70">Loading terrain…</p>
               )}
               {terrainStatus === 'error' && (
-                <p role="alert" className="text-xs text-red-300">Terrain unavailable</p>
+                <p role="alert" className="text-caption text-brand-coral">Terrain unavailable</p>
               )}
               {terrainStatus === 'ready' && (
-                <div className="space-y-1 text-xs">
-                  <div className="flex justify-between">
-                    <span className="opacity-80">Sunrise:</span>
-                    <span className="font-mono">
-                      {formatTerrainDelta('sun', terrainSunTimes?.sunrise ?? null, sunTimes.sunrise)}
+                <div className="space-y-1">
+                  <div className={ROW}>
+                    <span className="opacity-80 text-caption">Sunrise:</span>
+                    <span className="text-caption tabular-nums">
+                      {renderTerrainDelta(formatTerrainDelta('sun', terrainSunTimes?.sunrise ?? null, sunTimes.sunrise))}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="opacity-80">Sunset:</span>
-                    <span className="font-mono">
-                      {formatTerrainDelta('sun', terrainSunTimes?.sunset ?? null, sunTimes.sunset)}
+                  <div className={ROW}>
+                    <span className="opacity-80 text-caption">Sunset:</span>
+                    <span className="text-caption tabular-nums">
+                      {renderTerrainDelta(formatTerrainDelta('sun', terrainSunTimes?.sunset ?? null, sunTimes.sunset))}
                     </span>
                   </div>
                   {moonPosition.visible && (
                     <>
-                      <div className="flex justify-between">
-                        <span className="opacity-80">Moonrise:</span>
-                        <span className="font-mono">
-                          {formatTerrainDelta('moon', terrainMoonTimes?.rise ?? null, moonTimes.rise)}
+                      <div className={ROW}>
+                        <span className="opacity-80 text-caption">Moonrise:</span>
+                        <span className="text-caption tabular-nums">
+                          {renderTerrainDelta(formatTerrainDelta('moon', terrainMoonTimes?.rise ?? null, moonTimes.rise))}
                         </span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="opacity-80">Moonset:</span>
-                        <span className="font-mono">
-                          {formatTerrainDelta('moon', terrainMoonTimes?.set ?? null, moonTimes.set)}
+                      <div className={ROW}>
+                        <span className="opacity-80 text-caption">Moonset:</span>
+                        <span className="text-caption tabular-nums">
+                          {renderTerrainDelta(formatTerrainDelta('moon', terrainMoonTimes?.set ?? null, moonTimes.set))}
                         </span>
                       </div>
                     </>
@@ -748,7 +787,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 </div>
               )}
 
-              <div className="flex flex-col gap-1 mt-3 text-xs">
+              <div className="flex flex-col gap-1 mt-3 text-caption">
                 <label htmlFor="eye-height" className="opacity-80">Eye height (m) — e.g. floor, tower</label>
                 <input
                   id="eye-height"
@@ -758,41 +797,41 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   step="any"
                   value={eyeHeightMeters}
                   onChange={(e) => onEyeHeightChange(Number(e.target.value))}
-                  className="bg-black bg-opacity-30 rounded px-2 py-1 text-white w-24"
+                  className={`bg-black bg-opacity-30 rounded px-2 py-1 text-white w-24 tabular-nums ${FOCUS_RING}`}
                 />
               </div>
 
-              <p className="text-[10px] opacity-50 mt-2">{TERRAIN_ATTRIBUTION}</p>
+              <p className="text-caption opacity-50 mt-2">{TERRAIN_ATTRIBUTION}</p>
             </div>
           )}
 
           {/* Golden & blue hour: only the next pair, from the same part of the day
               (ROADMAP item 20) */}
           <div className="mt-6 pt-4 border-t border-white border-opacity-20">
-            <h3 className="text-sm font-bold mb-2">
+            <h3 className={`${SECTION_HEADING} mb-2`}>
               Golden &amp; Blue Hour{goldenBlueHeading ? ` · ${goldenBlueHeading}` : ''}
             </h3>
-            <div className="space-y-1 text-xs">
+            <div className="space-y-1">
               {nextGoldenBlueHours?.part === 'morning' ? (
                 <>
-                  <div className="flex justify-between">
-                    <span className="opacity-80">Blue hour:</span>
-                    <span className="font-mono tabular-nums">{formatWindow(nextGoldenBlueHours?.blue)}</span>
+                  <div className={ROW}>
+                    <span className="opacity-80 text-caption">Blue hour:</span>
+                    <span className="text-caption tabular-nums">{renderWindow(formatWindow(nextGoldenBlueHours?.blue))}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="opacity-80">Golden hour:</span>
-                    <span className="font-mono tabular-nums">{formatWindow(nextGoldenBlueHours?.golden)}</span>
+                  <div className={ROW}>
+                    <span className="opacity-80 text-caption">Golden hour:</span>
+                    <span className="text-caption tabular-nums">{renderWindow(formatWindow(nextGoldenBlueHours?.golden))}</span>
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="flex justify-between">
-                    <span className="opacity-80">Golden hour:</span>
-                    <span className="font-mono tabular-nums">{formatWindow(nextGoldenBlueHours?.golden)}</span>
+                  <div className={ROW}>
+                    <span className="opacity-80 text-caption">Golden hour:</span>
+                    <span className="text-caption tabular-nums">{renderWindow(formatWindow(nextGoldenBlueHours?.golden))}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="opacity-80">Blue hour:</span>
-                    <span className="font-mono tabular-nums">{formatWindow(nextGoldenBlueHours?.blue)}</span>
+                  <div className={ROW}>
+                    <span className="opacity-80 text-caption">Blue hour:</span>
+                    <span className="text-caption tabular-nums">{renderWindow(formatWindow(nextGoldenBlueHours?.blue))}</span>
                   </div>
                 </>
               )}
@@ -803,7 +842,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           {moonPosition.visible && (
             <div className="mt-6 pt-4 border-t border-white border-opacity-20">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-bold flex items-center">
+                <h3 className={SECTION_HEADING}>
                   <Moon size={16} className="mr-2" />
                   Moon Information
                 </h3>
@@ -812,36 +851,36 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                     userToggledMoonRef.current = true;
                     setIsMoonCollapsed(!isMoonCollapsed);
                   }}
-                  className="p-1 rounded hover:bg-white hover:bg-opacity-10 transition-colors"
+                  className={ICON_TOGGLE}
                   aria-label={isMoonCollapsed ? "Expand moon info" : "Collapse moon info"}
                 >
                   {isMoonCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
                 </button>
               </div>
-              
+
               <div className={`transition-all duration-300 ease-in-out ${
                 isMoonCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-64 opacity-100'
               }`}>
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span>Phase:</span>
-                    <span className="font-mono">{getMoonPhaseLabel(moonPosition.phase)}</span>
+                <div className="space-y-1">
+                  <div className={ROW}>
+                    <span className="text-caption">Phase:</span>
+                    <span className="text-caption tabular-nums">{getMoonPhaseLabel(moonPosition.phase)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Illumination:</span>
-                    <span className="font-mono">{(moonPosition.illumination * 100).toFixed(0)}%</span>
+                  <div className={ROW}>
+                    <span className="text-caption">Illumination:</span>
+                    <span className="text-caption tabular-nums">{(moonPosition.illumination * 100).toFixed(0)}%</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Altitude:</span>
-                    <span className="font-mono">{moonPosition.altitude.toFixed(1)}°</span>
+                  <div className={ROW}>
+                    <span className="text-caption">Altitude:</span>
+                    <span className="text-caption tabular-nums">{moonPosition.altitude.toFixed(1)}°</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Azimuth:</span>
-                    <span className="font-mono">{moonPosition.azimuth.toFixed(1)}°</span>
+                  <div className={ROW}>
+                    <span className="text-caption">Azimuth:</span>
+                    <span className="text-caption tabular-nums">{moonPosition.azimuth.toFixed(1)}°</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Moonrise:</span>
-                    <span className="font-mono">
+                  <div className={ROW}>
+                    <span className="text-caption">Moonrise:</span>
+                    <span className="text-caption tabular-nums">
                       {moonTimes.alwaysUp
                         ? 'Up all day'
                         : moonTimes.alwaysDown
@@ -851,9 +890,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                             : '—'}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Moonset:</span>
-                    <span className="font-mono">
+                  <div className={ROW}>
+                    <span className="text-caption">Moonset:</span>
+                    <span className="text-caption tabular-nums">
                       {moonTimes.alwaysUp
                         ? 'Up all day'
                         : moonTimes.alwaysDown
@@ -863,23 +902,23 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                             : '—'}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Next full moon:</span>
-                    <span className="font-mono">{format(nextFullMoon, 'MMM d, HH:mm')}</span>
+                  <div className={ROW}>
+                    <span className="text-caption">Next full moon:</span>
+                    <span className="text-caption tabular-nums">{format(nextFullMoon, 'MMM d, HH:mm')}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Next new moon:</span>
-                    <span className="font-mono">{format(nextNewMoon, 'MMM d, HH:mm')}</span>
+                  <div className={ROW}>
+                    <span className="text-caption">Next new moon:</span>
+                    <span className="text-caption tabular-nums">{format(nextNewMoon, 'MMM d, HH:mm')}</span>
                   </div>
                 </div>
               </div>
             </div>
           )}
-          
+
           {/* Upcoming twilight times - collapsible */}
           <div className="mt-6 pt-4 border-t border-white border-opacity-20">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-bold">
+              <h3 className={SECTION_HEADING}>
                 Upcoming {relevantTwilightTimes.type === 'dawn' ? 'Dawn' : 'Dusk'} Times
               </h3>
               <button
@@ -887,23 +926,23 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   userToggledTwilightRef.current = true;
                   setIsTwilightCollapsed(!isTwilightCollapsed);
                 }}
-                className="p-1 rounded hover:bg-white hover:bg-opacity-10 transition-colors"
+                className={ICON_TOGGLE}
                 aria-label={isTwilightCollapsed ? "Expand twilight times" : "Collapse twilight times"}
               >
                 {isTwilightCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
               </button>
             </div>
-            
+
             <div className={`transition-all duration-300 ease-in-out ${
               isTwilightCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-32 opacity-100'
             }`}>
-              <div className="space-y-2 text-xs">
+              <div className="space-y-1">
                 {relevantTwilightTimes.type === 'dusk' ? (
                   <>
-                    <div className="flex justify-between">
+                    <div className={ROW}>
                       <button
                         type="button"
-                        className="font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left"
+                        className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left text-caption rounded ${FOCUS_RING}`}
                         onMouseEnter={() => setHoveredTwilight('civil')}
                         onMouseLeave={() => setHoveredTwilight(null)}
                         onFocus={() => setHoveredTwilight('civil')}
@@ -915,17 +954,17 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                       >
                         Civil:
                       </button>
-                      <span className="font-mono">{formatTime(sunTimes.sunset)} - {formatTime(relevantTwilightTimes.civil)}</span>
+                      <span className="text-caption tabular-nums">{formatTime(sunTimes.sunset)} - {formatTime(relevantTwilightTimes.civil)}</span>
                     </div>
                     {hoveredTwilight === 'civil' && (
-                      <div id="twilight-degree-civil" className="text-xs opacity-60 ml-2">
+                      <div id="twilight-degree-civil" className="text-caption opacity-60 ml-2">
                         {getDegreeInfo('civil')}
                       </div>
                     )}
-                    <div className="flex justify-between">
+                    <div className={ROW}>
                       <button
                         type="button"
-                        className="font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left"
+                        className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left text-caption rounded ${FOCUS_RING}`}
                         onMouseEnter={() => setHoveredTwilight('nautical')}
                         onMouseLeave={() => setHoveredTwilight(null)}
                         onFocus={() => setHoveredTwilight('nautical')}
@@ -937,17 +976,17 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                       >
                         Nautical:
                       </button>
-                      <span className="font-mono">{formatTime(relevantTwilightTimes.civil)} - {formatTime(relevantTwilightTimes.nautical)}</span>
+                      <span className="text-caption tabular-nums">{formatTime(relevantTwilightTimes.civil)} - {formatTime(relevantTwilightTimes.nautical)}</span>
                     </div>
                     {hoveredTwilight === 'nautical' && (
-                      <div id="twilight-degree-nautical" className="text-xs opacity-60 ml-2">
+                      <div id="twilight-degree-nautical" className="text-caption opacity-60 ml-2">
                         {getDegreeInfo('nautical')}
                       </div>
                     )}
-                    <div className="flex justify-between">
+                    <div className={ROW}>
                       <button
                         type="button"
-                        className="font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left"
+                        className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left text-caption rounded ${FOCUS_RING}`}
                         onMouseEnter={() => setHoveredTwilight('astronomical')}
                         onMouseLeave={() => setHoveredTwilight(null)}
                         onFocus={() => setHoveredTwilight('astronomical')}
@@ -959,20 +998,20 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                       >
                         Astronomical:
                       </button>
-                      <span className="font-mono">{formatTime(relevantTwilightTimes.nautical)} - {formatTime(relevantTwilightTimes.astronomical)}</span>
+                      <span className="text-caption tabular-nums">{formatTime(relevantTwilightTimes.nautical)} - {formatTime(relevantTwilightTimes.astronomical)}</span>
                     </div>
                     {hoveredTwilight === 'astronomical' && (
-                      <div id="twilight-degree-astronomical" className="text-xs opacity-60 ml-2">
+                      <div id="twilight-degree-astronomical" className="text-caption opacity-60 ml-2">
                         {getDegreeInfo('astronomical')}
                       </div>
                     )}
                   </>
                 ) : (
                   <>
-                    <div className="flex justify-between">
+                    <div className={ROW}>
                       <button
                         type="button"
-                        className="font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left"
+                        className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left text-caption rounded ${FOCUS_RING}`}
                         onMouseEnter={() => setHoveredTwilight('astronomical')}
                         onMouseLeave={() => setHoveredTwilight(null)}
                         onFocus={() => setHoveredTwilight('astronomical')}
@@ -984,17 +1023,17 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                       >
                         Astronomical:
                       </button>
-                      <span className="font-mono">{formatTime(relevantTwilightTimes.astronomical)} - {formatTime(relevantTwilightTimes.nautical)}</span>
+                      <span className="text-caption tabular-nums">{formatTime(relevantTwilightTimes.astronomical)} - {formatTime(relevantTwilightTimes.nautical)}</span>
                     </div>
                     {hoveredTwilight === 'astronomical' && (
-                      <div id="twilight-degree-astronomical" className="text-xs opacity-60 ml-2">
+                      <div id="twilight-degree-astronomical" className="text-caption opacity-60 ml-2">
                         {getDegreeInfo('astronomical')}
                       </div>
                     )}
-                    <div className="flex justify-between">
+                    <div className={ROW}>
                       <button
                         type="button"
-                        className="font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left"
+                        className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left text-caption rounded ${FOCUS_RING}`}
                         onMouseEnter={() => setHoveredTwilight('nautical')}
                         onMouseLeave={() => setHoveredTwilight(null)}
                         onFocus={() => setHoveredTwilight('nautical')}
@@ -1006,17 +1045,17 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                       >
                         Nautical:
                       </button>
-                      <span className="font-mono">{formatTime(relevantTwilightTimes.nautical)} - {formatTime(relevantTwilightTimes.civil)}</span>
+                      <span className="text-caption tabular-nums">{formatTime(relevantTwilightTimes.nautical)} - {formatTime(relevantTwilightTimes.civil)}</span>
                     </div>
                     {hoveredTwilight === 'nautical' && (
-                      <div id="twilight-degree-nautical" className="text-xs opacity-60 ml-2">
+                      <div id="twilight-degree-nautical" className="text-caption opacity-60 ml-2">
                         {getDegreeInfo('nautical')}
                       </div>
                     )}
-                    <div className="flex justify-between">
+                    <div className={ROW}>
                       <button
                         type="button"
-                        className="font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left"
+                        className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left text-caption rounded ${FOCUS_RING}`}
                         onMouseEnter={() => setHoveredTwilight('civil')}
                         onMouseLeave={() => setHoveredTwilight(null)}
                         onFocus={() => setHoveredTwilight('civil')}
@@ -1028,10 +1067,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                       >
                         Civil:
                       </button>
-                      <span className="font-mono">{formatTime(relevantTwilightTimes.civil)} - {formatTime(sunTimes.sunrise)}</span>
+                      <span className="text-caption tabular-nums">{formatTime(relevantTwilightTimes.civil)} - {formatTime(sunTimes.sunrise)}</span>
                     </div>
                     {hoveredTwilight === 'civil' && (
-                      <div id="twilight-degree-civil" className="text-xs opacity-60 ml-2">
+                      <div id="twilight-degree-civil" className="text-caption opacity-60 ml-2">
                         {getDegreeInfo('civil')}
                       </div>
                     )}
@@ -1040,34 +1079,34 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               </div>
             </div>
           </div>
-          
+
           {/* Sun position - collapsible */}
           <div className="mt-6 pt-4 border-t border-white border-opacity-20">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-bold">Sun Position</h3>
+              <h3 className={SECTION_HEADING}>Sun Position</h3>
               <button
                 onClick={() => {
                   userToggledSunPositionRef.current = true;
                   setIsSunPositionCollapsed(!isSunPositionCollapsed);
                 }}
-                className="p-1 rounded hover:bg-white hover:bg-opacity-10 transition-colors"
+                className={ICON_TOGGLE}
                 aria-label={isSunPositionCollapsed ? "Expand sun position" : "Collapse sun position"}
               >
                 {isSunPositionCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
               </button>
             </div>
-            
+
             <div className={`transition-all duration-300 ease-in-out ${
               isSunPositionCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-16 opacity-100'
             }`}>
-              <div className="grid grid-cols-2 gap-1 text-xs">
+              <div className="grid grid-cols-2 gap-1 text-caption">
                 <div>
                   <span>Altitude: </span>
-                  <span className="font-mono">{sunPosition.altitude.toFixed(2)}°</span>
+                  <span className="tabular-nums">{sunPosition.altitude.toFixed(2)}°</span>
                 </div>
                 <div>
                   <span>Azimuth: </span>
-                  <span className="font-mono">{sunPosition.azimuth.toFixed(2)}°</span>
+                  <span className="tabular-nums">{sunPosition.azimuth.toFixed(2)}°</span>
                 </div>
               </div>
             </div>
@@ -1082,7 +1121,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   form?.appendToDom();
                   form?.open();
                 }}
-                className="flex items-center gap-2 text-xs opacity-80 hover:opacity-100 transition-opacity"
+                className={`flex items-center gap-2 text-caption opacity-80 hover:opacity-100 transition-opacity rounded ${FOCUS_RING}`}
               >
                 <MessageSquare size={14} />
                 Send feedback

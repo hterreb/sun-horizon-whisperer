@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Sun Chaser favicon">
+  <defs>
+    <clipPath id="fav-clip"><circle cx="60" cy="60" r="58"/></clipPath>
+    <linearGradient id="fav-sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5A4A8C"/>
+      <stop offset=".55" stop-color="#F97316"/>
+      <stop offset="1" stop-color="#FEC6A1"/>
+    </linearGradient>
+  </defs>
+  <g clip-path="url(#fav-clip)">
+    <rect x="2" y="2" width="116" height="116" fill="url(#fav-sky)"/>
+    <circle cx="60" cy="62" r="24" fill="#FFD84D"/>
+    <rect x="2" y="82" width="116" height="36" fill="#0EA5E9"/>
+  </g>
+  <circle cx="60" cy="60" r="58" fill="none" stroke="#1A1F2C" stroke-width="4"/>
+</svg>
