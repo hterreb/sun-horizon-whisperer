@@ -1,14 +1,24 @@
 
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { VitePWA } from 'vite-plugin-pwa';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
 
+// Source maps go to Sentry only in CI builds that have SENTRY_AUTH_TOKEN (ROADMAP
+// item 21). The maps are deleted after upload, so they are never served. The token
+// comes from the CI env or .env.local (see scripts/setup-keys.sh).
 // https://vitejs.dev/config/
-export default defineConfig(() => ({
+export default defineConfig(({ mode }) => {
+  const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN || loadEnv(mode, process.cwd(), '').SENTRY_AUTH_TOKEN;
+  const uploadSourceMaps = !!sentryAuthToken;
+  return {
   server: {
     host: "::",
     port: 8080,
+  },
+  build: {
+    sourcemap: uploadSourceMaps ? 'hidden' : false,
   },
   plugins: [
     react(),
@@ -77,11 +87,18 @@ export default defineConfig(() => ({
         categories: ['weather', 'utilities', 'lifestyle'],
         lang: 'en'
       }
-    })
+    }),
+    uploadSourceMaps && sentryVitePlugin({
+      org: 'ainabler',
+      project: 'sun-chaser',
+      authToken: sentryAuthToken,
+      sourcemaps: { filesToDeleteAfterUpload: ['./dist/**/*.map'] },
+    }),
   ],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
-}));
+  };
+});

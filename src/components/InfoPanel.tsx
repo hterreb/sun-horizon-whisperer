@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Moon, RefreshCw, Thermometer } from 'lucide-react';
+import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Moon, RefreshCw, Thermometer, MessageSquare } from 'lucide-react';
+import { getFeedback } from '@sentry/react';
 import { ScrollArea } from './ui/scroll-area';
 import { Button } from './ui/button';
 import {
@@ -947,6 +948,23 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Anonymous feedback (ROADMAP item 21): only when Sentry is set up */}
+          {getFeedback() && (
+            <div className="mt-6 pt-4 border-t border-white border-opacity-20">
+              <button
+                onClick={async () => {
+                  const form = await getFeedback()?.createForm();
+                  form?.appendToDom();
+                  form?.open();
+                }}
+                className="flex items-center gap-2 text-xs opacity-80 hover:opacity-100 transition-opacity"
+              >
+                <MessageSquare size={14} />
+                Send feedback
+              </button>
+            </div>
+          )}
             </div>
           </ScrollArea>
         </div>
