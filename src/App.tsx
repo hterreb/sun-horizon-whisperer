@@ -1,19 +1,14 @@
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { BrowserRouter, Routes, Route } from "react-router";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
+// ponytail: one page, so no router (AUDIT P-7, saves ~37 kB). Add react-router back
+// when a second route (for example /pricing) exists.
 const App = () => (
   <TooltipProvider>
     <Toaster />
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Index />} />
-        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </BrowserRouter>
+    {window.location.pathname === "/" ? <Index /> : <NotFound />}
   </TooltipProvider>
 );
 
