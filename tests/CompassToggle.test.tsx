@@ -35,6 +35,11 @@ describe('CompassToggle (ROADMAP item 8)', () => {
     expect(onDisable).toHaveBeenCalledTimes(1);
   });
 
+  it('marks compass mode as premium with a gold plus (ROADMAP item 35)', () => {
+    render(<CompassToggle status="idle" onEnable={vi.fn()} onDisable={vi.fn()} />);
+    expect(screen.getByRole('button').querySelector('[data-testid="premium-badge"]')).not.toBeNull();
+  });
+
   // Fullscreen-idle fade is owned by the shared TopLeftButtons row (ROADMAP item 22);
   // see tests/TopLeftButtons.test.tsx.
 });
