@@ -49,6 +49,8 @@ interface CloudLayerProps {
 const BIRD_RATE_PERCENT_PER_SEC = 5; // was 0.08%/16ms in the old rAF loop
 const WATER_RATE_PERCENT_PER_SEC = 2.5; // was 0.04%/16ms in the old rAF loop (fish + ships)
 const LEAF_RATE_PERCENT_PER_SEC = 6;
+// Boats come every 2-4 min; the first one sails out ~5 s after load instead.
+const FIRST_BOAT_HEAD_START_MS = 115000;
 
 // A fixed fallback seed date for callers that don't pass one (e.g. existing tests) -
 // a stable constant, not `new Date()`, so it never changes identity across renders.
@@ -132,7 +134,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   const lastSpawnTimeRef = useRef({ birds: 0, fish: 0, ships: 0, leaves: 0 });
   useEffect(() => {
     const now = Date.now();
-    lastSpawnTimeRef.current = { birds: now, fish: now, ships: now, leaves: now };
+    lastSpawnTimeRef.current = { birds: now, fish: now, ships: now - FIRST_BOAT_HEAD_START_MS, leaves: now };
   }, []);
   const prefersReducedMotion = usePrefersReducedMotion();
 

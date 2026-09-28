@@ -358,6 +358,7 @@ Five findings from use after items 22–30, checked on `main` at `046abff` with 
   - **L1 Line leaf:** the 🍃 emoji is replaced by lucide `Leaf` in the boat tone.
   - Not picked: V1 (both directions). Boats still sail from left to right.
 - **Checked:** in the browser at 20:05 in Ravensburg (nautical twilight), the line bats flew, a ferry and a sailboat sailed with gold lights, and a far freighter sat on the horizon. No emoji was rendered.
+- **Follow-up (field feedback, 2026-09-28 night):** "I don't see any of the new ships with lights." The first boat came only 2 min after load (then one every 2–4 min). It now sails out about 5–15 s after load (`FIRST_BOAT_HEAD_START_MS` in `CloudLayer.tsx`). Checked in real time in Ravensburg at night: first boat after 7–14 s in 5 of 6 reloads, with its lights on (the 6th hit the 10 % skip roll).
 
 ### Verification findings (2026-09-28)
 

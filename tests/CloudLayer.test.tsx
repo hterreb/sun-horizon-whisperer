@@ -144,6 +144,12 @@ describe('CloudLayer', () => {
       expect(container.querySelectorAll('[data-testid="boat-light"]').length).toBeGreaterThan(0);
     });
 
+    it('sends the first boat, lit at night, within seconds of load', () => {
+      const container = spawn({ timeOfDay: 'night' }, 6000);
+      expect(container.querySelector('[data-testid="scene-boat"]')).not.toBeNull();
+      expect(container.querySelectorAll('[data-testid="boat-light"]').length).toBeGreaterThan(0);
+    });
+
     it('sends out only the big boats in rain', () => {
       const container = spawn({ weatherType: 'rain' }, 121000);
       expect(container.querySelector('[data-testid="scene-boat"]')?.getAttribute('data-kind')).toBe('ferry');
