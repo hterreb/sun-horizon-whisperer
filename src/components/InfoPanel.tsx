@@ -378,6 +378,12 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
   const relevantTwilightTimes = getRelevantTwilightTimes(currentTime, sunTimes, location.latitude, location.longitude);
 
+  // Coordinates in the header (ROADMAP item 25): shown only when there is no place
+  // name to show instead - while the reverse-geocode lookup is still loading, or
+  // after it failed ('Unknown Location'). Kept in the "Change location" form either way.
+  const hasPlaceName = locationName !== '' && locationName !== 'Unknown Location';
+  const showCoordinates = loadingLocation || !hasPlaceName;
+
   // At polar day/night, SunCalc has no real sunrise/sunset, so `sunTimes.sunrise`/`.sunset`
   // hold invented 06:00/18:00 fallback times (kept only for internal time-of-day math).
   // Show a plain-language label instead of those fake times.
@@ -478,9 +484,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               ) : (
                 locationName && <span className="mb-1 truncate">{locationName}</span>
               )}
-              <span className="text-caption opacity-70 tabular-nums">
-                {location.latitude.toFixed(4)}°, {location.longitude.toFixed(4)}°
-              </span>
+              {showCoordinates && (
+                <span className="text-caption opacity-70 tabular-nums">
+                  {location.latitude.toFixed(4)}°, {location.longitude.toFixed(4)}°
+                </span>
+              )}
               <Button
                 ref={changeLocationButtonRef}
                 type="button"
@@ -627,11 +635,6 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   <span className="opacity-80 text-body">Condition:</span>
                   <span className="font-semibold text-body">{weatherData.weatherDescription}</span>
                 </div>
-                {weatherData.isRealWeather && (
-                  <div className="text-caption opacity-60 mt-1 tabular-nums">
-                    Updated: {format(weatherData.lastUpdated, 'HH:mm')}
-                  </div>
-                )}
                 {!weatherData.isRealWeather && (
                   <div className="text-caption opacity-60 text-brand-peach mt-1">
                     Real weather unavailable
