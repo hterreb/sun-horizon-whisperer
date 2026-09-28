@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
-import InfoPanel from '../src/components/InfoPanel';
+import InfoPanel, { formatTerrainDelta } from '../src/components/InfoPanel';
 import { type TimeOfDay, type SunTimes } from '../src/utils/sunUtils';
 import { type WeatherType } from '../src/components/CloudLayer';
 import { type WeatherData } from '../src/utils/weatherUtils';
@@ -349,5 +349,147 @@ describe('InfoPanel', () => {
         { timeout: 2000 }
       );
     });
+  });
+});
+
+describe('InfoPanel: line of sight with terrain (ROADMAP item 13)', () => {
+  const now = new Date();
+  const sunTimes: SunTimes = {
+    sunrise: new Date(now.setHours(6, 0, 0, 0)),
+    sunset: new Date(now.setHours(18, 0, 0, 0)),
+    solarNoon: new Date(now.setHours(12, 0, 0, 0)),
+    dawn: new Date(now.setHours(5, 30, 0, 0)),
+    dusk: new Date(now.setHours(18, 30, 0, 0)),
+    nauticalDawn: new Date(now.setHours(5, 0, 0, 0)),
+    nauticalDusk: new Date(now.setHours(19, 0, 0, 0)),
+    astronomicalDawn: new Date(now.setHours(4, 30, 0, 0)),
+    astronomicalDusk: new Date(now.setHours(19, 30, 0, 0)),
+    polar: null,
+  };
+  const defaultProps = {
+    sunPosition: { azimuth: 0, altitude: 0 },
+    moonPosition: { azimuth: 0, altitude: 0, phase: 0, illumination: 0, visible: true },
+    moonTimes: {
+      rise: new Date(now.setHours(20, 0, 0, 0)),
+      set: new Date(now.setHours(7, 0, 0, 0)),
+      alwaysUp: false,
+      alwaysDown: false,
+    },
+    nextFullMoon: new Date(now.setHours(12, 0, 0, 0)),
+    nextNewMoon: new Date(now.setHours(12, 0, 0, 0)),
+    sunTimes,
+    nextGoldenBlueHours: null,
+    location: { latitude: 0, longitude: 0, loaded: true },
+    manualPlaceName: null,
+    timeOfDay: 'midday' as TimeOfDay,
+    currentTime: new Date(),
+    weatherType: 'clear' as WeatherType,
+    weatherData: null,
+    isLoadingWeather: false,
+    useRealWeather: true,
+    isFullscreen: false,
+    onWeatherChange: () => {},
+    onWeatherModeToggle: () => {},
+    onWeatherRefresh: () => {},
+    onLocationChange: () => {},
+    onUseMyLocation: () => {},
+  };
+
+  it('hides the terrain section when status is idle (feature disabled)', () => {
+    render(<InfoPanel {...defaultProps} terrainStatus="idle" />);
+    expect(screen.queryByText(/line of sight/i)).not.toBeInTheDocument();
+  });
+
+  it('shows a loading note while the terrain profile is loading', () => {
+    render(<InfoPanel {...defaultProps} terrainStatus="loading" />);
+    expect(screen.getByText(/loading terrain/i)).toBeInTheDocument();
+  });
+
+  it('shows a visible error message when the terrain profile fails to load', () => {
+    render(<InfoPanel {...defaultProps} terrainStatus="error" />);
+    expect(screen.getByRole('alert')).toHaveTextContent(/terrain unavailable/i);
+  });
+
+  it('shows the attribution and an eye-height input whenever the section is visible', () => {
+    render(<InfoPanel {...defaultProps} terrainStatus="loading" />);
+    expect(screen.getByText(/Mapzen \/ AWS Terrain Tiles/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/eye height/i)).toBeInTheDocument();
+  });
+
+  it('calls onEyeHeightChange when the eye-height input changes', () => {
+    const onEyeHeightChange = vi.fn();
+    render(
+      <InfoPanel
+        {...defaultProps}
+        terrainStatus="loading"
+        eyeHeightMeters={1.7}
+        onEyeHeightChange={onEyeHeightChange}
+      />
+    );
+    fireEvent.change(screen.getByLabelText(/eye height/i), { target: { value: '12' } });
+    expect(onEyeHeightChange).toHaveBeenCalledWith(12);
+  });
+
+  it('shows terrain-adjusted sunrise/sunset next to the astronomical times when ready', () => {
+    render(
+      <InfoPanel
+        {...defaultProps}
+        terrainStatus="ready"
+        terrainSunTimes={{
+          sunrise: new Date(sunTimes.sunrise.getTime() + 23 * 60000),
+          sunset: new Date(sunTimes.sunset.getTime() - 23 * 60000),
+        }}
+      />
+    );
+    expect(screen.getByText(/behind terrain .* \(\+23 min\)/)).toBeInTheDocument();
+    expect(screen.getByText(/behind terrain .* \(-23 min\)/)).toBeInTheDocument();
+  });
+
+  it('shows "sun stays behind terrain" when the sun never clears the terrain that day', () => {
+    render(
+      <InfoPanel {...defaultProps} terrainStatus="ready" terrainSunTimes={{ sunrise: null, sunset: null }} />
+    );
+    expect(screen.getAllByText(/sun stays behind terrain/i)).toHaveLength(2);
+  });
+
+  it('shows terrain-adjusted moonrise/moonset when ready and the moon is visible', () => {
+    render(
+      <InfoPanel
+        {...defaultProps}
+        terrainStatus="ready"
+        terrainSunTimes={{ sunrise: sunTimes.sunrise, sunset: sunTimes.sunset }}
+        terrainMoonTimes={{
+          rise: new Date(defaultProps.moonTimes.rise.getTime() + 10 * 60000),
+          set: null,
+        }}
+      />
+    );
+    expect(screen.getByText(/behind terrain .* \(\+10 min\)/)).toBeInTheDocument();
+    expect(screen.getByText(/moon stays behind terrain/i)).toBeInTheDocument();
+  });
+});
+
+describe('formatTerrainDelta (ROADMAP item 13)', () => {
+  const astronomical = new Date(2026, 0, 1, 18, 0, 0);
+
+  it('formats a later terrain time with a positive sign', () => {
+    const terrain = new Date(astronomical.getTime() + 23 * 60000);
+    const result = formatTerrainDelta('sun', terrain, astronomical);
+    expect(result).toContain('behind terrain');
+    expect(result).toContain('(+23 min)');
+  });
+
+  it('formats an earlier terrain time with a negative sign', () => {
+    const terrain = new Date(astronomical.getTime() - 23 * 60000);
+    expect(formatTerrainDelta('sun', terrain, astronomical)).toContain('(-23 min)');
+  });
+
+  it('falls back to the "stays behind terrain" message when the body never clears the terrain', () => {
+    expect(formatTerrainDelta('sun', null, astronomical)).toBe('sun stays behind terrain');
+    expect(formatTerrainDelta('moon', null, astronomical)).toBe('moon stays behind terrain');
+  });
+
+  it('falls back to an em dash when the astronomical time itself is unknown', () => {
+    expect(formatTerrainDelta('moon', null, null)).toBe('—');
   });
 });
