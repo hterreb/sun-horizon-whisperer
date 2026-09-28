@@ -51,6 +51,7 @@ Re-verification, 2026-09-28 (`a9882c4`):
 > Notes: A-2 is covered by the global `prefers-reduced-motion` rule in `index.css` plus `usePrefersReducedMotion` for the JS loops. A-4 uses a fixed 24-hour format by decision (`6856be1`), not the locale format. S-1 … S-9 have no automated tests; Deno tests for the functions are ROADMAP item 14, step 7.
 
 > **Status 2026-09-28 (fixes):** fixed: C-14 (PR #21); C-15, C-17, A-8 (PR #22); C-7 (install steps shown in the prompt card instead of `alert()`, no Dialog needed), P-4 (`TemperatureIceberg` interval depends on `shouldReset` only; `Fireworks` per-frame state accepted with a `ponytail:` comment, it runs a few seconds), P-6 (reload on the next `visibilitychange` to hidden), B-6 (`supabase/` ignored by ESLint), B-8 (fast-refresh rule off for `src/components/ui/**`), D-4 (one import path, `src/components/ui/use-toast.ts` deleted), A-9 (rainbow spectrum marked as a deliberate exception). Open: C-16, A-6, A-7 (ROADMAP item 39), P-7.
+> P-7 step 1: react-router (one page) and date-fns (3 format calls, now `Intl`) removed. Bundle 580 → 524 kB (190 → 171 kB gzip). The rest of the gap is Sentry (~125 kB, feedback form 38 kB).
 
 1. Remove the third-party `gptengineer.js` script from production HTML (S-1).
 2. Run `npm audit fix` and commit the lockfile (D-1).
