@@ -283,8 +283,8 @@ describe('sunUtils', () => {
     });
   });
 
-  describe('getSunPathAround (ROADMAP item 17, sun arc)', () => {
-    it('returns 49 samples spanning date - 12h .. date + 12h, the same shape as getMoonPathAround', () => {
+  describe('getSunPathAround (ROADMAP item 17/26, sun arc)', () => {
+    it('returns 49 samples, the same shape as getMoonPathAround', () => {
       const date = new Date('2026-06-21T12:00:00Z');
       const path = getSunPathAround(date, 51.5, 0);
       expect(path).toHaveLength(49);
@@ -294,17 +294,54 @@ describe('sunUtils', () => {
       });
     });
 
-    it('the center sample is the sun position at `date` itself', () => {
-      const date = new Date('2026-06-21T12:00:00Z');
-      const path = getSunPathAround(date, 51.5, 0);
-      const expected = getSunPosition(date, 51.5, 0);
-      expect(path[24].azimuth).toBeCloseTo(expected.azimuth);
-      expect(path[24].altitude).toBeCloseTo(expected.altitude);
-    });
-
     it('honors a custom step count', () => {
       const date = new Date('2026-06-21T12:00:00Z');
       expect(getSunPathAround(date, 51.5, 0, 4)).toHaveLength(5);
+    });
+
+    it('one sample is the sun position at `date` itself, when the sun is up (ROADMAP item 26)', () => {
+      const date = new Date('2026-06-21T12:00:00Z'); // midday, temperate latitude - sun is up
+      const path = getSunPathAround(date, 51.5, 0);
+      const expected = getSunPosition(date, 51.5, 0);
+      expect(path.some((p) => Math.abs(p.azimuth - expected.azimuth) < 0.01 && Math.abs(p.altitude - expected.altitude) < 0.01)).toBe(true);
+    });
+
+    it('the first and last points reach the flat horizon, altitude 0 +-0.1 degrees (ROADMAP item 26)', () => {
+      const date = new Date('2026-06-21T12:00:00Z');
+      const path = getSunPathAround(date, 51.5, 0);
+      expect(Math.abs(path[0].altitude)).toBeLessThan(0.1);
+      expect(Math.abs(path[path.length - 1].altitude)).toBeLessThan(0.1);
+    });
+
+    it('a pass longer than the old fixed 24h window is sampled whole, not cut at date + 12h (ROADMAP item 26)', () => {
+      // Near the summer solstice at a temperate latitude, the sun's above-horizon
+      // pass is well over 12h; sampling shortly after sunrise must still reach the
+      // (much later than +12h) sunset at the far end.
+      const times = getSunTimes(new Date('2026-06-21T00:00:00Z'), 51.5, 0);
+      const passHours = (times.sunset.getTime() - times.sunrise.getTime()) / 3600000;
+      expect(passHours).toBeGreaterThan(12);
+
+      const shortlyAfterSunrise = new Date(times.sunrise.getTime() + 5 * 60 * 1000);
+      const path = getSunPathAround(shortlyAfterSunrise, 51.5, 0);
+      expect(Math.abs(path[0].altitude)).toBeLessThan(0.1);
+      expect(Math.abs(path[path.length - 1].altitude)).toBeLessThan(0.1);
+    });
+
+    it('does not mutate the input date', () => {
+      const date = new Date('2026-06-21T12:00:00Z');
+      const before = date.getTime();
+      getSunPathAround(date, 51.5, 0);
+      expect(date.getTime()).toBe(before);
+    });
+
+    it('falls back to a fixed window without throwing at polar day (lat 78, June)', () => {
+      const date = new Date(2026, 5, 21, 12, 0, 0, 0);
+      const path = getSunPathAround(date, 78, 15);
+      expect(path).toHaveLength(49);
+      path.forEach((point) => {
+        expect(Number.isFinite(point.altitude)).toBe(true);
+        expect(Number.isFinite(point.azimuth)).toBe(true);
+      });
     });
   });
 });
