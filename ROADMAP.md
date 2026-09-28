@@ -5,7 +5,27 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-09-28. Done: items 1–13, 15 and 17–36 (marked **✅ Done** in the heading; real-device checks for 17 and 19 and the Sentry release to-dos are still open). Open: items 14–16, easter eggs, backlog.
+Status: last updated 2026-09-28. Done: items 1–13, 15 and 17–36 (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14, 16 and 37–39, the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
+
+## Verification (2026-09-28)
+
+- **Method:** each done item was checked against its Spec and Done-when in the code and the tests (`main` at `a9882c4`: 487 tests, lint, typecheck and build pass). It was also checked in the running app with Playwright: 390×844 and 360×640, Ravensburg by day and at night, Sydney, fullscreen idle and wake, compass mode with synthetic headings, denied geolocation, place search.
+- **Result:** items 1–13, 15 and 17–30 are built as specified, or as a later item changed them. The check found two new bugs (items 37 and 38). Items 31–36 were built after this check and are not part of it.
+- **Still open:**
+
+| Item | Open point | Needs |
+|---|---|---|
+| 2 | Touch scroll in the panel does not pan the scene. | Real device |
+| 4 | The installed PWA shows no browser bars and no gaps (Android); it draws under the status bar (iOS). | Real device |
+| 8, 19 | Labels match a hardware compass within about 10°. Pointing the phone at the sun puts it at screen centre; a 45° turn moves it to the edge. | Real Android phone and iPhone |
+| 9 | Moon times match timeanddate.com within 2 minutes. | External reference |
+| 13 | An alpine sunset matches PeakFinder or an observation within 5 minutes. | External reference |
+| 15 | The maskable icon is not cropped on a launcher. | Real Android device |
+| 21 | A thrown test error has readable stack frames and no coordinates; a feedback message has no name or email. Sentry in the privacy policy (item 16). | Sentry dashboard |
+| 23 | In fullscreen on a phone, a tap shows the feedback button and it opens the form. | Real device |
+| 14, 16 | Not started. Decide Stripe or Google Play Billing before item 16. | Decision |
+| 37, 38 | New bugs, see below (AUDIT C-14, C-15). | Fix |
+| 39 | New loading screen, variant A (Rising Mark) chosen. | Build |
 
 ## Priority rules
 
@@ -338,6 +358,44 @@ Five findings from use after items 22–30, checked on `main` at `046abff` with 
   - **L1 Line leaf:** the 🍃 emoji is replaced by lucide `Leaf` in the boat tone.
   - Not picked: V1 (both directions). Boats still sail from left to right.
 - **Checked:** in the browser at 20:05 in Ravensburg (nautical twilight), the line bats flew, a ferry and a sailboat sailed with gold lights, and a far freighter sat on the horizon. No emoji was rendered.
+
+### Verification findings (2026-09-28)
+
+Items 37 and 38 were found in the browser check of the verification above (on `a9882c4`, before items 31–36). Item 39 is the new loading screen, requested in the same check.
+
+### 37. Sun arc drops out at night every other minute — S — AUDIT C-14
+
+- **Found:** Ravensburg, 22:30, 390×844. After a reload the sun arc has its zenith label (13:13). One minute later the label is gone.
+- **Cause:** `findSunPass` (`sunUtils.ts`) and `findMoonPass` (`moonUtils.ts`) have the same bug. When the body is below the horizon, the set search starts at the bisected rise time. That time is only within ±5 s of the crossing. When it lands just below 0°, the search finds the same rise again and returns a pass of zero length (for example 05:22–05:22 UTC). `getSunPathAround` then returns 49 identical points (no arc), and `getSunArcLabels` finds no zenith. The result changes from minute to minute.
+- **Spec:**
+  - In both functions, start the set search after the rise crossing (for example at `startMs + HORIZON_BISECT_TOLERANCE_MS`).
+  - Add a test: for each minute of one night, the sun pass is longer than 6 h and the arc labels have a zenith.
+- **Done when:** the test passes, and at night the sun arc and its zenith label stay on screen across minute changes.
+
+### 38. Moon zenith label under the collapsed panel — S — AUDIT C-15
+
+- **Found:** Ravensburg, 390×844. When the moon culminates high, its zenith label falls under the collapsed panel. Rechecked after item 31 (panel at the top from 364 px, `main` at `499ce9e`): the collapsed panel covers y 0–112 px at x ≥ 90 px, and the moon zenith label is at y 78–100 px on 30 Sep, 21:30, and at y 72–94 px on 1 Oct, 22:00. The sun label was moved below the apex for this reason, but a high moon apex still falls under the panel.
+- **Spec:** move an arc label that overlaps the collapsed panel's box below the panel's bottom edge, or place it beside the apex. Do not hide it.
+- **Done when:** at 390×844, day and night, the collapsed panel covers no arc label.
+
+### 39. Loading screen: Rising Mark (variant A) — S — AUDIT A-6, A-7, C-16
+
+- **Why:** the loading screen always shows a daytime sky, but the Android splash before it is Night (`#0F1016`). A start at night goes dark, then bright blue, then dark again. The top-left buttons and the radio show before there is a scene. When the location prompt stays open, "Locating…" never ends, and there is no way to choose a place. The spinner has no brand.
+- **Decision (2026-09-28):** variant **A, Rising Mark**. Design: <https://claude.ai/artifact/YbVzMgv8ncwoh7TEah1Dfk> (private artifact, variants A–D; open it with `#locating`, `#waiting` or `#found-night` to see one state).
+- **Spec:**
+  - Add `src/components/LoadingScreen.tsx`. `SunTracker` shows it while `location.loaded` is false, in place of the spinner branch.
+  - **Layout:** background `--brand-night` (`#0F1016`, the same as the manifest `background_color`). The app mark from `public/logo-mark.svg` (inline SVG, 136 px) centred at about 36 % of the height. Below it the "Sun Chaser" wordmark (reuse the outlined paths from `store/wordmark-sun-chaser.svg`, so no web font loads) in `--brand-peach`, then the caption "Locating…" (body size).
+  - **Motion:** the mark's sun, with its stripes, rises once from below the water line to its logo position: 2.6 s, ease-out. The two reflection bars on the water fade in after 1.3 s. No loop.
+  - **Hand-off:** when the location arrives, the scene shows through a circle that grows from the mark (`clip-path: circle()` from 68 px to the full screen, 1 s). If the location arrives before the rise ends, start the circle at once. Do not add a wait.
+  - **Controls:** show the top-left buttons and the radio only after the hand-off, with a 0.5 s fade-in.
+  - **Prompt left open:** after 3 s with no location, the sun stops half-risen, the caption changes to "Waiting for location access", and a "Choose a place" button (glass pill, search icon) opens the place search of the manual-location form.
+  - **Timeout:** call `getCurrentPosition` with `{ timeout: 10000 }`. On a timeout, use the default location with the existing "Location unavailable" toast.
+  - **Fast start:** with a saved manual location, or a location in less than 400 ms, skip the rise and fade the scene in (200 ms).
+  - **Reduced motion:** with `usePrefersReducedMotion`, no rise and no circle. A 200 ms fade only.
+  - Colours from the tokens only (item 15). No new hex values.
+- **Done when:**
+  - Tests show: the loading screen renders while the location is not loaded; the top-left buttons and the radio are not rendered then; after 3 s the "Choose a place" button shows and opens the place search; a timeout gives the default location and the toast; with reduced motion no rise or circle animation is applied.
+  - At 390×844, a start at night shows no blue frame between the Android splash and the scene.
 
 ---
 
