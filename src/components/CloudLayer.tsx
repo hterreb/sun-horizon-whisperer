@@ -40,6 +40,8 @@ interface CloudLayerProps {
   cloudCoverPercent?: number | null;
   windSpeedKmh?: number | null;
   windDirectionDeg?: number | null;
+  // Fullscreen fades the chrome away, so near boats can sail lower.
+  isFullscreen?: boolean;
 }
 
 // Birds/fish/ships/leaves travel horizontally at a constant rate (in % of the layer's
@@ -123,6 +125,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   cloudCoverPercent = null,
   windSpeedKmh = null,
   windDirectionDeg = null,
+  isFullscreen = false,
 }) => {
   const [birds, setBirds] = useState<MovingEntity[]>([]);
   const [fish, setFish] = useState<MovingEntity[]>([]);
@@ -292,7 +295,9 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             const newShip: Boat = {
               id: Date.now() + Math.random(),
               x: startX,
-              y: 67 + (1 - depth) * 20, // far boats sit at the horizon (65%), near ones low in front
+              // Far boats sit at the horizon (65%). Near ones sail down to 87%, just above the
+              // music player, or to 94% in fullscreen.
+              y: 67 + (1 - depth) * (isFullscreen ? 27 : 20),
               dx: endX - startX,
               duration: (endX - startX) / (WATER_RATE_PERCENT_PER_SEC * (1 - FAR_SHRINK * depth)),
               kind: pickBoat(weatherType, windSpeedKmh, Math.random()),
@@ -333,7 +338,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     return () => {
       clearInterval(intervalId);
     };
-  }, [weatherType, windSpeedKmh, timeOfDay, prefersReducedMotion, isNightTime, effects.showLeaves, effects.birdSpeedFactor]);
+  }, [weatherType, windSpeedKmh, timeOfDay, prefersReducedMotion, isNightTime, isFullscreen, effects.showLeaves, effects.birdSpeedFactor]);
 
   // The grey/wet-weather cloud tints below (storm/hail/rain/drizzle/fog/snow/
   // overcast) are ROADMAP item 10's weather-conditioned matrix, unchanged by the
