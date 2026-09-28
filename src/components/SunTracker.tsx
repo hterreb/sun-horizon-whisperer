@@ -29,12 +29,11 @@ import SunVisualization from './SunVisualization';
 import InfoPanel from './InfoPanel';
 import NightStars from './NightStars';
 import MusicPlayer from './MusicPlayer';
-import FullscreenButton from './FullscreenButton';
+import TopLeftButtons from './TopLeftButtons';
 import PWAInstallPrompt from './PWAInstallPrompt';
 import MidnightGhost from './MidnightGhost';
 import TemperatureIceberg from './TemperatureIceberg';
 import { type WeatherType } from './CloudLayer';
-import CompassToggle from './CompassToggle';
 import { toast } from '@/components/ui/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useWakeLock } from '@/hooks/useWakeLock';
@@ -501,13 +500,13 @@ const SunTracker: React.FC = () => {
     >
       <NightStars timeOfDay={timeOfDay} moonPosition={moonPosition} />
       <MusicPlayer isFullscreen={isFullscreen} />
-      <FullscreenButton onFullscreenChange={setIsFullscreen} />
-      <CompassToggle
-        status={compassStatus}
-        onEnable={handleCompassEnable}
-        onDisable={disableCompass}
+      <TopLeftButtons
         isFullscreen={isFullscreen}
         showCursor={showCursor}
+        onFullscreenChange={setIsFullscreen}
+        compassStatus={compassStatus}
+        onCompassEnable={handleCompassEnable}
+        onCompassDisable={disableCompass}
       />
       <PWAInstallPrompt />
       <MidnightGhost currentTime={date} />
