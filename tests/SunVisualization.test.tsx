@@ -16,6 +16,7 @@ import SunVisualization, {
   buildTerrainSegments,
 } from '../src/components/SunVisualization';
 import type { HorizonProfile } from '../src/utils/horizonUtils';
+import { getSunTimes, formatTime } from '../src/utils/sunUtils';
 
 describe('getAzimuthScreenFraction (C-3, static/non-compass mode)', () => {
   it('northern hemisphere: culmination (180°, South) stays centered', () => {
@@ -441,6 +442,139 @@ describe('SunVisualization (rendered): static cardinal direction labels (ROADMAP
   });
 });
 
+describe('SunVisualization (rendered): arc rise/zenith/set labels', () => {
+  const originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+  const originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
+
+  const setMockedContainerSize = (width: number, height: number) => {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { value: width, configurable: true });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { value: height, configurable: true });
+  };
+
+  afterEach(() => {
+    if (originalClientWidth) Object.defineProperty(HTMLElement.prototype, 'clientWidth', originalClientWidth);
+    if (originalClientHeight) Object.defineProperty(HTMLElement.prototype, 'clientHeight', originalClientHeight);
+  });
+
+  // A real summer day at a temperate latitude/longitude, so sunrise/zenith/sunset all
+  // fall within the pass and match a known SunCalc result (verified against
+  // utils.arcLabels.test.ts / utils.sunUtils.test.ts).
+  const summerDay = new Date('2026-06-21T12:00:00Z');
+  const latitude = 51.5;
+  const longitude = 0;
+
+  it("renders three sun labels by day, matching the panel's own sunrise/zenith/sunset times", () => {
+    setMockedContainerSize(800, 600);
+    render(
+      <SunVisualization
+        sunPosition={{ azimuth: 180, altitude: 60 }}
+        moonPosition={{ azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false }}
+        sunPath={[
+          { azimuth: 170, altitude: 20 },
+          { azimuth: 180, altitude: 60 },
+          { azimuth: 190, altitude: 20 },
+        ]}
+        moonPath={[]}
+        timeOfDay="midday"
+        weatherType="clear"
+        latitude={latitude}
+        longitude={longitude}
+        date={summerDay}
+      />
+    );
+
+    const times = getSunTimes(summerDay, latitude, longitude);
+    expect(screen.getByTestId('arc-label-sun-rise')).toHaveTextContent(formatTime(times.sunrise));
+    expect(screen.getByTestId('arc-label-sun-zenith')).toHaveTextContent(formatTime(times.solarNoon));
+    expect(screen.getByTestId('arc-label-sun-set')).toHaveTextContent(formatTime(times.sunset));
+  });
+
+  it('renders moon labels only when the moon arc is actually drawn', () => {
+    setMockedContainerSize(800, 600);
+    // The moon is up at this date/location (rise ~02:52 UTC, set ~20:23 UTC - see
+    // utils.moonUtils.test.ts), so the arc is non-empty once `timeOfDay` says it's
+    // being shown.
+    const moonDate = new Date('2026-06-15T12:00:00Z');
+    const moonProps = {
+      sunPosition: { azimuth: 180, altitude: 60 },
+      moonPosition: { azimuth: 180, altitude: 30, phase: 0.5, illumination: 0.5, visible: true },
+      sunPath: [],
+      moonPath: [
+        { azimuth: 170, altitude: 20, phase: 0.5, illumination: 0.5, visible: true },
+        { azimuth: 180, altitude: 30, phase: 0.5, illumination: 0.5, visible: true },
+        { azimuth: 190, altitude: 20, phase: 0.5, illumination: 0.5, visible: true },
+      ],
+      weatherType: 'clear' as const,
+      latitude: 48,
+      longitude: 11,
+      date: moonDate,
+    };
+
+    const { rerender } = render(<SunVisualization {...moonProps} timeOfDay="night" />);
+    expect(screen.getByTestId('arc-label-moon-rise')).toBeInTheDocument();
+    expect(screen.getByTestId('arc-label-moon-set')).toBeInTheDocument();
+
+    // Same moon path/position, but `timeOfDay` now says the moon isn't shown - the
+    // moon arc itself goes empty (moonAltitudeVisible gate), and so should its labels.
+    rerender(<SunVisualization {...moonProps} timeOfDay="midday" />);
+    expect(screen.queryByTestId('arc-label-moon-rise')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('arc-label-moon-set')).not.toBeInTheDocument();
+  });
+
+  it('fades out together with the cardinal labels while idle in fullscreen (ROADMAP item 29)', () => {
+    setMockedContainerSize(800, 600);
+    const props = {
+      sunPosition: { azimuth: 180, altitude: 60 },
+      moonPosition: { azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false },
+      sunPath: [
+        { azimuth: 170, altitude: 20 },
+        { azimuth: 180, altitude: 60 },
+        { azimuth: 190, altitude: 20 },
+      ],
+      moonPath: [],
+      timeOfDay: 'midday' as const,
+      weatherType: 'clear' as const,
+      latitude,
+      longitude,
+      date: summerDay,
+    };
+
+    const { rerender } = render(<SunVisualization {...props} isFullscreen={true} showCursor={false} />);
+    expect(screen.getByTestId('arc-labels')).toHaveClass('opacity-0');
+
+    rerender(<SunVisualization {...props} isFullscreen={true} showCursor={true} />);
+    expect(screen.getByTestId('arc-labels')).toHaveClass('opacity-100');
+  });
+
+  it('drops a label outside the compass field of view instead of clamping it (ROADMAP item 19)', () => {
+    setMockedContainerSize(800, 600);
+    // Facing NE (45°): the sun's ~49° sunrise azimuth is inside the 90° FOV, but its
+    // ~180° zenith and ~311° sunset azimuths are not (verified in utils.arcLabels.test.ts).
+    render(
+      <SunVisualization
+        sunPosition={{ azimuth: 180, altitude: 60 }}
+        moonPosition={{ azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false }}
+        sunPath={[
+          { azimuth: 170, altitude: 20 },
+          { azimuth: 180, altitude: 60 },
+          { azimuth: 190, altitude: 20 },
+        ]}
+        moonPath={[]}
+        timeOfDay="midday"
+        weatherType="clear"
+        latitude={latitude}
+        longitude={longitude}
+        date={summerDay}
+        compassHeading={45}
+      />
+    );
+
+    expect(screen.getByTestId('arc-label-sun-rise')).toBeInTheDocument();
+    expect(screen.queryByTestId('arc-label-sun-zenith')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('arc-label-sun-set')).not.toBeInTheDocument();
+  });
+});
+
 describe('buildTerrainSegments (ROADMAP item 13, line of sight with terrain)', () => {
   const flatProfile: HorizonProfile = { angles: new Array(360).fill(0), observerElevation: 0, eyeHeight: 1.7 };
   const ridgeProfile: HorizonProfile = { angles: new Array(360).fill(10), observerElevation: 0, eyeHeight: 1.7 };
@@ -522,7 +656,7 @@ describe('SunVisualization (rendered): terrain silhouette (ROADMAP item 13)', ()
     expect(sunDot.compareDocumentPosition(ridge) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('colors the ridge per time of day (ROADMAP item 15 D polish), semi-transparent', () => {
+  it('colors the ridge per time of day (ROADMAP item 15 D polish), opaque so stars and the sun do not show through', () => {
     setMockedContainerSize(800, 600);
 
     const { unmount } = render(
@@ -537,6 +671,7 @@ describe('SunVisualization (rendered): terrain silhouette (ROADMAP item 13)', ()
     expect(nightFill).toBe('hsl(var(--scene-ridge-night))');
     expect(dayFill).toBe('hsl(var(--scene-ridge-day))');
     expect(nightFill).not.toBe(dayFill);
+    expect(screen.getByTestId('terrain-silhouette').getAttribute('fill-opacity')).toBeNull();
   });
 });
 
