@@ -522,7 +522,7 @@ describe('SunVisualization (rendered): terrain silhouette (ROADMAP item 13)', ()
     expect(sunDot.compareDocumentPosition(ridge) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('colors the ridge per time of day (ROADMAP item 15 D polish), semi-transparent', () => {
+  it('colors the ridge per time of day (ROADMAP item 15 D polish), opaque so stars and the sun do not show through', () => {
     setMockedContainerSize(800, 600);
 
     const { unmount } = render(
@@ -537,6 +537,7 @@ describe('SunVisualization (rendered): terrain silhouette (ROADMAP item 13)', ()
     expect(nightFill).toBe('hsl(var(--scene-ridge-night))');
     expect(dayFill).toBe('hsl(var(--scene-ridge-day))');
     expect(nightFill).not.toBe(dayFill);
+    expect(screen.getByTestId('terrain-silhouette').getAttribute('fill-opacity')).toBeNull();
   });
 });
 
