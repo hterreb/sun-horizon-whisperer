@@ -497,7 +497,7 @@ describe('InfoPanel: Golden & Blue Hour after Moon Information, collapsed by def
   });
 });
 
-describe('InfoPanel: line of sight with terrain (ROADMAP item 13)', () => {
+describe('InfoPanel: line of sight as an icon at the sun and moon rows (ROADMAP item 30)', () => {
   const now = new Date();
   const sunTimes: SunTimes = {
     sunrise: new Date(now.setHours(6, 0, 0, 0)),
@@ -540,23 +540,49 @@ describe('InfoPanel: line of sight with terrain (ROADMAP item 13)', () => {
     onUseMyLocation: () => {},
   };
 
-  it('hides the terrain section when status is idle (feature disabled)', () => {
+  // Sun rows (Sunrise/Sunset) sit before the moon rows (Moon Information), so the
+  // first "Show line of sight" button is always the sun one, and the second (when
+  // present) the moon one.
+  const getSunLineOfSightButton = () => screen.getAllByRole('button', { name: /show line of sight/i })[0];
+  const getMoonLineOfSightButton = () => screen.getAllByRole('button', { name: /show line of sight/i })[1];
+
+  it('shows no Line of Sight section, and no icon buttons, when status is idle (feature disabled)', () => {
     render(<InfoPanel {...defaultProps} terrainStatus="idle" />);
     expect(screen.queryByText(/line of sight/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /show line of sight/i })).not.toBeInTheDocument();
   });
 
-  it('shows a loading note while the terrain profile is loading', () => {
+  it('shows a Mountain icon button at the sun rows, and one at the moon rows, closed by default', () => {
+    render(<InfoPanel {...defaultProps} terrainStatus="ready" />);
+    const buttons = screen.getAllByRole('button', { name: /show line of sight/i });
+    expect(buttons).toHaveLength(2);
+    for (const button of buttons) {
+      expect(button).toHaveAttribute('aria-expanded', 'false');
+    }
+    expect(screen.queryByText(/loading terrain/i)).not.toBeInTheDocument();
+  });
+
+  it('opens the sun details on click, independently of the moon details', () => {
     render(<InfoPanel {...defaultProps} terrainStatus="loading" />);
+
+    fireEvent.click(getSunLineOfSightButton());
+    expect(getSunLineOfSightButton()).toHaveAttribute('aria-expanded', 'true');
+    expect(getMoonLineOfSightButton()).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByText(/loading terrain/i)).toBeInTheDocument();
   });
 
-  it('shows a visible error message when the terrain profile fails to load', () => {
+  it('opens the moon details on click, independently of the sun details', () => {
     render(<InfoPanel {...defaultProps} terrainStatus="error" />);
+
+    fireEvent.click(getMoonLineOfSightButton());
+    expect(getMoonLineOfSightButton()).toHaveAttribute('aria-expanded', 'true');
+    expect(getSunLineOfSightButton()).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByRole('alert')).toHaveTextContent(/terrain unavailable/i);
   });
 
-  it('shows the attribution and an eye-height input whenever the section is visible', () => {
+  it('shows the attribution and an eye-height input once the sun details are opened', () => {
     render(<InfoPanel {...defaultProps} terrainStatus="loading" />);
+    fireEvent.click(getSunLineOfSightButton());
     expect(screen.getByText(/Mapzen \/ AWS Terrain Tiles/)).toBeInTheDocument();
     expect(screen.getByLabelText(/eye height/i)).toBeInTheDocument();
   });
@@ -571,11 +597,12 @@ describe('InfoPanel: line of sight with terrain (ROADMAP item 13)', () => {
         onEyeHeightChange={onEyeHeightChange}
       />
     );
+    fireEvent.click(getSunLineOfSightButton());
     fireEvent.change(screen.getByLabelText(/eye height/i), { target: { value: '12' } });
     expect(onEyeHeightChange).toHaveBeenCalledWith(12);
   });
 
-  it('shows terrain-adjusted sunrise/sunset next to the astronomical times when ready', () => {
+  it('shows short terrain-adjusted sunrise/sunset values, with "behind terrain" once as a note', () => {
     render(
       <InfoPanel
         {...defaultProps}
@@ -586,14 +613,20 @@ describe('InfoPanel: line of sight with terrain (ROADMAP item 13)', () => {
         }}
       />
     );
-    expect(screen.getByText(/behind terrain .* \(\+23 min\)/)).toBeInTheDocument();
-    expect(screen.getByText(/behind terrain .* \(-23 min\)/)).toBeInTheDocument();
+    fireEvent.click(getSunLineOfSightButton());
+
+    expect(screen.getByText(/\(\+23 min\)/)).toBeInTheDocument();
+    expect(screen.getByText(/\(-23 min\)/)).toBeInTheDocument();
+    // The values themselves are short, and don't each repeat "behind terrain".
+    expect(screen.queryByText(/behind terrain .*\+23 min/)).not.toBeInTheDocument();
+    expect(screen.getByText(/^behind terrain$/i)).toBeInTheDocument();
   });
 
   it('shows "sun stays behind terrain" when the sun never clears the terrain that day', () => {
     render(
       <InfoPanel {...defaultProps} terrainStatus="ready" terrainSunTimes={{ sunrise: null, sunset: null }} />
     );
+    fireEvent.click(getSunLineOfSightButton());
     expect(screen.getAllByText(/sun stays behind terrain/i)).toHaveLength(2);
   });
 
@@ -602,25 +635,26 @@ describe('InfoPanel: line of sight with terrain (ROADMAP item 13)', () => {
       <InfoPanel
         {...defaultProps}
         terrainStatus="ready"
-        terrainSunTimes={{ sunrise: sunTimes.sunrise, sunset: sunTimes.sunset }}
         terrainMoonTimes={{
           rise: new Date(defaultProps.moonTimes.rise.getTime() + 10 * 60000),
           set: null,
         }}
       />
     );
-    expect(screen.getByText(/behind terrain .* \(\+10 min\)/)).toBeInTheDocument();
+    fireEvent.click(getMoonLineOfSightButton());
+
+    expect(screen.getByText(/\(\+10 min\)/)).toBeInTheDocument();
     expect(screen.getByText(/moon stays behind terrain/i)).toBeInTheDocument();
   });
 });
 
-describe('formatTerrainDelta (ROADMAP item 13)', () => {
+describe('formatTerrainDelta (ROADMAP items 13 & 30)', () => {
   const astronomical = new Date(2026, 0, 1, 18, 0, 0);
 
-  it('formats a later terrain time with a positive sign', () => {
+  it('formats a later terrain time with a positive sign, as a short value', () => {
     const terrain = new Date(astronomical.getTime() + 23 * 60000);
     const result = formatTerrainDelta('sun', terrain, astronomical);
-    expect(result).toContain('behind terrain');
+    expect(result).not.toContain('behind terrain');
     expect(result).toContain('(+23 min)');
   });
 
