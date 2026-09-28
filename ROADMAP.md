@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-09-28. Done: items 1–13, 15 and 17–37 (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14, 16, 38 and 39, the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
+Status: last updated 2026-09-28. Done: items 1–13, 15 and 17–38 (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14, 16 and 39, the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
 
 ## Verification (2026-09-28)
 
@@ -372,7 +372,7 @@ Items 37 and 38 were found in the browser check of the verification above (on `a
   - Add a test: for each minute of one night, the sun pass is longer than 6 h and the arc labels have a zenith.
 - **Done when:** the test passes, and at night the sun arc and its zenith label stay on screen across minute changes.
 
-### 38. Moon zenith label under the collapsed panel — S — AUDIT C-15
+### 38. Moon zenith label under the collapsed panel — S — AUDIT C-15 — **✅ Done**
 
 - **Found:** Ravensburg, 390×844. When the moon culminates high, its zenith label falls under the collapsed panel. Rechecked after item 31 (panel at the top from 364 px, `main` at `499ce9e`): the collapsed panel covers y 0–112 px at x ≥ 90 px, and the moon zenith label is at y 78–100 px on 30 Sep, 21:30, and at y 72–94 px on 1 Oct, 22:00. The sun label was moved below the apex for this reason, but a high moon apex still falls under the panel.
 - **Spec:** move an arc label that overlaps the collapsed panel's box below the panel's bottom edge, or place it beside the apex. Do not hide it.
