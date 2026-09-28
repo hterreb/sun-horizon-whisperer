@@ -54,6 +54,27 @@ export const getSunPosition = (date: Date, latitude: number, longitude: number):
   };
 };
 
+// Samples the sun's altitude/azimuth across the sun's current pass (date − 12 h …
+// date + 12 h), for drawing the sun's arc in the sky (ROADMAP item 17). Same shape as
+// moonUtils.getMoonPathAround; pure and stateless, callers map each point to screen
+// coordinates themselves. With the default `steps`, the center sample (index steps/2)
+// is `date` itself.
+export const getSunPathAround = (
+  date: Date,
+  latitude: number,
+  longitude: number,
+  steps = 48
+): SunPosition[] => {
+  const start = date.getTime() - 12 * 60 * 60 * 1000;
+
+  const points: SunPosition[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = new Date(start + (i / steps) * 24 * 60 * 60 * 1000);
+    points.push(getSunPosition(t, latitude, longitude));
+  }
+  return points;
+};
+
 const isValidDate = (date: Date | null | undefined): date is Date => {
   return date instanceof Date && !isNaN(date.getTime());
 };
@@ -272,6 +293,44 @@ export const getBlueHourTimes = (date: Date, latitude: number, longitude: number
     morning: buildWindow(times.dawn, times[BLUE_HOUR_DAWN_END]),
     evening: buildWindow(times[BLUE_HOUR_DUSK_START], times.dusk)
   };
+};
+
+export interface NextGoldenBlueHours {
+  part: 'morning' | 'evening';
+  day: 'today' | 'tomorrow';
+  golden: TimeWindow | null;
+  blue: TimeWindow | null;
+}
+
+// The InfoPanel used to show all 4 golden/blue hour windows at once (ROADMAP item
+// 11); item 20 narrows that to the single upcoming pair, from the same part of the
+// day. Follows the "which window is still ahead" pattern of getRelevantTwilightTimes:
+// before the morning golden hour ends, today's morning pair is still ahead; before
+// the evening blue hour ends, today's evening pair is still ahead; otherwise the next
+// pair is tomorrow morning's. At polar day/night a window is null (see
+// getGoldenHourTimes/getBlueHourTimes) and simply falls through to the next check.
+export const getNextGoldenBlueHours = (
+  now: Date,
+  latitude: number,
+  longitude: number
+): NextGoldenBlueHours => {
+  const todayGolden = getGoldenHourTimes(now, latitude, longitude);
+  const todayBlue = getBlueHourTimes(now, latitude, longitude);
+  const nowMs = now.getTime();
+
+  if (todayGolden.morning !== null && nowMs < todayGolden.morning.end.getTime()) {
+    return { part: 'morning', day: 'today', golden: todayGolden.morning, blue: todayBlue.morning };
+  }
+
+  if (todayBlue.evening !== null && nowMs < todayBlue.evening.end.getTime()) {
+    return { part: 'evening', day: 'today', golden: todayGolden.evening, blue: todayBlue.evening };
+  }
+
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowGolden = getGoldenHourTimes(tomorrow, latitude, longitude);
+  const tomorrowBlue = getBlueHourTimes(tomorrow, latitude, longitude);
+  return { part: 'morning', day: 'tomorrow', golden: tomorrowGolden.morning, blue: tomorrowBlue.morning };
 };
 
 export interface RelevantTwilightTimes {

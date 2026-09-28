@@ -8,8 +8,7 @@ import {
   type SunTimes,
   type LocationData,
   type TimeOfDay,
-  type GoldenHourTimes,
-  type BlueHourTimes,
+  type NextGoldenBlueHours,
   type TimeWindow,
   formatTime,
   getTimeOfDayLabel,
@@ -29,8 +28,7 @@ interface InfoPanelProps {
   nextFullMoon: Date;
   nextNewMoon: Date;
   sunTimes: SunTimes | null;
-  goldenHourTimes: GoldenHourTimes | null;
-  blueHourTimes: BlueHourTimes | null;
+  nextGoldenBlueHours: NextGoldenBlueHours | null;
   location: LocationData;
   // The place name chosen via search, when the current location came from one; takes
   // priority over the reverse-geocode guess below for the same coordinates.
@@ -56,8 +54,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   nextFullMoon,
   nextNewMoon,
   sunTimes,
-  goldenHourTimes,
-  blueHourTimes,
+  nextGoldenBlueHours,
   location,
   manualPlaceName,
   timeOfDay,
@@ -327,10 +324,24 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   // Frost (< -5°C, ROADMAP item 10): a subtle, CSS-only icy edge on the panel itself.
   const isFrost = weatherData != null && weatherData.temperature < -5;
 
-  // Golden/blue hour windows (ROADMAP item 11): null at polar day/night, or
-  // before SunTracker has computed them yet.
-  const formatWindow = (window: TimeWindow | null | undefined): string =>
-    window ? `${formatTime(window.start)} – ${formatTime(window.end)}` : '—';
+  // Golden/blue hour window (ROADMAP item 20): null at polar day/night, or before
+  // SunTracker has computed it yet. A window running right now is marked as such
+  // instead of showing its already-passed start time.
+  const formatWindow = (window: TimeWindow | null | undefined): string => {
+    if (!window) return '—';
+    const now = currentTime.getTime();
+    if (now >= window.start.getTime() && now < window.end.getTime()) {
+      return `now, until ${formatTime(window.end)}`;
+    }
+    return `${formatTime(window.start)} – ${formatTime(window.end)}`;
+  };
+
+  // "this morning" / "this evening" / "tomorrow morning" (ROADMAP item 20).
+  const goldenBlueHeading = nextGoldenBlueHours
+    ? nextGoldenBlueHours.day === 'today'
+      ? `this ${nextGoldenBlueHours.part}`
+      : `tomorrow ${nextGoldenBlueHours.part}`
+    : null;
 
   const weatherOptions: { type: WeatherType; label: string; icon: React.ReactNode }[] = [
     { type: 'clear', label: 'Clear', icon: <Sun size={16} /> },
@@ -652,26 +663,36 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             )}
           </div>
 
-          {/* Golden & blue hour windows (ROADMAP item 11) */}
+          {/* Golden & blue hour: only the next pair, from the same part of the day
+              (ROADMAP item 20) */}
           <div className="mt-6 pt-4 border-t border-white border-opacity-20">
-            <h3 className="text-sm font-bold mb-2">Golden &amp; Blue Hour</h3>
+            <h3 className="text-sm font-bold mb-2">
+              Golden &amp; Blue Hour{goldenBlueHeading ? ` · ${goldenBlueHeading}` : ''}
+            </h3>
             <div className="space-y-1 text-xs">
-              <div className="flex justify-between">
-                <span className="opacity-80">Blue hour (morning):</span>
-                <span className="font-mono tabular-nums">{formatWindow(blueHourTimes?.morning)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="opacity-80">Golden hour (morning):</span>
-                <span className="font-mono tabular-nums">{formatWindow(goldenHourTimes?.morning)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="opacity-80">Golden hour (evening):</span>
-                <span className="font-mono tabular-nums">{formatWindow(goldenHourTimes?.evening)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="opacity-80">Blue hour (evening):</span>
-                <span className="font-mono tabular-nums">{formatWindow(blueHourTimes?.evening)}</span>
-              </div>
+              {nextGoldenBlueHours?.part === 'morning' ? (
+                <>
+                  <div className="flex justify-between">
+                    <span className="opacity-80">Blue hour:</span>
+                    <span className="font-mono tabular-nums">{formatWindow(nextGoldenBlueHours?.blue)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="opacity-80">Golden hour:</span>
+                    <span className="font-mono tabular-nums">{formatWindow(nextGoldenBlueHours?.golden)}</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between">
+                    <span className="opacity-80">Golden hour:</span>
+                    <span className="font-mono tabular-nums">{formatWindow(nextGoldenBlueHours?.golden)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="opacity-80">Blue hour:</span>
+                    <span className="font-mono tabular-nums">{formatWindow(nextGoldenBlueHours?.blue)}</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 

@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { Sun } from 'lucide-react';
+import { Sun, ChevronLeft, ChevronRight } from 'lucide-react';
 import { type SunPosition, type TimeOfDay } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
+import { shortestHeadingDelta } from '../utils/compassUtils';
 import CloudLayer, { type WeatherType } from './CloudLayer';
 import Fireworks from './Fireworks';
 import WeatherEffects from './WeatherEffects';
@@ -13,8 +14,10 @@ const DEFAULT_SEED_DATE = new Date(0);
 interface SunVisualizationProps {
   sunPosition: SunPosition;
   moonPosition: MoonPosition;
-  // The moon's altitude/azimuth sampled across the current day (see
-  // moonUtils.getMoonPathAround), used to draw its arc across the sky.
+  // The sun's and moon's altitude/azimuth sampled across the current pass (see
+  // sunUtils.getSunPathAround / moonUtils.getMoonPathAround), used to draw their arcs
+  // across the sky (ROADMAP item 17).
+  sunPath: SunPosition[];
   moonPath: MoonPosition[];
   timeOfDay: TimeOfDay;
   weatherType: WeatherType;
@@ -29,26 +32,62 @@ interface SunVisualizationProps {
   cloudCoverPercent?: number | null;
   windSpeedKmh?: number | null;
   windDirectionDeg?: number | null;
-  // Live compass mode (ROADMAP item 8): shifts the azimuth->x mapping so the
-  // current device heading sits at screen center. 0 (the default) reproduces the
-  // static mapping. See compassUtils.headingToAzimuthOffset.
-  azimuthOffset?: number;
+  // Live compass mode (ROADMAP item 19): the current (smoothed) device heading, or
+  // null/undefined for the static 360°-across-the-screen mode. When set, azimuths are
+  // mapped through a real field of view centered on this heading (getCompassScreenFraction)
+  // instead of the full-circle static mapping, and out-of-view elements are hidden.
+  compassHeading?: number | null;
 }
 
-// Maps an azimuth (0-360°, 0 = North) to a horizontal screen fraction (0-1).
+// Maps an azimuth (0-360°, 0 = North) to a horizontal screen fraction (0-1), for the
+// static (non-compass) 360°-across-the-screen mode.
 // North hemisphere: sun/moon culminate at 180° (South), which already sits at the
 // center of a linear 0->left/360->right mapping, so no shift is needed.
 // South hemisphere: culmination is at 0°/360° (North), which would otherwise land on
 // the screen edge and jump edge-to-edge at noon. Shifting by 180° before mapping
 // centers the culmination instead.
-// `azimuthOffset` (compass mode) is applied after the hemisphere shift, so it always
-// pans the same visual amount regardless of hemisphere.
 // eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
-export const getAzimuthScreenFraction = (azimuth: number, latitude: number, azimuthOffset = 0): number => {
+export const getAzimuthScreenFraction = (azimuth: number, latitude: number): number => {
   const hemisphereShifted = latitude < 0 ? (azimuth + 180) % 360 : azimuth;
-  const adjusted = ((hemisphereShifted + azimuthOffset) % 360 + 360) % 360;
-  return adjusted / 360;
+  return ((hemisphereShifted % 360) + 360) % 360 / 360;
 };
+
+// Compass mode's field of view in degrees (ROADMAP item 19): how much of the horizon
+// maps onto the screen width, centered on the current device heading. Named/exported
+// so it's easy to tune from real-device testing.
+export const COMPASS_FOV_DEG = 90;
+
+export interface CompassScreenFraction {
+  fraction: number; // 0.5 = screen center (the heading); continues outside [0, 1] when not visible
+  visible: boolean;
+}
+
+// Maps an azimuth to a horizontal screen fraction under compass mode's field-of-view:
+// screen center is the current heading, +-fov/2 either side. No hemisphere shift and
+// no wrap - `shortestHeadingDelta` already gives the signed short way from the heading
+// to the azimuth, so there's no 0°/360° jump (ROADMAP item 19).
+// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
+export const getCompassScreenFraction = (
+  azimuth: number,
+  heading: number,
+  fov = COMPASS_FOV_DEG
+): CompassScreenFraction => {
+  const delta = shortestHeadingDelta(heading, azimuth);
+  return { fraction: 0.5 + delta / fov, visible: Math.abs(delta) <= fov / 2 };
+};
+
+// Resolves an azimuth to a screen fraction under whichever mode is active: the static
+// full-circle mapping (compassHeading null/undefined, always visible) or the compass
+// field-of-view mapping (ROADMAP item 19). Shared by every azimuth consumer below -
+// sun/moon dots, both arcs, cardinal labels, and the rainbow.
+const resolveAzimuth = (
+  azimuth: number,
+  latitude: number,
+  compassHeading?: number | null
+): CompassScreenFraction =>
+  compassHeading === null || compassHeading === undefined
+    ? { fraction: getAzimuthScreenFraction(azimuth, latitude), visible: true }
+    : getCompassScreenFraction(azimuth, compassHeading);
 
 // The 8 cardinal/intercardinal directions shown as static horizon labels (ROADMAP
 // item 8), always in clockwise order from North.
@@ -65,21 +104,21 @@ export const CARDINAL_DIRECTIONS = [
 ] as const;
 
 // Screen fraction for each cardinal label, using the same azimuth->x mapping as the
-// sun/moon (including the compass-mode pan offset), so labels stay correct in both
-// hemispheres and pan together with the scene. The mapping wraps the full 360°
-// circle across the full width, so every fraction is finite and "in range" - this
-// still guards against a non-finite result (e.g. NaN input).
+// sun/moon, so labels stay correct in both hemispheres and pan together with the
+// scene. In compass mode, a label outside the field of view is dropped instead of
+// being clamped to the edge (ROADMAP item 19); the finite-fraction guard still covers
+// a non-finite result (e.g. NaN input).
 // eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
 export const getVisibleCardinalLabels = (
   latitude: number,
-  azimuthOffset = 0
+  compassHeading?: number | null
 ): Array<{ label: string; azimuth: number; fraction: number }> =>
   CARDINAL_DIRECTIONS
-    .map((direction) => ({
-      ...direction,
-      fraction: getAzimuthScreenFraction(direction.azimuth, latitude, azimuthOffset),
-    }))
-    .filter((direction) => Number.isFinite(direction.fraction));
+    .map((direction) => {
+      const { fraction, visible } = resolveAzimuth(direction.azimuth, latitude, compassHeading);
+      return { ...direction, fraction, visible };
+    })
+    .filter((direction) => Number.isFinite(direction.fraction) && direction.visible);
 
 export interface RainbowGeometry {
   visible: boolean;
@@ -89,24 +128,24 @@ export interface RainbowGeometry {
 
 // Rainbow geometry (ROADMAP item 10): visible while it's raining/drizzling and the sun
 // sits low (0-42° altitude), opposite the sun's azimuth - using the same azimuth->x
-// mapping (and compass offset) as the sun/moon, so it pans together with them.
+// mapping as the sun/moon, so it pans together with them and hides outside the
+// compass field of view (ROADMAP item 19).
 // eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
 export const getRainbowGeometry = (
   isRainingOrDrizzling: boolean,
   sunAltitude: number,
   sunAzimuth: number,
   latitude: number,
-  azimuthOffset = 0
+  compassHeading?: number | null
 ): RainbowGeometry => {
-  const visible = isRainingOrDrizzling && sunAltitude > 0 && sunAltitude < 42;
-  if (!visible) return { visible: false, xFraction: 0, apexHeightDeg: 0 };
+  const inRange = isRainingOrDrizzling && sunAltitude > 0 && sunAltitude < 42;
+  if (!inRange) return { visible: false, xFraction: 0, apexHeightDeg: 0 };
 
   const oppositeAzimuth = (sunAzimuth + 180) % 360;
-  return {
-    visible: true,
-    xFraction: getAzimuthScreenFraction(oppositeAzimuth, latitude, azimuthOffset),
-    apexHeightDeg: 42 - sunAltitude
-  };
+  const { fraction, visible } = resolveAzimuth(oppositeAzimuth, latitude, compassHeading);
+  if (!visible) return { visible: false, xFraction: 0, apexHeightDeg: 0 };
+
+  return { visible: true, xFraction: fraction, apexHeightDeg: 42 - sunAltitude };
 };
 
 // True when the sun's altitude crosses the horizon (0°) between two samples, i.e. it
@@ -116,45 +155,90 @@ export const getRainbowGeometry = (
 export const crossesHorizon = (prevAltitude: number, currentAltitude: number): boolean =>
   (prevAltitude < 0) !== (currentAltitude < 0);
 
+// The altitude->y part of the mapping, shared by the clamped (dot) and unclamped
+// (arc) screen positions below.
+const altitudeToY = (altitude: number, height: number): number => {
+  const horizonY = height * 0.65;
+  const altitudeRadians = altitude * (Math.PI / 180);
+  const maxAltitudeHeight = horizonY - 30;
+  return horizonY - Math.sin(altitudeRadians) * maxAltitudeHeight;
+};
+
 // Maps a sky position (altitude/azimuth, in degrees) to screen x/y for the given
-// container size and latitude. Shared by the sun and moon's current-position dots and
-// by each sampled point of the moon's day arc, so they all agree on the same mapping.
+// container size and latitude, clamped to the screen edges - used for the sun and
+// moon's current-position dots only (ROADMAP item 17 keeps arcs unclamped, see
+// getArcScreenPosition below). Also reports FOV visibility (ROADMAP item 19): a dot
+// outside the compass field of view should be hidden, not clamped to the edge.
 const getScreenPosition = (
   altitude: number,
   azimuth: number,
   width: number,
   height: number,
   latitude: number,
-  azimuthOffset = 0
-): { x: number; y: number } => {
-  if (width === 0 || height === 0) return { x: 0, y: 0 };
+  compassHeading?: number | null
+): { x: number; y: number; visible: boolean } => {
+  if (width === 0 || height === 0) return { x: 0, y: 0, visible: true };
 
-  const horizonY = height * 0.65;
-  const altitudeRadians = altitude * (Math.PI / 180);
-  const maxAltitudeHeight = horizonY - 30;
-  const y = horizonY - Math.sin(altitudeRadians) * maxAltitudeHeight;
-  const x = width * getAzimuthScreenFraction(azimuth, latitude, azimuthOffset);
+  const { fraction, visible } = resolveAzimuth(azimuth, latitude, compassHeading);
+  const x = width * fraction;
+  const y = altitudeToY(altitude, height);
 
   return {
     x: Math.max(30, Math.min(width - 30, x)),
-    y: Math.max(30, Math.min(height - 30, y))
+    y: Math.max(30, Math.min(height - 30, y)),
+    visible
   };
 };
 
-// SVG path through the above-horizon points only; a gap below the horizon starts a new segment.
+// Same mapping as getScreenPosition, but unclamped (arc points run off-screen
+// cleanly, ROADMAP item 17) and returns null for a point outside the compass field of
+// view instead of a position (ROADMAP item 19) - buildArcPath treats that the same as
+// a below-horizon point (pen up).
+const getArcScreenPosition = (
+  altitude: number,
+  azimuth: number,
+  width: number,
+  height: number,
+  latitude: number,
+  compassHeading?: number | null
+): { x: number; y: number } | null => {
+  if (width === 0 || height === 0) return null;
+
+  const { fraction, visible } = resolveAzimuth(azimuth, latitude, compassHeading);
+  if (!visible) return null;
+
+  return { x: width * fraction, y: altitudeToY(altitude, height) };
+};
+
+// SVG path through the above-horizon, in-view points only; a gap (below the horizon,
+// outside the compass field of view, or a wrap in `toXY`'s screen x) starts a new
+// segment instead of drawing a line across the screen (ROADMAP item 17).
 type SkyPoint = { altitude: number; azimuth: number };
 // eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
-export const buildArcPath = (points: SkyPoint[], toXY: (p: SkyPoint) => { x: number; y: number }): string => {
+export const buildArcPath = (
+  points: SkyPoint[],
+  toXY: (p: SkyPoint) => { x: number; y: number } | null,
+  width = Infinity
+): string => {
   let path = '';
   let penDown = false;
+  let prevX: number | null = null;
   for (const point of points) {
-    if (point.altitude < 0) {
+    const xy = point.altitude < 0 ? null : toXY(point);
+    if (xy === null) {
       penDown = false;
+      prevX = null;
       continue;
     }
-    const { x, y } = toXY(point);
+    const { x, y } = xy;
+    if (penDown && prevX !== null && Math.abs(x - prevX) > width / 2) {
+      // The x jumped by more than half the width: an azimuth wrap (0°/360°, or the
+      // FOV edge), not a real sweep across the screen - start a new segment.
+      penDown = false;
+    }
     path += `${penDown ? 'L' : 'M'}${x},${y} `;
     penDown = true;
+    prevX = x;
   }
   return path.trim();
 };
@@ -162,6 +246,7 @@ export const buildArcPath = (points: SkyPoint[], toXY: (p: SkyPoint) => { x: num
 const SunVisualization: React.FC<SunVisualizationProps> = ({
   sunPosition,
   moonPosition,
+  sunPath,
   moonPath,
   timeOfDay,
   weatherType,
@@ -172,8 +257,12 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   cloudCoverPercent = null,
   windSpeedKmh = null,
   windDirectionDeg = null,
-  azimuthOffset = 0
+  compassHeading = null
 }) => {
+  // Compass mode (ROADMAP item 19): a real field of view centered on the heading,
+  // replacing the static full-circle mapping - also turns off the CSS transitions
+  // below (the heading's own low-pass filter already smooths the motion).
+  const compassActive = compassHeading !== null;
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerDimensions, setContainerDimensions] = useState({ width: 0, height: 0 });
   const [showFireworks, setShowFireworks] = useState(false);
@@ -187,13 +276,13 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     // Trigger fireworks on a sign change (crossing the horizon in either direction).
     if (crossesHorizon(prevAltitude, currentAltitude)) {
       setShowFireworks(true);
-      
+
       // Reset fireworks trigger after a short delay
       setTimeout(() => {
         setShowFireworks(false);
       }, 100);
     }
-    
+
     prevAltitudeRef.current = sunPosition.altitude;
   }, [sunPosition.altitude]);
 
@@ -243,23 +332,53 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   }, [containerDimensions]);
 
   const getSunPosition = () =>
-    getScreenPosition(sunPosition.altitude, sunPosition.azimuth, containerDimensions.width, containerDimensions.height, latitude, azimuthOffset);
+    getScreenPosition(sunPosition.altitude, sunPosition.azimuth, containerDimensions.width, containerDimensions.height, latitude, compassHeading);
 
   const getMoonPosition = () =>
-    getScreenPosition(moonPosition.altitude, moonPosition.azimuth, containerDimensions.width, containerDimensions.height, latitude, azimuthOffset);
+    getScreenPosition(moonPosition.altitude, moonPosition.azimuth, containerDimensions.width, containerDimensions.height, latitude, compassHeading);
 
-  const { x: sunX, y: sunY } = getSunPosition();
-  const { x: moonX, y: moonY } = getMoonPosition();
+  const { x: sunX, y: sunY, visible: sunDotVisible } = getSunPosition();
+  const { x: moonX, y: moonY, visible: moonDotVisible } = getMoonPosition();
 
-  // The moon's arc for its current pass (above-horizon points only): same screen mapping as its current-position
-  // dot, just applied to every sampled point in `moonPath`. Paler than the moon itself
-  // (lower stroke opacity), using the scene.moon token (see index.css/tailwind.config).
+  // Whether each body is up at all, on altitude/weather/time-of-day grounds alone -
+  // independent of the compass field of view, so the off-FOV hint below can tell "it's
+  // up, just off to one side" apart from "it's not up right now" (ROADMAP item 19).
+  const sunAltitudeVisible = sunPosition.altitude > -18 && weatherType !== 'storm';
+  const moonAltitudeVisible = moonPosition.visible && (
+    timeOfDay === 'night' ||
+    timeOfDay === 'astronomical-twilight' ||
+    timeOfDay === 'nautical-twilight'
+  );
+
+  const isSunVisible = sunAltitudeVisible && sunDotVisible;
+  const isMoonVisible = moonAltitudeVisible && moonDotVisible;
+
+  // The sun's and moon's arcs for their current pass (above-horizon, in-FOV points
+  // only): same screen mapping as their current-position dots, just unclamped and
+  // applied to every sampled point (ROADMAP item 17). The sun arc is a stronger, warm
+  // token color; the moon's is paler, and only drawn while the moon is actually shown
+  // (it used to also draw during the day, when the moon isn't shown at all).
+  const sunArcPath = useMemo(() => {
+    const { width, height } = containerDimensions;
+    if (width === 0 || height === 0 || sunPath.length === 0) return '';
+
+    return buildArcPath(
+      sunPath,
+      (p) => getArcScreenPosition(p.altitude, p.azimuth, width, height, latitude, compassHeading),
+      width
+    );
+  }, [sunPath, containerDimensions, latitude, compassHeading]);
+
   const moonArcPath = useMemo(() => {
     const { width, height } = containerDimensions;
-    if (width === 0 || height === 0 || moonPath.length === 0) return '';
+    if (width === 0 || height === 0 || moonPath.length === 0 || !moonAltitudeVisible) return '';
 
-    return buildArcPath(moonPath, (p) => getScreenPosition(p.altitude, p.azimuth, width, height, latitude, azimuthOffset));
-  }, [moonPath, containerDimensions, latitude, azimuthOffset]);
+    return buildArcPath(
+      moonPath,
+      (p) => getArcScreenPosition(p.altitude, p.azimuth, width, height, latitude, compassHeading),
+      width
+    );
+  }, [moonPath, containerDimensions, latitude, compassHeading, moonAltitudeVisible]);
 
   const getSunColor = () => {
     if (sunPosition.altitude > 10) {
@@ -278,14 +397,14 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
                      weatherType === 'fog' ? 0.25 :
                      weatherType === 'drizzle' || weatherType === 'overcast' ? 0.5 :
                      weatherType === 'snow' ? 0.5 : 1;
-    
+
     if (sunPosition.altitude > 10) {
       return `drop-shadow-[0_0_15px_rgba(255,255,0,${0.8 * baseGlow})]`;
     } else if (sunPosition.altitude > 0) {
       return `drop-shadow-[0_0_10px_rgba(255,165,0,${0.6 * baseGlow})]`;
     } else if (sunPosition.altitude > -10) {
       return `drop-shadow-[0_0_5px_rgba(255,99,71,${0.4 * baseGlow})]`;
-    } 
+    }
     return '';
   };
 
@@ -308,13 +427,6 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     return timeOfDay === 'night' ? 0.1 : 0.3;
   };
 
-  const isSunVisible = sunPosition.altitude > -18 && weatherType !== 'storm';
-  const isMoonVisible = moonPosition.visible && (
-    timeOfDay === 'night' ||
-    timeOfDay === 'astronomical-twilight' ||
-    timeOfDay === 'nautical-twilight'
-  );
-
   const moonRadius = 18 + moonPosition.illumination * 6; // same footprint as the old 36 + illumination*12 diameter
   const moonPhasePath = useMemo(
     () => getMoonPhasePath(moonPosition.illumination, moonPosition.phase, latitude, moonRadius),
@@ -322,25 +434,39 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   );
 
   // Cardinal direction labels (ROADMAP item 8): always on, panning together with the
-  // sun/moon in compass mode via the same azimuthOffset.
+  // sun/moon and hidden outside the field of view in compass mode (ROADMAP item 19).
   const cardinalLabels = useMemo(
-    () => getVisibleCardinalLabels(latitude, azimuthOffset),
-    [latitude, azimuthOffset]
+    () => getVisibleCardinalLabels(latitude, compassHeading),
+    [latitude, compassHeading]
   );
   const horizonLabelY = containerDimensions.height * 0.65;
 
   // Rainbow (ROADMAP item 10): raining/drizzling, opposite the sun's azimuth, using the
-  // same azimuth->x mapping (and compass offset) as the sun/moon.
+  // same azimuth->x mapping as the sun/moon.
   const rainbowGeometry = useMemo(
     () => getRainbowGeometry(
       weatherType === 'rain' || weatherType === 'drizzle',
       sunPosition.altitude,
       sunPosition.azimuth,
       latitude,
-      azimuthOffset
+      compassHeading
     ),
-    [weatherType, sunPosition.altitude, sunPosition.azimuth, latitude, azimuthOffset]
+    [weatherType, sunPosition.altitude, sunPosition.azimuth, latitude, compassHeading]
   );
+
+  // Off-screen hint (ROADMAP item 19): in compass mode, when the body currently shown
+  // (the moon by night, else the sun) sits outside the field of view, point an arrow
+  // the short way toward it instead of leaving the screen empty.
+  const offFovHintSide = useMemo((): 'left' | 'right' | null => {
+    if (!compassActive) return null;
+    const usingMoon = moonAltitudeVisible;
+    if (!usingMoon && !sunAltitudeVisible) return null;
+
+    const azimuth = usingMoon ? moonPosition.azimuth : sunPosition.azimuth;
+    const { fraction, visible } = getCompassScreenFraction(azimuth, compassHeading as number);
+    if (visible) return null;
+    return fraction > 0.5 ? 'right' : 'left';
+  }, [compassActive, moonAltitudeVisible, sunAltitudeVisible, moonPosition.azimuth, sunPosition.azimuth, compassHeading]);
 
   return (
     <div ref={containerRef} className="w-full h-dvh relative overflow-hidden" data-testid="sun-visualization">
@@ -366,24 +492,35 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       />
       <Fireworks trigger={showFireworks} />
 
-      {moonArcPath && (
+      {(sunArcPath || moonArcPath) && (
         <svg className="absolute inset-0 w-full h-full pointer-events-none">
-          <path
-            d={moonArcPath}
-            fill="none"
-            stroke="hsl(var(--scene-moon))"
-            strokeOpacity={0.25}
-            strokeWidth={1.5}
-          />
+          {sunArcPath && (
+            <path
+              d={sunArcPath}
+              fill="none"
+              stroke="hsl(var(--brand-sunset))"
+              strokeOpacity={0.45}
+              strokeWidth={2}
+            />
+          )}
+          {moonArcPath && (
+            <path
+              d={moonArcPath}
+              fill="none"
+              stroke="hsl(var(--scene-moon))"
+              strokeOpacity={0.25}
+              strokeWidth={1.5}
+            />
+          )}
         </svg>
       )}
 
       {isSunVisible && (
-        <div 
-          className={`absolute transition-transform duration-1000 ${getSunColor()} ${getGlowIntensity()} animate-glow`}
-          style={{ 
-            left: `${sunX}px`, 
-            top: `${sunY}px`, 
+        <div
+          className={`absolute ${compassActive ? '' : 'transition-transform duration-1000'} ${getSunColor()} ${getGlowIntensity()} animate-glow`}
+          style={{
+            left: `${sunX}px`,
+            top: `${sunY}px`,
             transform: 'translate(-50%, -50%)',
             opacity: weatherType === 'rain' ? 0.7 : 1
           }}
@@ -391,10 +528,21 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           <Sun size={sunPosition.altitude > 0 ? 96 : 80} strokeWidth={1} />
         </div>
       )}
-      
+
+      {offFovHintSide && (
+        <div
+          className="absolute top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-panel-background border border-panel-border text-white/90 pointer-events-none"
+          style={offFovHintSide === 'left' ? { left: '0.75rem' } : { right: '0.75rem' }}
+          aria-hidden="true"
+          data-testid="compass-off-fov-hint"
+        >
+          {offFovHintSide === 'left' ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        </div>
+      )}
+
       {isMoonVisible && (
         <div
-          className="absolute transition-all duration-1000"
+          className={`absolute ${compassActive ? '' : 'transition-all duration-1000'}`}
           style={{
             left: `${moonX}px`,
             top: `${moonY}px`,
@@ -413,7 +561,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           </svg>
         </div>
       )}
-      
+
       <svg className="absolute inset-0 w-full h-full pointer-events-none">
         <defs>
           <linearGradient id="horizonGradient" x1="0" y1="0" x2="0" y2="1">
@@ -433,7 +581,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           {cardinalLabels.map(({ label, fraction }) => (
             <div
               key={label}
-              className="absolute flex flex-col items-center gap-1 transition-all duration-1000"
+              className={`absolute flex flex-col items-center gap-1 ${compassActive ? '' : 'transition-all duration-1000'}`}
               style={{
                 left: `${fraction * containerDimensions.width}px`,
                 top: `${horizonLabelY}px`,
@@ -450,18 +598,18 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       )}
 
       <div
-        className="absolute left-1/2 transform -translate-x-1/2 bottom-1/3 -translate-y-12 
+        className="absolute left-1/2 transform -translate-x-1/2 bottom-1/3 -translate-y-12
                    bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm"
       >
-        {sunPosition.altitude > 0 
-          ? `+${sunPosition.altitude.toFixed(1)}°` 
+        {sunPosition.altitude > 0
+          ? `+${sunPosition.altitude.toFixed(1)}°`
           : `${sunPosition.altitude.toFixed(1)}°`
         }
       </div>
-      
+
       {isMoonVisible && (
-        <div 
-          className="absolute left-1/2 transform -translate-x-1/2 bottom-1/4 -translate-y-12 
+        <div
+          className="absolute left-1/2 transform -translate-x-1/2 bottom-1/4 -translate-y-12
                      bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-xs"
         >
           Moon: {moonPosition.altitude.toFixed(1)}° | {(moonPosition.illumination * 100).toFixed(0)}%
