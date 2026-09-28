@@ -263,6 +263,47 @@ describe('SunVisualization (rendered): static cardinal direction labels (ROADMAP
     }
   });
 
+  it('fades out together with the top-left buttons while idle in fullscreen (ROADMAP item 29)', () => {
+    setMockedContainerSize(800, 600);
+    const props = {
+      sunPosition: { azimuth: 180, altitude: 30 },
+      moonPosition: { azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false },
+      sunPath: [],
+      moonPath: [],
+      timeOfDay: 'midday' as const,
+      weatherType: 'clear' as const,
+      latitude: 51,
+    };
+
+    const { rerender } = render(<SunVisualization {...props} isFullscreen={true} showCursor={false} />);
+    expect(screen.getByTestId('cardinal-labels')).toHaveClass('opacity-0');
+
+    rerender(<SunVisualization {...props} isFullscreen={true} showCursor={true} />);
+    expect(screen.getByTestId('cardinal-labels')).toHaveClass('opacity-100');
+
+    rerender(<SunVisualization {...props} isFullscreen={false} showCursor={false} />);
+    expect(screen.getByTestId('cardinal-labels')).toHaveClass('opacity-100');
+  });
+
+  it('stays visible in compass mode even when idle in fullscreen (ROADMAP item 29)', () => {
+    setMockedContainerSize(800, 600);
+    render(
+      <SunVisualization
+        sunPosition={{ azimuth: 180, altitude: 30 }}
+        moonPosition={{ azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false }}
+        sunPath={[]}
+        moonPath={[]}
+        timeOfDay="midday"
+        weatherType="clear"
+        latitude={51}
+        compassHeading={90}
+        isFullscreen={true}
+        showCursor={false}
+      />
+    );
+    expect(screen.getByTestId('cardinal-labels')).toHaveClass('opacity-100');
+  });
+
   it('draws a sun arc by day and does not draw a moon arc when the moon is not shown (ROADMAP item 17)', () => {
     setMockedContainerSize(800, 600);
     const { container } = render(
