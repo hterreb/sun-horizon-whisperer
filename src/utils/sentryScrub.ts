@@ -3,7 +3,11 @@
 // and the geocoding URL carries the searched place name, so every string in the
 // payload has those query values replaced.
 
-const LOCATION_PARAM = /([?&](?:latitude|longitude|lat|lon|name)=)[^&#\s"']*/gi;
+// Matches the key after any non-word character or at the string start (ROADMAP item
+// 28), not only after `?`/`&` - a real request URL always has one of those, but a
+// value logged inside a plain message (e.g. "... (latitude=47.65...") did not match
+// before and leaked. Filtering too much is acceptable; filtering too little is not.
+const LOCATION_PARAM = /\b((?:latitude|longitude|lat|lon|name)=)[^&#\s"']*/gi;
 const MAX_DEPTH = 10; // ponytail: Sentry payloads are shallow; deeper values pass through unscrubbed
 
 export const scrubLocationString = (value: string): string =>
