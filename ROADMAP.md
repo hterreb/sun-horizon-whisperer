@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-09-28. Done: items 1–12 (marked **✅ Done** in the heading). Open: items 13–16, the P0 field findings 17–21 (do these first), easter eggs, backlog.
+Status: last updated 2026-09-28. Done: items 1–12 and 17–21 (marked **✅ Done** in the heading; real-device checks for 17 and 19 and the Sentry release to-dos are still open). Open: items 13–16, easter eggs, backlog.
 
 ## Priority rules
 
@@ -85,7 +85,7 @@ Status: last updated 2026-09-28. Done: items 1–12 (marked **✅ Done** in the 
 
 Found on a real phone after items 8–11 shipped. Items 17–20 are bugs or UX fixes, item 21 is error reporting.
 
-### 17. Sun arc, and fix the arc line — S
+### 17. Sun arc, and fix the arc line — S — **✅ Done**
 
 - **Why:**
   - "Sun is not on the line": the only arc in the scene is the **moon's** path (`moonArcPath` in `SunVisualization.tsx`). There is no sun path. The moon arc is also drawn by day, when the moon is not shown.
@@ -102,7 +102,7 @@ Found on a real phone after items 8–11 shipped. Items 17–20 are bugs or UX f
   - A test shows that a path across the wrap gives two segments and no line across the screen.
   - At 390×844 (portrait), in both hemispheres and with a compass offset, no arc draws a straight line across the screen. If the portrait bug still shows after this, get a screenshot and reopen.
 
-### 18. Hide the compass toggle in fullscreen — S
+### 18. Hide the compass toggle in fullscreen — S — **✅ Done**
 
 - **Why:** `FullscreenButton` fades out in fullscreen. `CompassToggle` has no hide logic, so it stays on screen.
 - **Spec:**
@@ -111,7 +111,7 @@ Found on a real phone after items 8–11 shipped. Items 17–20 are bugs or UX f
   - The toggle must stay reachable: `opacity-0` only, not `display: none`, and focus makes it visible.
 - **Done when:** in fullscreen both buttons fade out together, and a tap or mouse move brings both back.
 
-### 19. Compass mode rework — M
+### 19. Compass mode rework — M — **✅ Done**
 
 - **Why:** "all the directions move quite a lot and cluster together". Three causes in the code:
   1. **No real field of view.** The scene always maps 360° to the screen width. On a 390 px portrait phone, the 8 labels sit about 49 px apart, and 1° of phone turn moves the scene about 1 px. The labels do not match what the camera sees, except at screen center.
@@ -135,7 +135,7 @@ Found on a real phone after items 8–11 shipped. Items 17–20 are bugs or UX f
   - The labels match real directions (check against a hardware compass within about 10°), and they do not slide or bunch up at the 0°/360° wrap.
   - Unit tests cover the field-of-view mapping, including the wrap and the hide-when-outside rule.
 
-### 20. Golden and blue hour: show only the next pair — S
+### 20. Golden and blue hour: show only the next pair — S — **✅ Done**
 
 - **Why:** the InfoPanel shows 4 rows (morning and evening, golden and blue). Only the next ones are useful.
 - **Decision (2026-09-28):** show the next blue hour and the next golden hour, from the same part of the day.
