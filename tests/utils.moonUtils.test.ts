@@ -151,7 +151,7 @@ describe('getMoonTimes (ROADMAP item 9)', () => {
   });
 });
 
-describe('getMoonPathAround (ROADMAP item 9 - arc)', () => {
+describe('getMoonPathAround (ROADMAP item 9/26 - arc)', () => {
   it('does not mutate the Date argument', () => {
     const date = new Date('2026-06-01T12:34:56Z');
     const before = date.getTime();
@@ -159,7 +159,7 @@ describe('getMoonPathAround (ROADMAP item 9 - arc)', () => {
     expect(date.getTime()).toBe(before);
   });
 
-  it('samples a 24 h window centred on the date, at the requested resolution', () => {
+  it('samples the current pass at the requested resolution', () => {
     const steps = 24;
     const points = getMoonPathAround(new Date('2026-06-15T09:00:00Z'), 48, 11, steps);
     expect(points).toHaveLength(steps + 1);
@@ -167,6 +167,38 @@ describe('getMoonPathAround (ROADMAP item 9 - arc)', () => {
       expect(p).toHaveProperty('azimuth');
       expect(p).toHaveProperty('altitude');
     }
+  });
+
+  it('the first and last points reach the flat horizon, altitude 0 +-0.1 degrees (ROADMAP item 26)', () => {
+    const date = new Date('2026-06-15T09:00:00Z');
+    const path = getMoonPathAround(date, 48, 11);
+    expect(Math.abs(path[0].altitude)).toBeLessThan(0.1);
+    expect(Math.abs(path[path.length - 1].altitude)).toBeLessThan(0.1);
+  });
+
+  it('a pass longer than the old fixed 24h window is complete, not cut at date + 12h (ROADMAP item 26)', () => {
+    // Verified against getMoonTimes at 48N/11E: 2026-06-15 rise ~02:52 UTC, set ~20:23
+    // UTC - a ~17.5h pass, well past the old fixed date+12h cutoff.
+    const times = getMoonTimes(new Date('2026-06-15T00:00:00Z'), 48, 11);
+    expect(times.rise).toBeInstanceOf(Date);
+    expect(times.set).toBeInstanceOf(Date);
+    const passHours = ((times.set as Date).getTime() - (times.rise as Date).getTime()) / 3600000;
+    expect(passHours).toBeGreaterThan(12);
+
+    const shortlyAfterRise = new Date((times.rise as Date).getTime() + 60 * 1000);
+    const path = getMoonPathAround(shortlyAfterRise, 48, 11);
+    expect(Math.abs(path[0].altitude)).toBeLessThan(0.1);
+    expect(Math.abs(path[path.length - 1].altitude)).toBeLessThan(0.1);
+  });
+
+  it('falls back to a fixed window without throwing during an alwaysUp stretch (lat 78, Jan 2026)', () => {
+    const date = new Date(Date.UTC(2026, 0, 2));
+    const path = getMoonPathAround(date, 78, 15);
+    expect(path).toHaveLength(49);
+    path.forEach((point) => {
+      expect(Number.isFinite(point.altitude)).toBe(true);
+      expect(Number.isFinite(point.azimuth)).toBe(true);
+    });
   });
 });
 

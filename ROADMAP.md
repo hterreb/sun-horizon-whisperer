@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-09-28. Done: items 1–13 and 17–21 (marked **✅ Done** in the heading; real-device checks for 17 and 19 and the Sentry release to-dos are still open). Open: items 14–16, 22–30 (Sentry feedback), easter eggs, backlog.
+Status: last updated 2026-09-28. Done: items 1–13, 15 and 17–30 (marked **✅ Done** in the heading; real-device checks for 17 and 19 and the Sentry release to-dos are still open). Open: items 14–16, easter eggs, backlog.
 
 ## Priority rules
 
@@ -183,7 +183,7 @@ Eight feedback reports from production (Ravensburg, releases `afb9e52` and `f490
 
 **Dependency:** item 15 (redesign) is in progress in worktrees and changes `InfoPanel.tsx`, `FullscreenButton.tsx`, `CompassToggle.tsx`, `SunVisualization.tsx` and `sunUtils.ts`. Merge item 15 first, or build these items on top of it, to prevent conflicts.
 
-### 22. Top-left buttons stay together in fullscreen — S — [SUN-CHASER-2](https://ainabler.sentry.io/issues/SUN-CHASER-2)
+### 22. Top-left buttons stay together in fullscreen — S — **✅ Done** — [SUN-CHASER-2](https://ainabler.sentry.io/issues/SUN-CHASER-2)
 
 - **Feedback:** "Compass icon under the full screen not next to it."
 - **Cause (confirmed in the browser):** the two buttons use different visibility rules in fullscreen.
@@ -196,7 +196,7 @@ Eight feedback reports from production (Ravensburg, releases `afb9e52` and `f490
   - Use one visibility rule for the row: visible when not in fullscreen, or `showCursor` is true, or a button in the row has focus. Remove the separate hover state from `FullscreenButton`.
 - **Done when:** in fullscreen, a tap or mouse move shows both buttons side by side, and both fade out together after the idle timeout.
 
-### 23. Feedback available in fullscreen — S — [SUN-CHASER-5](https://ainabler.sentry.io/issues/SUN-CHASER-5)
+### 23. Feedback available in fullscreen — S — **✅ Done** — [SUN-CHASER-5](https://ainabler.sentry.io/issues/SUN-CHASER-5)
 
 - **Feedback:** "Feedback not available in full screen."
 - **Cause:** the only way to send feedback is the "Send feedback" link at the bottom of the InfoPanel. In fullscreen the panel fades out after 10 s (`InfoPanel.tsx`, `setIsVisible(false)`). A tap on the scene brings back the top-left buttons (`showCursor`), but not the panel. On a phone, the user sees no way to send feedback. The Sentry form itself works in fullscreen (checked: it attaches to `body`, and the fullscreen element is `<html>`).
@@ -206,7 +206,7 @@ Eight feedback reports from production (Ravensburg, releases `afb9e52` and `f490
   - Move the open logic (`createForm`, `appendToDom`, `open`) into one small helper, used by the button and the link.
 - **Done when:** in fullscreen on a phone, a tap on the scene shows the feedback button, and the button opens the form.
 
-### 24. Golden and blue hour: below the sun and moon times, collapsed by default — S — [SUN-CHASER-3](https://ainabler.sentry.io/issues/SUN-CHASER-3)
+### 24. Golden and blue hour: below the sun and moon times, collapsed by default — S — **✅ Done** — [SUN-CHASER-3](https://ainabler.sentry.io/issues/SUN-CHASER-3)
 
 - **Feedback:** "Golden & blue hour needs to go below sun and moon times and be collapsed on default."
 - **Current order in the panel:** Weather → Weather mode → Time (sunrise, sunset, sunset score) → Line of Sight → **Golden & Blue Hour** → Moon Information (moonrise, moonset) → Twilight → Sun Position → Send feedback.
@@ -217,7 +217,7 @@ Eight feedback reports from production (Ravensburg, releases `afb9e52` and `f490
   - Do not add it to the time-of-day auto-collapse effect. It stays collapsed until the user opens it.
 - **Done when:** a test shows the section after the moon section, collapsed at start, and expanded after one click.
 
-### 25. Hide the coordinates and the weather update time — S — [SUN-CHASER-4](https://ainabler.sentry.io/issues/SUN-CHASER-4)
+### 25. Hide the coordinates and the weather update time — S — **✅ Done** — [SUN-CHASER-4](https://ainabler.sentry.io/issues/SUN-CHASER-4)
 
 - **Feedback:** "No need for location coordinates - please hide them and as well as weather update time."
 - **Where:** coordinates in the panel header (`InfoPanel.tsx`, `location.latitude.toFixed(4)`); "Updated: HH:mm" in Current Weather.
@@ -227,7 +227,7 @@ Eight feedback reports from production (Ravensburg, releases `afb9e52` and `f490
   - Keep the coordinates in the "Change location" form fields.
 - **Done when:** with a place name, the header shows the name and no coordinates, and Current Weather has no update time. Without a place name, the coordinates show.
 
-### 26. Sun and moon arcs reach the horizon — S — [SUN-CHASER-6](https://ainabler.sentry.io/issues/SUN-CHASER-6)
+### 26. Sun and moon arcs reach the horizon — S — **✅ Done** — [SUN-CHASER-6](https://ainabler.sentry.io/issues/SUN-CHASER-6)
 
 - **Feedback:** "Arc not going to the horizon."
 - **Cause (confirmed in the browser):** two gaps in `getSunPathAround` / `getMoonPathAround` and `buildArcPath`.
@@ -241,7 +241,7 @@ Eight feedback reports from production (Ravensburg, releases `afb9e52` and `f490
   - Unit tests: the first and last points of an arc have altitude 0 (±0.1°), and a moon pass that runs past `date + 12 h` is complete.
   - At 390×844, by day and by night, both arcs touch the flat horizon line (or go behind the terrain).
 
-### 27. Sea visible at the horizon — S — [SUN-CHASER-7](https://ainabler.sentry.io/issues/SUN-CHASER-7)
+### 27. Sea visible at the horizon — S — **✅ Done** — [SUN-CHASER-7](https://ainabler.sentry.io/issues/SUN-CHASER-7)
 
 - **Feedback:** "Sea is missing at the horizon." (sent at 21:27, night, with the terrain profile on)
 - **Cause (seen in the browser):**
@@ -255,7 +255,7 @@ Eight feedback reports from production (Ravensburg, releases `afb9e52` and `f490
   - Check first after item 15 merges: `feat/redesign` adds water and ridge colour tokens and a water reflection, which can fix part of this.
 - **Done when:** at 390×844, at night and by day, with and without terrain, the sea and its wave line are visible below the horizon.
 
-### 28. Sentry scrub: filter location values anywhere in a string — S — [SUN-CHASER-1](https://ainabler.sentry.io/issues/SUN-CHASER-1)
+### 28. Sentry scrub: filter location values anywhere in a string — S — **✅ Done** — [SUN-CHASER-1](https://ainabler.sentry.io/issues/SUN-CHASER-1)
 
 - **Finding:** the setup test error "Sentry test from sun-chaser setup (latitude=47.65&longitude=[Filtered]" shows the latitude. `LOCATION_PARAM` in `src/utils/sentryScrub.ts` only matches a key after `?` or `&`. Real request URLs always have one of these, so the risk is low, but a key at the start of a string or after `(` or a space is not filtered.
 - **Spec:**
@@ -264,7 +264,7 @@ Eight feedback reports from production (Ravensburg, releases `afb9e52` and `f490
   - Resolve SUN-CHASER-1 in Sentry after the merge (it is a test event from `localhost`).
 - **Done when:** the test shows `latitude=[Filtered]&longitude=[Filtered]` for the test string, and the existing tests still pass.
 
-### 29. Direction labels fade out in fullscreen — S — [SUN-CHASER-9](https://ainabler.sentry.io/issues/SUN-CHASER-9)
+### 29. Direction labels fade out in fullscreen — S — **✅ Done** — [SUN-CHASER-9](https://ainabler.sentry.io/issues/SUN-CHASER-9)
 
 - **Feedback:** "Direction labels should also fade out in full screen."
 - **Cause:** the cardinal labels (item 8) in `SunVisualization.tsx` are always drawn. `SunVisualization` gets neither `isFullscreen` nor the idle state `showCursor` from `SunTracker`, so the labels cannot fade with the buttons.
@@ -274,7 +274,7 @@ Eight feedback reports from production (Ravensburg, releases `afb9e52` and `f490
   - Keep the labels visible in compass mode, where they are needed to aim the phone.
 - **Done when:** in fullscreen, the labels fade out together with the buttons and come back on a tap. A test covers the visible and hidden states.
 
-### 30. Line of Sight as an icon at the sun and moon times — S — [SUN-CHASER-8](https://ainabler.sentry.io/issues/SUN-CHASER-8)
+### 30. Line of Sight as an icon at the sun and moon times — S — **✅ Done** — [SUN-CHASER-8](https://ainabler.sentry.io/issues/SUN-CHASER-8)
 
 - **Feedback:** "Line of sight should be a separate icon that adds that info panel when clicked on at the moon or at the sun times."
 - **Now:** Line of Sight is its own panel section (between the sun times and Golden & Blue Hour) with four rows: terrain sunrise, sunset, moonrise and moonset. At 390 px the values ("behind terrain 07:44 (+27 min)") are wider than the value column, wrap and move the labels out of line (seen in the browser).
