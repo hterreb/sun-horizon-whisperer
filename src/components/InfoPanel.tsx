@@ -22,7 +22,6 @@ import { isValidLatitude, isValidLongitude } from '../utils/manualLocation';
 import { searchPlaces, formatGeocodeResultLabel, type GeocodeResult } from '../utils/geocodeUtils';
 import { type HorizonProfileStatus } from '../hooks/useHorizonProfile';
 import { type WeatherType } from './CloudLayer';
-import { format } from 'date-fns';
 
 // Direction D "Polished Classic" (ROADMAP items 7 & 15): shared classes so every
 // row/section/focus ring in the panel reads as one system. ROW, ICON_TOGGLE and
@@ -56,6 +55,10 @@ export const formatTerrainDelta = (
   return `${formatTime(terrainDate)} (${sign}${diffMinutes} min)`;
 };
 
+// "Oct 7, 14:05", as date-fns 'MMM d, HH:mm' did, with Intl instead (AUDIT P-7).
+const formatMoonDate = (date: Date): string =>
+  `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${formatTime(date)}`;
+
 // Highlights "now, until 19:42" in peach, the same D `--panel-hi` treatment as the
 // terrain delta above, without changing formatWindow's own text.
 const renderWindow = (text: string): React.ReactNode => {
@@ -72,6 +75,9 @@ interface InfoPanelProps {
   nextFullMoon: Date;
   nextNewMoon: Date;
   sunTimes: SunTimes | null;
+  // Sunrise/sunset of the pass the sun arc draws (AUDIT C-17): after sunset, the next
+  // ones. Null or missing falls back to `sunTimes` (today's).
+  passSunTimes?: { sunrise: Date | null; sunset: Date | null } | null;
   nextGoldenBlueHours: NextGoldenBlueHours | null;
   location: LocationData;
   // The place name chosen via search, when the current location came from one; takes
@@ -106,6 +112,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   nextFullMoon,
   nextNewMoon,
   sunTimes,
+  passSunTimes = null,
   nextGoldenBlueHours,
   location,
   manualPlaceName,
@@ -398,6 +405,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     : sunTimes.polar === 'night'
       ? 'Sun does not rise'
       : null;
+  const shownSunrise = passSunTimes?.sunrise ?? sunTimes.sunrise;
+  const shownSunset = passSunTimes?.sunset ?? sunTimes.sunset;
 
   // Frost (< -5°C, ROADMAP item 10): a subtle, CSS-only icy edge on the panel itself.
   const isFrost = weatherData != null && weatherData.temperature < -5;
@@ -713,7 +722,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 <Clock size={18} className="mr-2" />
                 <span className="text-body">Current Time</span>
               </div>
-              <span className="font-semibold text-body tabular-nums">{format(currentTime, 'HH:mm:ss')}</span>
+              <span className="font-semibold text-body tabular-nums">{currentTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })}</span>
             </div>
 
             <div className={ROW}>
@@ -733,7 +742,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   </button>
                 )}
               </div>
-              <span className="font-semibold text-body tabular-nums">{polarSunLabel ?? formatTime(sunTimes.sunrise)}</span>
+              <span className="font-semibold text-body tabular-nums">{polarSunLabel ?? formatTime(shownSunrise)}</span>
             </div>
 
             <div className={ROW}>
@@ -741,7 +750,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 <Sunset size={18} className="mr-2" />
                 <span className="text-body">Sunset</span>
               </div>
-              <span className="font-semibold text-body tabular-nums">{polarSunLabel ?? formatTime(sunTimes.sunset)}</span>
+              <span className="font-semibold text-body tabular-nums">{polarSunLabel ?? formatTime(shownSunset)}</span>
             </div>
 
             {terrainStatus !== 'idle' && isSunTerrainOpen && (
@@ -751,8 +760,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 eyeHeightMeters={eyeHeightMeters}
                 onEyeHeightChange={onEyeHeightChange}
                 rows={[
-                  { label: 'Sunrise', value: formatTerrainDelta('sun', terrainSunTimes?.sunrise ?? null, sunTimes.sunrise) },
-                  { label: 'Sunset', value: formatTerrainDelta('sun', terrainSunTimes?.sunset ?? null, sunTimes.sunset) },
+                  { label: 'Sunrise', value: formatTerrainDelta('sun', terrainSunTimes?.sunrise ?? null, shownSunrise) },
+                  { label: 'Sunset', value: formatTerrainDelta('sun', terrainSunTimes?.sunset ?? null, shownSunset) },
                 ]}
               />
             )}
@@ -874,11 +883,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
                   <div className={ROW}>
                     <span className="text-caption">Next full moon:</span>
-                    <span className="text-caption tabular-nums">{format(nextFullMoon, 'MMM d, HH:mm')}</span>
+                    <span className="text-caption tabular-nums">{formatMoonDate(nextFullMoon)}</span>
                   </div>
                   <div className={ROW}>
                     <span className="text-caption">Next new moon:</span>
-                    <span className="text-caption tabular-nums">{format(nextNewMoon, 'MMM d, HH:mm')}</span>
+                    <span className="text-caption tabular-nums">{formatMoonDate(nextNewMoon)}</span>
                   </div>
                 </div>
               </div>

@@ -15,8 +15,8 @@ const TemperatureIceberg: React.FC<TemperatureIcebergProps> = ({ temperature, is
 
   // Reset the position as soon as floating stops being applicable. Adjusting state
   // during render (rather than in an effect) avoids an extra commit; the effect
-  // below still owns the interval itself (using the exact same dependencies as
-  // before, so it keeps restarting on every temperature tick while floating).
+  // below owns the interval itself. It depends on `shouldReset` only, so a new
+  // temperature reading does not restart it (AUDIT P-4).
   const [prevShouldReset, setPrevShouldReset] = useState(shouldReset);
   if (shouldReset !== prevShouldReset) {
     setPrevShouldReset(shouldReset);
@@ -52,7 +52,7 @@ const TemperatureIceberg: React.FC<TemperatureIcebergProps> = ({ temperature, is
     }, 100);
 
     return () => clearInterval(floatInterval);
-  }, [isVisible, temperature, prefersReducedMotion, shouldReset]);
+  }, [shouldReset]);
 
   if (!isVisible || temperature >= 0) {
     return null;

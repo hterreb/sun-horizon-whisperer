@@ -31,6 +31,8 @@ interface FireworksProps {
 const FIREWORK_COLORS = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff'];
 
 const Fireworks: React.FC<FireworksProps> = ({ trigger }) => {
+  // ponytail: React state per animation frame (AUDIT P-4). Accepted: it runs a few
+  // seconds at sunrise/sunset. Move particles to a ref + canvas if it ever runs longer.
   const [fireworks, setFireworks] = useState<Firework[]>([]);
   const animationIdRef = useRef<number | null>(null);
   const prefersReducedMotion = usePrefersReducedMotion();

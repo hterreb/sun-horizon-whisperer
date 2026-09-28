@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import { toast } from '../src/components/ui/use-toast';
+import { toast } from '../src/hooks/use-toast';
 
 describe('toast', () => {
   it('displays a toast', () => {
