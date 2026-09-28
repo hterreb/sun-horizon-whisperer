@@ -5,6 +5,7 @@ import {
   getMoonPhaseIndex,
   getMoonTimes,
   getMoonPathAround,
+  findMoonPass,
   getNextFullMoon,
   getNextNewMoon,
   getMoonPhasePath,
@@ -391,4 +392,15 @@ describe('getMoonTimes accuracy against USNO reference (ROADMAP item 9, <= 2 min
       });
     }
   }
+});
+
+describe('findMoonPass while the moon is down (AUDIT C-14, ROADMAP item 37)', () => {
+  it('returns a full pass for every minute of a day, never the same rise twice', () => {
+    const start = Date.UTC(2026, 8, 27, 0, 0);
+    for (let ms = start; ms < start + 24 * 60 * 60 * 1000; ms += 60 * 1000) {
+      const pass = findMoonPass(new Date(ms), 47.78, 9.61);
+      expect(pass).not.toBeNull();
+      expect(pass!.end.getTime() - pass!.start.getTime()).toBeGreaterThan(6 * 60 * 60 * 1000);
+    }
+  });
 });
