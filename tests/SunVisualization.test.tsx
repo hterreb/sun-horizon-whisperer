@@ -3,13 +3,15 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect, afterEach } from 'vitest';
 import SunVisualization, {
   getAzimuthScreenFraction,
+  getCompassScreenFraction,
   getVisibleCardinalLabels,
   crossesHorizon,
   buildArcPath,
   getRainbowGeometry,
+  COMPASS_FOV_DEG,
 } from '../src/components/SunVisualization';
 
-describe('getAzimuthScreenFraction (C-3)', () => {
+describe('getAzimuthScreenFraction (C-3, static/non-compass mode)', () => {
   it('northern hemisphere: culmination (180°, South) stays centered', () => {
     expect(getAzimuthScreenFraction(180, 51)).toBeCloseTo(0.5);
   });
@@ -26,11 +28,46 @@ describe('getAzimuthScreenFraction (C-3)', () => {
     expect(getAzimuthScreenFraction(270, -33)).toBeCloseTo(0.25);
   });
 
-  it('applies a compass-mode azimuthOffset on top of the hemisphere shift (ROADMAP item 8)', () => {
-    expect(getAzimuthScreenFraction(180, 51, 0)).toBeCloseTo(getAzimuthScreenFraction(180, 51));
-    expect(getAzimuthScreenFraction(180, 51, 90)).toBeCloseTo(0.75);
-    // Wraps correctly past 360/0.
-    expect(getAzimuthScreenFraction(350, 51, 20)).toBeCloseTo((350 + 20 - 360) / 360);
+});
+
+describe('getCompassScreenFraction (ROADMAP item 19, field-of-view compass mapping)', () => {
+  it('centers the current heading at fraction 0.5', () => {
+    expect(getCompassScreenFraction(180, 180).fraction).toBeCloseTo(0.5);
+    expect(getCompassScreenFraction(180, 180).visible).toBe(true);
+  });
+
+  it('places an azimuth half the FOV clockwise of the heading at the right edge', () => {
+    const result = getCompassScreenFraction(225, 180); // +45°, half of the 90° default FOV
+    expect(result.fraction).toBeCloseTo(1);
+    expect(result.visible).toBe(true);
+  });
+
+  it('places an azimuth half the FOV counter-clockwise of the heading at the left edge', () => {
+    const result = getCompassScreenFraction(135, 180); // -45°
+    expect(result.fraction).toBeCloseTo(0);
+    expect(result.visible).toBe(true);
+  });
+
+  it('is not visible once an azimuth sits outside the field of view', () => {
+    expect(getCompassScreenFraction(280, 180).visible).toBe(false); // +100°, > 45° away
+    expect(getCompassScreenFraction(80, 180).visible).toBe(false); // -100°
+  });
+
+  it('has no wrap jump across 0°/360° - the short way is always used', () => {
+    // Heading close to North; an azimuth just the other side of the 0°/360° wrap is
+    // a short distance away, not almost all the way around.
+    const result = getCompassScreenFraction(355, 10);
+    expect(result.visible).toBe(true);
+    expect(result.fraction).toBeLessThan(0.5);
+  });
+
+  it('respects a custom field of view', () => {
+    expect(getCompassScreenFraction(215, 180, 60).visible).toBe(false); // +35°, outside a 60° FOV (half = 30°)
+    expect(getCompassScreenFraction(215, 180, 120).visible).toBe(true); // inside a 120° FOV (half = 60°)
+  });
+
+  it('COMPASS_FOV_DEG defaults to 90°, tunable on real devices', () => {
+    expect(COMPASS_FOV_DEG).toBe(90);
   });
 });
 
@@ -52,9 +89,17 @@ describe('getVisibleCardinalLabels (ROADMAP item 8, C-8 style label visibility p
     expect(labels.every((l) => Number.isFinite(l.fraction))).toBe(true);
   });
 
-  it('shifts together with a compass-mode azimuthOffset', () => {
-    const withOffset = getVisibleCardinalLabels(51, 90);
-    expect(withOffset.find((l) => l.label === 'N')?.fraction).toBeCloseTo(0.25);
+  it('compass mode (ROADMAP item 19): only labels within the field of view are returned', () => {
+    // Heading due South (180°): only S (0°) and the two neighbors within ±45° remain.
+    const labels = getVisibleCardinalLabels(51, 180);
+    expect(labels.map((l) => l.label)).toEqual(['SE', 'S', 'SW']);
+    expect(labels.find((l) => l.label === 'S')?.fraction).toBeCloseTo(0.5);
+  });
+
+  it('compass mode: labels pan together as the heading turns', () => {
+    const labels = getVisibleCardinalLabels(51, 90); // facing East
+    expect(labels.map((l) => l.label)).toEqual(['NE', 'E', 'SE']);
+    expect(labels.find((l) => l.label === 'E')?.fraction).toBeCloseTo(0.5);
   });
 });
 
@@ -168,9 +213,15 @@ describe('getRainbowGeometry (ROADMAP item 10)', () => {
     expect(geometry.xFraction).toBeCloseTo(getAzimuthScreenFraction(270, 51));
   });
 
-  it('pans together with a compass-mode azimuthOffset', () => {
-    const withOffset = getRainbowGeometry(true, 10, 90, 51, 45);
-    expect(withOffset.xFraction).toBeCloseTo(getAzimuthScreenFraction(270, 51, 45));
+  it('compass mode: pans together with the heading and hides outside the field of view (ROADMAP item 19)', () => {
+    // Sun azimuth 90° -> opposite is 270°; facing that same direction keeps it centered.
+    const centered = getRainbowGeometry(true, 10, 90, 51, 270);
+    expect(centered.visible).toBe(true);
+    expect(centered.xFraction).toBeCloseTo(0.5);
+
+    // Facing due North instead puts the rainbow (at 270°) outside the 90° FOV.
+    const hidden = getRainbowGeometry(true, 10, 90, 51, 0);
+    expect(hidden.visible).toBe(false);
   });
 });
 
@@ -233,5 +284,40 @@ describe('SunVisualization (rendered): static cardinal direction labels (ROADMAP
     const strokes = Array.from(paths).map((p) => p.getAttribute('stroke'));
     expect(strokes).toContain('hsl(var(--brand-sunset))'); // the sun arc
     expect(strokes).not.toContain('hsl(var(--scene-moon))'); // no moon arc while it's midday
+  });
+
+  it('shows an off-FOV hint arrow in compass mode when the sun is outside the field of view (ROADMAP item 19)', () => {
+    setMockedContainerSize(800, 600);
+    render(
+      <SunVisualization
+        sunPosition={{ azimuth: 90, altitude: 30 }}
+        moonPosition={{ azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false }}
+        sunPath={[]}
+        moonPath={[]}
+        timeOfDay="midday"
+        weatherType="clear"
+        latitude={51}
+        compassHeading={270} // facing the opposite direction from the sun
+      />
+    );
+
+    expect(screen.getByTestId('compass-off-fov-hint')).toBeInTheDocument();
+  });
+
+  it('shows no off-FOV hint outside compass mode', () => {
+    setMockedContainerSize(800, 600);
+    render(
+      <SunVisualization
+        sunPosition={{ azimuth: 90, altitude: 30 }}
+        moonPosition={{ azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false }}
+        sunPath={[]}
+        moonPath={[]}
+        timeOfDay="midday"
+        weatherType="clear"
+        latitude={51}
+      />
+    );
+
+    expect(screen.queryByTestId('compass-off-fov-hint')).not.toBeInTheDocument();
   });
 });
