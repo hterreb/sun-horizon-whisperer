@@ -57,6 +57,10 @@ supabase/functions/ Stripe subscription Edge Functions (Deno, not yet wired to t
 - **Open-Meteo** (`api.open-meteo.com`) — current weather. No API key. The app sends your exact latitude/longitude.
 - **BigDataCloud** (`api.bigdatacloud.net`) — reverse geocoding (place name for your coordinates). No API key. The app sends your exact latitude/longitude.
 - Lo-fi radio streams — third-party internet radio endpoints played through an `<audio>` element.
+- **Sentry** (sentry.io, org `ainabler`, project `sun-chaser`) — error reports and anonymous feedback (no name, email or screenshot). No tracing, no replay. Location query values (`latitude`, `longitude`, `lat`, `lon`, `name`) are removed before sending (`src/utils/sentryScrub.ts`).
+  - Run `npm run setup:keys` to enter both keys (hidden input). They go to `.env.local` (gitignored) and, if you want, to the GitHub Actions secrets.
+  - `VITE_SENTRY_DSN` — set at build time to turn Sentry on. Without it, the app sends nothing to Sentry.
+  - `SENTRY_AUTH_TOKEN` — CI only. When set, `npm run build` uploads hidden source maps and then deletes them from `dist/`. Never commit it.
 
 ## PWA notes
 

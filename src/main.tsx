@@ -1,10 +1,54 @@
-
 import { createRoot } from 'react-dom/client'
+import * as Sentry from '@sentry/react'
 import App from './App.tsx'
 import './index.css'
 import { registerSW } from 'virtual:pwa-register'
+import { scrubLocation } from './utils/sentryScrub'
 
-createRoot(document.getElementById("root")!).render(<App />);
+// Error reports + anonymous feedback (ROADMAP item 21). Off when no DSN is set
+// (local dev, tests). No tracing, no replay, no user identity, no coordinates.
+const sentryDsn = import.meta.env.VITE_SENTRY_DSN
+if (sentryDsn) {
+  Sentry.init({
+    dsn: sentryDsn,
+    environment: import.meta.env.MODE,
+    // Sentry v11 replaced sendDefaultPii with dataCollection: collect no user info,
+    // cookies, headers or bodies, and drop the location query params.
+    dataCollection: {
+      userInfo: false,
+      cookies: false,
+      httpHeaders: false,
+      httpBodies: [],
+      urlQueryParams: { deny: ['latitude', 'longitude', 'lat', 'lon', 'name'] },
+    },
+    beforeSend: (event) => scrubLocation(event),
+    beforeBreadcrumb: (breadcrumb) => scrubLocation(breadcrumb),
+    integrations: [
+      Sentry.feedbackIntegration({
+        autoInject: false, // opened from the InfoPanel, so no floating button over the scene
+        showName: false,
+        showEmail: false,
+        isNameRequired: false,
+        isEmailRequired: false,
+        enableScreenshot: false, // a screenshot would show the location in the InfoPanel
+        showBranding: false,
+      }),
+    ],
+  })
+}
+
+const errorFallback = (
+  <div className="h-dvh flex flex-col items-center justify-center gap-4 bg-background text-foreground">
+    <p>Something went wrong.</p>
+    <button className="underline" onClick={() => window.location.reload()}>Reload</button>
+  </div>
+)
+
+createRoot(document.getElementById("root")!).render(
+  <Sentry.ErrorBoundary fallback={errorFallback}>
+    <App />
+  </Sentry.ErrorBoundary>
+);
 
 // Register PWA service worker with immediate updates
 const updateSW = registerSW({
