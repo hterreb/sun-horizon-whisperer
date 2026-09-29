@@ -543,7 +543,7 @@ A visual review of `main` at `6da35c1`. The method: 47 scene states in headless 
 - **Order:** 46 → 50 → 53, because each one changes the sky or the sun that the next one tints. The other items are independent.
 - **Rule:** all motion stays slow and calm (see item 10).
 
-### 46. A filled sun that shows in golden hour — S — R2, R20
+### 46. A filled sun that shows in golden hour — S — R2, R20 — **✅ Done**
 
 - **Now:** the sun is the lucide `Sun` outline icon, `strokeWidth={1}` (`SunVisualization.tsx:859`). Between 0° and 10° it is `text-orange-400` (`getSunColor`), so on the orange evening sky only the glow shows. At +2.4° and +4.9° the sun is not visible.
 - **Spec:**
@@ -551,6 +551,7 @@ A visual review of `main` at `6da35c1`. The method: 47 scene states in headless 
   - Colour per altitude band: above 10° a pale warm white-yellow; 0–10° a deep gold-to-red that is darker and more saturated than the sky behind it; below 0° (the upper limb) deep red. Add the colours as `--scene-sun-*` tokens in `index.css`.
   - Keep the halo, the `drop-shadow` glow and `animate-glow`.
 - **Done when:** in the browser at 18:30 and 18:45 (Ravensburg, clear), the disc is clearly visible against the evening sky. A test checks the colour token per altitude band.
+- **Built:** the sun is a 56 px filled disc with a soft 6 px rim shadow, over the halo. The halo, the `drop-shadow` glow and `animate-glow` stay. `getSunDiscToken` sets the fill: `--scene-sun-high` (pale white-yellow) above 10°, `--scene-sun-low` (deep red-orange) from 0° to 10°, `--scene-sun-horizon` (deep red) below 0°. At 18:30 (+4.9°) and 18:45 (+2.4°) the disc is clearly visible on the orange sky.
 
 ### 47. Collapsed panel: hide "Change location" — S — R3
 
@@ -558,13 +559,14 @@ A visual review of `main` at `6da35c1`. The method: 47 scene states in headless 
 - **Spec:** show "Change location" only when the panel is expanded. Keep the title and the place when it is collapsed.
 - **Done when:** at 360 and 390 px, the collapsed panel is at most `COLLAPSED_PANEL_HEIGHT` tall for every time-of-day title, including "Astronomical Twilight". A test checks that the link does not render in the collapsed state.
 
-### 48. Sun altitude pill: no "-0.0°", hidden at night — S — R4, R14
+### 48. Sun altitude pill: no "-0.0°", hidden at night — S — R4, R14 — **✅ Done**
 
 - **Now:** the pill shows `altitude.toFixed(1)` (`SunVisualization.tsx:1036`), so a value just below 0 reads "-0.0°". It shows at night too (for example "-37.1°"), next to the "Moon:" line.
 - **Spec:**
   - When the rounded value is 0, show "0.0°" (no sign).
   - Hide the pill when `timeOfDay` is `night`. It stays in twilight, when the sun is still near the horizon.
 - **Done when:** tests: −0.04° gives "0.0°", +0.04° gives "0.0°", −3.1° gives "-3.1°". The pill does not render at night.
+- **Built:** `formatSunAltitude` gives "0.0°" when the rounded value is 0, and "+" only for positive values. The pill does not render when `timeOfDay` is `night`, and stays in twilight.
 
 ### 49. Frost: one threshold and a visible icy edge — S — R5
 
@@ -611,11 +613,12 @@ A visual review of `main` at `6da35c1`. The method: 47 scene states in headless 
   - **Reflection:** replace the ladder of short dashes (`data-testid="water-reflection"`) with a soft glitter strip under the sun or the moon. The strip is a vertical band about the width of the disc, getting narrower and fainter with depth, made of short, blurred horizontal highlights. It shimmers slowly (a 4–6 s cycle, opacity only). With reduced motion it stays still.
 - **Done when:** a test checks that the water colours come from the sky gradient for each `timeOfDay`. In the browser at 07:25, 18:45 and 19:20, the water is warm or lilac like the sky above it, and the reflection reads as light on water.
 
-### 54. Moon line a few pixels lower — S — R13
+### 54. Moon line a few pixels lower — S — R13 — **✅ Done**
 
 - **Now:** the "Moon: 22.7° | 80%" line (`SunVisualization.tsx:1043`, `bottom-1/4 -translate-y-12`) touches the SE, S and SW compass chips.
 - **Spec:** move the moon line down until there are at least 6 px between it and the bottom of the compass chips at 360, 390 and 1280 px. Leave all other horizon labels as they are.
 - **Done when:** in the browser at 22:30 at those widths, the moon line and the chips do not touch.
+- **Built:** the moon line is now anchored 30 px below the horizon line (`top-[calc(65%+30px)]`), not to the bottom of the screen. The gap to the chips is 11 px at 360, 390 and 1280 px.
 
 ### 55. The panel opens collapsed on a phone — S — R21
 
