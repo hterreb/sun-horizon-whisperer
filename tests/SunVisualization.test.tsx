@@ -15,6 +15,8 @@ import SunVisualization, {
   COMPASS_FOV_DEG,
   buildTerrainSegments,
   avoidCollapsedPanel,
+  getSunDiscToken,
+  formatSunAltitude,
 } from '../src/components/SunVisualization';
 import type { HorizonProfile } from '../src/utils/horizonUtils';
 import { getSunTimes, formatTime } from '../src/utils/sunUtils';
@@ -769,5 +771,43 @@ describe('avoidCollapsedPanel (AUDIT C-15, ROADMAP item 38)', () => {
   it('uses the lower panel position below 364 px width', () => {
     expect(avoidCollapsedPanel({ x: 200, y: 89 }, 360)).toEqual({ x: 200, y: 89 });
     expect(avoidCollapsedPanel({ x: 200, y: 200 }, 360)).toEqual({ x: 200, y: 287 });
+  });
+});
+
+describe('sun disc and altitude pill (ROADMAP items 46, 48)', () => {
+  const baseProps = {
+    sunPosition: { azimuth: 180, altitude: 30 },
+    moonPosition: { azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false },
+    sunPath: [],
+    moonPath: [],
+    timeOfDay: 'midday' as const,
+    weatherType: 'clear' as const,
+    latitude: 51,
+  };
+
+  it('picks the sun disc colour token per altitude band', () => {
+    expect(getSunDiscToken(30)).toBe('--scene-sun-high');
+    expect(getSunDiscToken(4.9)).toBe('--scene-sun-low');
+    expect(getSunDiscToken(-0.3)).toBe('--scene-sun-horizon');
+  });
+
+  it('fills the sun dot with the band token', () => {
+    render(<SunVisualization {...baseProps} sunPosition={{ azimuth: 270, altitude: 2.4 }} timeOfDay="evening" />);
+    expect(screen.getByTestId('sun-dot').style.background).toContain('--scene-sun-low');
+  });
+
+  it('never shows "-0.0°"', () => {
+    expect(formatSunAltitude(-0.04)).toBe('0.0°');
+    expect(formatSunAltitude(0.04)).toBe('0.0°');
+    expect(formatSunAltitude(-3.1)).toBe('-3.1°');
+    expect(formatSunAltitude(12.34)).toBe('+12.3°');
+  });
+
+  it('hides the altitude pill at night and keeps it in twilight', () => {
+    const { unmount } = render(<SunVisualization {...baseProps} sunPosition={{ azimuth: 330, altitude: -37.1 }} timeOfDay="night" />);
+    expect(screen.queryByTestId('sun-altitude')).not.toBeInTheDocument();
+    unmount();
+    render(<SunVisualization {...baseProps} sunPosition={{ azimuth: 290, altitude: -8 }} timeOfDay="nautical-twilight" />);
+    expect(screen.getByTestId('sun-altitude')).toHaveTextContent('-8.0°');
   });
 });

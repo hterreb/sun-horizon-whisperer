@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { Sun, ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp } from 'lucide-react';
 import { type SunPosition, type TimeOfDay, formatTime } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
 import { getSunArcLabels, getMoonArcLabels, type ArcLabels, type ArcLabelPoint } from '../utils/arcLabels';
@@ -432,6 +432,19 @@ export const avoidCollapsedPanel = <T extends { x: number; y: number }>(label: T
   return covered ? { ...label, y: box.bottom + ARC_LABEL_HEIGHT / 2 + 4 } : label;
 };
 
+// Sun disc fill token per altitude band (ROADMAP item 46).
+// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
+export const getSunDiscToken = (altitude: number): string =>
+  altitude > 10 ? '--scene-sun-high' : altitude > 0 ? '--scene-sun-low' : '--scene-sun-horizon';
+
+// Sun altitude pill text (ROADMAP item 48): a value that rounds to 0 reads "0.0°", never "-0.0°".
+// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
+export const formatSunAltitude = (altitude: number): string => {
+  const text = altitude.toFixed(1);
+  if (Number(text) === 0) return '0.0°';
+  return altitude > 0 ? `+${text}°` : `${text}°`;
+};
+
 const ARC_LABEL_ICONS: Record<ArcLabelKind, typeof Sunrise> = {
   rise: Sunrise,
   zenith: ArrowUp,
@@ -620,16 +633,6 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     () => (moonArcPath ? getArcLabelGeometry(moonArcLabels, latitude, compassHeading) : []),
     [moonArcPath, moonArcLabels, latitude, compassHeading]
   );
-
-  const getSunColor = () => {
-    if (sunPosition.altitude > 10) {
-      return 'text-yellow-300';
-    } else if (sunPosition.altitude > 0) {
-      return 'text-orange-400';
-    } else {
-      return 'text-amber-600';
-    }
-  };
 
   // Sun glow color, by altitude band (ROADMAP item 15 D polish: the style book's
   // soft glowing sun) - the same 3 tokens/bands as getGlowIntensity below, also used
@@ -846,18 +849,21 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       )}
 
       {isSunVisible && (
+        // A filled disc with a soft rim, no rays (ROADMAP item 46, direction D's soft glowing sun).
         <div
           data-testid="sun-dot"
-          className={`absolute ${compassActive ? '' : 'transition-transform duration-1000'} ${getSunColor()} ${getGlowIntensity()} animate-glow`}
+          className={`absolute rounded-full ${compassActive ? '' : 'transition-transform duration-1000'} ${getGlowIntensity()} animate-glow`}
           style={{
             left: `${sunX}px`,
             top: `${sunY}px`,
+            width: 56,
+            height: 56,
             transform: 'translate(-50%, -50%)',
-            opacity: weatherType === 'rain' ? 0.7 : 1
+            opacity: weatherType === 'rain' ? 0.7 : 1,
+            background: `hsl(var(${getSunDiscToken(sunPosition.altitude)}))`,
+            boxShadow: `0 0 6px 2px hsl(var(${getSunDiscToken(sunPosition.altitude)}) / 0.6)`
           }}
-        >
-          <Sun size={sunPosition.altitude > 0 ? 96 : 80} strokeWidth={1} />
-        </div>
+        />
       )}
 
       {offFovHintSide && (
@@ -1028,19 +1034,21 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         </div>
       )}
 
-      <div
-        className="absolute left-1/2 transform -translate-x-1/2 bottom-1/3 -translate-y-12
-                   bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm"
-      >
-        {sunPosition.altitude > 0
-          ? `+${sunPosition.altitude.toFixed(1)}°`
-          : `${sunPosition.altitude.toFixed(1)}°`
-        }
-      </div>
+      {timeOfDay !== 'night' && (
+        <div
+          data-testid="sun-altitude"
+          className="absolute left-1/2 transform -translate-x-1/2 bottom-1/3 -translate-y-12
+                     bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm"
+        >
+          {formatSunAltitude(sunPosition.altitude)}
+        </div>
+      )}
 
       {isMoonVisible && (
+        // Anchored to the horizon line (65 %) below the compass chips, so it keeps a gap
+        // to them at every screen height (ROADMAP item 54).
         <div
-          className="absolute left-1/2 transform -translate-x-1/2 bottom-1/4 -translate-y-12
+          className="absolute left-1/2 transform -translate-x-1/2 top-[calc(65%+30px)]
                      bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-xs"
         >
           Moon: {moonPosition.altitude.toFixed(1)}° | {(moonPosition.illumination * 100).toFixed(0)}%
