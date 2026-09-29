@@ -595,7 +595,7 @@ A visual review of `main` at `6da35c1`. The method: 47 scene states in headless 
   - Keep the lightning (`WeatherEffects.tsx`).
 - **Done when:** in the browser at 15:00 with code 95, no blue sky shows through the deck, and the water is darker than in rain.
 
-### 52. Stars: dimmed by clouds and fewer in twilight — S — R8, R23
+### 52. Stars: dimmed by clouds and fewer in twilight — S — R8, R23 — **✅ Done**
 
 - **Now:** `NightStars` gets only `timeOfDay` and `moonPosition`. In nautical and astronomical twilight each star has 60 % opacity, so the sky has the same number of stars as at night. Under overcast, rain, snow, fog and storms all stars shine.
 - **Spec:**
@@ -604,6 +604,7 @@ A visual review of `main` at `6da35c1`. The method: 47 scene states in headless 
   - **Twilight:** nautical shows only the brightest 15 % of the stars at 40 %, astronomical the brightest 50 % at 70 %, night all of them. No shooting stars in twilight.
   - The rain streaks and snowflakes stay visible at night.
 - **Done when:** tests for the opacity per weather type and the star share per twilight phase. In the browser at 22:30, overcast and rain show no stars. At 19:55 (nautical) only a few stars show.
+- **Built:** `SunTracker` passes `weatherType` and `cloudCoverPercent` to `NightStars`. Two pure helpers in `weatherEffectsUtils.ts` set the values: `getStarCloudFactor` gives the cloud factor, and `getTwilightStars` gives the star share and opacity per phase. A star shows when its `brightness` is in the top share. Shooting stars show only at night. When the factor is 0, the canvas stays empty and no animation loop runs. Drizzle counts as covered (0), the same as rain.
 
 ### 53. The water follows the sky — M — R11, R12
 
@@ -626,11 +627,12 @@ A visual review of `main` at `6da35c1`. The method: 47 scene states in headless 
 - **Spec:** start collapsed when the window is narrower than 640 px (Tailwind `sm`). Wider screens start expanded, as now. Read the width once, at mount. Do not follow resizes.
 - **Done when:** tests: at 390 px the panel starts collapsed, at 1280 px it starts expanded.
 
-### 56. Heat shimmer that can be seen — S — R24
+### 56. Heat shimmer that can be seen — S — R24 — **✅ Done**
 
 - **Now:** above 30 °C (`showHeatShimmer`, `WeatherEffects.tsx:101`) there is almost no visible change. Only the sun glow looks larger.
 - **Spec:** a band about 40 px high just above the horizon, with a slow vertical wave distortion (an SVG `feTurbulence` + `feDisplacementMap` filter on a copy of the horizon strip, or a CSS mask with a slow translate). A 6–8 s cycle. Only in daylight, as now. With reduced motion: a still, pale haze band.
 - **Done when:** at 35 °C and 14:00 in the browser, the shimmer over the ridge can be seen in a screenshot, and it moves slowly.
+- **Built:** `WeatherEffects` draws a 40 px SVG band on the horizon: a pale haze gradient plus thin light lines. An `feTurbulence` + `feDisplacementMap` filter bends the lines, and an `feOffset` moves the noise over a 7 s cycle. With reduced motion, only the still haze shows. The old CSS keyframes are removed.
 
 ---
 
