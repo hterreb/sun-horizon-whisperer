@@ -92,6 +92,38 @@ describe('NightStars', () => {
     ctxSpy.mockRestore();
   });
 
+  // Reduced motion draws each shown star exactly once, so arc() calls count the stars.
+  const countStars = (props: Partial<React.ComponentProps<typeof NightStars>>) => {
+    const arc = vi.fn();
+    const ctxSpy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      clearRect: () => {}, beginPath: () => {}, arc, fill: () => {},
+    } as unknown as CanvasRenderingContext2D);
+    const mediaSpy = mockReducedMotion(true);
+    const { unmount } = render(<NightStars timeOfDay="night" {...props} />);
+    unmount();
+    ctxSpy.mockRestore();
+    mediaSpy.mockRestore();
+    return arc.mock.calls.length;
+  };
+
+  it('shows all stars at night, the brightest half in astronomical and ~15 % in nautical twilight (ROADMAP item 52)', () => {
+    expect(countStars({ timeOfDay: 'night' })).toBe(300);
+    const astro = countStars({ timeOfDay: 'astronomical-twilight' });
+    expect(astro).toBeGreaterThan(110);
+    expect(astro).toBeLessThan(190);
+    const nautical = countStars({ timeOfDay: 'nautical-twilight' });
+    expect(nautical).toBeGreaterThan(15);
+    expect(nautical).toBeLessThan(80);
+  });
+
+  it('shows no stars under a covered sky (ROADMAP item 52)', () => {
+    for (const weatherType of ['overcast', 'fog', 'rain', 'snow', 'storm', 'hail'] as const) {
+      expect(countStars({ weatherType })).toBe(0);
+    }
+    expect(countStars({ weatherType: 'rain', cloudCoverPercent: 100 })).toBe(0);
+    expect(countStars({ weatherType: 'partly', cloudCoverPercent: 30 })).toBe(300);
+  });
+
   it('draws stars statically without starting the animation loop when reduced motion is preferred (A-2)', () => {
     const ctxSpy = mockCanvasContext();
     const mediaSpy = mockReducedMotion(true);

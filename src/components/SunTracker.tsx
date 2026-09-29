@@ -576,7 +576,7 @@ const SunTracker: React.FC = () => {
       }`} 
       style={getBackgroundStyle()}
     >
-      <NightStars timeOfDay={timeOfDay} moonPosition={moonPosition} />
+      <NightStars timeOfDay={timeOfDay} moonPosition={moonPosition} weatherType={weatherType} cloudCoverPercent={weatherData?.cloudCoverPercent} />
       {reveal === 'done' && (
         <>
           <MusicPlayer isFullscreen={isFullscreen} />
