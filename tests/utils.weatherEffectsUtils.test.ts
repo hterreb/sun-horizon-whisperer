@@ -1,4 +1,4 @@
-import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat } from '../src/utils/weatherEffectsUtils';
+import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, getStarCloudFactor, getTwilightStars } from '../src/utils/weatherEffectsUtils';
 
 describe('getWeatherEffects (ROADMAP item 10)', () => {
   it('shows fog only for the fog type', () => {
@@ -94,5 +94,36 @@ describe('pickBoat (ROADMAP item 36)', () => {
   it('keeps the rowboat ashore above 40 km/h wind', () => {
     expect(picks('clear', 41).has('rowboat')).toBe(false);
     expect(picks('clear', 40).has('rowboat')).toBe(true);
+  });
+});
+
+describe('getStarCloudFactor (ROADMAP item 52)', () => {
+  it('dims the stars by the measured cloud cover', () => {
+    expect(getStarCloudFactor('clear', 0)).toBe(1);
+    expect(getStarCloudFactor('partly', 25)).toBe(0.75);
+    expect(getStarCloudFactor('overcast', 100)).toBe(0);
+  });
+
+  it('falls back to the weather type without a cover value', () => {
+    expect(getStarCloudFactor('clear', null)).toBe(1);
+    expect(getStarCloudFactor('partly', null)).toBe(0.8);
+    expect(getStarCloudFactor('cloudy', undefined)).toBe(0.4);
+    for (const type of ['overcast', 'fog', 'drizzle', 'rain', 'snow', 'storm', 'hail'] as const) {
+      expect(getStarCloudFactor(type, null)).toBe(0);
+    }
+  });
+});
+
+describe('getTwilightStars (ROADMAP item 52)', () => {
+  it('shows all stars at night, the brightest half in astronomical and 15 % in nautical twilight', () => {
+    expect(getTwilightStars('night')).toEqual({ share: 1, opacity: 1 });
+    expect(getTwilightStars('astronomical-twilight')).toEqual({ share: 0.5, opacity: 0.7 });
+    expect(getTwilightStars('nautical-twilight')).toEqual({ share: 0.15, opacity: 0.4 });
+  });
+
+  it('shows no stars from civil twilight on', () => {
+    for (const t of ['civil-twilight', 'dawn', 'midday', 'evening'] as const) {
+      expect(getTwilightStars(t).share).toBe(0);
+    }
   });
 });

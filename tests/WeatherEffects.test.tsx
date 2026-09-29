@@ -78,10 +78,28 @@ describe('WeatherEffects (ROADMAP item 10)', () => {
 
   it('shows heat shimmer above 30°C, not at/below it', () => {
     const { container, rerender } = render(<WeatherEffects {...baseProps} weatherType="clear" temperatureC={31} />);
-    expect(container.querySelector('[style*="heat-shimmer"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="heat-shimmer"]')).not.toBeNull();
 
     rerender(<WeatherEffects {...baseProps} weatherType="clear" temperatureC={30} />);
-    expect(container.querySelector('[style*="heat-shimmer"]')).toBeNull();
+    expect(container.querySelector('[data-testid="heat-shimmer"]')).toBeNull();
+  });
+
+  it('draws the heat shimmer as a 40 px band above the horizon with a slow 7 s wave (ROADMAP item 56)', () => {
+    const { container } = render(<WeatherEffects {...baseProps} weatherType="clear" temperatureC={35} />);
+    const band = container.querySelector('[data-testid="heat-shimmer"]') as SVGSVGElement;
+    expect(band.getAttribute('height')).toBe('40');
+    expect(band.style.top).toBe(`${baseProps.containerHeight * 0.65 - 40}px`);
+    expect(band.querySelector('animate')?.getAttribute('dur')).toBe('7s');
+    expect(band.querySelector('[filter="url(#heat-wave)"]')).not.toBeNull();
+  });
+
+  it('keeps only a still haze band for the heat shimmer under reduced motion (ROADMAP item 56)', () => {
+    const mediaSpy = mockReducedMotion(true);
+    const { container } = render(<WeatherEffects {...baseProps} weatherType="clear" temperatureC={35} />);
+    const band = container.querySelector('[data-testid="heat-shimmer"]') as SVGSVGElement;
+    expect(band).not.toBeNull();
+    expect(band.querySelector('[filter="url(#heat-wave)"]')).toBeNull();
+    mediaSpy.mockRestore();
   });
 
   it('renders a rainbow arc when visible, positioned by xFraction/apexHeightDeg', () => {

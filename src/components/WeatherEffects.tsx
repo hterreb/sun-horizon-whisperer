@@ -28,6 +28,10 @@ const LIGHTNING_FLASH_DURATION_MS = 150;
 const RAINBOW_BANDS = ['#dc2626', '#f97316', '#eab308', '#22c55e', '#0ea5e9', '#7c3aed'];
 const RAINBOW_BAND_GAP_PX = 7;
 
+// Heat shimmer (ROADMAP item 56): a band just above the horizon with thin pale lines,
+// bent by a slowly drifting turbulence field (one 7 s cycle).
+const HEAT_SHIMMER_BAND_PX = 40;
+
 // The illustrations from ROADMAP item 10 that aren't part of the spawning "living
 // scene" (that's CloudLayer): fog low over the horizon, storm lightning, heat shimmer
 // and the rainbow. All scene elements stay at z <= 10 (see ROADMAP item 1).
@@ -97,18 +101,40 @@ const WeatherEffects: React.FC<WeatherEffectsProps> = ({
         <div className="absolute inset-0 bg-white" style={{ opacity: 0.35 }} />
       )}
 
-      {/* Heat shimmer (> 30°C): a subtle, very slow haze band above the horizon. */}
-      {effects.showHeatShimmer && containerHeight > 0 && (
-        <div
-          className="absolute left-0 right-0"
-          style={{
-            top: `${horizonY - containerHeight * 0.08}px`,
-            height: `${containerHeight * 0.06}px`,
-            background: 'linear-gradient(to top, rgba(255,196,120,0.22), transparent)',
-            filter: 'blur(2px)',
-            animation: prefersReducedMotion ? 'none' : 'heat-shimmer 6s ease-in-out infinite'
-          }}
-        />
+      {/* Heat shimmer (> 30°C): a pale haze band over the horizon with wavy heat lines.
+          Reduced motion: only the still haze. */}
+      {effects.showHeatShimmer && containerWidth > 0 && containerHeight > 0 && (
+        <svg
+          data-testid="heat-shimmer"
+          className="absolute left-0"
+          width={containerWidth}
+          height={HEAT_SHIMMER_BAND_PX}
+          style={{ top: `${horizonY - HEAT_SHIMMER_BAND_PX}px` }}
+        >
+          <defs>
+            <linearGradient id="heat-haze" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0" stopColor="#fff3e0" stopOpacity="0.5" />
+              <stop offset="1" stopColor="#fff3e0" stopOpacity="0" />
+            </linearGradient>
+            <mask id="heat-fade">
+              <rect width="100%" height="100%" fill="url(#heat-haze)" />
+            </mask>
+            <pattern id="heat-lines" width="10" height="5" patternUnits="userSpaceOnUse">
+              <rect width="10" height="1.5" fill="#fff" />
+            </pattern>
+            <filter id="heat-wave">
+              <feTurbulence type="fractalNoise" baseFrequency="0.02 0.15" numOctaves="1" seed="4" />
+              <feOffset result="drift">
+                <animate attributeName="dx" values="0;40;0" dur="7s" repeatCount="indefinite" />
+              </feOffset>
+              <feDisplacementMap in="SourceGraphic" in2="drift" scale="8" xChannelSelector="R" yChannelSelector="G" />
+            </filter>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#heat-haze)" />
+          {!prefersReducedMotion && (
+            <rect width="100%" height="100%" fill="url(#heat-lines)" filter="url(#heat-wave)" mask="url(#heat-fade)" />
+          )}
+        </svg>
       )}
 
       {/* Rainbow: opposite the sun, clipped to the sky above the horizon so only the
@@ -134,13 +160,6 @@ const WeatherEffects: React.FC<WeatherEffectsProps> = ({
           </svg>
         </div>
       )}
-
-      <style>{`
-        @keyframes heat-shimmer {
-          0%, 100% { transform: translateY(0); opacity: 0.75; }
-          50% { transform: translateY(-3px); opacity: 1; }
-        }
-      `}</style>
     </div>
   );
 };
