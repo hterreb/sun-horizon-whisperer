@@ -127,6 +127,11 @@ describe('CloudLayer', () => {
       expect(container.textContent).not.toContain('🦇');
     });
 
+    it('flies bats right after sunset, in civil twilight (ROADMAP item 40)', () => {
+      const container = spawn({ timeOfDay: 'civil-twilight' }, 6000);
+      expect(container.querySelector('[data-testid="scene-bat"]')).not.toBeNull();
+    });
+
     it('keeps the sky quiet in full night: no bats, no birds', () => {
       const container = spawn({ timeOfDay: 'night' }, 6000);
       expect(container.querySelector('[data-testid="scene-bat"]')).toBeNull();
@@ -151,9 +156,30 @@ describe('CloudLayer', () => {
     });
 
     it('can have more than one boat on the lake at once', () => {
-      // Two spawns 30 s apart, within the 46 s a near boat takes to cross.
-      const container = spawn({}, 40000);
+      // Two spawns 55 s apart, within the 97 s a near sailboat takes to cross.
+      const container = spawn({}, 70000);
       expect(container.querySelectorAll('[data-testid="scene-boat"]').length).toBe(2);
+    });
+
+    it('never has more than 3 boats out at once (ROADMAP item 40)', () => {
+      // Spawns at ~5, 60, 115 and 170 s; no boat finishes its crossing in the test.
+      const container = spawn({}, 180000);
+      expect(container.querySelectorAll('[data-testid="scene-boat"]').length).toBe(3);
+    });
+
+    it('sails each boat type at its own speed (ROADMAP item 40)', () => {
+      // Near boats (depth 0) cross 116 % of the width: a sailboat at 1.2 %/s, a ferry at 1.8 %/s.
+      const crossingSec = (props: Partial<React.ComponentProps<typeof CloudLayer>>) => {
+        const wrapper = spawn(props, 6000).querySelector('[data-testid="scene-boat"]')?.parentElement?.parentElement as HTMLElement;
+        return parseFloat(wrapper.style.animation.split(' ')[1]);
+      };
+      expect(crossingSec({})).toBeCloseTo(116 / 1.2, 1);
+      expect(crossingSec({ weatherType: 'rain' })).toBeCloseTo(116 / 1.8, 1);
+    });
+
+    it('draws fish smaller than the boats (ROADMAP item 40)', () => {
+      const container = spawn({}, 9000);
+      expect(container.querySelector('[data-testid="scene-fish"]')?.getAttribute('width')).toBe('20');
     });
 
     it('sails near boats lower in fullscreen, where the chrome fades away', () => {
