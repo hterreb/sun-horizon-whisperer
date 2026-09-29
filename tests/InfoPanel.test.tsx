@@ -72,7 +72,7 @@ describe('InfoPanel', () => {
     expect(panel.className).toContain('max-h-dvh');
   });
 
-  it('shows a frost edge below -5°C, not otherwise (ROADMAP item 10)', () => {
+  it('shows the frost edge and crystals below -5°C, not otherwise (ROADMAP items 10 & 49)', () => {
     const weatherAt = (temperature: number): WeatherData => ({
       temperature,
       weatherType: 'snow',
@@ -87,12 +87,40 @@ describe('InfoPanel', () => {
     });
 
     const { container, rerender } = render(<InfoPanel {...defaultProps} weatherData={weatherAt(-6)} />);
-    let panel = container.firstChild as HTMLElement;
-    expect(panel.className).toContain('shadow-[inset_0_0_22px_4px_rgba(191,219,254,0.35)');
+    const panel = container.firstChild as HTMLElement;
+    expect(panel.className).toContain('shadow-[inset_0_0_6px_3px');
+    expect(screen.getByTestId('panel-frost')).toBeInTheDocument();
 
     rerender(<InfoPanel {...defaultProps} weatherData={weatherAt(-4)} />);
-    panel = container.firstChild as HTMLElement;
-    expect(panel.className).not.toContain('shadow-[inset_0_0_22px_4px_rgba(191,219,254,0.35)');
+    expect(panel.className).not.toContain('shadow-[inset_0_0_6px_3px');
+    expect(screen.queryByTestId('panel-frost')).not.toBeInTheDocument();
+  });
+
+  it('shows "Change location" only while the panel is expanded (ROADMAP item 47)', () => {
+    render(<InfoPanel {...defaultProps} />);
+    expect(screen.getByRole('button', { name: /change location/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText(/collapse info panel/i));
+    expect(screen.queryByRole('button', { name: /change location/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /midday/i })).toBeInTheDocument();
+  });
+
+  describe('initial collapsed state by window width (ROADMAP item 55)', () => {
+    const initialWidth = window.innerWidth;
+    const setWidth = (width: number) =>
+      Object.defineProperty(window, 'innerWidth', { value: width, configurable: true, writable: true });
+    afterEach(() => setWidth(initialWidth));
+
+    it('starts collapsed at 390 px', () => {
+      setWidth(390);
+      render(<InfoPanel {...defaultProps} />);
+      expect(screen.getByLabelText('Expand info panel')).toBeInTheDocument();
+    });
+
+    it('starts expanded at 1280 px', () => {
+      setWidth(1280);
+      render(<InfoPanel {...defaultProps} />);
+      expect(screen.getByLabelText('Collapse info panel')).toBeInTheDocument();
+    });
   });
 
   it('offers all 10 weather types in the manual picker (ROADMAP item 10)', () => {

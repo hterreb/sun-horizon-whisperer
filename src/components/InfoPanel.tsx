@@ -19,6 +19,7 @@ import {
 } from '../utils/sunUtils';
 import { type MoonPosition, type MoonTimes, getMoonPhaseLabel } from '../utils/moonUtils';
 import { type WeatherData } from '../utils/weatherUtils';
+import { getWeatherEffects } from '../utils/weatherEffectsUtils';
 import { isValidLatitude, isValidLongitude } from '../utils/manualLocation';
 import { type HorizonProfileStatus } from '../hooks/useHorizonProfile';
 import { type WeatherType } from './CloudLayer';
@@ -136,7 +137,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 }) => {
   const [locationName, setLocationName] = useState<string>('');
   const [loadingLocation, setLoadingLocation] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  // Phones (< 640 px, Tailwind `sm`) start collapsed so the first view shows the scene
+  // (ROADMAP item 55). Read once at mount; later resizes do not change it.
+  const [isCollapsed, setIsCollapsed] = useState(() => window.innerWidth < 640);
   const [isLocationFormOpen, setIsLocationFormOpen] = useState(false);
   const [latInput, setLatInput] = useState('');
   const [lonInput, setLonInput] = useState('');
@@ -350,8 +353,13 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   const shownSunrise = passSunTimes?.sunrise ?? sunTimes.sunrise;
   const shownSunset = passSunTimes?.sunset ?? sunTimes.sunset;
 
-  // Frost (< -5°C, ROADMAP item 10): a subtle, CSS-only icy edge on the panel itself.
-  const isFrost = weatherData != null && weatherData.temperature < -5;
+  // Frost (ROADMAP items 10 & 49): getWeatherEffects owns the one threshold.
+  const isFrost = getWeatherEffects({
+    type: weatherType,
+    windKmh: weatherData?.windSpeedKmh,
+    tempC: weatherData?.temperature,
+    sunAltitude: sunPosition.altitude,
+  }).showFrost;
 
   // Golden/blue hour window (ROADMAP item 20): null at polar day/night, or before
   // SunTracker has computed it yet. A window running right now is marked as such
@@ -421,11 +429,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
       className={`absolute top-0 max-[363px]:top-[calc(10rem+env(safe-area-inset-top))] right-0 z-30 w-full max-w-[min(300px,calc(100vw-2rem))] sm:w-[300px] bg-[hsl(var(--panel-background)/0.45)] backdrop-blur-md border border-[hsl(var(--panel-border)/0.14)] text-white rounded-bl-panel max-[363px]:rounded-tl-panel overflow-hidden transition-opacity duration-300 max-h-dvh max-[363px]:max-h-[calc(100dvh-10rem-env(safe-area-inset-top))] ${
         isVisible ? 'opacity-100' : 'opacity-0'
       } ${
-        // Frost (ROADMAP item 10): a subtle icy glow on the panel edges, CSS only.
-        // Only one `shadow-[...]` utility can win per element, so the frost glow
+        // Frost (ROADMAP items 10 & 49): a white-blue inner edge about 6 px wide, CSS only.
+        // Only one `shadow-[...]` utility can win per element, so the frost edge
         // (when present) replaces the plain D panel shadow rather than fighting it.
         isFrost
-          ? 'shadow-[inset_0_0_22px_4px_rgba(191,219,254,0.35),inset_0_0_2px_1px_rgba(255,255,255,0.6)]'
+          ? 'shadow-[inset_0_0_6px_3px_rgba(224,242,254,0.75),inset_0_0_0_1px_rgba(255,255,255,0.8)]'
           : 'shadow-[0_8px_30px_rgba(0,0,0,0.25)]'
       }`}
       style={{ paddingTop: 'env(safe-area-inset-top)', paddingRight: 'env(safe-area-inset-right)' }}
@@ -433,10 +441,22 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
       onFocus={handleFocus}
       onTouchStart={handleTouchStart}
     >
+      {isFrost && (
+        // Static ice crystals in two corners (ROADMAP item 49). No animation.
+        <div data-testid="panel-frost" aria-hidden="true" className="pointer-events-none">
+          {['top-1 left-1', 'bottom-1 right-1 rotate-180'].map((pos) => (
+            <svg key={pos} className={`absolute ${pos} w-5 h-5 text-sky-100/80`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+              {/* ponytail: one 3-line snowflake plus a small one, reused for both corners */}
+              <path d="M8 2v12M2.8 5l10.4 6M2.8 11l10.4-6M18 12v6M15.4 13.5l5.2 3M15.4 16.5l5.2-3" />
+            </svg>
+          ))}
+        </div>
+      )}
+
       {/* Header with toggle button */}
       <div className="p-4 pb-2 flex items-start justify-between flex-shrink-0">
         <div className="flex-1 min-w-0">
-          <h1 className="text-display font-bold tracking-tight">{getTimeOfDayLabel(timeOfDay)}</h1>
+          <h1 className="text-display leading-none font-bold tracking-tight">{getTimeOfDayLabel(timeOfDay)}</h1>
           <div className="flex items-start text-body opacity-80 mt-1">
             <MapPin size={14} className="mr-1 mt-0.5 flex-shrink-0" />
             <div className="flex flex-col min-w-0">
@@ -450,17 +470,21 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   {location.latitude.toFixed(4)}°, {location.longitude.toFixed(4)}°
                 </span>
               )}
-              <Button
-                ref={changeLocationButtonRef}
-                type="button"
-                variant="link"
-                size="sm"
-                className={`h-auto p-0 mt-1 gap-1 text-caption opacity-80 hover:opacity-100 text-white justify-start ${FOCUS_RING}`}
-                onClick={() => (isLocationFormOpen ? closeLocationForm() : openLocationForm())}
-                aria-expanded={isLocationFormOpen}
-              >
-                {isLocationFormOpen ? 'Cancel' : <>Change location<PremiumBadge /></>}
-              </Button>
+              {/* Expanded panel only (ROADMAP item 47): keeps the collapsed panel within
+                  COLLAPSED_PANEL_HEIGHT in SunVisualization.tsx. */}
+              {!isCollapsed && (
+                <Button
+                  ref={changeLocationButtonRef}
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  className={`h-auto p-0 mt-1 gap-1 text-caption opacity-80 hover:opacity-100 text-white justify-start ${FOCUS_RING}`}
+                  onClick={() => (isLocationFormOpen ? closeLocationForm() : openLocationForm())}
+                  aria-expanded={isLocationFormOpen}
+                >
+                  {isLocationFormOpen ? 'Cancel' : <>Change location<PremiumBadge /></>}
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -474,7 +498,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
         </button>
       </div>
 
-      {isLocationFormOpen && (
+      {!isCollapsed && isLocationFormOpen && (
         <form onSubmit={handleSubmitLocation} noValidate className="mx-4 mb-3 p-2 space-y-2 text-caption bg-white bg-opacity-10 rounded">
           <PlaceSearch onSelect={handleSelectPlace} />
           <div className="flex flex-col gap-1">
