@@ -552,11 +552,12 @@ A visual review of `main` at `6da35c1`. The method: 47 scene states in headless 
   - Keep the halo, the `drop-shadow` glow and `animate-glow`.
 - **Done when:** in the browser at 18:30 and 18:45 (Ravensburg, clear), the disc is clearly visible against the evening sky. A test checks the colour token per altitude band.
 
-### 47. Collapsed panel: hide "Change location" — S — R3
+### 47. Collapsed panel: hide "Change location" — S — R3 — **✅ Done**
 
 - **Now:** the collapsed panel shows the title, the place and "Change location". On a phone "Astronomical Twilight" wraps to two lines, so the panel is 145 px tall. `COLLAPSED_PANEL_HEIGHT = 112` in `SunVisualization.tsx` assumes 112 px, so the arc labels can move under the panel.
 - **Spec:** show "Change location" only when the panel is expanded. Keep the title and the place when it is collapsed.
 - **Done when:** at 360 and 390 px, the collapsed panel is at most `COLLAPSED_PANEL_HEIGHT` tall for every time-of-day title, including "Astronomical Twilight". A test checks that the link does not render in the collapsed state.
+- **Built:** `InfoPanel` renders "Change location" and its form only when the panel is expanded. Removing the link alone gave 122 px for "Astronomical Twilight", so the title also has `leading-none` (line height 28 px). Measured collapsed height at 360 and 390 px: 110 px for "Astronomical Twilight", 82 px for all one-line titles.
 
 ### 48. Sun altitude pill: no "-0.0°", hidden at night — S — R4, R14
 
@@ -566,13 +567,14 @@ A visual review of `main` at `6da35c1`. The method: 47 scene states in headless 
   - Hide the pill when `timeOfDay` is `night`. It stays in twilight, when the sun is still near the horizon.
 - **Done when:** tests: −0.04° gives "0.0°", +0.04° gives "0.0°", −3.1° gives "-3.1°". The pill does not render at night.
 
-### 49. Frost: one threshold and a visible icy edge — S — R5
+### 49. Frost: one threshold and a visible icy edge — S — R5 — **✅ Done**
 
 - **Now:** `getWeatherEffects` returns `showFrost` (`weatherEffectsUtils.ts:53`), but nothing uses it. `InfoPanel.tsx:354` checks its own `temperature < -5`. At −12 °C the icy glow on the panel cannot be seen.
 - **Spec:**
   - Use `showFrost` from `getWeatherEffects` as the only source. Remove the second `-5`.
   - Make the frost visible: a white-blue inner edge about 6 px wide on the panel, plus a few static crystal marks (CSS or an inline SVG) in two corners. No animation.
 - **Done when:** a test checks that the panel shows the frost at −6 °C and not at −4 °C. At −12 °C in the browser the frost is visible on the collapsed and on the expanded panel.
+- **Built:** `InfoPanel` calls `getWeatherEffects` and uses `showFrost`. The own `-5` check is removed. The frost shows as a white-blue inset shadow about 6 px wide and two static inline-SVG ice crystals, top left and bottom right. Checked in the browser at −12 °C at 390 and 1280 px.
 
 ### 50. Clouds dim the sun and the sky — M — R6, R9
 
@@ -617,11 +619,12 @@ A visual review of `main` at `6da35c1`. The method: 47 scene states in headless 
 - **Spec:** move the moon line down until there are at least 6 px between it and the bottom of the compass chips at 360, 390 and 1280 px. Leave all other horizon labels as they are.
 - **Done when:** in the browser at 22:30 at those widths, the moon line and the chips do not touch.
 
-### 55. The panel opens collapsed on a phone — S — R21
+### 55. The panel opens collapsed on a phone — S — R21 — **✅ Done**
 
 - **Now:** `isCollapsed` starts as `false` (`InfoPanel.tsx:139`). On a phone the open panel covers about 75 % of the screen, so the first view hides the scene.
 - **Spec:** start collapsed when the window is narrower than 640 px (Tailwind `sm`). Wider screens start expanded, as now. Read the width once, at mount. Do not follow resizes.
 - **Done when:** tests: at 390 px the panel starts collapsed, at 1280 px it starts expanded.
+- **Built:** `isCollapsed` starts as `window.innerWidth < 640`, read once at mount.
 
 ### 56. Heat shimmer that can be seen — S — R24
 
