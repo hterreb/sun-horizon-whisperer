@@ -3,6 +3,7 @@
 // separate from the components that render them so the rules are unit-testable
 // without mounting anything.
 import { type WeatherType } from '../components/CloudLayer';
+import { type TimeOfDay } from './sunUtils';
 
 export interface WeatherEffectsInput {
   type: WeatherType;
@@ -89,3 +90,20 @@ export const pickBoat = (type: WeatherType, windKmh: number | null | undefined, 
   let left = r * mix.reduce((sum, [, weight]) => sum + weight, 0);
   return (mix.find(([, weight]) => (left -= weight) < 0) ?? mix[mix.length - 1])[0];
 };
+
+// Stars behind clouds (ROADMAP item 52): the factor for star opacity. A measured cloud
+// cover wins; without one, the weather type decides.
+const STAR_CLOUD_FACTOR: Partial<Record<WeatherType, number>> = { clear: 1, partly: 0.8, cloudy: 0.4 };
+
+export const getStarCloudFactor = (type: WeatherType, cloudCoverPercent: number | null | undefined): number =>
+  cloudCoverPercent == null
+    ? STAR_CLOUD_FACTOR[type] ?? 0 // ponytail: drizzle counts as covered too, same as rain
+    : Math.min(1, Math.max(0, 1 - cloudCoverPercent / 100));
+
+// Stars in twilight (ROADMAP item 52): which share of the stars shows (the brightest
+// first) and at which opacity. Day: none.
+export const getTwilightStars = (timeOfDay: TimeOfDay): { share: number; opacity: number } =>
+  timeOfDay === 'night' ? { share: 1, opacity: 1 } :
+  timeOfDay === 'astronomical-twilight' ? { share: 0.5, opacity: 0.7 } :
+  timeOfDay === 'nautical-twilight' ? { share: 0.15, opacity: 0.4 } :
+  { share: 0, opacity: 0 };

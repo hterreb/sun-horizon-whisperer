@@ -3,10 +3,14 @@ import React, { useEffect, useRef } from 'react';
 import { type TimeOfDay } from '../utils/sunUtils';
 import { type MoonPosition } from '../utils/moonUtils';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
+import { type WeatherType } from './CloudLayer';
+import { getStarCloudFactor, getTwilightStars } from '../utils/weatherEffectsUtils';
 
 interface NightStarsProps {
   timeOfDay: TimeOfDay;
   moonPosition?: MoonPosition;
+  weatherType?: WeatherType;
+  cloudCoverPercent?: number | null;
 }
 
 interface Star {
@@ -28,11 +32,12 @@ const createStars = (width: number, height: number): Star[] =>
     brightness: Math.random(),
   }));
 
-const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition }) => {
+const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition, weatherType = 'clear', cloudCoverPercent = null }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const starsRef = useRef<Star[]>([]);
   const moonBrightnessRef = useRef(moonPosition?.illumination || 0);
   const prefersReducedMotion = usePrefersReducedMotion();
+  const cloudFactor = getStarCloudFactor(weatherType, cloudCoverPercent);
 
   // Keep the latest moon brightness in a ref so the animation effect below
   // doesn't need to depend on the moonPosition object (a new object every
@@ -67,12 +72,13 @@ const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition }) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const isNightTime = timeOfDay === 'night' ||
-                       timeOfDay === 'astronomical-twilight' ||
-                       timeOfDay === 'nautical-twilight';
+    // Twilight shows only the brightest share of the stars, dimmer; clouds dim them all.
+    const twilight = getTwilightStars(timeOfDay);
+    const skyFactor = twilight.opacity * cloudFactor;
+    const isShown = (star: Star) => star.brightness >= 1 - twilight.share;
 
-    if (!isNightTime) {
-      // Not night: clear once and don't keep an animation loop running.
+    if (skyFactor <= 0) {
+      // Day or a covered sky: clear once and don't keep an animation loop running.
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       return;
     }
@@ -82,8 +88,8 @@ const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition }) => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const moonBrightness = moonBrightnessRef.current;
       const starVisibilityFactor = 1 - (moonBrightness * 0.3);
-      starsRef.current.forEach(star => {
-        const opacity = star.baseOpacity * starVisibilityFactor * (timeOfDay === 'night' ? 1 : 0.6);
+      starsRef.current.filter(isShown).forEach(star => {
+        const opacity = star.baseOpacity * starVisibilityFactor * skyFactor;
         ctx.beginPath();
         ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
         ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
@@ -113,10 +119,9 @@ const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition }) => {
       const starVisibilityFactor = 1 - (moonBrightness * 0.3); // Moon reduces star visibility
 
       // Draw regular stars
-      starsRef.current.forEach(star => {
+      starsRef.current.filter(isShown).forEach(star => {
         const twinkle = Math.sin(time * star.twinkleSpeed + star.x) * 0.5 + 0.5;
-        const opacity = (star.baseOpacity * twinkle * starVisibilityFactor) *
-                       (timeOfDay === 'night' ? 1 : 0.6);
+        const opacity = star.baseOpacity * twinkle * starVisibilityFactor * skyFactor;
 
         ctx.beginPath();
         ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
@@ -127,8 +132,8 @@ const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition }) => {
         ctx.shadowBlur = 0;
       });
 
-      // Occasionally create shooting stars
-      if (Math.random() < 0.001) {
+      // Occasionally create shooting stars (full night only, not in twilight)
+      if (timeOfDay === 'night' && Math.random() < 0.001) {
         shootingStars.push({
           x: Math.random() * canvas.width,
           y: Math.random() * canvas.height * 0.3,
@@ -169,7 +174,7 @@ const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition }) => {
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-  }, [timeOfDay, prefersReducedMotion]);
+  }, [timeOfDay, cloudFactor, prefersReducedMotion]);
 
   return (
     <canvas
