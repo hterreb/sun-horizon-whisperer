@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-09-29. Done: items 1–13, 15 and 17–39 (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14 and 16, the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
+Status: last updated 2026-09-30. Done: items 1–13, 15 and 17–40 (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14, 16 and 41–45 (Sentry feedback, round 3), the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
 
 ## Verification (2026-09-28)
 
@@ -23,9 +23,11 @@ Status: last updated 2026-09-29. Done: items 1–13, 15 and 17–39 (marked **�
 | 15 | The maskable icon is not cropped on a launcher. | Real Android device |
 | 21 | A thrown test error has readable stack frames and no coordinates; a feedback message has no name or email. Sentry in the privacy policy (item 16). | Sentry dashboard |
 | 23 | In fullscreen on a phone, a tap shows the feedback button and it opens the form. | Real device |
-| 14, 16 | Not started. Decide Stripe or Google Play Billing before item 16. | Decision |
+| 14, 16 | Not started. Decide Stripe or Google Play Billing before item 16 (proposal: item 45). | Decision |
 | 37, 38 | New bugs, see below (AUDIT C-14, C-15). | Fix |
 | 39 | Built. The hand-off from the Android splash to the loading screen on a phone. | Real device |
+| 40 | Built. Look at the boat speeds and sizes on a phone. | Real device |
+| 41–45 | New, from Sentry feedback round 3, see below. | Build; decision for 45 |
 
 ## Priority rules
 
@@ -350,7 +352,7 @@ Five findings from use after items 22–30, checked on `main` at `046abff` with 
 - **Lookbook:** [Bats & Boats](https://claude.ai/artifact/PQH9vEKvGh49GNAd82yXFd) (private). Picks: N2, R1, S2, S3, S4, S5, S6, V2, V3, V4, L1.
 - **Fix** (all motion stays a slow, straight glide):
   - **N2 Line bat:** the 🦇 emoji is replaced by a `Bat` line icon (`src/components/sceneIcons.ts`, lucide's 24 px grid) in the night-ship tone.
-  - **R1 Bats at twilight only:** bats fly in nautical and astronomical twilight. Full night (`'night'`) has no flyers.
+  - **R1 Bats at twilight only:** bats fly in nautical and astronomical twilight. Full night (`'night'`) has no flyers. Item 40 adds civil twilight, so bats fly right after sunset.
   - **S2–S6 Fleet:** lucide `Sailboat` plus new `LakeFerry`, `FishingBoat`, `Rowboat` and `Freighter` icons. The old `Ship` (S1) is out. Mix: sailboat 35, ferry 15, fishing boat 15, rowboat 10, freighter 5 (`pickBoat` in `weatherEffectsUtils`).
   - **V2 Distance:** each boat gets a random distance. The farthest boat sits on the horizon at 55 % of the size, opacity and speed.
   - **V3 Lights:** once the sun is below the horizon (civil twilight to night), each boat shows small gold lights (`--brand-gold-light`).
@@ -407,6 +409,129 @@ Items 37 and 38 were found in the browser check of the verification above (on `a
   - The 200 ms fade stays 200 ms under reduced motion (the global rule in `index.css` cuts all other animations to 0).
   - Browsers start the 10 s geolocation timeout only after permission is granted. An open prompt is covered by "Choose a place".
 - **Checked:** headless Chromium at 390×844, Ravensburg at 22:30, dev server and production build. The first paint (JavaScript off) is Night. The sun rises, the circle opens when the location arrives after 2 s, and the buttons and the radio fade in after it. With no location, "Waiting for location access" and "Choose a place" show at 3 s, and the place search opens with focus. With reduced motion the mark stands still and the scene fades in.
+
+### Sentry feedback, round 3 (2026-09-29)
+
+Seven feedback reports from production (Ravensburg, release `6da35c1`, 29 Sep 16:57–17:09), analyzed on `main` at `6da35c1` by reading the code. Items 40–45 map to SUN-CHASER-A to F. Put `Fixes SUN-CHASER-n` in each commit, so Sentry closes the issue on merge. SUN-CHASER-G ("After sunset birds are still flying when will the bats occur?") was archived as working as designed, but on 2026-09-30 the request came to fly bats right after sunset: done in item 40.
+
+**Order:** build 41 → 42 → 43 → 44 (40 is done). Item 43 uses the sunset time from item 41. Item 44 turns off items 41 and 43 while it shows another time. Item 45 is a decision for items 14 and 16.
+
+### 40. Boats slower, each type at its own speed; smaller fish; bats from sunset — S — [SUN-CHASER-A](https://ainabler.sentry.io/issues/SUN-CHASER-A), [SUN-CHASER-G](https://ainabler.sentry.io/issues/SUN-CHASER-G) — **✅ Done**
+
+- **Feedback:** "Boats slower, fish smaller." Then (2026-09-30): "bats should fly directly after sunset please, boats should have different speeds depending on the type of boat - check the sizes and speeds after implementing." The second request reverses the archive of SUN-CHASER-G.
+- **Before (`CloudLayer.tsx`):**
+  - Boats and fish had one speed, `WATER_RATE_PERCENT_PER_SEC = 2.5` (% of the width per second, about 10 px/s at 390 px). A near boat crossed in 46 s, the farthest boat in 84 s.
+  - A fish was lucide `Fish` at 36 px in a `scale(1.2)` wrapper, so about 43 px: as large as a near rowboat (47 px).
+  - Bats flew in nautical and astronomical twilight only (item 36, R1). In civil twilight, right after sunset, birds still flew.
+- **Built:**
+  - **Speed per type:** `speed` in `BOATS` is a near boat's rate in % of the width per second. Far boats keep 55 % of it (`FAR_SHRINK`). Fish keep 2.5 %/s (`FISH_RATE_PERCENT_PER_SEC`).
+
+    | Type | Speed (%/s) | Near, 390 px | Crossing near / far |
+    |---|---|---|---|
+    | Ferry | 1.8 | 7.0 px/s | 64 s / 117 s |
+    | Fishing boat | 1.5 | 5.9 px/s | 77 s / 141 s |
+    | Freighter | 1.3 | 5.1 px/s | 89 s / 162 s |
+    | Sailboat | 1.2 | 4.7 px/s | 97 s / 176 s |
+    | Rowboat | 0.9 | 3.5 px/s | 129 s / 234 s |
+
+  - **Sizes (near, checked in a lineup):** rowboat 47 px, sailboat 64 px, fishing boat 64 px, ferry 81 px (scale 1.1 → 1.2), freighter 101 px (1.25 → 1.5). Before, the freighter was hardly larger than the ferry. Fish: 20 px, no wrapper.
+  - **Count:** a new boat at least every 55 s (was 30 s), and at most 3 boats at once (`MAX_BOATS`). So about 1–2 boats are out on average, as before. The random part of the gap is re-rolled on every 500 ms check, so most gaps end within about 10 s of the minimum. The earlier comment "every 30–90 s" was wrong for this reason.
+  - **Bats from sunset:** bats fly whenever the sun is below the horizon in twilight: civil, nautical and astronomical, in the evening and in the morning. Full night still has no flyers. Bats and boat lights share one flag, `isSunDown`.
+- **Checked:** headless Chromium, 390×844, Ravensburg, clear weather. For 70 spawns, each boat's measured speed and crossing time match the table. The lineup at near size shows rowboat < sailboat ≈ fishing boat < ferry < freighter, with the fish clearly the smallest. At 19:15 (civil twilight, 12 min after sunset) bats fly and the boats show their lights.
+- **Tests:** bats in civil twilight, a speed per type (sailboat against ferry), no fourth boat, a 20 px fish.
+
+### 41. Fireworks: a 10 s show at the visible sunrise and sunset — S — [SUN-CHASER-D](https://ainabler.sentry.io/issues/SUN-CHASER-D)
+
+- **Feedback:** "Redo firework animation not really visible and too short - should go at least 10s."
+- **Cause (`Fireworks.tsx`, from the code):**
+  - The spark speed is in % of the screen **per frame**: 4–9 % per frame, so 240–540 % per second at 60 Hz. A spark leaves the screen after about 0.2–0.4 s, although its `life` is 400–600 frames (7–10 s). The 8 bursts all start within 2.1 s, so the show is visible for about 2.5 s.
+  - The motion depends on the frame rate. On a 120 Hz phone it is twice as fast.
+  - The yellow and red sparks (`#feca57`, `#ff6b6b`) have little contrast against a sunset sky.
+  - **Trigger:** `SunVisualization` starts the show when the sun's altitude changes sign between two 30 s samples. This is up to 30 s late, and it uses the flat horizon, not the terrain (item 13).
+  - Each spark is a `div` with three `box-shadow`s, updated with `setState` in every frame (AUDIT P-4). This is acceptable for 2 s, but not for a longer show.
+- **Spec:**
+  - **Show:** about 14 bursts over 10 s, one every 0.6–0.9 s, and a larger last burst at about 9 s. Each burst starts as a rocket: a thin trail rises slowly from the water line for about 1 s, then bursts. The sparks fade out over 2.5–3.5 s, so the show ends after 12–13 s. Keep it slow and calm: sparks drift and fall slowly, with no flashing.
+  - **Physics per second, not per frame:** use the frame time (`dt`). Burst speed 60–140 px/s, gravity about 30 px/s², light drag. Use px, so the bursts are round (the % units make them oval on a portrait phone).
+  - **Visible:** sparks of 2–3 px with a short fading trail, drawn with `globalCompositeOperation = 'lighter'`. Use colours that stand out on a sunset sky: a white-gold core with cyan, magenta, violet and green. No yellow or orange.
+  - **Drawing:** one `<canvas>`, sized to the container and to `devicePixelRatio`. Keep the particles in a `useRef` and the rAF id in a `useRef` (CLAUDE.md). No React state per frame. This closes AUDIT P-4 for the fireworks; remove the `ponytail:` note.
+  - **Trigger:** add a pure `getNextSunEvent(now, flatTimes, terrainTimes)` in `src/utils/sunEvents.ts`, with tests. It returns the next sunrise or sunset: the line-of-sight time when the terrain profile is ready and has one, else the flat time. `SunTracker` starts the show when the 1 s clock passes that time, and passes the trigger to `SunVisualization`. It does not start when the clock step was longer than 5 s (a wake from sleep, or a time jump in item 44). Remove the altitude-sign effect in `SunVisualization`, but keep `crossesHorizon`, because the arc path uses it too.
+  - **Reduced motion:** no fireworks, as now.
+- **Done when:**
+  - Unit tests: the show plan spans at least 10 s. `getNextSunEvent` gives the terrain time when there is one, else the flat time. A clock step longer than 5 s does not start the show.
+  - In the browser (390×844, fixed clock 15 s before sunset): the show starts at sunset, runs for at least 10 s, and the bursts are clearly visible against the sunset sky.
+
+### 42. Line-of-sight sunrise and sunset on the sun arc — S — [SUN-CHASER-C](https://ainabler.sentry.io/issues/SUN-CHASER-C)
+
+- **Feedback:** "For premium show sunrise and sunset line of sight times on the arc."
+- **Now:** the sun arc has three labels: rise, zenith and set (from `getSunArcLabels`). Rise and set sit on the flat horizon line and show the flat SunCalc times. The line-of-sight times (`getTerrainSunTimes`, computed in `SunTracker` as `terrainExtras.terrainSunTimes`) show only in the panel, behind the `Mountain` button (item 30).
+- **Spec:**
+  - Pass `terrainSunTimes` from `SunTracker` to `SunVisualization`. Do not compute them a second time.
+  - Add a pure `getTerrainArcLabels(terrainSunTimes, latitude, longitude)` in `arcLabels.ts`. For each time that is not null, it returns the sun's azimuth and altitude at that time (`getSunPosition`). This is the point where the arc meets the terrain silhouette.
+  - Draw a label just above that point: the arc-label pill in the sun colour, with a 10 px `Mountain` icon, the time, and the gold plus from item 35 at the corner. Test ids: `arc-label-sun-terrain-rise` and `arc-label-sun-terrain-set`.
+  - Keep the flat rise and set labels. When a terrain label overlaps the flat label of the same kind, or shows the same minute (for example on a flat coast), show only the terrain label.
+  - Show the terrain labels only when `isLineOfSightEnabled()` is true and the profile is ready. Show no label when the sun does not clear the terrain that day (a null time, for example Viganella in winter).
+  - Apply the rules of the other arc labels: hide a label outside the compass field of view, fade it in fullscreen (item 29), and move it below the collapsed panel (item 38).
+  - The moon arc is not part of this item. The feedback asks only for the sun.
+- **Done when:**
+  - Unit test with a synthetic profile (a 5° ridge in the west): the set label has the `getTerrainSunTimes` sunset time and an altitude of 5° ± 0.5°.
+  - Component tests: the terrain labels render with a profile and terrain times, and do not render without them. When the minute is the same, only the terrain label renders.
+  - In the browser at Innsbruck (sunset about 31 min early, item 13), 390×844: the set label sits on the arc where the arc meets the ridge. At 360 px no labels overlap.
+
+### 43. Sunset countdown: 10 s of sound — S — [SUN-CHASER-B](https://ainabler.sentry.io/issues/SUN-CHASER-B)
+
+- **Feedback:** "10s acoustics count down for sunset, premium version to sunset line of sight times."
+- **Depends on:** item 41 (`getNextSunEvent`).
+- **Now:** the only sound is the radio (`MusicPlayer`, an `<audio>` element). There is no countdown.
+- **Spec:**
+  - **Toggle:** a bell button (lucide `Bell` / `BellRing`, `aria-label="Sunset countdown"`, `aria-pressed`) in the panel's Sunset row. Off by default. Save the choice in `localStorage` (`sunset-countdown`). The tap that turns it on creates or resumes an `AudioContext` (browsers allow sound only after a user gesture) and plays one soft tone as a check.
+  - **Target:** the next sunset from `getNextSunEvent`. Free version: the flat sunset. Premium (gold plus): the line-of-sight sunset, when the terrain profile is ready. While `PREMIUM_ENFORCED` is false, all users get the line-of-sight target.
+  - **Sound (Web Audio, no audio files):** from T−10 s to T−1 s, one soft tick per second (a sine at about 660 Hz, 80 ms, low volume, short fade in and out). At T0, a soft two-note chime (about 660 Hz and 990 Hz, 1.2 s fade). When the 1 s clock reaches T−11 s, schedule all 11 tones at once on the `AudioContext` clock, so the ticks are exact.
+  - **Visual:** during the 10 s, the sun-altitude pill shows "Sunset in 7 s". It shows the `Mountain` icon and the gold plus when the target is the line-of-sight sunset. At T0 the fireworks from item 41 start.
+  - **Only when someone watches:** no countdown when the page is hidden at T−11 s, or during a preview (item 44). In fullscreen, the wake lock (`useWakeLock`) keeps the screen on. A locked phone gets no countdown; the backlog item "Sunset reminder notification" covers that case.
+  - The radio keeps playing. Lower its volume during the countdown only if the ticks get lost under it.
+- **Done when:**
+  - Unit test: the target is the terrain sunset when there is one and line of sight is enabled, else the flat sunset.
+  - Component test (fake timers, mocked `AudioContext`): with the toggle on, 11 tones are scheduled at T−11 s, 1 s apart. With the toggle off, or with the page hidden, none are scheduled.
+  - On a phone: the ticks are audible with the radio on and off, and the chime sounds at the target time ± 0.5 s.
+
+### 44. Time travel: set the time, play it forward and backward — M — [SUN-CHASER-F](https://ainabler.sentry.io/issues/SUN-CHASER-F)
+
+- **Feedback:** "Another premium feature to set time or fast forward and backward in time." This item replaces the backlog item "Date/time scrubber".
+- **Now (`SunTracker.tsx`):**
+  - `date` is set to `new Date()` every second.
+  - Sun and moon position, sun times, golden and blue hour, and time of day come from a separate 30 s interval with its own `new Date()`, and once from `date` when the location changes.
+  - The arcs, pass times, arc labels and terrain times already follow `date` (keyed on the minute, hour or day).
+  - The weather is the live current weather.
+- **Spec:**
+  - **One time source:** a `timeOffsetMs` state (0 = live). The clock tick sets `date = new Date(Date.now() + timeOffsetMs)`.
+  - Derive sun and moon position, sun times, golden and blue hour, and time of day from `date`, with a memo keyed on the 30 s step and the location. This replaces the 30 s interval and the location-change block, so a time jump updates the scene at once. Live mode keeps its 30 s rhythm.
+  - **Controls (Time section, "Current Time" row):**
+    - `Rewind` (`aria-label="Play time backward"`) and `FastForward` (`aria-label="Play time forward"`). A tap plays time at 10 min per second (one day in about 2.4 min). A second tap pauses. During play, the clock ticks every 100 ms, so the motion is smooth.
+    - A tap on the time opens a native `<input type="datetime-local">` (min and max: today ± 1 year) to jump to any date and time.
+    - The gold plus from item 35 on the row. The feature stays free while `PREMIUM_ENFORCED` is false.
+  - **Preview (offset not 0):** the row shows the date and time, for example "Oct 3, 18:42" (reuse `formatMoonDate` in `InfoPanel.tsx`). A "Back to now" glass pill at the bottom centre, above the radio, stays visible in fullscreen. It sets the offset to 0 and stops play.
+  - **Stays live:** the weather and the sunset score (there is no weather for other times), and the spawns of birds, fish and boats. The countdown (item 43) and the fireworks (item 41) run only in live mode.
+  - Not part of this item: weather from the Open-Meteo hourly forecast for the next 7 days.
+- **Done when:**
+  - Tests: an offset of +6 h gives `getSunPosition(now + 6 h)`. Play forward moves `date` by 10 min per second (fake timers). "Back to now" returns to live. A preview does not fetch the weather again. No countdown and no fireworks during a preview.
+  - In the browser: play through a sunset. The sun moves along its arc, the sky colours change, and the panel times follow. One play tick takes less than 16 ms in the profiler.
+
+### 45. Premium as a one-time purchase on Google Play: price and billing — S *(decision)* — [SUN-CHASER-E](https://ainabler.sentry.io/issues/SUN-CHASER-E)
+
+- **Feedback:** "Premium buy once in play store - what would be a good pricing start point?"
+- **Conflict:** item 14 is built for a Stripe subscription (US$1.99 per month, 7-day trial). The feedback asks for a one-time purchase in the Play Store. Inside an Android app, digital features must use Google Play Billing (see the note in item 14), so Stripe covers only the web. Decide this before items 14 and 16.
+- **Market (Google Play, US, one-time prices, checked 2026-09-30):** PhotoPills $9.99, Sun Surveyor $9.99 (with a free Lite version), Sun Seeker $6.99, PeakFinder $4.99. The first three are planning tools for photographers. PeakFinder (the terrain horizon) is the closest to line of sight. Sources: [havecamerawilltravel.com](https://havecamerawilltravel.com/apps-for-tracking-the-sun/), [fstoppers.com](https://fstoppers.com/apps/outdoor-photography-apps-i-wont-leave-home-without-299365).
+- **Proposal: €3.99 / US$3.99, one-time.**
+  - This is below PeakFinder and far below the photographer tools. Sun Chaser is a calm sky app with one pro feature, not a planning tool.
+  - After 19 % German VAT and the 15 % Play fee (on the first US$1 M per year), about €2.85 per sale.
+  - The free app is the trial, because Play has no trial for one-time products. Later, test €2.99 against €4.99 with a Play Console price experiment.
+- **Billing plan (replaces steps 1–5 of item 14 for the Play app):**
+  - One managed one-time product, `premium`. Build with Bubblewrap with Play Billing on (`playBilling` in the TWA manifest).
+  - In the PWA ([Chrome docs](https://developer.chrome.com/docs/android/trusted-web-activity/receive-payments-play-billing)): the Digital Goods API (`getDigitalGoodsService('https://play.google.com/billing')`) for the local price and for `listPurchases()` at start (this restores the purchase on a new phone), and the Payment Request API to buy. Needs Chrome 101 or later.
+  - `PREMIUM_ENFORCED` gates the features only where the Digital Goods API exists, so only in the Play app. The web stays free for now: without an account, a purchase cannot move between devices. Trade-off: a Play user can use the same features free in the browser. Web sales later need Stripe one-time Checkout and the Supabase Auth from item 14.
+  - No backend for the first version. Before the release, check how the Digital Goods API acknowledges a one-time purchase: Play refunds a purchase that is not acknowledged within 3 days.
+  - Keep the Stripe subscription functions in `supabase/functions`, unused. Do not delete them until this decision is final.
+- **Done when:** the price and the billing plan are decided, and items 14 and 16 are updated to match.
 
 ---
 
@@ -531,6 +656,7 @@ Items 37 and 38 were found in the browser check of the verification above (on `a
 ### 14. Premium gating (deferred) — M
 
 - **Status:** backend ready, frontend not started. Only start this when `PREMIUM_ENFORCED` should become `true`.
+- **Update (2026-09-30):** item 45 proposes a one-time Google Play purchase in place of the Stripe subscription for the Play app.
 - **Depends on:** item 13.
 - **Exists today:**
   - `supabase/functions/create-checkout`: Stripe Checkout session, $1.99/month, 7-day trial for new customers only.
@@ -596,7 +722,7 @@ Items 37 and 38 were found in the browser check of the verification above (on `a
 
 ### 16. Google Play release (TWA via Bubblewrap) — M
 
-- **Depends on:** item 6 (no third-party script), item 15 (icon and store graphics), and the billing decision in item 14.
+- **Depends on:** item 6 (no third-party script), item 15 (icon and store graphics), and the billing decision in items 14 and 45.
 - **Spec:**
   1. Deploy the PWA to a production HTTPS domain.
   2. Serve `/.well-known/assetlinks.json` with the app signing key's SHA-256 fingerprint, so the TWA shows no URL bar.
@@ -646,4 +772,4 @@ Items:
 - German and English UI (i18n).
 - Share card: an image of today's sunset with the time and score.
 - Sunset reminder notification (after item 16, when notifications are practical).
-- Date/time scrubber to preview any day or time of the year.
+- Date/time scrubber to preview any day or time of the year: now item 44.

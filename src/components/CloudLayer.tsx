@@ -49,12 +49,14 @@ interface CloudLayerProps {
 // time, so no per-frame `setState` is needed for movement; state only changes on spawn
 // (adding an entry) and despawn (removing one, via `onAnimationEnd`).
 const BIRD_RATE_PERCENT_PER_SEC = 5; // was 0.08%/16ms in the old rAF loop
-const WATER_RATE_PERCENT_PER_SEC = 2.5; // was 0.04%/16ms in the old rAF loop (fish + ships)
+const FISH_RATE_PERCENT_PER_SEC = 2.5; // was 0.04%/16ms in the old rAF loop. Boats: `speed` in BOATS.
 const LEAF_RATE_PERCENT_PER_SEC = 6;
-// A new boat every 30-90 s: a crossing takes 46-84 s, so often 1-2 boats (now and then 3)
-// are out at once. The first one sails out ~5 s after load.
-const BOAT_GAP_MIN_MS = 30000;
+// A new boat at least every 55 s. The random part is re-rolled on every 500 ms check, so
+// most gaps end within ~10 s of the minimum. A crossing takes 64-234 s (ROADMAP item 40),
+// so 1-2 boats are out at once, never more than MAX_BOATS. The first sails out ~5 s after load.
+const BOAT_GAP_MIN_MS = 55000;
 const BOAT_GAP_RANGE_MS = 60000;
+const MAX_BOATS = 3;
 
 // A fixed fallback seed date for callers that don't pass one (e.g. existing tests) -
 // a stable constant, not `new Date()`, so it never changes identity across renders.
@@ -91,13 +93,14 @@ interface Boat extends MovingEntity {
   depth: number; // 0 = near, 1 = far: far boats are smaller, paler and slower
 }
 
-// `lights` are the boat's warm lights after sunset, in the icon's 24 px grid.
-const BOATS: Record<BoatKind, { Icon: LucideIcon; scale: number; lights: [number, number][] }> = {
-  sailboat: { Icon: Sailboat, scale: 0.95, lights: [[10, 2]] },
-  ferry: { Icon: LakeFerry, scale: 1.1, lights: [[8, 13], [12, 13], [16, 13]] },
-  fishing: { Icon: FishingBoat, scale: 0.95, lights: [[15, 3], [7.5, 11]] },
-  rowboat: { Icon: Rowboat, scale: 0.7, lights: [[19.5, 14.5]] },
-  freighter: { Icon: Freighter, scale: 1.25, lights: [[5, 6.5], [5.25, 11]] },
+// `lights` are the boat's warm lights after sunset, in the icon's 24 px grid. `speed` is a
+// near boat's rate in % of the layer width per second (ROADMAP item 40): each type its own.
+const BOATS: Record<BoatKind, { Icon: LucideIcon; scale: number; speed: number; lights: [number, number][] }> = {
+  sailboat: { Icon: Sailboat, scale: 0.95, speed: 1.2, lights: [[10, 2]] },
+  ferry: { Icon: LakeFerry, scale: 1.2, speed: 1.8, lights: [[8, 13], [12, 13], [16, 13]] },
+  fishing: { Icon: FishingBoat, scale: 0.95, speed: 1.5, lights: [[15, 3], [7.5, 11]] },
+  rowboat: { Icon: Rowboat, scale: 0.7, speed: 0.9, lights: [[19.5, 14.5]] },
+  freighter: { Icon: Freighter, scale: 1.5, speed: 1.3, lights: [[5, 6.5], [5.25, 11]] },
 };
 const FAR_SHRINK = 0.45; // the farthest boat is 55% of the size, opacity and speed of the nearest
 
@@ -207,12 +210,11 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     return newSnowflakes;
   }, [weatherType]);
 
-  // Determine if it's night time (for showing different colored birds)
-  const isNightTime = timeOfDay === 'night' ||
-                      timeOfDay === 'astronomical-twilight' ||
-                      timeOfDay === 'nautical-twilight';
-  // Boats show their lights once the sun is below the horizon.
-  const boatLightsOn = isNightTime || timeOfDay === 'civil-twilight';
+  // Sun below the horizon: bats instead of birds, and the boats show their lights.
+  const isSunDown = timeOfDay === 'night' ||
+                    timeOfDay === 'astronomical-twilight' ||
+                    timeOfDay === 'nautical-twilight' ||
+                    timeOfDay === 'civil-twilight';
   // Line icons (boats, leaves) share today's ship tone.
   const lineInk = timeOfDay === 'night' ? 'text-gray-300 text-opacity-60' : 'text-gray-600 text-opacity-80';
 
@@ -226,8 +228,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     // Reduced motion: skip spawning birds, fish, ships and leaves entirely (static sky).
     if (prefersReducedMotion) return;
 
-    // Fair-weather flyers: birds tuck away once it's wet, foggy or stormy. Bats fly in
-    // nautical and astronomical twilight only; full night stays quiet (ROADMAP item 36).
+    // Fair-weather flyers: birds tuck away once it's wet, foggy or stormy. Bats fly from
+    // sunset through twilight (ROADMAP item 40); full night stays quiet (item 36).
     const shouldShowBirds = (weatherType === 'clear' || weatherType === 'partly' ||
                           weatherType === 'cloudy' || weatherType === 'overcast') &&
                           timeOfDay !== 'night';
@@ -246,7 +248,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
           if (Math.random() < 0.8) { // 80% chance to spawn
             // Dynamically calculate the off-screen start position for the bird
             const birdSvgWidth = 300; // px
-            const birdScale = isNightTime ? 0.5 : 0.3;
+            const birdScale = isSunDown ? 0.5 : 0.3;
             const scaledBirdWidth = birdSvgWidth * birdScale;
             const viewportWidth = window.innerWidth;
             const startX = -(scaledBirdWidth / viewportWidth) * 100;
@@ -276,7 +278,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
               x: startX,
               y: 70 + Math.random() * 15,
               dx: endX - startX,
-              duration: (endX - startX) / WATER_RATE_PERCENT_PER_SEC,
+              duration: (endX - startX) / FISH_RATE_PERCENT_PER_SEC,
             };
             setFish(prev => [...prev, newFish]);
           }
@@ -292,6 +294,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             const startX = -8;
             const endX = 108;
             const depth = Math.random();
+            const kind = pickBoat(weatherType, windSpeedKmh, Math.random());
             const newShip: Boat = {
               id: Date.now() + Math.random(),
               x: startX,
@@ -299,12 +302,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
               // music player, or to 94% in fullscreen.
               y: 67 + (1 - depth) * (isFullscreen ? 27 : 20),
               dx: endX - startX,
-              duration: (endX - startX) / (WATER_RATE_PERCENT_PER_SEC * (1 - FAR_SHRINK * depth)),
-              kind: pickBoat(weatherType, windSpeedKmh, Math.random()),
+              duration: (endX - startX) / (BOATS[kind].speed * (1 - FAR_SHRINK * depth)),
+              kind,
               depth,
             };
             // Far boats first, so a near boat always sails in front of a far one.
-            setShips(prev => [...prev, newShip].sort((a, b) => b.depth - a.depth));
+            setShips(prev => (prev.length >= MAX_BOATS ? prev : [...prev, newShip].sort((a, b) => b.depth - a.depth)));
           }
           lastSpawnTimeRef.current.ships = currentTime;
         }
@@ -338,7 +341,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     return () => {
       clearInterval(intervalId);
     };
-  }, [weatherType, windSpeedKmh, timeOfDay, prefersReducedMotion, isNightTime, isFullscreen, effects.showLeaves, effects.birdSpeedFactor]);
+  }, [weatherType, windSpeedKmh, timeOfDay, prefersReducedMotion, isSunDown, isFullscreen, effects.showLeaves, effects.birdSpeedFactor]);
 
   // The grey/wet-weather cloud tints below (storm/hail/rain/drizzle/fog/snow/
   // overcast) are ROADMAP item 10's weather-conditioned matrix, unchanged by the
@@ -549,8 +552,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
           }}
           onAnimationEnd={() => setBirds(prev => prev.filter(b => b.id !== bird.id))}
         >
-          <div style={{ transform: `${isNightTime ? 'scale(0.5)' : 'scale(0.3)'} translateX(-100%)` }}>
-            {isNightTime ? (
+          <div style={{ transform: `${isSunDown ? 'scale(0.5)' : 'scale(0.3)'} translateX(-100%)` }}>
+            {isSunDown ? (
               <Bat size={76} strokeWidth={1.5} className="text-gray-300 text-opacity-60" data-testid="scene-bat" />
             ) : (
               <svg
@@ -596,14 +599,13 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
           }}
           onAnimationEnd={() => setFish(prev => prev.filter(f => f.id !== fishItem.id))}
         >
-          <div style={{ transform: 'scale(1.2)' }}>
-            <Fish
-              size={36}
-              className={`transition-colors duration-1000 ${
-                timeOfDay === 'night' ? 'text-blue-200 text-opacity-50' : 'text-blue-400 text-opacity-70'
-              }`}
-            />
-          </div>
+          <Fish
+            size={20}
+            data-testid="scene-fish"
+            className={`transition-colors duration-1000 ${
+              timeOfDay === 'night' ? 'text-blue-200 text-opacity-50' : 'text-blue-400 text-opacity-70'
+            }`}
+          />
         </div>
       ))}
 
@@ -628,7 +630,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             {/* Scale from the bottom-left corner, then lift by the icon's height, so `top` is the waterline. */}
             <div style={{ transform: `translateY(-100%) scale(${1.4 * scale * nearness})`, transformOrigin: 'bottom left' }}>
               <Icon size={48} className={`transition-colors duration-1000 ${lineInk}`} data-testid="scene-boat" data-kind={ship.kind}>
-                {boatLightsOn && lights.map(([cx, cy]) => (
+                {isSunDown && lights.map(([cx, cy]) => (
                   <circle
                     key={`${cx}-${cy}`}
                     cx={cx}
