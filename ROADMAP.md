@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-09-30. Done: items 1–13, 15 and 17–40 (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14, 16 and 41–45 (Sentry feedback, round 3), the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
+Status: last updated 2026-09-30. Done: items 1–13, 15 and 17–40 (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14, 16 and 41–45 (Sentry feedback, round 3), 46–56 ([scene review](#scene-review-2026-09-30)), the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
 
 ## Verification (2026-09-28)
 
@@ -449,6 +449,7 @@ Seven feedback reports from production (Ravensburg, release `6da35c1`, 29 Sep 16
   - The yellow and red sparks (`#feca57`, `#ff6b6b`) have little contrast against a sunset sky.
   - **Trigger:** `SunVisualization` starts the show when the sun's altitude changes sign between two 30 s samples. This is up to 30 s late, and it uses the flat horizon, not the terrain (item 13).
   - Each spark is a `div` with three `box-shadow`s, updated with `setState` in every frame (AUDIT P-4). This is acceptable for 2 s, but not for a longer show.
+  - **Most bursts never start** (scene review R1, 2026-09-30): `SunVisualization` sets the trigger back to `false` after 100 ms. The effect's cleanup (`Fireworks.tsx:102`) then clears the staggered timeouts, so only the first of the 8 bursts runs. The new show must not depend on how long the trigger stays `true`.
 - **Spec:**
   - **Show:** about 14 bursts over 10 s, one every 0.6–0.9 s, and a larger last burst at about 9 s. Each burst starts as a rocket: a thin trail rises slowly from the water line for about 1 s, then bursts. The sparks fade out over 2.5–3.5 s, so the show ends after 12–13 s. Keep it slow and calm: sparks drift and fall slowly, with no flashing.
   - **Physics per second, not per frame:** use the frame time (`dt`). Burst speed 60–140 px/s, gravity about 30 px/s², light drag. Use px, so the bursts are round (the % units make them oval on a portrait phone).
@@ -532,6 +533,101 @@ Seven feedback reports from production (Ravensburg, release `6da35c1`, 29 Sep 16
   - No backend for the first version. Before the release, check how the Digital Goods API acknowledges a one-time purchase: Play refunds a purchase that is not acknowledged within 3 days.
   - Keep the Stripe subscription functions in `supabase/functions`, unused. Do not delete them until this decision is final.
 - **Done when:** the price and the billing plan are decided, and items 14 and 16 are updated to match.
+
+### Scene review (2026-09-30)
+
+A visual review of `main` at `6da35c1`. The method: 47 scene states in headless Chromium (390×844 and 1280×800, Ravensburg, a fixed clock and faked Open-Meteo data). The states: every day phase from 03:00 to 23:30, 14 weather types by day and night, −15 °C to 35 °C, and the easter eggs. Lutz marked each finding Roadmap, Later or Skip on the [review page](https://claude.ai/artifact/NaCVFCvuThdaobbvKQMYUc). "R n" in a heading is the finding number there.
+
+- **Roadmap:** items 46–56 below. R1 (fireworks) goes to item 41. R22 (Premium badges) is on purpose, see item 14.
+- **Skip:** R10 (rainbow next to the sun), R15 (the sun covers the zenith label), R16 (chips in a night storm), R17 (the iceberg comes in late), R18 (fish contrast), R19 (boats under the chip row).
+- **Order:** 46 → 50 → 53, because each one changes the sky or the sun that the next one tints. The other items are independent.
+- **Rule:** all motion stays slow and calm (see item 10).
+
+### 46. A filled sun that shows in golden hour — S — R2, R20
+
+- **Now:** the sun is the lucide `Sun` outline icon, `strokeWidth={1}` (`SunVisualization.tsx:859`). Between 0° and 10° it is `text-orange-400` (`getSunColor`), so on the orange evening sky only the glow shows. At +2.4° and +4.9° the sun is not visible.
+- **Spec:**
+  - Draw the sun as a filled disc (about 56 px, a `div` or SVG circle) with a soft rim, over the halo that is there now. No rays. This is the "soft glowing sun" of direction D (item 15).
+  - Colour per altitude band: above 10° a pale warm white-yellow; 0–10° a deep gold-to-red that is darker and more saturated than the sky behind it; below 0° (the upper limb) deep red. Add the colours as `--scene-sun-*` tokens in `index.css`.
+  - Keep the halo, the `drop-shadow` glow and `animate-glow`.
+- **Done when:** in the browser at 18:30 and 18:45 (Ravensburg, clear), the disc is clearly visible against the evening sky. A test checks the colour token per altitude band.
+
+### 47. Collapsed panel: hide "Change location" — S — R3
+
+- **Now:** the collapsed panel shows the title, the place and "Change location". On a phone "Astronomical Twilight" wraps to two lines, so the panel is 145 px tall. `COLLAPSED_PANEL_HEIGHT = 112` in `SunVisualization.tsx` assumes 112 px, so the arc labels can move under the panel.
+- **Spec:** show "Change location" only when the panel is expanded. Keep the title and the place when it is collapsed.
+- **Done when:** at 360 and 390 px, the collapsed panel is at most `COLLAPSED_PANEL_HEIGHT` tall for every time-of-day title, including "Astronomical Twilight". A test checks that the link does not render in the collapsed state.
+
+### 48. Sun altitude pill: no "-0.0°", hidden at night — S — R4, R14
+
+- **Now:** the pill shows `altitude.toFixed(1)` (`SunVisualization.tsx:1036`), so a value just below 0 reads "-0.0°". It shows at night too (for example "-37.1°"), next to the "Moon:" line.
+- **Spec:**
+  - When the rounded value is 0, show "0.0°" (no sign).
+  - Hide the pill when `timeOfDay` is `night`. It stays in twilight, when the sun is still near the horizon.
+- **Done when:** tests: −0.04° gives "0.0°", +0.04° gives "0.0°", −3.1° gives "-3.1°". The pill does not render at night.
+
+### 49. Frost: one threshold and a visible icy edge — S — R5
+
+- **Now:** `getWeatherEffects` returns `showFrost` (`weatherEffectsUtils.ts:53`), but nothing uses it. `InfoPanel.tsx:354` checks its own `temperature < -5`. At −12 °C the icy glow on the panel cannot be seen.
+- **Spec:**
+  - Use `showFrost` from `getWeatherEffects` as the only source. Remove the second `-5`.
+  - Make the frost visible: a white-blue inner edge about 6 px wide on the panel, plus a few static crystal marks (CSS or an inline SVG) in two corners. No animation.
+- **Done when:** a test checks that the panel shows the frost at −6 °C and not at −4 °C. At −12 °C in the browser the frost is visible on the collapsed and on the expanded panel.
+
+### 50. Clouds dim the sun and the sky — M — R6, R9
+
+- **Now:** overcast, fog, drizzle, rain and snow keep a bright cyan sky and the full sun with its halo. Only a storm hides the sun. `WEATHER_GRADIENT_SHIFT` (`SunTracker.tsx`) changes the sky only a little. On a phone the snowflakes cannot be seen against the bright sky.
+- **Spec:**
+  - **Sky:** per weather type, mix the time-of-day gradient toward a grey (a `--scene-sky-overcast` token). Clear 0 %, partly 10 %, cloudy 25 %, drizzle and snow 45 %, overcast, fog and rain 60 %, storm and hail 75 %. When the weather has a `cloudCoverPercent`, use it to set the mix.
+  - **Sun (item 46):** clear and partly: full. Cloudy: disc 80 %, halo 60 %. Drizzle and snow: a pale disc at 50 %, a small halo. Overcast, fog and rain: no disc, only a soft light patch where the sun is. Storm and hail: nothing, as now.
+  - **Snow on the phone:** give the flakes a thin, darker blue-grey outline, or make them larger (at least 10 px), so they read on the greyer sky.
+- **Done when:** tests for the sky mix and the sun visibility per weather type. In the browser at 11:00, clear, overcast, rain and snow look clearly different, and snowflakes are visible at 390 px.
+
+### 51. Storm: a closed cloud deck and dark water — S — R7
+
+- **Depends on:** item 50 (the sky mix).
+- **Now:** a storm shows a few small dark clouds, with blue sky between them and bright water.
+- **Spec:**
+  - A dark cloud deck across the top third of the sky: large, overlapping, slightly blurred cloud shapes with no gaps. Keep the drifting clouds below it.
+  - Darken the water by about 40 % during a storm, and give it a slight grey tint.
+  - Keep the lightning (`WeatherEffects.tsx`).
+- **Done when:** in the browser at 15:00 with code 95, no blue sky shows through the deck, and the water is darker than in rain.
+
+### 52. Stars: dimmed by clouds and fewer in twilight — S — R8, R23
+
+- **Now:** `NightStars` gets only `timeOfDay` and `moonPosition`. In nautical and astronomical twilight each star has 60 % opacity, so the sky has the same number of stars as at night. Under overcast, rain, snow, fog and storms all stars shine.
+- **Spec:**
+  - Pass `weatherType` (and `cloudCoverPercent` when there is one) to `NightStars`.
+  - **Clouds:** star opacity × (1 − cover). With no cover value: overcast, fog, rain, snow, storm and hail 0; cloudy 0.4; partly 0.8.
+  - **Twilight:** nautical shows only the brightest 15 % of the stars at 40 %, astronomical the brightest 50 % at 70 %, night all of them. No shooting stars in twilight.
+  - The rain streaks and snowflakes stay visible at night.
+- **Done when:** tests for the opacity per weather type and the star share per twilight phase. In the browser at 22:30, overcast and rain show no stars. At 19:55 (nautical) only a few stars show.
+
+### 53. The water follows the sky — M — R11, R12
+
+- **Now:** `getHorizonColor` and `getWaterDeepColor` (`SunVisualization.tsx:666`) have five buckets. `dawn` is a grey (`--scene-horizon-dawn: 264 3.9% 25.3%`), and `morning`, `evening` and `civil-twilight` fall to `day`, a bright cyan. So dawn has an orange sky over grey-black water, and the evening has an orange or lilac sky over midday water.
+- **Spec:**
+  - **Water colour:** give the water the lower sky stop of the current gradient, reflected: the surface stop is the sky's horizon colour, darkened by about 15 % and a little more saturated. The deep stop is a dark version of the sky's top colour. Take both from the same gradient that paints the sky (after item 50's weather mix), so the sky and the water always change together. Remove the fixed per-bucket water tokens that this replaces.
+  - **Reflection:** replace the ladder of short dashes (`data-testid="water-reflection"`) with a soft glitter strip under the sun or the moon. The strip is a vertical band about the width of the disc, getting narrower and fainter with depth, made of short, blurred horizontal highlights. It shimmers slowly (a 4–6 s cycle, opacity only). With reduced motion it stays still.
+- **Done when:** a test checks that the water colours come from the sky gradient for each `timeOfDay`. In the browser at 07:25, 18:45 and 19:20, the water is warm or lilac like the sky above it, and the reflection reads as light on water.
+
+### 54. Moon line a few pixels lower — S — R13
+
+- **Now:** the "Moon: 22.7° | 80%" line (`SunVisualization.tsx:1043`, `bottom-1/4 -translate-y-12`) touches the SE, S and SW compass chips.
+- **Spec:** move the moon line down until there are at least 6 px between it and the bottom of the compass chips at 360, 390 and 1280 px. Leave all other horizon labels as they are.
+- **Done when:** in the browser at 22:30 at those widths, the moon line and the chips do not touch.
+
+### 55. The panel opens collapsed on a phone — S — R21
+
+- **Now:** `isCollapsed` starts as `false` (`InfoPanel.tsx:139`). On a phone the open panel covers about 75 % of the screen, so the first view hides the scene.
+- **Spec:** start collapsed when the window is narrower than 640 px (Tailwind `sm`). Wider screens start expanded, as now. Read the width once, at mount. Do not follow resizes.
+- **Done when:** tests: at 390 px the panel starts collapsed, at 1280 px it starts expanded.
+
+### 56. Heat shimmer that can be seen — S — R24
+
+- **Now:** above 30 °C (`showHeatShimmer`, `WeatherEffects.tsx:101`) there is almost no visible change. Only the sun glow looks larger.
+- **Spec:** a band about 40 px high just above the horizon, with a slow vertical wave distortion (an SVG `feTurbulence` + `feDisplacementMap` filter on a copy of the horizon strip, or a CSS mask with a slow translate). A 6–8 s cycle. Only in daylight, as now. With reduced motion: a still, pale haze band.
+- **Done when:** at 35 °C and 14:00 in the browser, the shimmer over the ridge can be seen in a screenshot, and it moves slowly.
 
 ---
 
@@ -671,6 +767,7 @@ Seven feedback reports from production (Ravensburg, release `6da35c1`, 29 Sep 16
   5. A "Manage subscription" button → `customer-portal`.
   6. Optional: a Stripe webhook function that updates `subscribers` without polling.
   7. Tests for the edge functions (Deno test with mocked Stripe).
+- **Gold plus (scene review R22, 2026-09-30):** the plus on each Premium feature (item 35) is on purpose and stays. After a purchase the plus goes away. When `PREMIUM_ENFORCED` is true and the user has not bought Premium, a tap on a feature with the plus opens the purchase: the Play Billing flow in the Play app (item 45), else the Play Store listing. Until then, all features stay free for development and testing.
 - **Note:** paying for digital features inside an Android app requires Google Play Billing. Stripe is only allowed for web purchases. Decide on this before item 16.
 
 ---
