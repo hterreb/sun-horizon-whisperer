@@ -1,4 +1,4 @@
-import { getSunPosition, getSunTimes, getTimeOfDay, getRelevantTwilightTimes, formatTime, getGoldenHourTimes, getBlueHourTimes, getNextGoldenBlueHours, mixGradientTowardOvercast, getSunPathAround, getBackgroundGradient, findSunPass } from '../src/utils/sunUtils';
+import { getSunPosition, getSunTimes, getTimeOfDay, getRelevantTwilightTimes, formatTime, getGoldenHourTimes, getBlueHourTimes, getNextGoldenBlueHours, mixGradientTowardOvercast, getSunPathAround, getBackgroundGradient, findSunPass, getWaterColors } from '../src/utils/sunUtils';
 describe('sunUtils', () => {
   it('calculates sun position', () => {
     const pos = getSunPosition(new Date(), 0, 0);
@@ -278,6 +278,67 @@ describe('sunUtils', () => {
       expect(getBackgroundGradient('midday')).toBe(
         'linear-gradient(to bottom, #0EA5E9 0%, #33C3F0 62%, #FEC6A1 100%)'
       );
+    });
+  });
+
+  describe('getWaterColors (ROADMAP item 53, the water follows the sky)', () => {
+    const timesOfDay = [
+      'night', 'astronomical-twilight', 'nautical-twilight', 'civil-twilight',
+      'dawn', 'morning', 'midday', 'afternoon', 'evening',
+    ] as const;
+    const parseHsl = (color: string) => (color.match(/[\d.]+/g) ?? []).map(Number);
+    // Independent HSL of a #rrggbb colour, for the expected values.
+    const hexHsl = (rgb: number[]) => {
+      const [r, g, b] = rgb.map((c) => c / 255);
+      const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, d = max - min;
+      if (d === 0) return [0, 0, l * 100];
+      const h = max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      return [h * 60, (d / (1 - Math.abs(2 * l - 1))) * 100, l * 100];
+    };
+    const stopsOf = (gradient: string) => [...gradient.matchAll(/#([0-9a-fA-F]{6}) (\d+)%/g)].map(([, hex, at]) => {
+      const n = parseInt(hex, 16);
+      return { rgb: [(n >> 16) & 255, (n >> 8) & 255, n & 255], at: Number(at) };
+    });
+
+    for (const timeOfDay of timesOfDay) {
+      it(`takes the ${timeOfDay} water from the sky gradient`, () => {
+        const gradient = getBackgroundGradient(timeOfDay);
+        const [top, mid, bottom] = stopsOf(gradient);
+        // Sky colour at the horizon line (65 %), between the 62 % and 100 % stops.
+        const t = (65 - mid.at) / (bottom.at - mid.at);
+        const horizon = hexHsl(mid.rgb.map((c, i) => c + (bottom.rgb[i] - c) * t));
+        const topHsl = hexHsl(top.rgb);
+
+        const { surface, deep } = getWaterColors(gradient);
+        const [sh, ss, sl] = parseHsl(surface);
+        const [dh, , dl] = parseHsl(deep);
+        expect(sh).toBeCloseTo(horizon[0], 0);
+        expect(ss).toBeCloseTo(Math.min(100, horizon[1] * 1.3), 0);
+        expect(sl).toBeCloseTo(Math.min(horizon[2] * 0.85, horizon[2] - 5), 0);
+        expect(dh).toBeCloseTo(topHsl[0], 0);
+        expect(dl).toBeCloseTo(topHsl[2] * 0.45, 0);
+      });
+    }
+
+    it('follows the weather mix of the sky (item 50)', () => {
+      const clear = getWaterColors(getBackgroundGradient('evening'));
+      const rain = getWaterColors(mixGradientTowardOvercast(getBackgroundGradient('evening'), 0.6));
+      expect(rain.surface).not.toBe(clear.surface);
+      expect(parseHsl(rain.surface)[1]).toBeLessThan(parseHsl(clear.surface)[1]);
+    });
+
+    it('darkens the water by 40 % and greys it in a storm (item 51)', () => {
+      const gradient = mixGradientTowardOvercast(getBackgroundGradient('afternoon'), 0.75);
+      const calm = getWaterColors(gradient);
+      const storm = getWaterColors(gradient, true);
+      for (const key of ['surface', 'deep'] as const) {
+        expect(parseHsl(storm[key])[2]).toBeCloseTo(parseHsl(calm[key])[2] * 0.6, 0);
+        expect(parseHsl(storm[key])[1]).toBeLessThan(parseHsl(calm[key])[1] + 0.01);
+      }
+    });
+
+    it('fails loudly on a gradient without hex stops', () => {
+      expect(() => getWaterColors('linear-gradient(red, blue)')).toThrow();
     });
   });
 

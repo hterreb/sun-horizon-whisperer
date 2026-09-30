@@ -19,7 +19,7 @@ import SunVisualization, {
   formatSunAltitude,
 } from '../src/components/SunVisualization';
 import type { HorizonProfile } from '../src/utils/horizonUtils';
-import { getSunTimes, formatTime } from '../src/utils/sunUtils';
+import { getSunTimes, formatTime, getWaterColors } from '../src/utils/sunUtils';
 
 describe('getAzimuthScreenFraction (C-3, static/non-compass mode)', () => {
   it('northern hemisphere: culmination (180°, South) stays centered', () => {
@@ -738,6 +738,26 @@ describe('SunVisualization (rendered): sea visible at the horizon (ROADMAP item 
       expect(screen.getByTestId('sea').getAttribute('stroke')).toBeNull();
       unmount();
     }
+  });
+
+  it('takes the water colours from the sky gradient it is given (ROADMAP item 53)', () => {
+    setMockedContainerSize(800, 600);
+    const skyGradient = 'linear-gradient(to bottom, #403E43 0%, #E5DEFF 62%, #F97316 100%)';
+    const { container } = render(<SunVisualization {...baseProps} skyGradient={skyGradient} />);
+    const stops = [...container.querySelectorAll('#horizonGradient stop')].map((stop) => stop.getAttribute('stop-color'));
+    const water = getWaterColors(skyGradient);
+    expect(stops).toEqual([water.surface, water.deep]);
+  });
+
+  it('draws a shimmering glitter strip under a visible sun, and none when clouds hide the disc (ROADMAP items 50, 53)', () => {
+    setMockedContainerSize(800, 600);
+    const { unmount } = render(<SunVisualization {...baseProps} />);
+    const strip = screen.getByTestId('water-reflection');
+    expect(strip.querySelectorAll('.animate-shimmer').length).toBeGreaterThan(10);
+    unmount();
+
+    render(<SunVisualization {...baseProps} weatherType="overcast" />);
+    expect(screen.queryByTestId('water-reflection')).toBeNull();
   });
 });
 

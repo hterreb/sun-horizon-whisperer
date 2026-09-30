@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-01. Done: items 1–13, 15, 17–41, 46–50, 52 and 54–56 (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14, 16 and 42–45 (Sentry feedback, round 3), 51 and 53 ([scene review](#scene-review-2026-09-30)), the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
+Status: last updated 2026-10-01. Done: items 1–13, 15, 17–41 and 46–56 (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14, 16 and 42–45 (Sentry feedback, round 3), the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
 
 ## Verification (2026-09-28)
 
@@ -593,7 +593,7 @@ A visual review of `main` at `6da35c1`. The method: 47 scene states in headless 
 - **Done when:** tests for the sky mix and the sun visibility per weather type. In the browser at 11:00, clear, overcast, rain and snow look clearly different, and snowflakes are visible at 390 px.
 - **Built:** `getSkyOvercastMix` (`weatherEffectsUtils.ts`) gives the mix per weather type, multiplied by the cloud cover when there is one (only for real weather, not for a weather picked by hand). `mixGradientTowardOvercast` (`sunUtils.ts`) replaces `shiftGradientBrightness` and `WEATHER_GRADIENT_SHIFT`. It mixes each stop toward `--scene-sky-overcast` (#8A949D), but the grey is never lighter than the stop, so night skies stay dark. `getSunVisibility` gives the disc and halo opacity and the halo size. With no disc, the halo is a white light patch and the water reflection is hidden. Hail now hides the sun like a storm. Snowflakes are at least 10 px, with a thin `--scene-snow-outline`.
 
-### 51. Storm: a closed cloud deck and dark water — S — R7
+### 51. Storm: a closed cloud deck and dark water — S — R7 — **✅ Done**
 
 - **Depends on:** item 50 (the sky mix).
 - **Now:** a storm shows a few small dark clouds, with blue sky between them and bright water.
@@ -602,6 +602,7 @@ A visual review of `main` at `6da35c1`. The method: 47 scene states in headless 
   - Darken the water by about 40 % during a storm, and give it a slight grey tint.
   - Keep the lightning (`WeatherEffects.tsx`).
 - **Done when:** in the browser at 15:00 with code 95, no blue sky shows through the deck, and the water is darker than in rain.
+- **Built:** `CloudLayer` draws a `storm-deck` SVG in a storm: a solid dark band with two rows of large overlapping ellipses along its lower edge, blurred 4 px, across the top ~35 % of the sky. In a storm the drifting clouds move down to 30–50 % of the height, below the deck. `getWaterColors(skyGradient, storm)` darkens both water stops by 40 % and cuts their saturation by 30 % (grey tint). The lightning is unchanged.
 
 ### 52. Stars: dimmed by clouds and fewer in twilight — S — R8, R23 — **✅ Done**
 
@@ -614,13 +615,14 @@ A visual review of `main` at `6da35c1`. The method: 47 scene states in headless 
 - **Done when:** tests for the opacity per weather type and the star share per twilight phase. In the browser at 22:30, overcast and rain show no stars. At 19:55 (nautical) only a few stars show.
 - **Built:** `SunTracker` passes `weatherType` and `cloudCoverPercent` to `NightStars`. Two pure helpers in `weatherEffectsUtils.ts` set the values: `getStarCloudFactor` gives the cloud factor, and `getTwilightStars` gives the star share and opacity per phase. A star shows when its `brightness` is in the top share. Shooting stars show only at night. When the factor is 0, the canvas stays empty and no animation loop runs. Drizzle counts as covered (0), the same as rain.
 
-### 53. The water follows the sky — M — R11, R12
+### 53. The water follows the sky — M — R11, R12 — **✅ Done**
 
 - **Now:** `getHorizonColor` and `getWaterDeepColor` (`SunVisualization.tsx:666`) have five buckets. `dawn` is a grey (`--scene-horizon-dawn: 264 3.9% 25.3%`), and `morning`, `evening` and `civil-twilight` fall to `day`, a bright cyan. So dawn has an orange sky over grey-black water, and the evening has an orange or lilac sky over midday water.
 - **Spec:**
   - **Water colour:** give the water the lower sky stop of the current gradient, reflected: the surface stop is the sky's horizon colour, darkened by about 15 % and a little more saturated. The deep stop is a dark version of the sky's top colour. Take both from the same gradient that paints the sky (after item 50's weather mix), so the sky and the water always change together. Remove the fixed per-bucket water tokens that this replaces.
   - **Reflection:** replace the ladder of short dashes (`data-testid="water-reflection"`) with a soft glitter strip under the sun or the moon. The strip is a vertical band about the width of the disc, getting narrower and fainter with depth, made of short, blurred horizontal highlights. It shimmers slowly (a 4–6 s cycle, opacity only). With reduced motion it stays still.
 - **Done when:** a test checks that the water colours come from the sky gradient for each `timeOfDay`. In the browser at 07:25, 18:45 and 19:20, the water is warm or lilac like the sky above it, and the reflection reads as light on water.
+- **Built:** `SunTracker` computes the mixed sky gradient once (`skyGradient`) and passes it to `SunVisualization`. `getWaterColors` (`sunUtils.ts`) reads the gradient's hex stops. Surface: the sky colour at the horizon line (65 % of the height, between the 62 % and 100 % stops), 15 % darker but at least 5 points of lightness, so the night sea still reads against the night sky, and saturation × 1.3. Deep: the top stop at 45 % lightness. The sky colour at the horizon line is used, not the 100 % stop, because the 100 % stop is under the water (at dawn it is cyan under a peach sky). The `--scene-horizon-*` and `--scene-water-deep-*` tokens are gone. The reflection is a soft tapering light band (disc width) plus 12 rows of two short, blurred highlights that get narrower and fainter with depth. Each highlight runs `animate-shimmer` (5 s, opacity only) with a staggered delay; the global reduced-motion rule stops it. The sun strip uses `--scene-sun-high`, the moon strip `--scene-moon`. No sun strip when the disc is hidden (item 50).
 
 ### 54. Moon line a few pixels lower — S — R13 — **✅ Done**
 

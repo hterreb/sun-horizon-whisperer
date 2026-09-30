@@ -113,14 +113,9 @@
     --scene-sun-low: 20 100% 42%;
     --scene-sun-horizon: 4 85% 38%;
 
-    /* Scene palette — moon, horizon (per SunVisualization's getHorizonColor), water */
+    /* Scene palette — moon, water (the water's gradient comes from the sky, ROADMAP item 53) */
     --scene-moon: 216 12.2% 83.9%;
     --scene-moon-dark: 224 14.9% 19.8%; /* the moon disc's unlit-side fill */
-    --scene-horizon-night: 218 42% 15%; /* dark navy: the night sea must read against the night sky and ridge (item 27) */
-    --scene-horizon-astro-twilight: 223.3 25.7% 13.7%;
-    --scene-horizon-nautical-twilight: 265.7 10.1% 13.5%;
-    --scene-horizon-dawn: 264 3.9% 25.3%;
-    --scene-horizon-day: 194.3 86.3% 57.1%;
     --scene-water: 194.3 86.3% 57.1%;
 
     /* Glass panel (InfoPanel restyle target, item 15) */
@@ -131,25 +126,13 @@
     /*
      * Scene palette — item 15 D polish (scene colour refactor + deliverable 2/3).
      * Extends the item-7 scene tokens above with the pieces the style book's D
-     * ("Polished Classic") branches actually draw: a two-tone water body (paired
-     * with the existing --scene-horizon-* as its top/surface stop), the
+     * ("Polished Classic") branches actually draw: the
      * line-of-sight ridge's soft colour per time-of-day bucket, and the palette
      * for the iceberg/ghost/critter easter eggs. Values are converted from the
      * style book's hex (see scene() k==='d' and ghostTile('d')) to this file's
      * HSL-triple convention so `hsl(var(--x))` and Tailwind's `/opacity` modifier
      * both work.
      */
-
-    /* Water — bottom (deep) stop, one per --scene-horizon-* bucket (its top/surface
-       stop). day's deep tone is the style book's water.day[1] (#0C5F8A); the other
-       buckets are a darkened version of their own --scene-horizon-* colour, since
-       the style book only defines golden/day/night/storm and this app's TimeOfDay
-       has finer twilight buckets. */
-    --scene-water-deep-night: 222 48% 7%;
-    --scene-water-deep-astro-twilight: 226.7 25.7% 6.9%;
-    --scene-water-deep-nautical-twilight: 270 11.8% 6.7%;
-    --scene-water-deep-dawn: 270 3.1% 12.5%;
-    --scene-water-deep-day: 200.5 84% 29.4%;
 
     /* Line-of-sight ridge (terrain-silhouette) — the style book's soft ridge
        colour per time-of-day: night #1C1D2A, day #5C8FB0, golden #6A4A6E. Drawn at
