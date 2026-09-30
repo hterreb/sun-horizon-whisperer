@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-01. Done: items 1–13, 15, 17–41 and 46–56 (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14, 16 and 42–45 (Sentry feedback, round 3), 57–60 (scene re-check), the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
+Status: last updated 2026-10-01. Done: items 1–13, 15, 17–41 and 47–56, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14, 16 and 42–45 (Sentry feedback, round 3), 57–60 (scene re-check), the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
 
 ## Verification (2026-09-28)
 
@@ -548,7 +548,7 @@ A visual review of `main` at `6da35c1`. The method: 47 scene states in headless 
 - **Order:** 46 → 50 → 53, because each one changes the sky or the sun that the next one tints. The other items are independent.
 - **Rule:** all motion stays slow and calm (see item 10).
 
-### 46. A filled sun that shows in golden hour — S — R2, R20 — **✅ Done**
+### 46. A filled sun that shows in golden hour — S — R2, R20 — **↩ Rolled back**
 
 - **Now:** the sun is the lucide `Sun` outline icon, `strokeWidth={1}` (`SunVisualization.tsx:859`). Between 0° and 10° it is `text-orange-400` (`getSunColor`), so on the orange evening sky only the glow shows. At +2.4° and +4.9° the sun is not visible.
 - **Spec:**
@@ -557,6 +557,7 @@ A visual review of `main` at `6da35c1`. The method: 47 scene states in headless 
   - Keep the halo, the `drop-shadow` glow and `animate-glow`.
 - **Done when:** in the browser at 18:30 and 18:45 (Ravensburg, clear), the disc is clearly visible against the evening sky. A test checks the colour token per altitude band.
 - **Built:** the sun is a 56 px filled disc with a soft 6 px rim shadow, over the halo. The halo, the `drop-shadow` glow and `animate-glow` stay. `getSunDiscToken` sets the fill: `--scene-sun-high` (pale white-yellow) above 10°, `--scene-sun-low` (deep red-orange) from 0° to 10°, `--scene-sun-horizon` (deep red) below 0°. At 18:30 (+4.9°) and 18:45 (+2.4°) the disc is clearly visible on the orange sky.
+- **Rolled back (2026-09-30):** on request ("the sun and the reflection looked better in the version before"), the sun is the line sun with rays again: lucide `Sun`, 96 px above the horizon and 80 px below, `text-yellow-300` above 10°, `text-orange-400` from 0° to 10°, `text-amber-600` below 0°. The dimming from item 50 stays: the sun's opacity is `getSunVisibility().disc`. `getSunDiscToken` and the `--scene-sun-high/low/horizon` tokens are gone. Trade-off: in golden hour the line sun is faint against the orange sky, which was the reason for this item.
 
 ### 47. Collapsed panel: hide "Change location" — S — R3 — **✅ Done**
 
@@ -623,6 +624,7 @@ A visual review of `main` at `6da35c1`. The method: 47 scene states in headless 
   - **Reflection:** replace the ladder of short dashes (`data-testid="water-reflection"`) with a soft glitter strip under the sun or the moon. The strip is a vertical band about the width of the disc, getting narrower and fainter with depth, made of short, blurred horizontal highlights. It shimmers slowly (a 4–6 s cycle, opacity only). With reduced motion it stays still.
 - **Done when:** a test checks that the water colours come from the sky gradient for each `timeOfDay`. In the browser at 07:25, 18:45 and 19:20, the water is warm or lilac like the sky above it, and the reflection reads as light on water.
 - **Built:** `SunTracker` computes the mixed sky gradient once (`skyGradient`) and passes it to `SunVisualization`. `getWaterColors` (`sunUtils.ts`) reads the gradient's hex stops. Surface: the sky colour at the horizon line (65 % of the height, between the 62 % and 100 % stops), 15 % darker but at least 5 points of lightness, so the night sea still reads against the night sky, and saturation × 1.3. Deep: the top stop at 45 % lightness. The sky colour at the horizon line is used, not the 100 % stop, because the 100 % stop is under the water (at dawn it is cyan under a peach sky). The `--scene-horizon-*` and `--scene-water-deep-*` tokens are gone. The reflection is a soft tapering light band (disc width) plus 12 rows of two short, blurred highlights that get narrower and fainter with depth. Each highlight runs `animate-shimmer` (5 s, opacity only) with a staggered delay; the global reduced-motion rule stops it. The sun strip uses `--scene-sun-high`, the moon strip `--scene-moon`. No sun strip when the disc is hidden (item 50).
+- **Reflection rolled back (2026-09-30):** on request, the reflection is the 7 short bars again (`--scene-sun-glow-low` under the sun, `--scene-moon` under the moon). `GLINT_OFFSETS` and `animate-shimmer` are gone. The water colours from the sky stay, and the bars stay hidden when clouds hide the sun (item 50).
 
 ### 54. Moon line a few pixels lower — S — R13 — **✅ Done**
 
@@ -657,13 +659,13 @@ These items come from the re-shoot of all states after items 46–56.
 
 ### 58. No reflection when the sun or moon is below the horizon — S
 
-- **Now:** the glitter strip (item 53) shows in nautical twilight at −9°, under the moon at −3.1°, and at −1° after sunset.
+- **Now:** the glitter strip (item 53) shows in nautical twilight at −9°, under the moon at −3.1°, and at −1° after sunset. Since 2026-09-30 the reflection is the bars again (item 53); the same rule applies to them.
 - **Spec:** show the sun or moon strip only when that body's altitude is above 0°. Fade the strip out between +2° and 0°. Clouds also hide the moon strip (item 57).
 - **Done when:** a test for the strip visibility by altitude. In the browser at 06:30, 19:20 and 19:55, there is no strip under a body that is below the horizon.
 
 ### 59. Drizzle and snow: a pale sun — S
 
-- **Now:** drizzle and snow set the disc to 50 % opacity (item 50). On the light sky the disc still looks almost fully bright.
+- **Now:** drizzle and snow set the disc to 50 % opacity (item 50). On the light sky the disc still looks almost fully bright. Since the item 46 rollback the sun is the line icon again: mix its line colour instead.
 - **Spec:** in drizzle and snow, mix the disc colour toward the sky's grey (`--scene-sky-overcast`) by about 50 % instead of only lowering the opacity, and blur its edge a little. Keep the small halo.
 - **Done when:** in the browser at 11:00, the sun in drizzle and snow is clearly paler than in the cloudy state, and it can still be seen.
 
