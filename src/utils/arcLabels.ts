@@ -110,6 +110,22 @@ export const getTerrainArcLabels = (
   };
 };
 
+// Line-of-sight moonrise/moonset labels for the moon arc (ROADMAP item 63): the moon's
+// position at each getTerrainMoonTimes time (SunTracker's terrainMoonTimes). Same rules
+// as getTerrainArcLabels.
+export const getTerrainMoonArcLabels = (
+  terrainMoonTimes: { rise: Date | null; set: Date | null },
+  latitude: number,
+  longitude: number
+): ArcLabels => {
+  const { rise, set } = terrainMoonTimes;
+  return {
+    rise: rise ? toPoint(rise, getMoonPosition(rise, latitude, longitude)) : null,
+    zenith: null,
+    set: set ? toPoint(set, getMoonPosition(set, latitude, longitude)) : null,
+  };
+};
+
 // Golden-section search for the time of maximum altitude in [loMs, hiMs] (a unimodal
 // rise-then-set climb over one pass) - refines the moon's zenith to well under a minute,
 // far tighter than the arc's own ~30 min sampling step.

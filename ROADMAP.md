@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44 and 47–62, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
+Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44 and 47–63, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
 
 ## Verification (2026-09-28)
 
@@ -750,6 +750,14 @@ These items come from the re-shoot of all states after items 46–56.
   - `weatherEffectsUtils.ts`: `FISH_WEIGHTS`, `pickFish` (shares `pickWeighted` with `pickBoat`), `canSpawnFish` (E4, turtle and jellyfish exempt) and `getRestStopMotion` (P8). The rest stop is a CSS `linear()` easing on the existing `moveAcrossX` animation, so no movement goes through React state. A browser without `linear()` ignores the easing, and the fish glides straight.
   - `CloudLayer.tsx`: the `FISH` table and `createFish` (distance, school, rest stop, haze, rain, glow, companion). A pair is one entry; the companion is the same fish with an animation delay, and its `onAnimationEnd` removes the pair. `FISH_RATE_PERCENT_PER_SEC` is gone.
 - **Checked:** 14 new unit tests (588 in all), lint, typecheck and build pass. In Chromium at 390×844, Ravensburg, clear weather: all 13 species swam across, at 70–85 % of the height (the whale 43 px wide, far and pale; a school of 5 minnows). The pike stopped at 33 % of the width for about 8 s and swam on. At 19:15 (civil twilight), 2 of 5 fish had the gold glow. There were no console errors.
+
+### 63. Line-of-sight moonrise and moonset on the moon arc — S — **✅ Done**
+
+- **Feedback (2026-09-30):** "moonrise and set dont have the line of sight times on the arc yet it is only for the sun at the moment please add".
+- **Now:** item 42 shows the line-of-sight sunrise and sunset on the sun arc. The moon arc shows only the flat moonrise and moonset. The line-of-sight moon times (`terrainExtras.terrainMoonTimes`) show only in the panel.
+- **Spec:** the item 42 rules on the moon arc: a moon-colour pill with the `Mountain` icon and the gold plus, just above the point where the moon arc meets the ridge. Only with line of sight on, a ready profile, and the moon arc drawn. A flat moon pill that overlaps the terrain pill of the same kind, or shows the same minute, is dropped.
+- **Done when:** unit test with a 5° ridge: the labels have the `getTerrainMoonTimes` times, at about 5° altitude. Component tests: the labels render with a profile and terrain times, not without a profile or while the moon arc is hidden, and a flat pill with the same minute is dropped. In the browser at Innsbruck, 390×844 and 360×800: no pills overlap.
+- **Built:** `getTerrainMoonArcLabels` (`arcLabels.ts`) returns the moon position at each terrain time. `SunTracker` passes `terrainMoonTimes` to `SunVisualization`. Test ids: `arc-label-moon-terrain-rise` and `arc-label-moon-terrain-set`. Fix on the way: a moon pill that overlaps a sun pill now steps up until it is clear (max. 3 steps), not only once. Before, at 360×800 the flat moonset pill overlapped the terrain sunset pill. Innsbruck, 2026-09-30 21:00: terrain moonrise 21:01 (flat 20:23), terrain moonset 11:37 (flat 13:19); no pills overlap at 390×844 and 360×800.
 
 ---
 
