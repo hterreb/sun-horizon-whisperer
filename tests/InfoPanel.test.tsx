@@ -96,6 +96,34 @@ describe('InfoPanel', () => {
     expect(screen.queryByTestId('panel-frost')).not.toBeInTheDocument();
   });
 
+  it('shows the temperature in the chosen unit, and the toggle reports the new unit', () => {
+    const weather: WeatherData = {
+      temperature: -3,
+      weatherType: 'snow',
+      weatherDescription: 'Snow',
+      lastUpdated: new Date(),
+      isRealWeather: true,
+      sunsetScoreToday: null,
+      sunsetScoreTomorrow: null,
+      cloudCoverPercent: null,
+      windSpeedKmh: null,
+      windDirectionDeg: null,
+    };
+    const onUnitChange = vi.fn();
+    const { rerender } = render(
+      <InfoPanel {...defaultProps} weatherData={weather} temperatureUnit="C" onTemperatureUnitChange={onUnitChange} />,
+    );
+    expect(screen.getByText('-3°C')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '°C' })).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: '°F' }));
+    expect(onUnitChange).toHaveBeenCalledWith('F');
+
+    rerender(<InfoPanel {...defaultProps} weatherData={weather} temperatureUnit="F" onTemperatureUnitChange={onUnitChange} />);
+    expect(screen.getByText('27°F')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '°F' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('shows "Change location" only while the panel is expanded (ROADMAP item 47)', () => {
     render(<InfoPanel {...defaultProps} />);
     expect(screen.getByRole('button', { name: /change location/i })).toBeInTheDocument();
