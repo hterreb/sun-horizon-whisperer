@@ -1,4 +1,4 @@
-import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, getStarCloudFactor, getTwilightStars, getSkyOvercastMix, getSunVisibility, getMoonCloudFactor } from '../src/utils/weatherEffectsUtils';
+import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, pickFish, FISH_WEIGHTS, canSpawnFish, getRestStopMotion, getStarCloudFactor, getTwilightStars, getSkyOvercastMix, getSunVisibility, getMoonCloudFactor } from '../src/utils/weatherEffectsUtils';
 
 describe('getWeatherEffects (ROADMAP item 10)', () => {
   it('shows fog only for the fog type', () => {
@@ -94,6 +94,51 @@ describe('pickBoat (ROADMAP item 36)', () => {
   it('keeps the rowboat ashore above 40 km/h wind', () => {
     expect(picks('clear', 41).has('rowboat')).toBe(false);
     expect(picks('clear', 40).has('rowboat')).toBe(true);
+  });
+});
+
+describe('fish mix (ROADMAP item 62)', () => {
+  it('has weights that sum to 100 and sends out every species', () => {
+    expect(FISH_WEIGHTS.reduce((sum, [, weight]) => sum + weight, 0)).toBe(100);
+    const picks = Array.from({ length: 100 }, (_, i) => pickFish(i / 100));
+    expect(new Set(picks)).toEqual(new Set(FISH_WEIGHTS.map(([kind]) => kind)));
+    expect(picks.filter(k => k === 'classic').length).toBe(25);
+    expect(picks.filter(k => k === 'whale').length).toBe(1);
+  });
+
+  it('allows at most five fish, but turtles and jellyfish never count (E4)', () => {
+    const four = ['classic', 'perch', 'pike', 'carp'] as const;
+    expect(canSpawnFish([...four], 'trout')).toBe(true);
+    expect(canSpawnFish([...four, 'trout'], 'seahorse')).toBe(false);
+    expect(canSpawnFish([...four, 'trout'], 'turtle')).toBe(true);
+    expect(canSpawnFish([...four, 'trout'], 'jellyfish')).toBe(true);
+    expect(canSpawnFish([...four, 'turtle', 'jellyfish', 'jellyfish'], 'trout')).toBe(true);
+  });
+});
+
+describe('getRestStopMotion (ROADMAP item 62, P8)', () => {
+  // A near pike: 2 %/s over 110 % of the width, stopped 50 % along, for 6 s.
+  const { duration, easing } = getRestStopMotion(110, 2, 50, 6);
+  const points = [...easing.matchAll(/([\d.]+) ([\d.]+)%/g)].map(([, p, t]) => [Number(t) / 100 * duration, Number(p)]);
+
+  it('takes the cruise time plus the stop: 3 s to slow, the hold, 3 s to speed up', () => {
+    // 110 % at 2 %/s is 55 s. Each 3 s ramp covers 3 % instead of 6 %, so it costs 1.5 s.
+    expect(duration).toBeCloseTo(55 + 1.5 + 6 + 1.5, 5);
+  });
+
+  it('starts at 0, ends at 1 and never moves backward', () => {
+    expect(easing.startsWith('linear(0.0000 0.00%')).toBe(true);
+    expect(easing.endsWith('1.0000 100.00%)')).toBe(true);
+    points.slice(1).forEach(([t, p], i) => {
+      expect(t).toBeGreaterThanOrEqual(points[i][0]);
+      expect(p).toBeGreaterThanOrEqual(points[i][1]);
+    });
+  });
+
+  it('holds still at the stop point for the hold time', () => {
+    const still = points.filter(([, p]) => Math.abs(p - 50 / 110) < 1e-4);
+    expect(still.length).toBe(2);
+    expect(still[1][0] - still[0][0]).toBeCloseTo(6, 1);
   });
 });
 
