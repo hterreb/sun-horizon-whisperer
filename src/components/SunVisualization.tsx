@@ -48,6 +48,8 @@ interface SunVisualizationProps {
   // existing callers/tests that don't pass them keep the labels always visible.
   isFullscreen?: boolean;
   showCursor?: boolean;
+  // Start time (ms) of the sunrise/sunset fireworks show from SunTracker; 0 = none (ROADMAP item 41).
+  fireworksTrigger?: number;
 }
 
 // Maps an azimuth (0-360°, 0 = North) to a horizontal screen fraction (0-1), for the
@@ -468,7 +470,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   compassHeading = null,
   horizonProfile = null,
   isFullscreen = false,
-  showCursor = true
+  showCursor = true,
+  fireworksTrigger = 0
 }) => {
   // Compass mode (ROADMAP item 19): a real field of view centered on the heading,
   // replacing the static full-circle mapping - also turns off the CSS transitions
@@ -480,27 +483,6 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   const cardinalLabelsVisible = compassActive || !isFullscreen || showCursor;
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerDimensions, setContainerDimensions] = useState({ width: 0, height: 0 });
-  const [showFireworks, setShowFireworks] = useState(false);
-  const prevAltitudeRef = useRef<number>(sunPosition.altitude);
-
-  // Check if sun crosses the horizon (0° altitude)
-  useEffect(() => {
-    const currentAltitude = sunPosition.altitude;
-    const prevAltitude = prevAltitudeRef.current;
-
-    // Trigger fireworks on a sign change (crossing the horizon in either direction).
-    if (crossesHorizon(prevAltitude, currentAltitude)) {
-      setShowFireworks(true);
-
-      // Reset fireworks trigger after a short delay
-      setTimeout(() => {
-        setShowFireworks(false);
-      }, 100);
-    }
-
-    prevAltitudeRef.current = sunPosition.altitude;
-  }, [sunPosition.altitude]);
-
   useEffect(() => {
     const updateDimensions = () => {
       if (containerRef.current) {
@@ -805,7 +787,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         containerWidth={containerDimensions.width}
         containerHeight={containerDimensions.height}
       />
-      <Fireworks trigger={showFireworks} />
+      <Fireworks trigger={fireworksTrigger} />
 
       {(sunArcPath || moonArcPath) && (
         <svg className="absolute inset-0 w-full h-full pointer-events-none">

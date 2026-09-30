@@ -440,7 +440,7 @@ Seven feedback reports from production (Ravensburg, release `6da35c1`, 29 Sep 16
 - **Checked:** headless Chromium, 390×844, Ravensburg, clear weather. For 70 spawns, each boat's measured speed and crossing time match the table. The lineup at near size shows rowboat < sailboat ≈ fishing boat < ferry < freighter, with the fish clearly the smallest. At 19:15 (civil twilight, 12 min after sunset) bats fly and the boats show their lights.
 - **Tests:** bats in civil twilight, a speed per type (sailboat against ferry), no fourth boat, a 20 px fish.
 
-### 41. Fireworks: a 10 s show at the visible sunrise and sunset — S — [SUN-CHASER-D](https://ainabler.sentry.io/issues/SUN-CHASER-D)
+### 41. Fireworks: a 10 s show at the visible sunrise and sunset — S — [SUN-CHASER-D](https://ainabler.sentry.io/issues/SUN-CHASER-D) — **✅ Done**
 
 - **Feedback:** "Redo firework animation not really visible and too short - should go at least 10s."
 - **Cause (`Fireworks.tsx`, from the code):**
@@ -460,6 +460,11 @@ Seven feedback reports from production (Ravensburg, release `6da35c1`, 29 Sep 16
 - **Done when:**
   - Unit tests: the show plan spans at least 10 s. `getNextSunEvent` gives the terrain time when there is one, else the flat time. A clock step longer than 5 s does not start the show.
   - In the browser (390×844, fixed clock 15 s before sunset): the show starts at sunset, runs for at least 10 s, and the bursts are clearly visible against the sunset sky.
+- **Built:**
+  - `Fireworks.tsx` draws the show on one `<canvas>` (sized to `devicePixelRatio`). The sparks and the rAF id are in `useRef`s. The physics uses the frame time in px/s. `planShow` gives 13 bursts 0.62 s apart and a larger last burst at 9.1 s. Each burst starts as a rocket that rises from the water line for 1 s.
+  - The trigger is the start time of the show, not a boolean. Only a new show or unmount stops the loop, so all bursts run.
+  - `getNextSunEvent` and `passesSunEvent` in `src/utils/sunEvents.ts` select the terrain time when there is one, else the flat time. `SunTracker` starts the show when the 1 s clock passes that time, but not after a clock step longer than 5 s. The altitude-sign effect in `SunVisualization` is removed.
+  - Browser check (Ravensburg, 2026-09-30, 390×844): with the terrain profile, the show starts at 18:57:14 (terrain sunset) and ends at 18:57:27. Without the profile, it starts at 19:05:50 (flat sunset 19:05:49) and ends at 19:06:03. The sparks are clearly visible on the orange sky.
 
 ### 42. Line-of-sight sunrise and sunset on the sun arc — S — [SUN-CHASER-C](https://ainabler.sentry.io/issues/SUN-CHASER-C)
 
