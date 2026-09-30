@@ -1,6 +1,9 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { Fish, Leaf, Sailboat, type LucideIcon } from 'lucide-react';
-import { Bat, FishingBoat, Freighter, LakeFerry, Rowboat } from './sceneIcons';
+import { Fish, Leaf, Sailboat, Turtle, type LucideIcon } from 'lucide-react';
+import {
+  Bat, FishingBoat, Freighter, LakeFerry, Rowboat,
+  Carp, Catfish, Jellyfish, Minnow, Perch, Pike, Pufferfish, Ray, Seahorse, Trout, Whale,
+} from './sceneIcons';
 import { type TimeOfDay } from '../utils/sunUtils';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import {
@@ -10,7 +13,10 @@ import {
   getCloudDriftDirection,
   getPrecipitationSlantPx,
 } from '../utils/cloudLayoutUtils';
-import { getWeatherEffects, pickBoat, type BoatKind } from '../utils/weatherEffectsUtils';
+import {
+  getWeatherEffects, pickBoat, type BoatKind,
+  pickFish, canSpawnFish, getRestStopMotion, type FishKind,
+} from '../utils/weatherEffectsUtils';
 
 // ROADMAP item 10: more than the original 6 types - fog, drizzle and hail join the
 // weather-dependent clouds/illustrations, and "partly" splits out the old single
@@ -45,11 +51,11 @@ interface CloudLayerProps {
 }
 
 // Birds/fish/ships/leaves travel horizontally at a constant rate (in % of the layer's
-// width per second). A CSS animation moves each entity across the screen once at spawn
-// time, so no per-frame `setState` is needed for movement; state only changes on spawn
+// width per second; resting fish pause on the way, see getRestStopMotion). A CSS
+// animation moves each entity across the screen once at spawn time, so no per-frame `setState` is needed for movement; state only changes on spawn
 // (adding an entry) and despawn (removing one, via `onAnimationEnd`).
 const BIRD_RATE_PERCENT_PER_SEC = 5; // was 0.08%/16ms in the old rAF loop
-const FISH_RATE_PERCENT_PER_SEC = 2.5; // was 0.04%/16ms in the old rAF loop. Boats: `speed` in BOATS.
+// Fish and boats: `speed` in FISH and BOATS.
 const LEAF_RATE_PERCENT_PER_SEC = 6;
 // A new boat at least every 55 s. The random part is re-rolled on every 500 ms check, so
 // most gaps end within ~10 s of the minimum. A crossing takes 64-234 s (ROADMAP item 40),
@@ -111,6 +117,89 @@ const BOATS: Record<BoatKind, { Icon: LucideIcon; scale: number; speed: number; 
 };
 const FAR_SHRINK = 0.45; // the farthest boat is 55% of the size, opacity and speed of the nearest
 
+// ROADMAP item 62 (Fish & Currents lookbook). `size` (px) and `speed` (% of the width per
+// second) are a near fish's; far fish shrink and slow down like the boats (FAR_SHRINK).
+// `haze` is how deep the species swims: 0 = at the surface (crisp) to 1 = deep (faint).
+// `glow` is the spot that lights up after sunset (E1), in the icon's 24 px grid.
+type FishPattern = 'glide' | 'school' | 'companions' | 'rest';
+const FISH: Record<FishKind, { Icon: LucideIcon; size: number; speed: number; haze: number; pattern: FishPattern; glow: [number, number] }> = {
+  classic: { Icon: Fish, size: 20, speed: 2.5, haze: 0.3, pattern: 'companions', glow: [14, 12] },
+  minnow: { Icon: Minnow, size: 10, speed: 3, haze: 0.1, pattern: 'school', glow: [13, 12] },
+  perch: { Icon: Perch, size: 22, speed: 2.2, haze: 0.35, pattern: 'companions', glow: [13.5, 12.5] },
+  pike: { Icon: Pike, size: 32, speed: 2, haze: 0.45, pattern: 'rest', glow: [13, 12] },
+  carp: { Icon: Carp, size: 26, speed: 1.6, haze: 0.65, pattern: 'glide', glow: [12, 12] },
+  catfish: { Icon: Catfish, size: 34, speed: 1.1, haze: 0.85, pattern: 'glide', glow: [12, 13] },
+  trout: { Icon: Trout, size: 22, speed: 2.8, haze: 0, pattern: 'glide', glow: [13, 12] },
+  ray: { Icon: Ray, size: 30, speed: 1.5, haze: 0.75, pattern: 'glide', glow: [12.5, 12] },
+  turtle: { Icon: Turtle, size: 26, speed: 1.2, haze: 0.5, pattern: 'rest', glow: [10, 7] },
+  jellyfish: { Icon: Jellyfish, size: 18, speed: 0.5, haze: 0.3, pattern: 'glide', glow: [12, 9] },
+  seahorse: { Icon: Seahorse, size: 18, speed: 0.4, haze: 0.4, pattern: 'glide', glow: [12.5, 11] },
+  whale: { Icon: Whale, size: 72, speed: 0.8, haze: 0.8, pattern: 'glide', glow: [13, 12] },
+  pufferfish: { Icon: Pufferfish, size: 20, speed: 1, haze: 0.4, pattern: 'rest', glow: [12.5, 12] },
+};
+// P5: a minnow school's fixed formation, in minnow widths x 1.15, the leader in front.
+const SCHOOL_FORMATION: [number, number][] = [[0, 0], [-1.4, -0.9], [-1.6, 0.9], [-2.9, -0.1], [-3.1, 1.6], [-4.2, -1.1], [-4.5, 0.7]];
+
+interface FishEntity extends MovingEntity {
+  kind: FishKind;
+  depth: number; // 0 = near, 1 = far, like the boats
+  size: number; // px, after the distance shrink
+  width: number; // px, of one fish or of the whole school
+  height: number;
+  opacity: number;
+  glow: boolean;
+  easing?: string; // rest stop (P8): a CSS linear() easing that holds still mid-crossing
+  school?: { left: number; top: number }[]; // P5: each minnow's offset in px
+  companion?: { lag: number; dy: number }; // P6: a second fish, `lag` s behind, `dy` % lower
+}
+
+// Builds one fish (ROADMAP item 62). `wet` = rain or drizzle, where fish swim deeper (E2).
+// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
+export const createFish = (
+  kind: FishKind, sunDown: boolean, wet: boolean, viewportWidth: number, random = Math.random,
+): FishEntity => {
+  const spec = FISH[kind];
+  // P3: a random distance; the whale always passes far out.
+  const depth = kind === 'whale' ? 0.75 + random() * 0.25 : random();
+  const nearness = 1 - FAR_SHRINK * depth;
+  const size = Math.round(spec.size * nearness);
+  let width = size;
+  let height = size;
+  let school: FishEntity['school'];
+  if (spec.pattern === 'school') {
+    const cell = size * 1.15;
+    const spots = SCHOOL_FORMATION.slice(0, 4 + Math.floor(random() * 4));
+    const minX = Math.min(...spots.map(([x]) => x));
+    const minY = Math.min(...spots.map(([, y]) => y));
+    school = spots.map(([x, y]) => ({ left: (x - minX) * cell, top: (y - minY) * cell }));
+    width = -minX * cell + size;
+    height = (Math.max(...spots.map(([, y]) => y)) - minY) * cell + size;
+  }
+  const startX = -(width / viewportWidth) * 100 - 1;
+  const dx = 101 - startX;
+  const speed = spec.speed * nearness; // P4
+  // P8: stop with the fish's left edge at 30-65 % of the width, for 5-8 s.
+  const rest = spec.pattern === 'rest'
+    ? getRestStopMotion(dx, speed, 30 + random() * 35 - startX, 5 + random() * 3)
+    : null;
+  return {
+    id: Date.now() + Math.random(),
+    kind, depth, size, width, height, school,
+    x: startX,
+    // Far fish swim at 70 % of the height, near ones at 85 % (the old fish band), ±1 %.
+    y: 70 + (1 - depth) * 15 + (random() - 0.5) * 2,
+    dx,
+    duration: rest ? rest.duration : dx / speed,
+    easing: rest?.easing,
+    // Paler with distance (P3), with depth (P9 haze) and in rain (E2).
+    opacity: 0.7 * (1 - 0.3 * depth) * (1 - 0.4 * spec.haze) * (wet ? 0.75 : 1),
+    glow: sunDown && spec.pattern !== 'school' && random() < 0.35, // E1
+    companion: spec.pattern === 'companions' && random() < 0.35 // P6
+      ? { lag: 2 + random() * 2, dy: (random() - 0.5) * 2.8 }
+      : undefined,
+  };
+};
+
 // Deterministic pseudo-random value in [0, 1), seeded by an integer. Lets raindrop/
 // snowflake/hail layouts be derived during render (pure, no `Math.random()`) while
 // still looking randomly scattered; the classic fract(sin(x)) trick.
@@ -138,7 +227,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   isFullscreen = false,
 }) => {
   const [birds, setBirds] = useState<MovingEntity[]>([]);
-  const [fish, setFish] = useState<MovingEntity[]>([]);
+  const [fish, setFish] = useState<FishEntity[]>([]);
   const [ships, setShips] = useState<Boat[]>([]);
   const [leaves, setLeaves] = useState<MovingEntity[]>([]);
 
@@ -245,6 +334,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
                           timeOfDay !== 'night' &&
                           timeOfDay !== 'astronomical-twilight' &&
                           timeOfDay !== 'nautical-twilight';
+    const wetForFish = weatherType === 'rain' || weatherType === 'drizzle';
     const shouldShowShips = weatherType !== 'storm' && weatherType !== 'hail';
 
     const spawnTick = () => {
@@ -277,17 +367,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
 
       if (shouldShowFish) {
         if (currentTime - lastSpawnTimeRef.current.fish > 5000 + Math.random() * 3000) {
-          if (Math.random() < 0.7) { // 70% chance to spawn
-            const startX = -5;
-            const endX = 105;
-            const newFish: MovingEntity = {
-              id: Date.now() + Math.random(),
-              x: startX,
-              y: 70 + Math.random() * 15,
-              dx: endX - startX,
-              duration: (endX - startX) / FISH_RATE_PERCENT_PER_SEC,
-            };
-            setFish(prev => [...prev, newFish]);
+          if (Math.random() < (wetForFish ? 0.35 : 0.7)) { // 70% chance, half of it in rain (E2)
+            const newFish = createFish(pickFish(Math.random()), isSunDown, wetForFish, window.innerWidth);
+            // At most five fish (E4). Far fish first, so a near fish swims in front.
+            setFish(prev => (canSpawnFish(prev.map(f => f.kind), newFish.kind)
+              ? [...prev, newFish].sort((a, b) => b.depth - a.depth)
+              : prev));
           }
           lastSpawnTimeRef.current.fish = currentTime;
         }
@@ -616,29 +701,66 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         </div>
       ))}
 
-      {/* Fish */}
-      {fish.map((fishItem) => (
-        <div
-          key={fishItem.id}
-          className="absolute"
-          style={{
-            left: `${fishItem.x}%`,
-            top: `${fishItem.y}%`,
-            zIndex: 5,
-            ['--dx' as string]: `${fishItem.dx}vw`,
-            animation: `moveAcrossX ${fishItem.duration}s linear forwards`,
-          }}
-          onAnimationEnd={() => setFish(prev => prev.filter(f => f.id !== fishItem.id))}
-        >
-          <Fish
-            size={20}
-            data-testid="scene-fish"
-            className={`transition-colors duration-1000 ${
-              timeOfDay === 'night' ? 'text-blue-200 text-opacity-50' : 'text-blue-400 text-opacity-70'
-            }`}
-          />
-        </div>
-      ))}
+      {/* Fish (ROADMAP item 62): each species at its own distance, pace and tint. A pair's
+          companion swims `lag` s behind; it leaves last, so its onAnimationEnd removes the pair. */}
+      {fish.map((fishItem) => {
+        const { Icon, glow } = FISH[fishItem.kind];
+        const remove = () => setFish(prev => prev.filter(f => f.id !== fishItem.id));
+        const body = fishItem.school ? (
+          <div className="relative" style={{ width: fishItem.width, height: fishItem.height }}>
+            {fishItem.school.map((spot, i) => (
+              <Icon
+                key={i}
+                size={fishItem.size}
+                className="absolute"
+                style={{ left: spot.left, top: spot.top }}
+                data-testid="scene-fish"
+                data-kind={fishItem.kind}
+              />
+            ))}
+          </div>
+        ) : (
+          <Icon size={fishItem.size} data-testid="scene-fish" data-kind={fishItem.kind}>
+            {fishItem.glow && (
+              <circle
+                cx={glow[0]}
+                cy={glow[1]}
+                r={1.3}
+                stroke="none"
+                className="fill-brand-gold-light"
+                style={{ filter: 'drop-shadow(0 0 2px hsl(var(--brand-gold)))' }}
+                data-testid="fish-glow"
+              />
+            )}
+          </Icon>
+        );
+        const swimmer = (key: string, lag: number, dy: number, onEnd?: () => void) => (
+          <div
+            key={key}
+            className="absolute"
+            style={{
+              left: `${fishItem.x}%`,
+              top: `${fishItem.y + dy}%`,
+              zIndex: 5,
+              opacity: fishItem.opacity,
+              color: `hsl(var(--scene-fish-${fishItem.kind}))`,
+              ['--dx' as string]: `${fishItem.dx}vw`,
+              animation: `moveAcrossX ${fishItem.duration}s linear ${lag}s forwards`,
+              // Rest stop (P8). A browser without CSS linear() ignores it and glides straight.
+              animationTimingFunction: fishItem.easing,
+            }}
+            onAnimationEnd={onEnd}
+          >
+            {body}
+          </div>
+        );
+        return fishItem.companion ? (
+          <React.Fragment key={fishItem.id}>
+            {swimmer('lead', 0, 0)}
+            {swimmer('companion', fishItem.companion.lag, fishItem.companion.dy, remove)}
+          </React.Fragment>
+        ) : swimmer(String(fishItem.id), 0, 0, remove);
+      })}
 
       {/* Boats (ROADMAP item 36) */}
       {ships.map((ship) => {
