@@ -979,6 +979,22 @@ describe('SunVisualization (rendered): sea visible at the horizon (ROADMAP item 
     render(<SunVisualization {...baseProps} weatherType="overcast" />);
     expect(screen.queryByTestId('water-reflection')).toBeNull();
   });
+
+  it('draws the pool of moonlight at night, as bright as the moon is full (ROADMAP item 64)', () => {
+    setMockedContainerSize(800, 600);
+    const night = {
+      ...baseProps,
+      timeOfDay: 'night' as const,
+      sunPosition: { azimuth: 0, altitude: -30 },
+      moonPosition: { azimuth: 180, altitude: 30, phase: 0.5, illumination: 0.5, visible: true },
+    };
+    const { unmount } = render(<SunVisualization {...night} />);
+    expect(screen.getByTestId('moon-pool').getAttribute('opacity')).toBe('0.5');
+    unmount();
+
+    render(<SunVisualization {...night} moonPosition={{ ...night.moonPosition, altitude: -5, visible: false }} />);
+    expect(screen.queryByTestId('moon-pool')).toBeNull();
+  });
 });
 
 describe('SunVisualization source (ROADMAP item 15, scene colour refactor)', () => {

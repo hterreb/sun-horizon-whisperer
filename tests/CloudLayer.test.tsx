@@ -278,10 +278,63 @@ describe('CloudLayer', () => {
       expect(spawnFish({ weatherType: 'drizzle' }, 9000, 0.5).querySelector('[data-testid="scene-fish"]')).toBeNull();
     });
 
+    it('builds night fish in the moon tone or with their own light (ROADMAP item 64)', () => {
+      expect(createFish('burbot', false, false, 390, always(0), true).light).toBe('moon');
+      expect(createFish('eel', false, false, 390, always(0), true).light).toBe('moon');
+      expect(createFish('lanternfish', false, false, 390, always(0), true).light).toBe('own');
+      expect(createFish('jellyfish', false, false, 390, always(0), true).light).toBe('own');
+      const moonlitClassic = createFish('classic', true, false, 390, always(0), true);
+      expect(moonlitClassic.light).toBe('moon');
+      expect(moonlitClassic.glow).toBe(false); // no E1 spot on a night fish
+      expect(createFish('lanternfish', false, false, 390, always(0), true).opacity).toBeCloseTo(0.95, 5);
+      expect(createFish('classic', false, false, 390, always(0)).light).toBeUndefined();
+    });
+
     it('keeps at most five fish on screen (E4)', () => {
       // A classic fish pair every 5.5 s; none finishes its 42 s crossing in the test.
       const container = spawnFish({}, 40000);
       expect(container.querySelectorAll('[data-testid="scene-fish"]').length).toBe(10); // 5 pairs
+    });
+  });
+
+  // ROADMAP item 64 (Night waters lookbook picks NF1-NF7, NR1-NR3).
+  describe('night fish (ROADMAP item 64)', () => {
+    const moon = { x: 0.5, strength: 1 };
+    const spawnNight = (props: Partial<React.ComponentProps<typeof CloudLayer>>, ms: number, random = 0) => {
+      vi.useFakeTimers();
+      const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(random);
+      const view = render(<CloudLayer weatherType="clear" timeOfDay="night" {...props} />);
+      act(() => { vi.advanceTimersByTime(ms); });
+      randomSpy.mockRestore();
+      vi.useRealTimers();
+      return view.container;
+    };
+
+    it('swims moonlit day fish from nautical twilight on, in the pool layer (NF1, NR2)', () => {
+      for (const timeOfDay of ['nautical-twilight', 'astronomical-twilight', 'night'] as const) {
+        const fishIcon = spawnNight({ timeOfDay, moonlight: moon }, 16000)
+          .querySelector('[data-testid="moonlit-fish"] [data-testid="scene-fish"]');
+        expect(fishIcon?.getAttribute('data-kind')).toBe('classic');
+        expect((fishIcon?.parentElement as HTMLElement).style.color).toBe('hsl(var(--scene-moon))');
+      }
+    });
+
+    it('sends no fish lit by the moon while the moon is down (NR3)', () => {
+      expect(spawnNight({}, 16000).querySelector('[data-testid="scene-fish"]')).toBeNull();
+      expect(spawnNight({ moonlight: { x: 0.5, strength: 0 } }, 16000).querySelector('[data-testid="scene-fish"]')).toBeNull();
+    });
+
+    it('sends glowing fish without the moon, with their lights (NF4)', () => {
+      // A roll of 0.6 picks the lanternfish (60 of 100), passes the 70 % chance and sets a 21 s gap.
+      const container = spawnNight({}, 22000, 0.6);
+      expect(container.querySelector('[data-testid="scene-fish"]')?.getAttribute('data-kind')).toBe('lanternfish');
+      expect(container.querySelectorAll('[data-testid="fish-light"]').length).toBe(5);
+    });
+
+    it('keeps the night quiet: a check every 15-25 s, at most three fish (NR1)', () => {
+      expect(spawnNight({ moonlight: moon }, 14000).querySelector('[data-testid="scene-fish"]')).toBeNull();
+      // A moonlit classic pair every 15.5 s; six tries in 100 s, three pairs stay.
+      expect(spawnNight({ moonlight: moon }, 100000).querySelectorAll('[data-testid="scene-fish"]').length).toBe(6);
     });
   });
 });
