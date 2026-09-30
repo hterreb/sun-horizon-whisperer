@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp } from 'lucide-react';
-import { type SunPosition, type TimeOfDay, formatTime } from '../utils/sunUtils';
+import { type SunPosition, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
 import { getSunArcLabels, getMoonArcLabels, type ArcLabels, type ArcLabelPoint } from '../utils/arcLabels';
 import { shortestHeadingDelta } from '../utils/compassUtils';
@@ -23,6 +23,9 @@ interface SunVisualizationProps {
   sunPath: SunPosition[];
   moonPath: MoonPosition[];
   timeOfDay: TimeOfDay;
+  // The sky gradient after the weather mix (SunTracker, ROADMAP item 50). The water
+  // takes its colours from it (item 53). Defaults to the plain time-of-day gradient.
+  skyGradient?: string;
   weatherType: WeatherType;
   latitude: number;
   // Longitude, current date, and live cloud_cover/wind/temperature (ROADMAP item 10):
@@ -70,6 +73,10 @@ export const getAzimuthScreenFraction = (azimuth: number, latitude: number): num
 // maps onto the screen width, centered on the current device heading. Named/exported
 // so it's easy to tune from real-device testing.
 export const COMPASS_FOV_DEG = 90;
+
+// Horizontal offsets of the reflection's highlights, as a share of the strip's
+// width, from the horizon down (ROADMAP item 53). Fixed, so the strip never jumps.
+const GLINT_OFFSETS = [0, -0.25, 0.2, -0.1, 0.28, -0.22, 0.08, -0.15, 0.18, -0.05, 0.12, -0.18];
 
 export interface CompassScreenFraction {
   fraction: number; // 0.5 = screen center (the heading); continues outside [0, 1] when not visible
@@ -460,6 +467,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   sunPath,
   moonPath,
   timeOfDay,
+  skyGradient = getBackgroundGradient(timeOfDay),
   weatherType,
   latitude,
   longitude = 0,
@@ -646,42 +654,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     return '';
   };
 
-  // Horizon/water surface color (top gradient stop) per time-of-day - the D style
-  // book's soft sky-glow-over-water tones, already defined as --scene-horizon-* by
-  // item 7 (values matching one-for-one with the old hex here, so this is a pure
-  // "wire it in" swap, no visual change to this stop).
-  const getHorizonColor = () => {
-    switch(timeOfDay) {
-      case 'night':
-        return 'hsl(var(--scene-horizon-night))';
-      case 'astronomical-twilight':
-        return 'hsl(var(--scene-horizon-astro-twilight))';
-      case 'nautical-twilight':
-        return 'hsl(var(--scene-horizon-nautical-twilight))';
-      case 'dawn':
-        return 'hsl(var(--scene-horizon-dawn))';
-      default:
-        return 'hsl(var(--scene-horizon-day))';
-    }
-  };
-
-  // Water - bottom (deep) gradient stop, paired with getHorizonColor's top/surface
-  // stop (ROADMAP item 15 deliverable 2: "the water gradient"). Same time-of-day
-  // buckets as getHorizonColor, one darker --scene-water-deep-* token each.
-  const getWaterDeepColor = () => {
-    switch(timeOfDay) {
-      case 'night':
-        return 'hsl(var(--scene-water-deep-night))';
-      case 'astronomical-twilight':
-        return 'hsl(var(--scene-water-deep-astro-twilight))';
-      case 'nautical-twilight':
-        return 'hsl(var(--scene-water-deep-nautical-twilight))';
-      case 'dawn':
-        return 'hsl(var(--scene-water-deep-dawn))';
-      default:
-        return 'hsl(var(--scene-water-deep-day))';
-    }
-  };
+  // The water follows the sky (ROADMAP item 53); a storm darkens it (item 51).
+  const water = getWaterColors(skyGradient, weatherType === 'storm');
 
   // Line-of-sight ridge (terrain-silhouette) color, the style book's "soft ridge"
   // per time-of-day bucket (ROADMAP item 15 deliverable 2), drawn semi-transparent
@@ -886,12 +860,10 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
       <svg className="absolute inset-0 w-full h-full pointer-events-none">
         <defs>
-          {/* Water gradient (ROADMAP item 15 D polish): surface stop from
-              getHorizonColor, a distinct deeper stop from getWaterDeepColor - a real
-              two-tone body of water instead of the old same-color opacity fade. */}
+          {/* Water gradient: both stops come from the sky gradient (ROADMAP item 53). */}
           <linearGradient id="horizonGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={getHorizonColor()} />
-            <stop offset="100%" stopColor={getWaterDeepColor()} />
+            <stop offset="0%" stopColor={water.surface} />
+            <stop offset="100%" stopColor={water.deep} />
           </linearGradient>
         </defs>
         {terrainFillPath && (
@@ -917,36 +889,57 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       </svg>
 
       {containerDimensions.height > 0 && weatherType !== 'storm' && (() => {
-        // Sun/moon reflection on the water (ROADMAP item 15 deliverable 2): a few
-        // short glinting bars under whichever body is currently shown, fading out
-        // with depth - the style book's water reflection streaks.
+        // Sun/moon reflection (ROADMAP item 53): a soft glitter strip under whichever
+        // body is shown, about the disc's width at the horizon, narrower and fainter
+        // with depth. Each short blurred highlight shimmers slowly (opacity only);
+        // the global reduced-motion rule in index.css keeps it still.
         const nightReflection = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
         const reflectionVisible = nightReflection ? isMoonVisible : isSunVisible && sunVisibility.disc > 0;
         if (!reflectionVisible) return null;
 
         const reflectX = nightReflection ? moonX : sunX;
-        const reflectColor = nightReflection ? 'hsl(var(--scene-moon))' : 'hsl(var(--scene-sun-glow-low))';
-        const baseOpacity = nightReflection ? 0.35 : 0.6;
-        const bandHeight = (containerDimensions.height - horizonLabelY) * 0.07;
+        const reflectToken = nightReflection ? '--scene-moon' : '--scene-sun-high';
+        const baseOpacity = nightReflection ? 0.5 : 0.8;
+        const discWidth = nightReflection ? moonRadius * 2 : 56;
+        const stripDepth = (containerDimensions.height - horizonLabelY) * 0.55;
 
         return (
-          <svg className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true" data-testid="water-reflection">
-            {Array.from({ length: 7 }, (_, i) => {
-              const barWidth = Math.max(4, 26 - i * 3);
-              return (
-                <rect
-                  key={i}
-                  x={reflectX - barWidth / 2 + (i % 2 ? 3 : -3)}
-                  y={horizonLabelY + 6 + i * bandHeight}
-                  width={barWidth}
-                  height={1.6}
-                  rx={0.8}
-                  fill={reflectColor}
-                  opacity={Math.max(0, baseOpacity - i * 0.05)}
+          <div className="absolute inset-0 pointer-events-none" aria-hidden="true" data-testid="water-reflection">
+            {/* A faint soft band behind the highlights, so they read as one strip of light. */}
+            <div
+              className="absolute"
+              style={{
+                left: reflectX - discWidth / 2,
+                top: horizonLabelY,
+                width: discWidth,
+                height: stripDepth,
+                // An ellipse centred on the horizon: widest at the top, it tapers and fades with depth.
+                background: `radial-gradient(ellipse 50% 100% at 50% 0%, hsl(var(${reflectToken}) / ${baseOpacity * 0.35}), transparent)`
+              }}
+            />
+            {GLINT_OFFSETS.flatMap((offset, i) => {
+              const depth = i / GLINT_OFFSETS.length; // 0 at the horizon, near 1 at the strip's end
+              const bandWidth = discWidth * (1 - 0.65 * depth);
+              const glintWidth = bandWidth * (0.3 + 0.1 * (i % 3));
+              // Two highlights per row, on either side of the strip's centre line.
+              return [offset, offset > 0 ? offset - 0.45 : offset + 0.45].map((x, j) => (
+                <div
+                  key={`${i}-${j}`}
+                  className="absolute rounded-full animate-shimmer"
+                  style={{
+                    left: reflectX + x * bandWidth - glintWidth / 2,
+                    top: horizonLabelY + 5 + depth * depth * stripDepth,
+                    width: glintWidth,
+                    height: 3,
+                    // The depth fade sits in the colour's alpha, since the shimmer animates opacity.
+                    background: `hsl(var(${reflectToken}) / ${baseOpacity * (1 - 0.8 * depth)})`,
+                    filter: 'blur(1.5px)',
+                    animationDelay: `${-((i * 1.3 + j * 2.5) % 5)}s`
+                  }}
                 />
-              );
+              ));
             })}
-          </svg>
+          </div>
         );
       })()}
 

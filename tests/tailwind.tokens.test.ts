@@ -24,20 +24,18 @@ describe('tailwind design tokens (ROADMAP item 7)', () => {
     }
   });
 
-  it('defines scene sun glow, moon, horizon and water tokens', () => {
+  it('defines scene sun glow, moon and water tokens', () => {
     const scene = colors.scene as Record<string, unknown>;
     expect(scene.sunGlow).toBeTruthy();
     expect(scene.moon).toBeTruthy();
-    expect(scene.horizon).toBeTruthy();
     expect(scene.water).toBeTruthy();
+    // The water's gradient comes from the sky (ROADMAP item 53), not per-bucket tokens.
+    expect(scene.horizon).toBeUndefined();
+    expect(scene.waterDeep).toBeUndefined();
   });
 
-  it('defines the item 15 D-polish scene tokens (water-deep, ridge, ghost, iceberg, critter)', () => {
+  it('defines the item 15 D-polish scene tokens (ridge, ghost, iceberg, critter)', () => {
     const scene = colors.scene as Record<string, unknown>;
-    const waterDeep = scene.waterDeep as Record<string, string>;
-    for (const bucket of ['night', 'astro-twilight', 'nautical-twilight', 'dawn', 'day']) {
-      expect(waterDeep[bucket]).toBeTruthy();
-    }
     const ridge = scene.ridge as Record<string, string>;
     for (const bucket of ['night', 'day', 'golden']) {
       expect(ridge[bucket]).toBeTruthy();
