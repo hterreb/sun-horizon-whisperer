@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44 and 47–64, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built except the whale (→ item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), the device and dashboard checks listed under Verification (status 2026-10-01), backlog (i18n, share card, sunset reminder). [AUDIT.md](AUDIT.md) has no open findings.
+Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44 and 47–65, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), the device and dashboard checks listed under Verification (status 2026-10-01), backlog (i18n, share card, sunset reminder). [AUDIT.md](AUDIT.md) has no open findings.
 
 ## Verification (2026-09-28)
 
@@ -792,6 +792,43 @@ These items come from the re-shoot of all states after items 46–56.
 - **Spec:** the same `Bat` shape, filled with the bird/bat silhouette colour (`--scene-critter-silhouette`) at 90 %, 0.6 stroke. The Halloween bats get the same look.
 - **Done when:** tests: the dusk bat and the Halloween bat have `fill="currentColor"` and the silhouette colour. In the browser at Innsbruck, 390×844: the bats show as dark shapes in civil and nautical twilight and on Halloween night.
 - **Built:** `CloudLayer` and `CalendarEggs` render `Bat` with `fill="currentColor"` and `color: hsl(var(--scene-critter-silhouette) / 0.9)`. Checked at Innsbruck on 2026-09-30 at 19:20 and 19:50 (civil and nautical twilight) and on 2026-10-31 at 22:00 (Halloween night).
+
+### 65. Night fish: moonlight and glowing fish — M — **✅ Done**
+
+- **Feedback (2026-09-30):** "I also want some night fish - any ideas?"
+- **Lookbook:** [Fish & Currents, Night waters](https://claude.ai/artifact/FoeCu4oaNTnoiBfwqXpUjk#night) (private). Picks: NF1, NF2, NF4, NF5, NF6, NF7, NR1, NR2, NR3, and NF3 (added the same evening).
+- **Now:** fish swim from dawn to the end of civil twilight (item 62). In nautical and astronomical twilight and at night there are no fish. The night water is almost black, so a night fish needs light: the moon's, or its own.
+- **Night fish** (sizes and speeds are for a near fish; crossing = time to cross a phone; share = part of all night spawns):
+
+  | ID | Night fish | Icon | Size | Speed (%/s) | Crossing | Share | Light | Pattern |
+  |---|---|---|---|---|---|---|---|---|
+  | NF1 | Moonlit day fish | the item 62 icons (lake species without the minnow school) | as by day | as by day | as by day | 25 | Moon | As by day |
+  | NF2 | Burbot | new `Burbot` | 30 px | 1.2 | 92 s | 15 | Moon | Glide |
+  | NF3 | Eel | new `Eel` | 36 px | 1.4 | 79 s | 12 | Moon | Glide, no wiggle |
+  | NF4 | Lanternfish | new `Lanternfish` | 16 px | 2.2 | 50 s | 30 | Own | Glide, P6 |
+  | NF5 | Glowing jellyfish | `Jellyfish` | 18 px | 0.5 | 220 s | 8 | Own | Glide, not in the fish limit |
+  | NF6 | Anglerfish | new `Anglerfish` | 26 px | 0.9 | 122 s + rest | 5 | Own | P8 |
+  | NF7 | Firefly squid | blue light points, no outline | 7 px each | 2 | 55 s | 5 | Own | School of 4–7 (P5 formation) |
+
+- **Spec:**
+  - **NR2 When:** night fish swim in nautical twilight, astronomical twilight and night, in the evening and in the morning. The day fish keep dawn to civil twilight. So there is no gap. The weather rules are the same as by day (item 62: clear to overcast, rain and drizzle; E2 in rain). At the switch from one mix to the other, the fish on screen swim on; only new spawns come from the other mix.
+  - **Mix:** `NIGHT_FISH_WEIGHTS` and `pickNightFish(r)` in `weatherEffectsUtils.ts`, built like `pickFish`. The weights are the share column (sum 100). A moonlit day fish (NF1) then picks its species with the day weights of the lake species without the minnow.
+  - **Moonlight pool (NF1–NF3):** the moonlit fish are drawn in `--scene-moon` at 70 % opacity (× the distance factor). They show only in a pool under the moon: fully within ±9 % of the width from the moon's x, fading out to ±20 % (a CSS mask on a moonlit layer in `CloudLayer`). A faint light cone on the water shows the pool: 40 % of the width, from the horizon down, `--scene-moon` at 10 %. `SunVisualization` passes the moon's x (as a fraction of the width) and the pool strength to `CloudLayer`.
+  - **NR3 Moon phase:** the pool strength = the moon's illuminated fraction (`getMoonPosition().illumination`) × `getMoonCloudFactor`. When the moon is below the horizon or hidden by clouds (strength 0), there is no pool, and no moonlit fish spawn.
+  - **Own light (NF4–NF7):** these show anywhere. The outlines are in the moon tone at 45 % stroke opacity. The lanternfish has 5 gold belly lights and the anglerfish one gold lure light, all in `--brand-gold-light` with the boat-light glow. The jellyfish line is pale cyan with a 3 px glow (new token `--scene-fish-jellyfish-glow`). The squid points are blue with a glow (new token `--scene-fish-squid`). Paths for `Burbot`, `Eel`, `Lanternfish` and `Anglerfish` come from the lookbook.
+  - **Distance (P3):** as by day. Size and speed × (1 − 0.45 × depth), opacity × (1 − 0.3 × depth), 70–85 % of the height.
+  - **NR1 Quiet night:** a spawn check every 15–25 s instead of every 5–8 s (70 % chance, 35 % in rain). At most three fish on screen. A pair or a school counts as one, and the jellyfish does not count.
+  - **Motion rule** (item 15): every night fish glides straight. The anglerfish rests on the way, like the pike (P8). There is no drift.
+  - **Not picked:** NF8 (glow trail).
+- **Done when:**
+  - Tests: the night weights and `pickNightFish`; night fish only in nautical twilight, astronomical twilight and night; no moonlit spawn when the pool strength is 0; NR1 blocks a fourth fish but not a jellyfish; the lanternfish and anglerfish lights render.
+  - In Chromium at 390×844 in Ravensburg, on a night with the moon up: the moonlit fish show only in the pool under the moon, the lanternfish lights glow, and with the moon down only the glowing fish swim.
+- **Built:**
+  - `sceneIcons.ts`: `Burbot`, `Eel`, `Lanternfish`, `Anglerfish` and `FireflySquid` (a filled point). `index.css`: `--scene-fish-jellyfish-glow` and `--scene-fish-squid`.
+  - `weatherEffectsUtils.ts`: `NIGHT_FISH_WEIGHTS`, `pickNightFish`, `pickMoonlitDayFish` and `MAX_NIGHT_FISH`. `canSpawnFish` takes the limit as a parameter.
+  - `SunVisualization.tsx`: the pool strength (`moonPool` = illumination × `getMoonCloudFactor` × `getReflectionFade`) and the light cone (a radial gradient on a rect twice the water's height, so it has no hard edge). It passes `moonlight` (x and strength) to `CloudLayer`.
+  - `CloudLayer.tsx`: the night mix from nautical twilight on, with a check every 15–25 s. `createFish` takes a `night` flag: `light` is `'moon'` or `'own'`, with no depth haze and no E1 spot. The moonlit fish swim in a layer masked around the moon, at the pool's opacity. The layer is always rendered, so a fish can always finish its crossing and be removed. The glowing fish carry `lights` (gold circles, like the boat lights) or a `drop-shadow` halo (jellyfish, squid).
+- **Checked:** 9 new unit tests (699 in all), lint, typecheck and build pass. In Chromium at 390×844, Ravensburg, clear, 2026-09-27 00:30 (full moon at 47°): all seven night kinds spawned. The moonlit day fish (classic, trout), the burbot and the eel were in the pool layer, whose mask was centred on the moon (46 % of the width) at full strength. A lanternfish pair showed its 10 gold lights. The first cone had hard side edges; it now fades out softly.
 
 ---
 

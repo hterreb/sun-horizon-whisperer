@@ -1,4 +1,4 @@
-import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, pickFish, FISH_WEIGHTS, canSpawnFish, getRestStopMotion, getStarCloudFactor, getTwilightStars, getSkyOvercastMix, getSunVisibility, getMoonCloudFactor } from '../src/utils/weatherEffectsUtils';
+import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, pickFish, FISH_WEIGHTS, canSpawnFish, getRestStopMotion, pickNightFish, pickMoonlitDayFish, NIGHT_FISH_WEIGHTS, MAX_NIGHT_FISH, getStarCloudFactor, getTwilightStars, getSkyOvercastMix, getSunVisibility, getMoonCloudFactor } from '../src/utils/weatherEffectsUtils';
 
 describe('getWeatherEffects (ROADMAP item 10)', () => {
   it('shows fog only for the fog type', () => {
@@ -113,6 +113,27 @@ describe('fish mix (ROADMAP item 62)', () => {
     expect(canSpawnFish([...four, 'trout'], 'turtle')).toBe(true);
     expect(canSpawnFish([...four, 'trout'], 'jellyfish')).toBe(true);
     expect(canSpawnFish([...four, 'turtle', 'jellyfish', 'jellyfish'], 'trout')).toBe(true);
+  });
+});
+
+describe('night fish mix (ROADMAP item 65)', () => {
+  it('has weights that sum to 100 and sends out every night fish', () => {
+    expect(NIGHT_FISH_WEIGHTS.reduce((sum, [, weight]) => sum + weight, 0)).toBe(100);
+    const picks = Array.from({ length: 100 }, (_, i) => pickNightFish(i / 100));
+    expect(new Set(picks)).toEqual(new Set(['moonlit', 'burbot', 'eel', 'lanternfish', 'jellyfish', 'anglerfish', 'squid']));
+    expect(picks.filter(k => k === 'lanternfish').length).toBe(30);
+  });
+
+  it('lights the lake fish by the moon, but not the minnow school (NF1)', () => {
+    const picks = new Set(Array.from({ length: 100 }, (_, i) => pickMoonlitDayFish(i / 100)));
+    expect(picks).toEqual(new Set(['classic', 'perch', 'pike', 'carp', 'catfish', 'trout']));
+  });
+
+  it('allows at most three fish at night, but jellyfish still come (NR1)', () => {
+    const three = ['classic', 'lanternfish', 'burbot'] as const;
+    expect(canSpawnFish(three.slice(0, 2), 'eel', MAX_NIGHT_FISH)).toBe(true);
+    expect(canSpawnFish([...three], 'eel', MAX_NIGHT_FISH)).toBe(false);
+    expect(canSpawnFish([...three], 'jellyfish', MAX_NIGHT_FISH)).toBe(true);
   });
 });
 

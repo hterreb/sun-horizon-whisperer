@@ -144,3 +144,38 @@ export const Pufferfish = createLucideIcon('Pufferfish', [
   ['path', { d: 'M13 19v1.6', key: 'spike-bottom' }],
   ['path', { d: 'M16.5 10.5h.01', key: 'eye' }],
 ]);
+
+// Night fish from the Night waters lookbook (ROADMAP item 65). The lanternfish's belly
+// lights and the anglerfish's lure are drawn by CloudLayer (FISH `lights`), like the boat lights.
+export const Burbot = createLucideIcon('Burbot', [
+  ['path', { d: 'M3 12.5c3-2.5 8-3.5 13-3.5 3 0 5 1 6 3-1 2-3 3-6 3-5 0-10-.5-13-2.5Z', key: 'body' }],
+  ['path', { d: 'M3 12.5 1 10.3v4.4Z', key: 'tail' }],
+  ['path', { d: 'M7 10.7c3-.8 6-1.3 8.5-1.4', key: 'fin' }],
+  ['path', { d: 'M20.6 14.3l.3 1.8', key: 'whisker' }],
+  ['path', { d: 'M19 11.3h.01', key: 'eye' }],
+]);
+
+export const Eel = createLucideIcon('Eel', [
+  ['path', { d: 'M2 12.3c4-2 12-2.6 18-2 1.4.1 2.3.8 2.3 1.6s-.9 1.5-2.3 1.6c-6 .6-14 .1-18-1.2Z', key: 'body' }],
+  ['path', { d: 'M6 10.6c4-.8 8-1.1 11-1.1', key: 'fin' }],
+  ['path', { d: 'M19.5 11.6h.01', key: 'eye' }],
+]);
+
+export const Lanternfish = createLucideIcon('Lanternfish', [
+  ['path', { d: 'M5 12c2.5-3 6-4.5 10-4.5 3 0 5.5 1.5 7 4.5-1.5 3-4 4.5-7 4.5-4 0-7.5-1.5-10-4.5Z', key: 'body' }],
+  ['path', { d: 'M5 12 2 9v6Z', key: 'tail' }],
+  ['path', { d: 'M18.5 10.8h.01', key: 'eye' }],
+]);
+
+export const Anglerfish = createLucideIcon('Anglerfish', [
+  ['path', { d: 'M4 12c1.5-4 5-6.5 9.5-6.5 4.5 0 7.5 2.5 8.5 6.5-1 3.5-4 6-8.5 6-4.5 0-8-2.5-9.5-6Z', key: 'body' }],
+  ['path', { d: 'M4 12 1.5 9v6Z', key: 'tail' }],
+  ['path', { d: 'M22 12.3 18 13.2', key: 'mouth' }],
+  ['path', { d: 'M17 9.3h.01', key: 'eye' }],
+  ['path', { d: 'M15 5.6c.5-2 2.3-3.2 4.5-3.2', key: 'lure-rod' }],
+]);
+
+// A firefly squid is only its light: one point, filled with the current colour.
+export const FireflySquid = createLucideIcon('FireflySquid', [
+  ['circle', { cx: '12', cy: '12', r: '4', fill: 'currentColor', stroke: 'none', key: 'light' }],
+]);
