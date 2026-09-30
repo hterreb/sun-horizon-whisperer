@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44 and 47–61, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14, 16 and 45 (Sentry feedback, round 3), the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
+Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44 and 47–61, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
 
 ## Verification (2026-09-28)
 
@@ -534,7 +534,7 @@ Seven feedback reports from production (Ravensburg, release `6da35c1`, 29 Sep 16
   - InfoPanel row: Rewind, the time and FastForward (`aria-pressed` on the playing direction), plus the gold plus. A tap on the time shows a `datetime-local` input; blur closes it. In a preview the row reads "Time" and `formatMoonDate` ("Sep 30, 19:08"), because "Current Time" plus the date does not fit on one line at 390 px. The "Back to now" glass pill is fixed at the bottom centre, above the radio, and does not fade in fullscreen.
   - Browser check (Ravensburg, 2026-09-30 18:30, 1280×800 and 390×844): the play runs through the sunset (18:44 → 20:09); the sun sets along its arc, the sky goes from orange to civil and nautical twilight, and the sunrise/sunset rows follow the next pass. "Back to now" returns to the live clock. The jump to Dec 24 16:30 shows the winter arc (sunset 16:34). No weather request during the preview. With a real clock, play adds about 9 ms of main-thread work per 100 ms tick, with no frame gap above 16.8 ms and no long task.
 
-### 45. Premium as a one-time purchase on Google Play: price and billing — S *(decision)* — [SUN-CHASER-E](https://ainabler.sentry.io/issues/SUN-CHASER-E)
+### 45. Premium as a one-time purchase on Google Play: price and billing — S *(decision)* — **✅ Decided** — [SUN-CHASER-E](https://ainabler.sentry.io/issues/SUN-CHASER-E)
 
 - **Feedback:** "Premium buy once in play store - what would be a good pricing start point?"
 - **Conflict:** item 14 is built for a Stripe subscription (US$1.99 per month, 7-day trial). The feedback asks for a one-time purchase in the Play Store. Inside an Android app, digital features must use Google Play Billing (see the note in item 14), so Stripe covers only the web. Decide this before items 14 and 16.
@@ -550,6 +550,7 @@ Seven feedback reports from production (Ravensburg, release `6da35c1`, 29 Sep 16
   - No backend for the first version. Before the release, check how the Digital Goods API acknowledges a one-time purchase: Play refunds a purchase that is not acknowledged within 3 days.
   - Keep the Stripe subscription functions in `supabase/functions`, unused. Do not delete them until this decision is final.
 - **Done when:** the price and the billing plan are decided, and items 14 and 16 are updated to match.
+- **Decision (2026-09-30):** Premium is sold only in the Play app, as the one-time product `premium`. The web stays free, with all features and no gate. The billing plan above applies. The working price is €3.99 / US$3.99; confirm it in the Play Console before the release. Items 14 and 16 are updated.
 
 ### Scene review (2026-09-30)
 
@@ -822,14 +823,20 @@ These items come from the re-shoot of all states after items 46–56.
 ### 14. Premium gating (deferred) — M
 
 - **Status:** backend ready, frontend not started. Only start this when `PREMIUM_ENFORCED` should become `true`.
-- **Update (2026-09-30):** item 45 proposes a one-time Google Play purchase in place of the Stripe subscription for the Play app.
+- **Update (2026-09-30), decision in item 45:** Premium is a one-time Google Play purchase in the Play app only. The web stays free. The Stripe steps below are not needed for the first release. They are kept for a possible later web sale.
 - **Depends on:** item 13.
 - **Exists today:**
   - `supabase/functions/create-checkout`: Stripe Checkout session, $1.99/month, 7-day trial for new customers only.
   - `supabase/functions/check-subscription`: syncs Stripe status to the `subscribers` table.
   - `supabase/functions/customer-portal`: Stripe billing portal session.
   - `supabase/migrations/20260927000000_create_subscribers.sql`: table + RLS.
-- **To build:**
+- **To build (Play app, first release):**
+  1. A `usePremium` check: when the Digital Goods API exists (`getDigitalGoodsService('https://play.google.com/billing')`), call `listPurchases()` at start and cache the result. When the API does not exist (the web), Premium is always unlocked.
+  2. Buy: a tap on a feature with the gold plus opens the Payment Request API for the product `premium`, with the local price from `getDetails()`. After the purchase, the plus goes away.
+  3. Acknowledge the purchase. Play refunds a purchase that is not acknowledged within 3 days (see item 45).
+  4. Gate the gold-plus features only where the Digital Goods API exists and `PREMIUM_ENFORCED` is true.
+  5. Tests with a mocked Digital Goods service: no API → unlocked; API without a purchase → locked; API with a purchase → unlocked.
+- **Later, only for a web sale (not planned):**
   1. Supabase Auth in the frontend (sign-in, session handling, `@supabase/supabase-js` client).
   2. Upgrade UI: pricing dialog → call `create-checkout` → redirect to Stripe.
   3. Handle the return URLs `/?checkout=success` and `/?checkout=cancel` (toast + call `check-subscription`).
@@ -895,8 +902,9 @@ These items come from the re-shoot of all states after items 46–56.
   2. Serve `/.well-known/assetlinks.json` with the app signing key's SHA-256 fingerprint, so the TWA shows no URL bar.
   3. Run `bubblewrap init --manifest https://<domain>/manifest.webmanifest`, then `bubblewrap build`. Set `display: fullscreen` for true fullscreen.
   4. Use Play App Signing. Keep the upload key out of git.
-  5. Store listing: privacy policy (location use, no tracking), data-safety form, content rating, and the graphics from item 15.
-  6. Note: new personal developer accounts must run a closed test with 12+ testers for 14 days before the production release. Plan for this time.
+  5. Turn on Play Billing in the TWA (`playBilling` in the Bubblewrap manifest), and create the managed one-time product `premium` in the Play Console at the price from item 45.
+  6. Store listing: privacy policy (location use, no tracking), data-safety form, content rating, and the graphics from item 15.
+  7. Note: new personal developer accounts must run a closed test with 12+ testers for 14 days before the production release. Plan for this time.
 - **Done when:** the app is live on Google Play, opens fullscreen without a URL bar, and web deploys update it without a new store release.
 
 ---
