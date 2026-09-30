@@ -285,9 +285,9 @@ export const getTimeOfDayLabel = (timeOfDay: TimeOfDay): string => {
 
 // Brand hex values (ROADMAP item 15, direction D "Polished Classic"). These mirror
 // the HSL custom properties in index.css (--brand-*, --scene-sky-*-*) - kept here as
-// literal #rrggbb, not `hsl(var(--x))`, because shiftGradientBrightness below only
-// rewrites literal hex inside the gradient string it walks (ROADMAP item 10); a CSS
-// var reference would silently stop getting the weather brightness shift.
+// literal #rrggbb, not `hsl(var(--x))`, because mixGradientTowardOvercast below only
+// rewrites literal hex inside the gradient string it walks (ROADMAP item 50); a CSS
+// var reference would silently stop getting the weather grey mix.
 const SUNSET = '#F97316'; // --brand-sunset
 const PEACH = '#FEC6A1'; // --brand-peach
 const SKY = '#0EA5E9'; // --brand-sky
@@ -322,19 +322,23 @@ export const getBackgroundGradient = (timeOfDay: TimeOfDay): string => {
   return `linear-gradient(to bottom, ${start} 0%, ${mid} 62%, ${end} 100%)`;
 };
 
-// Shifts every #rrggbb color in a CSS gradient string by the same amount per channel
-// (negative = darker, positive = brighter), clamped to [0, 255]. Used to tint the sky
-// gradient for weather (ROADMAP item 10) without hardcoding a second gradient per
-// weather type. Pure and independent of WeatherType, so it's testable on its own.
-export const shiftGradientBrightness = (gradient: string, deltaPerChannel: number): string => {
-  if (deltaPerChannel === 0) return gradient;
+// Clouds dim the sky (ROADMAP item 50): mixes every #rrggbb color in a CSS gradient
+// string toward the overcast grey by `mix` (0 = unchanged, 1 = all grey). The grey is
+// never lighter than the color it replaces, so a cloudy night stays dark instead of
+// turning mid-grey. Pure and independent of WeatherType, so it is testable on its own.
+const SKY_OVERCAST = [0x8a, 0x94, 0x9d]; // --scene-sky-overcast (#8A949D)
+const SKY_OVERCAST_LIGHTNESS = (Math.max(...SKY_OVERCAST) + Math.min(...SKY_OVERCAST)) / 2;
+
+export const mixGradientTowardOvercast = (gradient: string, mix: number): string => {
+  if (mix <= 0) return gradient;
+  const m = Math.min(1, mix);
 
   return gradient.replace(/#([0-9a-fA-F]{6})/g, (_match, hex: string) => {
     const num = parseInt(hex, 16);
-    const clamp = (channel: number): number => Math.max(0, Math.min(255, channel));
-    const r = clamp(((num >> 16) & 0xff) + deltaPerChannel);
-    const g = clamp(((num >> 8) & 0xff) + deltaPerChannel);
-    const b = clamp((num & 0xff) + deltaPerChannel);
+    const rgb = [(num >> 16) & 0xff, (num >> 8) & 0xff, num & 0xff];
+    // Scaling all channels scales the HSL lightness by the same factor.
+    const scale = Math.min(1, (Math.max(...rgb) + Math.min(...rgb)) / 2 / SKY_OVERCAST_LIGHTNESS);
+    const [r, g, b] = rgb.map((c, i) => Math.round(c * (1 - m) + SKY_OVERCAST[i] * scale * m));
     return `#${(((r << 16) | (g << 8) | b) >>> 0).toString(16).padStart(6, '0')}`;
   });
 };
