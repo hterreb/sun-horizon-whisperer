@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44 and 47–61, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
+Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44 and 47–62, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
 
 ## Verification (2026-09-28)
 
@@ -700,6 +700,57 @@ These items come from the re-shoot of all states after items 46–56.
 - **Done when:** a test that the water hue stays blue in every time of day. In the browser at 18:45, the sea is blue under the orange sky.
 - **Built:** `getWaterColors` sends both colours through `toSea` (`sunUtils.ts`): a sea blue (hue 205°) with the sky colour's saturation and lightness, with 35 % of the sky colour mixed in (`SKY_TINT`). The lightness stays the sky's, so night, storm and weather dimming work as before. The sun's glitter strip gives the warm reflection.
 
+### Fish lookbook (2026-09-30)
+
+### 62. Fish: 13 species, calm swimming patterns — M — **✅ Done**
+
+- **Feedback:** "Please ideate and create a lookbook for adding a lot of different fish with different swimming patterns."
+- **Lookbook:** [Fish & Currents](https://claude.ai/artifact/FoeCu4oaNTnoiBfwqXpUjk) (private). Picks: F1–F13, P1, P3, P4, P5, P6, P8, P9, E1, E2, E3, E4.
+- **Now:** one fish (lucide `Fish`, 20 px, `text-blue-400` at 70 %) glides left to right at 2.5 % of the width per second, at a random height between 70 % and 85 % of the screen (`CloudLayer.tsx`).
+- **Species** (sizes and speeds are for a near fish; crossing = time to cross a phone; share = part of all spawns):
+
+  | ID | Species | Icon | Size | Speed (%/s) | Crossing | Share | Pattern | Haze | Tint (E3) |
+  |---|---|---|---|---|---|---|---|---|---|
+  | F1 | Classic fish | lucide `Fish` | 20 px | 2.5 | 44 s | 25 | Glide, P6 | 0.3 | 213 94% 68% (today's blue) |
+  | F2 | Minnow school | new `Minnow` | 10 px each | 3 | 37 s | 18 | P5 | 0.1 | 200 70% 82% |
+  | F3 | Perch | new `Perch` | 22 px | 2.2 | 50 s | 14 | Glide, P6 | 0.35 | 88 40% 50% |
+  | F4 | Pike | new `Pike` | 32 px | 2 | 55 s + rest | 8 | P8 | 0.45 | 70 30% 42% |
+  | F5 | Carp | new `Carp` | 26 px | 1.6 | 69 s | 10 | Glide | 0.65 | 40 80% 56% |
+  | F6 | Catfish (wels) | new `Catfish` | 34 px | 1.1 | 100 s | 4 | Glide | 0.85 | 30 18% 40% |
+  | F7 | Trout | new `Trout` | 22 px | 2.8 | 39 s | 12 | Glide | 0 | 350 55% 76% |
+  | F8 | Ray | new `Ray` | 30 px | 1.5 | 73 s | 2 | Glide | 0.75 | 215 20% 35% |
+  | F9 | Turtle | lucide `Turtle` | 26 px | 1.2 | 92 s + rest | 2 | P8, not in E4 | 0.5 | 150 35% 38% |
+  | F10 | Jellyfish | new `Jellyfish` | 18 px | 0.5 | 220 s | 2 | Glide, not in E4 | 0.3 | 285 70% 82% |
+  | F11 | Seahorse | new `Seahorse` | 18 px | 0.4 | 275 s | 1 | Glide | 0.4 | 30 85% 60% |
+  | F12 | Whale | new `Whale` | 72 px | 0.8 | 138 s | 1 | Glide, always far | 0.8 | 215 25% 30% |
+  | F13 | Pufferfish | new `Pufferfish` | 20 px | 1 | 110 s + rest | 1 | P8 | 0.4 | 50 90% 58% |
+
+- **Spec:**
+  - **Icons:** add the new icons to `sceneIcons.ts` with `createLucideIcon`, with the path data from the lookbook (24 px grid, 2 px round strokes, no fill). F1 and F9 come with lucide.
+  - **Mix:** `FISH_WEIGHTS` and `pickFish(r)` in `weatherEffectsUtils.ts`, built like `pickBoat`. The weights are the share column (sum 100).
+  - **P3 Distance:** each fish gets a random `depth` from 0 (near) to 1 (far), like the boats. Size and speed × (1 − 0.45 × depth) (`FAR_SHRINK`), opacity × (1 − 0.3 × depth). A far fish swims at 70 % of the screen height, a near fish at 85 % (today's band), ±1 %. Far fish are drawn first. The whale always has a depth of 0.75–1, so it is 40–48 px on screen, about the size of the rowboat.
+  - **P4 Own pace:** the speed column replaces `FISH_RATE_PERCENT_PER_SEC`.
+  - **P5 School:** a minnow spawn is one entity with 4–7 minnows in a fixed formation. The offsets, in minnow widths × 1.15, are (0, 0), (−1.4, −0.9), (−1.6, 0.9), (−2.9, −0.1), (−3.1, 1.6), (−4.2, −1.1) and (−4.5, 0.7). The formation does not change during the crossing.
+  - **P6 Companions:** a classic fish or a perch has a 35 % chance of a second fish of the same species, 2–4 s behind, at the same depth, ±1.4 % of the screen height.
+  - **P8 Rest stop:** the pike, the turtle and the pufferfish glide in, slow to a stop over 3 s at 30–65 % of the width, hold still for 5–8 s, speed up over 3 s and glide out. The speed changes, the direction never. To keep movement out of React state (as with today's CSS animation), use the Web Animations API (`element.animate`) with keyframe offsets from this profile.
+  - **P9 Depth haze:** opacity × (1 − 0.4 × haze), with the haze column. The water is drawn in perspective, so height on screen shows distance, and paleness shows depth.
+  - **E1 Twilight glow:** fish show until the end of civil twilight. When the sun is below the horizon, 35 % of the fish get a small gold glow spot at the body centre: a circle of r 1.3 on the 24 px grid, `--brand-gold-light`, with the same glow as the boat lights. Full night stays without fish.
+  - **E2 Rain:** in rain and drizzle, the spawn chance goes from 70 % to 35 %, and the fish opacity × 0.75.
+  - **E3 Tints:** each species uses its tint column, as `--scene-fish-<species>` tokens in `index.css`, at today's 70 % base opacity. This replaces `text-blue-400`.
+  - **E4 At most five:** no new spawn while five fish entities are on screen. A school or a companion pair counts as one. The turtle and the jellyfish are not fish, so they do not count, and they can spawn when five fish are on screen.
+  - **Unchanged:** fish swim left to right only (P2 not picked). The spawn check runs every 5–8 s. Fish show from dawn to the end of civil twilight, in clear, partly cloudy, cloudy, overcast, rain and drizzle. With reduced motion there are no fish.
+  - **Not picked:** P2 (both ways), P7 (long curve: the carp and the ray glide straight), P10 (drift), P11 (turn back).
+  - **Motion rule** (item 15): the fish never jump, dart, wag the tail, blow bubbles or chase each other.
+- **Decision (2026-09-30):** no drift. The jellyfish and the seahorse glide straight at their own pace: 220 s and 275 s per crossing. The turtle and the jellyfish do not count toward E4.
+- **Done when:**
+  - Tests: the weights sum to 100 and `pickFish` returns every species; the rest-stop keyframes hold still for the hold time; E4 blocks a sixth fish but not a turtle or a jellyfish; E2 halves the spawn chance; the whale is always far.
+  - In the headless scene capture at 390×844 in Ravensburg: each species is seen once, the minnow school keeps its shape, the pike stops and goes on, fish glow at 19:15 after sunset, and rain has fewer and paler fish.
+- **Built:**
+  - `sceneIcons.ts`: 11 new icons (`Minnow`, `Perch`, `Pike`, `Carp`, `Catfish`, `Trout`, `Ray`, `Jellyfish`, `Seahorse`, `Whale`, `Pufferfish`). `index.css`: 13 `--scene-fish-*` tint tokens.
+  - `weatherEffectsUtils.ts`: `FISH_WEIGHTS`, `pickFish` (shares `pickWeighted` with `pickBoat`), `canSpawnFish` (E4, turtle and jellyfish exempt) and `getRestStopMotion` (P8). The rest stop is a CSS `linear()` easing on the existing `moveAcrossX` animation, so no movement goes through React state. A browser without `linear()` ignores the easing, and the fish glides straight.
+  - `CloudLayer.tsx`: the `FISH` table and `createFish` (distance, school, rest stop, haze, rain, glow, companion). A pair is one entry; the companion is the same fish with an animation delay, and its `onAnimationEnd` removes the pair. `FISH_RATE_PERCENT_PER_SEC` is gone.
+- **Checked:** 14 new unit tests (588 in all), lint, typecheck and build pass. In Chromium at 390×844, Ravensburg, clear weather: all 13 species swam across, at 70–85 % of the height (the whale 43 px wide, far and pale; a school of 5 minnows). The pike stopped at 33 % of the width for about 8 s and swam on. At 19:15 (civil twilight), 2 of 5 fish had the gold glow. There were no console errors.
+
 ---
 
 ## P1 — Core sky features
@@ -921,11 +972,11 @@ Rules for all items:
 Items:
 
 - **Calendar:**
-  - New Year: fireworks at 00:00 on Jan 1 (reuse `Fireworks`).
-  - Solstice and equinox: a small badge and the longest/shortest-day text.
-  - Halloween: a pumpkin moon when the full moon is within 3 days of Oct 31. Otherwise bats all night.
-  - Christmas: light snow on Dec 24–26, even when the weather is clear.
-  - Friday the 13th: a black cat walks along the horizon once.
+  - ✅ New Year: fireworks at 00:00 on Jan 1 (reuse `Fireworks`). Done: the clock tick starts the show when it enters 00:00; the midnight ghost stays away.
+  - ✅ Solstice and equinox: a small badge and the longest/shortest-day text. Done: a glass pill on the water, text by hemisphere.
+  - ✅ Halloween: a pumpkin moon when the full moon is within 3 days of Oct 31. Otherwise bats all night. Done: pumpkin over the moon; 5 slow gliding bats.
+  - ✅ Christmas: light snow on Dec 24–26, even when the weather is clear. Done: slow small flakes, off when it already snows.
+  - ✅ Friday the 13th: a black cat walks along the horizon once. Done: a 45 s straight glide, no bounce.
 - **Astronomy:**
   - Solar and lunar eclipses: a darkened sun or red moon at the correct time (hardcoded date list for 10 years).
   - Supermoon: a bigger moon when the full moon is near perigee.
@@ -936,15 +987,26 @@ Items:
 - **Hidden:**
   - ✅ Tap the sun 7 times: it wears sunglasses for one minute. (The sun is now a button; `?egg=sunglasses`.)
   - ✅ A UFO crosses the night sky (1 in 200 chance per night view). (40 s straight glide; `?egg=ufo`.)
-  - A whale instead of fish (1% chance). → item 62
+  - A whale instead of fish (1% chance). → Item 62 (F12).
   - ✅ The Konami code gives a disco sky for 10 seconds. (Soft colour spots, one slow hue turn; `?egg=disco`.)
 
 ---
 
 ## Backlog (not prioritized)
 
-- Unit toggle °C/°F.
 - German and English UI (i18n).
 - Share card: an image of today's sunset with the time and score.
 - Sunset reminder notification (after item 16, when notifications are practical).
 - Date/time scrubber to preview any day or time of the year: now item 44.
+
+### Unit toggle °C/°F — S — **✅ Done**
+
+- **Now:** the app shows temperatures in °C only.
+- **Spec:**
+  1. Add a small °C/°F segmented toggle to the "Current Weather" section of the InfoPanel. Use the same style as the "Real / Manual" weather-mode toggle.
+  2. The default comes from the locale: °F for `en-US` and the other Fahrenheit regions (US, LR, MM, BS, KY, PW, FM, MH). °C for all other regions.
+  3. Save the choice in `localStorage` (`temperature-unit`). Wrap the read and the write in try/catch.
+  4. The toggle changes only the display. The effects keep °C internally: the iceberg below 0 °C, the frost, the heat shimmer above 30 °C.
+  5. If there is a manual weather temperature input, it shows and accepts the chosen unit.
+- **Done when:** unit tests for the conversion, the format and the locale default. In the browser, `en-US` shows °F and `de-DE` shows °C, and a toggled choice stays after a reload.
+- **Built:** `src/utils/temperatureUnit.ts` has the pure functions: `getDefaultTemperatureUnit` (region from `Intl.Locale(...).maximize()`, so `en` also gives °F), `loadTemperatureUnit` / `saveTemperatureUnit` (try/catch), `celsiusToFahrenheit` and `formatTemperature` (whole degrees). `SunTracker` holds the unit in state (default from `navigator.language`) and gives it to `InfoPanel`. The toggle is next to the temperature value. The weather data and all effect thresholds stay in °C. The manual weather mode has no temperature input, so spec step 5 has no work.

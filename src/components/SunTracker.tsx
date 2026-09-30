@@ -52,11 +52,13 @@ import { getTerrainSunTimes, getTerrainMoonTimes } from '../utils/horizonUtils';
 import { getSunArcLabels, getMoonArcLabels } from '../utils/arcLabels';
 import { isLineOfSightEnabled } from '../utils/premium';
 import { passesSunEvent, getCountdownTarget } from '../utils/sunEvents';
+import { getCalendarEvent } from '@/utils/calendarEvents';
 import { PLAY_SPEED, PLAY_TICK_MS, clampTimeOffset } from '@/utils/timeTravel';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
 import { DISCO_MS, KONAMI_SEQUENCE, SUNGLASSES_MS, advanceKonami, getEggOverride, registerSunTap, rollUfo } from '@/utils/hiddenEggs';
 import DiscoSky from './DiscoSky';
 import Ufo from './Ufo';
+import { loadTemperatureUnit, saveTemperatureUnit, type TemperatureUnit } from '@/utils/temperatureUnit';
 
 // Eye height above ground for line of sight with terrain (ROADMAP item 13): e.g. a
 // building floor or a tower, clamped to a sane 0-1000 m range and persisted like
@@ -127,6 +129,12 @@ const SunTracker: React.FC = () => {
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [isLoadingWeather, setIsLoadingWeather] = useState(false);
   const [useRealWeather, setUseRealWeather] = useState(true);
+  // Display unit only (ROADMAP backlog "Unit toggle °C/°F"); effects stay in °C.
+  const [temperatureUnit, setTemperatureUnit] = useState<TemperatureUnit>(() => loadTemperatureUnit(navigator.language));
+  const handleTemperatureUnitChange = useCallback((unit: TemperatureUnit) => {
+    setTemperatureUnit(unit);
+    saveTemperatureUnit(unit);
+  }, []);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showCursor, setShowCursor] = useState(true);
   const isMobile = useIsMobile();
@@ -554,7 +562,9 @@ const SunTracker: React.FC = () => {
   useEffect(() => {
     const prev = prevClockRef.current;
     prevClockRef.current = date;
-    if (!isTimePreview && passesSunEvent(prev, date, sunTimes, terrainExtras.terrainSunTimes)) setFireworksTrigger(date.getTime());
+    // New Year (ROADMAP "Ongoing", Calendar): also when the clock enters 00:00 on Jan 1.
+    const entersNewYear = getCalendarEvent(date) === 'new-year' && getCalendarEvent(prev) !== 'new-year';
+    if (!isTimePreview && (entersNewYear || passesSunEvent(prev, date, sunTimes, terrainExtras.terrainSunTimes))) setFireworksTrigger(date.getTime());
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per clock tick
   }, [date]);
 
@@ -602,6 +612,12 @@ const SunTracker: React.FC = () => {
     if (isNight && rollUfo()) setUfoOn(true);
   }
   const handleUfoDone = useCallback(() => setUfoOn(false), []);
+  // Calendar easter eggs (ROADMAP "Ongoing"): one event id per minute.
+  const calendarEvent = useMemo(
+    () => getCalendarEvent(date, location.latitude),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on passMinuteKey, not `date` itself
+    [passMinuteKey, location.latitude]
+  );
 
   // Sunset countdown (ROADMAP item 43): 10 s of ticks and a chime at the next sunset
   // (line of sight when there is one). Live time only; the tap that turns it on
@@ -682,7 +698,8 @@ const SunTracker: React.FC = () => {
         </>
       )}
       <PWAInstallPrompt />
-      <MidnightGhost currentTime={date} />
+      {/* One special event at a time: New Year's fireworks replace the midnight ghost. */}
+      {calendarEvent !== 'new-year' && <MidnightGhost currentTime={date} />}
       <TemperatureIceberg 
         temperature={weatherData?.temperature || 20} 
         isVisible={location.loaded && weatherData !== null} 
@@ -713,6 +730,7 @@ const SunTracker: React.FC = () => {
             fireworksTrigger={fireworksTrigger}
             sunglasses={sunglassesOn}
             onSunTap={handleSunTap}
+            calendarEvent={calendarEvent}
             sunsetCountdown={countdownSeconds === null ? null : { seconds: countdownSeconds, lineOfSight: !!countdownTarget?.lineOfSight }}
           />
           <InfoPanel
@@ -732,6 +750,8 @@ const SunTracker: React.FC = () => {
             weatherData={weatherData}
             isLoadingWeather={isLoadingWeather}
             useRealWeather={useRealWeather}
+            temperatureUnit={temperatureUnit}
+            onTemperatureUnitChange={handleTemperatureUnitChange}
             isFullscreen={isFullscreen}
             onWeatherChange={handleWeatherChange}
             onWeatherModeToggle={handleWeatherModeToggle}

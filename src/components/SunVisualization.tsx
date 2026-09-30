@@ -8,6 +8,8 @@ import { type HorizonProfile, horizonAngleAt } from '../utils/horizonUtils';
 import CloudLayer, { type WeatherType } from './CloudLayer';
 import Fireworks from './Fireworks';
 import SunSunglasses from './SunSunglasses';
+import CalendarEggs from './CalendarEggs';
+import { type CalendarEvent } from '@/utils/calendarEvents';
 import PremiumBadge from './PremiumBadge';
 import WeatherEffects from './WeatherEffects';
 import { getSunVisibility, getMoonCloudFactor } from '@/utils/weatherEffectsUtils';
@@ -65,6 +67,8 @@ interface SunVisualizationProps {
   // Hidden sunglasses egg: the sun wears sunglasses; tapping the sun reports each tap to SunTracker.
   sunglasses?: boolean;
   onSunTap?: () => void;
+  // Today's calendar easter egg from SunTracker (utils/calendarEvents), or null.
+  calendarEvent?: CalendarEvent | null;
 }
 
 // Maps an azimuth (0-360°, 0 = North) to a horizontal screen fraction (0-1), for the
@@ -489,7 +493,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   showCursor = true,
   fireworksTrigger = 0,
   sunglasses = false,
-  onSunTap
+  onSunTap,
+  calendarEvent = null
 }) => {
   // Compass mode (ROADMAP item 19): a real field of view centered on the heading,
   // replacing the static full-circle mapping - also turns off the CSS transitions
@@ -908,6 +913,14 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           </svg>
         </div>
       )}
+
+      <CalendarEggs
+        event={calendarEvent}
+        timeOfDay={timeOfDay}
+        weatherType={weatherType}
+        moon={isMoonVisible && moonCloudFactor > 0 ? { x: moonX, y: moonY, r: moonRadius } : null}
+        horizonY={containerDimensions.height * 0.65}
+      />
 
       <svg className="absolute inset-0 w-full h-full pointer-events-none">
         <defs>
