@@ -132,6 +132,12 @@ describe('CloudLayer', () => {
       expect(container.textContent).not.toContain('🦇');
     });
 
+    it('draws bats as a solid dark silhouette (ROADMAP item 64, B2)', () => {
+      const bat = spawn({ timeOfDay: 'civil-twilight' }, 6000).querySelector('[data-testid="scene-bat"]') as SVGElement;
+      expect(bat.getAttribute('fill')).toBe('currentColor');
+      expect(bat.style.color).toBe('hsl(var(--scene-critter-silhouette) / 0.9)');
+    });
+
     it('flies bats right after sunset, in civil twilight (ROADMAP item 40)', () => {
       const container = spawn({ timeOfDay: 'civil-twilight' }, 6000);
       expect(container.querySelector('[data-testid="scene-bat"]')).not.toBeNull();
@@ -278,7 +284,7 @@ describe('CloudLayer', () => {
       expect(spawnFish({ weatherType: 'drizzle' }, 9000, 0.5).querySelector('[data-testid="scene-fish"]')).toBeNull();
     });
 
-    it('builds night fish in the moon tone or with their own light (ROADMAP item 64)', () => {
+    it('builds night fish in the moon tone or with their own light (ROADMAP item 65)', () => {
       expect(createFish('burbot', false, false, 390, always(0), true).light).toBe('moon');
       expect(createFish('eel', false, false, 390, always(0), true).light).toBe('moon');
       expect(createFish('lanternfish', false, false, 390, always(0), true).light).toBe('own');
@@ -297,8 +303,8 @@ describe('CloudLayer', () => {
     });
   });
 
-  // ROADMAP item 64 (Night waters lookbook picks NF1-NF7, NR1-NR3).
-  describe('night fish (ROADMAP item 64)', () => {
+  // ROADMAP item 65 (Night waters lookbook picks NF1-NF7, NR1-NR3).
+  describe('night fish (ROADMAP item 65)', () => {
     const moon = { x: 0.5, strength: 1 };
     const spawnNight = (props: Partial<React.ComponentProps<typeof CloudLayer>>, ms: number, random = 0) => {
       vi.useFakeTimers();

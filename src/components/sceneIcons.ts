@@ -145,7 +145,7 @@ export const Pufferfish = createLucideIcon('Pufferfish', [
   ['path', { d: 'M16.5 10.5h.01', key: 'eye' }],
 ]);
 
-// Night fish from the Night waters lookbook (ROADMAP item 64). The lanternfish's belly
+// Night fish from the Night waters lookbook (ROADMAP item 65). The lanternfish's belly
 // lights and the anglerfish's lure are drawn by CloudLayer (FISH `lights`), like the boat lights.
 export const Burbot = createLucideIcon('Burbot', [
   ['path', { d: 'M3 12.5c3-2.5 8-3.5 13-3.5 3 0 5 1 6 3-1 2-3 3-6 3-5 0-10-.5-13-2.5Z', key: 'body' }],

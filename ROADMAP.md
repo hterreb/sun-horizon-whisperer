@@ -1,11 +1,11 @@
 # Sun Chaser — Roadmap
 
-> summary: Prioritized list of Sun Chaser features that are not built yet, each with a short spec.
+> summary: Prioritized list of Sun Chaser features, done and open, each with a short spec. The Status line says which items are done.
 > P0 = quick fixes and polish, P1 = core sky features, P2 = line-of-sight terrain analysis (Premium later, free now),
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44 and 47–64, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), the device and dashboard checks listed under Verification (status 2026-10-01), backlog (i18n, share card, sunset reminder). [AUDIT.md](AUDIT.md) has no open findings.
+Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44 and 47–65, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), the device and dashboard checks listed under Verification (status 2026-10-01), backlog (i18n, share card, sunset reminder). [AUDIT.md](AUDIT.md) has no open findings.
 
 ## Verification (2026-09-28)
 
@@ -384,7 +384,7 @@ Five findings from use after items 22–30, checked on `main` at `046abff` with 
   - **L1 Line leaf:** the 🍃 emoji is replaced by lucide `Leaf` in the boat tone.
   - Not picked: V1 (both directions). Boats still sail from left to right.
 - **Checked:** in the browser at 20:05 in Ravensburg (nautical twilight), the line bats flew, a ferry and a sailboat sailed with gold lights, and a far freighter sat on the horizon. No emoji was rendered.
-- **Follow-up (field feedback, 2026-09-28 night):** "I don't see any of the new ships with lights." The first boat came only 2 min after load (then one every 2–4 min). It now sails out about 5–15 s after load (`FIRST_BOAT_HEAD_START_MS` in `CloudLayer.tsx`). Checked in real time in Ravensburg at night: first boat after 7–14 s in 5 of 6 reloads, with its lights on (the 6th hit the 10 % skip roll).
+- **Follow-up (field feedback, 2026-09-28 night):** "I don't see any of the new ships with lights." The first boat came only 2 min after load (then one every 2–4 min). It now sails out about 5–15 s after load (the `ships` start value of `lastSpawnTimeRef` in `CloudLayer.tsx`). Checked in real time in Ravensburg at night: first boat after 7–14 s in 5 of 6 reloads, with its lights on (the 6th hit the 10 % skip roll).
   - Then: "there can also be more than one boat" and "boats can be lower on the screen, closer to the front edge". A new boat now comes every 30–90 s (was 2–4 min); a crossing takes 46–84 s, so often 1–2 boats (now and then 3) are out at once. Far boats are drawn first, so a near boat sails in front. The waterline now spans 67 % (far, at the horizon) to 87 % (near, just above the music player; was 77 %). Checked in real time at 390×844: first boat after about 10 s, two boats at once twice in 100 s.
   - Then, on going lower than the music player: "only in full screen". In fullscreen, where the chrome fades away, near boats sail down to 94 % (`isFullscreen` from `SunVisualization` into `CloudLayer`). A boat keeps its waterline for its whole crossing; only new boats use the new range. Checked at 390×844 in fullscreen: a near sailboat at y 791 of 844.
 
@@ -553,7 +553,7 @@ Seven feedback reports from production (Ravensburg, release `6da35c1`, 29 Sep 16
   - In the browser: play through a sunset. The sun moves along its arc, the sky colours change, and the panel times follow. One play tick takes less than 16 ms in the profiler.
 - **Built:**
   - `SunTracker` has `timeOffsetMs` and `playDirection` state. The clock sets `date = Date.now() + offset`, every 1 s live and every 100 ms during play; during play each tick adds `(direction × 600 − 1) × elapsed` to the offset, so `date` moves exactly 10 min per second. One `useMemo` keyed on the 30 s step and the location derives sun and moon position, sun times, golden and blue hour and time of day from `date`; the 30 s interval and the location-change block are removed.
-  - `isTimePreview` (`timeOffsetMs !== 0`) in `SunTracker` is the preview flag. It gates the fireworks, and item 43 (countdown, not built) can use the same flag. The weather fetch still uses its own `new Date()`, so a preview does not fetch again, and the sunset score and the spawns stay live.
+  - `isTimePreview` (`timeOffsetMs !== 0`) in `SunTracker` is the preview flag. It gates the fireworks and the countdown (item 43). The weather fetch still uses its own `new Date()`, so a preview does not fetch again, and the sunset score and the spawns stay live.
   - `src/utils/timeTravel.ts`: `getTimeTravelRange` (start of today − 1 year to end of today + 1 year), `clampTimeOffset` (play stops at the range edge) and `toDateTimeLocalValue`.
   - InfoPanel row: Rewind, the time and FastForward (`aria-pressed` on the playing direction), plus the gold plus. A tap on the time shows a `datetime-local` input; blur closes it. In a preview the row reads "Time" and `formatMoonDate` ("Sep 30, 19:08"), because "Current Time" plus the date does not fit on one line at 390 px. The "Back to now" glass pill is fixed at the bottom centre, above the radio, and does not fade in fullscreen.
   - Browser check (Ravensburg, 2026-09-30 18:30, 1280×800 and 390×844): the play runs through the sunset (18:44 → 20:09); the sun sets along its arc, the sky goes from orange to civil and nautical twilight, and the sunrise/sunset rows follow the next pass. "Back to now" returns to the live clock. The jump to Dec 24 16:30 shows the winter arc (sunset 16:34). No weather request during the preview. With a real clock, play adds about 9 ms of main-thread work per 100 ms tick, with no frame gap above 16.8 ms and no long task.
@@ -572,7 +572,7 @@ Seven feedback reports from production (Ravensburg, release `6da35c1`, 29 Sep 16
   - In the PWA ([Chrome docs](https://developer.chrome.com/docs/android/trusted-web-activity/receive-payments-play-billing)): the Digital Goods API (`getDigitalGoodsService('https://play.google.com/billing')`) for the local price and for `listPurchases()` at start (this restores the purchase on a new phone), and the Payment Request API to buy. Needs Chrome 101 or later.
   - `PREMIUM_ENFORCED` gates the features only where the Digital Goods API exists, so only in the Play app. The web stays free for now: without an account, a purchase cannot move between devices. Trade-off: a Play user can use the same features free in the browser. Web sales later need Stripe one-time Checkout and the Supabase Auth from item 14.
   - No backend for the first version. Before the release, check how the Digital Goods API acknowledges a one-time purchase: Play refunds a purchase that is not acknowledged within 3 days.
-  - Keep the Stripe subscription functions in `supabase/functions`, unused. Do not delete them until this decision is final.
+  - Keep the Stripe subscription functions in `supabase/functions`, unused, for a possible later web sale (item 14).
 - **Done when:** the price and the billing plan are decided, and items 14 and 16 are updated to match.
 - **Decision (2026-09-30):** Premium is sold only in the Play app, as the one-time product `premium`. The web stays free, with all features and no gate. The billing plan above applies. The working price is €3.99 / US$3.99; confirm it in the Play Console before the release. Items 14 and 16 are updated.
 
@@ -694,6 +694,7 @@ These items come from the re-shoot of all states after items 46–56.
 - **Spec:** dim the moon disc and its glow with the same cloud factor as the stars (`getStarCloudFactor`). Keep a faint light patch where the moon is (at least 15 % opacity) when the cover is not 100 %, or when the weather type is cloudy or overcast. Storm and fog: moon hidden.
 - **Done when:** a test for the moon opacity per weather type. In the browser at 22:30, the moon cannot be seen in rain, fog and storm, and it shows at full brightness when the sky is clear.
 - **Built:** `getMoonCloudFactor` (`weatherEffectsUtils.ts`) starts from `getStarCloudFactor`. Storm and fog give 0. Cover below 100 %, cloudy and overcast give at least 0.15. `SunVisualization` multiplies the moon opacity (disc and glow) by the factor and does not draw the disc at 0. The old fixed storm opacity (0.3) is gone. The moon line and the moon arc stay.
+- **Fix (2026-09-30):** with a manually picked weather, the stars, the moon and the clouds still used the real cloud cover, while the sky ignored it (a manual "Clear" under a real 100 % cover showed no stars). `SunTracker` now passes one `cloudCover` to the sky, `NightStars` and `SunVisualization`: `null` for manual weather, so all follow the weather type alone.
 
 ### 58. No reflection when the sun or moon is below the horizon — S — **✅ Done**
 
@@ -722,7 +723,7 @@ These items come from the re-shoot of all states after items 46–56.
 - **Now:** the water takes the sky's hue 1:1 (item 53), with 1.3× saturation. At dusk the sea is saturated orange-red.
 - **Spec:** the water can mirror the sky, but keeps a blue tone.
 - **Done when:** a test that the water hue stays blue in every time of day. In the browser at 18:45, the sea is blue under the orange sky.
-- **Built:** `getWaterColors` sends both colours through `toSea` (`sunUtils.ts`): a sea blue (hue 205°) with the sky colour's saturation and lightness, with 35 % of the sky colour mixed in (`SKY_TINT`). The lightness stays the sky's, so night, storm and weather dimming work as before. The sun's glitter strip gives the warm reflection.
+- **Built:** `getWaterColors` sends both colours through `toSea` (`sunUtils.ts`): a sea blue (hue 205°) with the sky colour's saturation and lightness, with 35 % of the sky colour mixed in (`SKY_TINT`). The lightness stays the sky's, so night, storm and weather dimming work as before. The sun's reflection bars (item 53) give the warm reflection.
 
 ### Fish lookbook (2026-09-30)
 
@@ -783,7 +784,16 @@ These items come from the re-shoot of all states after items 46–56.
 - **Done when:** unit test with a 5° ridge: the labels have the `getTerrainMoonTimes` times, at about 5° altitude. Component tests: the labels render with a profile and terrain times, not without a profile or while the moon arc is hidden, and a flat pill with the same minute is dropped. In the browser at Innsbruck, 390×844 and 360×800: no pills overlap.
 - **Built:** `getTerrainMoonArcLabels` (`arcLabels.ts`) returns the moon position at each terrain time. `SunTracker` passes `terrainMoonTimes` to `SunVisualization`. Test ids: `arc-label-moon-terrain-rise` and `arc-label-moon-terrain-set`. Fix on the way: a moon pill that overlaps a sun pill now steps up until it is clear (max. 3 steps), not only once. Before, at 360×800 the flat moonset pill overlapped the terrain sunset pill. Innsbruck, 2026-09-30 21:00: terrain moonrise 21:01 (flat 20:23), terrain moonset 11:37 (flat 13:19); no pills overlap at 390×844 and 360×800.
 
-### 64. Night fish: moonlight and glowing fish — M — **✅ Done**
+### 64. Darker bats — S — **✅ Done**
+
+- **Feedback (2026-09-30):** "bats are not dark enough, give me five different bat versions to choose from".
+- **Lookbook:** [Dusk Bats](https://claude.ai/artifact/2LWnCSmscEHtj2mfRjoMeo) (private), versions B1–B5. Pick: **B2, solid silhouette**.
+- **Now:** the dusk bats (item 36) and the Halloween bats are a pale grey line at 60 %. They fade into the lavender civil-twilight sky.
+- **Spec:** the same `Bat` shape, filled with the bird/bat silhouette colour (`--scene-critter-silhouette`) at 90 %, 0.6 stroke. The Halloween bats get the same look.
+- **Done when:** tests: the dusk bat and the Halloween bat have `fill="currentColor"` and the silhouette colour. In the browser at Innsbruck, 390×844: the bats show as dark shapes in civil and nautical twilight and on Halloween night.
+- **Built:** `CloudLayer` and `CalendarEggs` render `Bat` with `fill="currentColor"` and `color: hsl(var(--scene-critter-silhouette) / 0.9)`. Checked at Innsbruck on 2026-09-30 at 19:20 and 19:50 (civil and nautical twilight) and on 2026-10-31 at 22:00 (Halloween night).
+
+### 65. Night fish: moonlight and glowing fish — M — **✅ Done**
 
 - **Feedback (2026-09-30):** "I also want some night fish - any ideas?"
 - **Lookbook:** [Fish & Currents, Night waters](https://claude.ai/artifact/FoeCu4oaNTnoiBfwqXpUjk#night) (private). Picks: NF1, NF2, NF4, NF5, NF6, NF7, NR1, NR2, NR3, and NF3 (added the same evening).
@@ -942,7 +952,7 @@ These items come from the re-shoot of all states after items 46–56.
 
 ### 14. Premium gating (deferred) — M
 
-- **Status:** backend ready, frontend not started. Only start this when `PREMIUM_ENFORCED` should become `true`.
+- **Status:** not started. The Stripe backend below is ready but only needed for a later web sale. Only start this when `PREMIUM_ENFORCED` should become `true`.
 - **Update (2026-09-30), decision in item 45:** Premium is a one-time Google Play purchase in the Play app only. The web stays free. The Stripe steps below are not needed for the first release. They are kept for a possible later web sale.
 - **Depends on:** item 13.
 - **Exists today:**
@@ -964,8 +974,8 @@ These items come from the re-shoot of all states after items 46–56.
   5. A "Manage subscription" button → `customer-portal`.
   6. Optional: a Stripe webhook function that updates `subscribers` without polling.
   7. Tests for the edge functions (Deno test with mocked Stripe).
-- **Gold plus (scene review R22, 2026-09-30):** the plus on each Premium feature (item 35) is on purpose and stays. After a purchase the plus goes away. When `PREMIUM_ENFORCED` is true and the user has not bought Premium, a tap on a feature with the plus opens the purchase: the Play Billing flow in the Play app (item 45), else the Play Store listing. Until then, all features stay free for development and testing.
-- **Note:** paying for digital features inside an Android app requires Google Play Billing. Stripe is only allowed for web purchases. Decide on this before item 16.
+- **Gold plus (scene review R22, 2026-09-30):** the plus on each Premium feature (item 35) is on purpose and stays. After a purchase the plus goes away. When `PREMIUM_ENFORCED` is true and the user has not bought Premium, a tap on a feature with the plus opens the purchase: the Play Billing flow in the Play app (item 45). Outside the Play app there is no gate. Until then, all features stay free for development and testing.
+- **Note:** paying for digital features inside an Android app requires Google Play Billing. Stripe is only allowed for web purchases. Decided in item 45: Play Billing in the Play app, the web free.
 
 ---
 

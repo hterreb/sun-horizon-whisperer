@@ -50,7 +50,7 @@ interface CloudLayerProps {
   windDirectionDeg?: number | null;
   // Fullscreen fades the chrome away, so near boats can sail lower.
   isFullscreen?: boolean;
-  // The pool of moonlight for the night fish (ROADMAP item 64): the moon's x as a fraction
+  // The pool of moonlight for the night fish (ROADMAP item 65): the moon's x as a fraction
   // of the width, and the pool's strength (0 = no pool, 1 = a full moon in a clear sky).
   moonlight?: { x: number; strength: number } | null;
 }
@@ -126,7 +126,7 @@ const FAR_SHRINK = 0.45; // the farthest boat is 55% of the size, opacity and sp
 // second) are a near fish's; far fish shrink and slow down like the boats (FAR_SHRINK).
 // `haze` is how deep the species swims: 0 = at the surface (crisp) to 1 = deep (faint).
 // `glow` is the spot that lights up after sunset (E1), in the icon's 24 px grid.
-// `lights` (night fish, item 64) are always on: [cx, cy, r] in the 24 px grid.
+// `lights` (night fish, item 65) are always on: [cx, cy, r] in the 24 px grid.
 type FishPattern = 'glide' | 'school' | 'companions' | 'rest';
 const FISH: Record<FishKind, {
   Icon: LucideIcon; size: number; speed: number; haze: number; pattern: FishPattern; glow: [number, number];
@@ -145,7 +145,7 @@ const FISH: Record<FishKind, {
   seahorse: { Icon: Seahorse, size: 18, speed: 0.4, haze: 0.4, pattern: 'glide', glow: [12.5, 11] },
   whale: { Icon: Whale, size: 72, speed: 0.8, haze: 0.8, pattern: 'glide', glow: [13, 12] },
   pufferfish: { Icon: Pufferfish, size: 20, speed: 1, haze: 0.4, pattern: 'rest', glow: [12.5, 12] },
-  // Night only (ROADMAP item 64).
+  // Night only (ROADMAP item 65).
   burbot: { Icon: Burbot, size: 30, speed: 1.2, haze: 0, pattern: 'glide', glow: [12, 12] },
   eel: { Icon: Eel, size: 36, speed: 1.4, haze: 0, pattern: 'glide', glow: [12, 12] },
   lanternfish: {
@@ -155,7 +155,7 @@ const FISH: Record<FishKind, {
   anglerfish: { Icon: Anglerfish, size: 26, speed: 0.9, haze: 0, pattern: 'rest', glow: [13, 12], lights: [[20.3, 2.6, 1.3]] },
   squid: { Icon: FireflySquid, size: 7, speed: 2, haze: 0, pattern: 'school', glow: [12, 12] },
 };
-// Night fish with their own light (item 64); all other fish at night are lit by the moon.
+// Night fish with their own light (item 65); all other fish at night are lit by the moon.
 const GLOWING_AT_NIGHT: FishKind[] = ['lanternfish', 'anglerfish', 'squid', 'jellyfish'];
 // P5: a minnow school's fixed formation, in minnow widths x 1.15, the leader in front.
 const SCHOOL_FORMATION: [number, number][] = [[0, 0], [-1.4, -0.9], [-1.6, 0.9], [-2.9, -0.1], [-3.1, 1.6], [-4.2, -1.1], [-4.5, 0.7]];
@@ -168,14 +168,14 @@ interface FishEntity extends MovingEntity {
   height: number;
   opacity: number;
   glow: boolean;
-  light?: 'moon' | 'own'; // night fish (item 64): lit by the moon, or by their own light
+  light?: 'moon' | 'own'; // night fish (item 65): lit by the moon, or by their own light
   easing?: string; // rest stop (P8): a CSS linear() easing that holds still mid-crossing
   school?: { left: number; top: number }[]; // P5: each minnow's offset in px
   companion?: { lag: number; dy: number }; // P6: a second fish, `lag` s behind, `dy` % lower
 }
 
 // Builds one fish (ROADMAP item 62). `wet` = rain or drizzle, where fish swim deeper (E2).
-// `night` = a night fish (item 64): in the moon tone or with its own light, no depth haze.
+// `night` = a night fish (item 65): in the moon tone or with its own light, no depth haze.
 // eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
 export const createFish = (
   kind: FishKind, sunDown: boolean, wet: boolean, viewportWidth: number, random = Math.random, night = false,
@@ -339,7 +339,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   // Line icons (boats, leaves) share today's ship tone.
   const lineInk = timeOfDay === 'night' ? 'text-gray-300 text-opacity-60' : 'text-gray-600 text-opacity-80';
 
-  // The pool of moonlight (ROADMAP item 64, NF1/NR3): moonlit fish show only within ±9 %
+  // The pool of moonlight (ROADMAP item 65, NF1/NR3): moonlit fish show only within ±9 %
   // of the width from the moon, fading out to ±20 %, as bright as the pool is strong.
   const moonUp = (moonlight?.strength ?? 0) > 0;
   const poolX = (moonlight?.x ?? 0.5) * 100;
@@ -362,7 +362,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
                           timeOfDay !== 'night';
     const fishWeather = weatherType === 'clear' || weatherType === 'partly' || weatherType === 'cloudy' ||
                         weatherType === 'overcast' || weatherType === 'rain' || weatherType === 'drizzle';
-    // Night fish (ROADMAP item 64, NR2) take over in nautical twilight, where the day fish stop.
+    // Night fish (ROADMAP item 65, NR2) take over in nautical twilight, where the day fish stop.
     const nightWater = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
     const shouldShowFish = fishWeather && !nightWater;
     const shouldShowNightFish = fishWeather && nightWater;
@@ -397,7 +397,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         setBirds(prev => (prev.length > 0 ? [] : prev));
       }
 
-      // At the switch between day and night fish, the fish on screen swim on (item 64).
+      // At the switch between day and night fish, the fish on screen swim on (item 65).
       if (shouldShowFish || shouldShowNightFish) {
         // A quiet night (NR1): a check every 15-25 s instead of every 5-8 s.
         const gapMs = shouldShowNightFish ? 15000 + Math.random() * 10000 : 5000 + Math.random() * 3000;
@@ -582,7 +582,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     weatherType === 'hail' || weatherType === 'drizzle' || weatherType === 'fog';
 
   // One fish, or a pair (P6): the companion swims `lag` s behind and leaves last, so its
-  // onAnimationEnd removes the pair. Night fish (item 64) are in the moon tone or carry lights.
+  // onAnimationEnd removes the pair. Night fish (item 65) are in the moon tone or carry lights.
   const renderFish = (fishItem: FishEntity) => {
     const { Icon, glow, lights } = FISH[fishItem.kind];
     // Lit by the moon, or an outline with lights: the moon tone. A jellyfish or squid with
@@ -798,7 +798,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         >
           <div style={{ transform: `${isSunDown ? 'scale(0.5)' : 'scale(0.3)'} translateX(-100%)` }}>
             {isSunDown ? (
-              <Bat size={76} strokeWidth={1.5} className="text-gray-300 text-opacity-60" data-testid="scene-bat" />
+              <Bat size={76} strokeWidth={0.6} fill="currentColor" style={{ color: 'hsl(var(--scene-critter-silhouette) / 0.9)' }} data-testid="scene-bat" />
             ) : (
               <svg
                 version="1.1"

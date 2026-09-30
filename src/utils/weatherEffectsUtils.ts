@@ -99,7 +99,7 @@ export const pickBoat = (type: WeatherType, windKmh: number | null | undefined, 
 export type FishKind =
   | 'classic' | 'minnow' | 'perch' | 'pike' | 'carp' | 'catfish' | 'trout'
   | 'ray' | 'turtle' | 'jellyfish' | 'seahorse' | 'whale' | 'pufferfish'
-  | 'burbot' | 'eel' | 'lanternfish' | 'anglerfish' | 'squid'; // night only (item 64)
+  | 'burbot' | 'eel' | 'lanternfish' | 'anglerfish' | 'squid'; // night only (item 65)
 
 export const FISH_WEIGHTS: [FishKind, number][] = [
   ['classic', 25], ['minnow', 18], ['perch', 14], ['pike', 8], ['carp', 10], ['catfish', 4], ['trout', 12],
@@ -108,7 +108,7 @@ export const FISH_WEIGHTS: [FishKind, number][] = [
 
 export const pickFish = (r: number): FishKind => pickWeighted(FISH_WEIGHTS, r);
 
-// Night mix (ROADMAP item 64, Night waters lookbook), from nautical twilight on. 'moonlit'
+// Night mix (ROADMAP item 65, Night waters lookbook), from nautical twilight on. 'moonlit'
 // is a day fish in the moon tone (NF1); pickMoonlitDayFish then picks its species with
 // the day weights of the lake fish, without the minnow school.
 export type NightFishPick = 'moonlit' | 'burbot' | 'eel' | 'lanternfish' | 'jellyfish' | 'anglerfish' | 'squid';
@@ -122,7 +122,7 @@ export const pickNightFish = (r: number): NightFishPick => pickWeighted(NIGHT_FI
 export const pickMoonlitDayFish = (r: number): FishKind =>
   pickWeighted(FISH_WEIGHTS.filter(([kind]) => MOONLIT_DAY_FISH.includes(kind)), r);
 
-// At most five fish on screen (E4), three at night (item 64, NR1). A school or a pair is
+// At most five fish on screen (E4), three at night (item 65, NR1). A school or a pair is
 // one entry. Turtles and jellyfish are not fish, so they neither count nor wait for a free place.
 export const MAX_FISH = 5;
 export const MAX_NIGHT_FISH = 3;

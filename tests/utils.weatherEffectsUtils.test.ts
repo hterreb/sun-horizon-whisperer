@@ -116,7 +116,7 @@ describe('fish mix (ROADMAP item 62)', () => {
   });
 });
 
-describe('night fish mix (ROADMAP item 64)', () => {
+describe('night fish mix (ROADMAP item 65)', () => {
   it('has weights that sum to 100 and sends out every night fish', () => {
     expect(NIGHT_FISH_WEIGHTS.reduce((sum, [, weight]) => sum + weight, 0)).toBe(100);
     const picks = Array.from({ length: 100 }, (_, i) => pickNightFish(i / 100));

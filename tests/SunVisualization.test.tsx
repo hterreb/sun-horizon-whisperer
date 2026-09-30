@@ -980,7 +980,7 @@ describe('SunVisualization (rendered): sea visible at the horizon (ROADMAP item 
     expect(screen.queryByTestId('water-reflection')).toBeNull();
   });
 
-  it('draws the pool of moonlight at night, as bright as the moon is full (ROADMAP item 64)', () => {
+  it('draws the pool of moonlight at night, as bright as the moon is full (ROADMAP item 65)', () => {
     setMockedContainerSize(800, 600);
     const night = {
       ...baseProps,

@@ -372,7 +372,7 @@ const hslToRgb = ([h, s, l]: [number, number, number]): number[] => {
 // The sea stays blue (ROADMAP item 61): a sea blue with the sky colour's saturation
 // and lightness, with SKY_TINT of the sky colour mixed in (RGB). The lightness stays
 // the sky's. A warm dusk sky so gives a muted blue, not an orange sea; the sun's
-// glitter strip adds the warm reflection. Raise SKY_TINT for a stronger mirror.
+// reflection bars add the warm reflection. Raise SKY_TINT for a stronger mirror.
 const SEA_HUE = 205;
 const SKY_TINT = 0.35;
 
@@ -410,7 +410,7 @@ export const getWaterColors = (skyGradient: string, storm = false): { surface: s
   };
 };
 
-// No reflection below the horizon (ROADMAP item 58): the sun or moon glitter strip's
+// No reflection below the horizon (ROADMAP item 58): the sun or moon reflection's
 // opacity factor by that body's altitude. Full above +2°, fading out to 0 at 0°.
 export const getReflectionFade = (altitude: number): number => Math.min(1, Math.max(0, altitude / 2));
 
