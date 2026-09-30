@@ -82,13 +82,66 @@ const BOAT_WEIGHTS: [BoatKind, number][] = [
 const BIG_BOATS: BoatKind[] = ['ferry', 'freighter'];
 
 // `r` is a random number in [0, 1), passed in so the pick stays pure and testable.
+const pickWeighted = <K>(mix: [K, number][], r: number): K => {
+  let left = r * mix.reduce((sum, [, weight]) => sum + weight, 0);
+  return (mix.find(([, weight]) => (left -= weight) < 0) ?? mix[mix.length - 1])[0];
+};
+
 export const pickBoat = (type: WeatherType, windKmh: number | null | undefined, r: number): BoatKind => {
   const fair = type === 'clear' || type === 'partly' || type === 'cloudy' || type === 'overcast';
   const strongWind = (windKmh ?? 0) > STRONG_WIND_KMH;
-  const mix = BOAT_WEIGHTS.filter(([kind]) =>
-    (fair || BIG_BOATS.includes(kind)) && !(strongWind && kind === 'rowboat'));
-  let left = r * mix.reduce((sum, [, weight]) => sum + weight, 0);
-  return (mix.find(([, weight]) => (left -= weight) < 0) ?? mix[mix.length - 1])[0];
+  return pickWeighted(BOAT_WEIGHTS.filter(([kind]) =>
+    (fair || BIG_BOATS.includes(kind)) && !(strongWind && kind === 'rowboat')), r);
+};
+
+// Fish mix (ROADMAP item 62, Fish & Currents lookbook): which species swims out next.
+// The weights are each species' share of all spawns (sum 100). The sea visitors are rare.
+export type FishKind =
+  | 'classic' | 'minnow' | 'perch' | 'pike' | 'carp' | 'catfish' | 'trout'
+  | 'ray' | 'turtle' | 'jellyfish' | 'seahorse' | 'whale' | 'pufferfish';
+
+export const FISH_WEIGHTS: [FishKind, number][] = [
+  ['classic', 25], ['minnow', 18], ['perch', 14], ['pike', 8], ['carp', 10], ['catfish', 4], ['trout', 12],
+  ['ray', 2], ['turtle', 2], ['jellyfish', 2], ['seahorse', 1], ['whale', 1], ['pufferfish', 1],
+];
+
+export const pickFish = (r: number): FishKind => pickWeighted(FISH_WEIGHTS, r);
+
+// At most five fish on screen (E4). A school or a pair is one entry. Turtles and
+// jellyfish are not fish, so they neither count nor wait for a free place.
+export const MAX_FISH = 5;
+const NOT_FISH: FishKind[] = ['turtle', 'jellyfish'];
+
+export const canSpawnFish = (onScreen: FishKind[], next: FishKind): boolean =>
+  NOT_FISH.includes(next) || onScreen.filter(kind => !NOT_FISH.includes(kind)).length < MAX_FISH;
+
+// Rest stop (P8): cruise at `speed`, slow to a stop over 3 s so that it stands still
+// `stopAt` along the path, hold for `holdSec`, speed up over 3 s and cruise on. Distances
+// are in % of the width, speed in % per second. Returns the crossing time and a CSS
+// `linear()` easing for the moveAcrossX animation, so the stop stays in CSS like every
+// other glide (no per-frame state). A constant slow-down is a quadratic path, sampled
+// every 0.5 s.
+const REST_RAMP_SEC = 3;
+
+export const getRestStopMotion = (distance: number, speed: number, stopAt: number, holdSec: number) => {
+  const ramp = speed * REST_RAMP_SEC / 2; // the distance covered while slowing down (or speeding up)
+  const cruiseIn = Math.max(0, stopAt - ramp);
+  const slowFrom = cruiseIn / speed;
+  const stop = cruiseIn + ramp;
+  const goAt = slowFrom + REST_RAMP_SEC + holdSec;
+  const duration = goAt + REST_RAMP_SEC + (distance - stop - ramp) / speed;
+  const points: [number, number][] = [[0, 0], [slowFrom, cruiseIn]];
+  for (let i = 1; i <= 6; i++) {
+    const u = REST_RAMP_SEC * i / 6;
+    points.push([slowFrom + u, cruiseIn + speed * (u - u * u / (2 * REST_RAMP_SEC))]);
+  }
+  for (let i = 0; i <= 6; i++) {
+    const u = REST_RAMP_SEC * i / 6;
+    points.push([goAt + u, stop + speed * u * u / (2 * REST_RAMP_SEC)]);
+  }
+  points.push([duration, distance]);
+  const easing = `linear(${points.map(([t, s]) => `${(s / distance).toFixed(4)} ${(t / duration * 100).toFixed(2)}%`).join(', ')})`;
+  return { duration, easing };
 };
 
 // Stars behind clouds (ROADMAP item 52): the factor for star opacity. A measured cloud
