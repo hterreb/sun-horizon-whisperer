@@ -52,6 +52,8 @@ interface SunVisualizationProps {
   // Line-of-sight sunrise/sunset from SunTracker (terrainExtras.terrainSunTimes), drawn as
   // extra sun-arc labels where the arc meets the ridge (ROADMAP item 42). Null = none.
   terrainSunTimes?: { sunrise: Date | null; sunset: Date | null } | null;
+  // Sunset countdown (ROADMAP item 43): the seconds left, shown in the altitude pill.
+  sunsetCountdown?: { seconds: number; lineOfSight: boolean } | null;
   // Fade the cardinal labels out together with the top-left buttons while idle in
   // fullscreen (ROADMAP item 29); both default to their non-fullscreen values so
   // existing callers/tests that don't pass them keep the labels always visible.
@@ -478,6 +480,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   compassHeading = null,
   horizonProfile = null,
   terrainSunTimes = null,
+  sunsetCountdown = null,
   isFullscreen = false,
   showCursor = true,
   fireworksTrigger = 0
@@ -1054,7 +1057,15 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           className="absolute z-[9] left-1/2 transform -translate-x-1/2 bottom-1/3 -translate-y-12
                      bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm"
         >
-          {formatSunAltitude(sunPosition.altitude)}
+          {sunsetCountdown ? (
+            <span className="flex items-center gap-1 tabular-nums">
+              {sunsetCountdown.lineOfSight && <Mountain size={12} />}
+              Sunset in {sunsetCountdown.seconds} s
+              {sunsetCountdown.lineOfSight && <PremiumBadge className="absolute -right-1 -top-1 h-2.5 w-2.5" />}
+            </span>
+          ) : (
+            formatSunAltitude(sunPosition.altitude)
+          )}
         </div>
       )}
 
