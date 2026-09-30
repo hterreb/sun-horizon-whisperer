@@ -8,6 +8,7 @@ import { type HorizonProfile, horizonAngleAt } from '../utils/horizonUtils';
 import CloudLayer, { type WeatherType } from './CloudLayer';
 import Fireworks from './Fireworks';
 import WeatherEffects from './WeatherEffects';
+import { getSunVisibility } from '@/utils/weatherEffectsUtils';
 
 // A fixed fallback seed date for callers that don't pass one (e.g. existing tests) -
 // a stable constant, not `new Date()`, so it never changes identity across renders.
@@ -552,7 +553,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   // Whether each body is up at all, on altitude/weather/time-of-day grounds alone -
   // independent of the compass field of view, so the off-FOV hint below can tell "it's
   // up, just off to one side" apart from "it's not up right now" (ROADMAP item 19).
-  const sunAltitudeVisible = sunPosition.altitude > -18 && weatherType !== 'storm';
+  const sunVisibility = getSunVisibility(weatherType); // clouds dim the sun (ROADMAP item 50)
+  const sunAltitudeVisible = sunPosition.altitude > -18 && sunVisibility.halo > 0;
   const moonAltitudeVisible = moonPosition.visible && (
     timeOfDay === 'night' ||
     timeOfDay === 'astronomical-twilight' ||
@@ -821,16 +823,17 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           style={{
             left: `${sunX}px`,
             top: `${sunY}px`,
-            width: sunPosition.altitude > 0 ? 200 : 160,
-            height: sunPosition.altitude > 0 ? 200 : 160,
+            width: (sunPosition.altitude > 0 ? 200 : 160) * sunVisibility.haloScale,
+            height: (sunPosition.altitude > 0 ? 200 : 160) * sunVisibility.haloScale,
             transform: 'translate(-50%, -50%)',
-            opacity: weatherType === 'rain' ? 0.7 : 1,
-            background: `radial-gradient(circle, hsl(var(${getSunGlowToken()}) / 0.55) 0%, transparent 70%)`
+            opacity: sunVisibility.halo,
+            // No disc (overcast, fog, rain): a white light patch, not a yellow glow on grey.
+            background: `radial-gradient(circle, hsl(var(${sunVisibility.disc > 0 ? getSunGlowToken() : '--scene-glow-white'}) / 0.55) 0%, transparent 70%)`
           }}
         />
       )}
 
-      {isSunVisible && (
+      {isSunVisible && sunVisibility.disc > 0 && (
         // A filled disc with a soft rim, no rays (ROADMAP item 46, direction D's soft glowing sun).
         <div
           data-testid="sun-dot"
@@ -841,7 +844,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             width: 56,
             height: 56,
             transform: 'translate(-50%, -50%)',
-            opacity: weatherType === 'rain' ? 0.7 : 1,
+            opacity: sunVisibility.disc,
             background: `hsl(var(${getSunDiscToken(sunPosition.altitude)}))`,
             boxShadow: `0 0 6px 2px hsl(var(${getSunDiscToken(sunPosition.altitude)}) / 0.6)`
           }}
@@ -918,7 +921,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         // short glinting bars under whichever body is currently shown, fading out
         // with depth - the style book's water reflection streaks.
         const nightReflection = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
-        const reflectionVisible = nightReflection ? isMoonVisible : isSunVisible;
+        const reflectionVisible = nightReflection ? isMoonVisible : isSunVisible && sunVisibility.disc > 0;
         if (!reflectionVisible) return null;
 
         const reflectX = nightReflection ? moonX : sunX;

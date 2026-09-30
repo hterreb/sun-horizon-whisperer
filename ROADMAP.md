@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-01. Done: items 1–13, 15, 17–41, 46–49, 52 and 54–56 (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14, 16 and 42–45 (Sentry feedback, round 3), 50, 51 and 53 ([scene review](#scene-review-2026-09-30)), the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
+Status: last updated 2026-10-01. Done: items 1–13, 15, 17–41, 46–50, 52 and 54–56 (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14, 16 and 42–45 (Sentry feedback, round 3), 51 and 53 ([scene review](#scene-review-2026-09-30)), the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
 
 ## Verification (2026-09-28)
 
@@ -583,7 +583,7 @@ A visual review of `main` at `6da35c1`. The method: 47 scene states in headless 
 - **Done when:** a test checks that the panel shows the frost at −6 °C and not at −4 °C. At −12 °C in the browser the frost is visible on the collapsed and on the expanded panel.
 - **Built:** `InfoPanel` calls `getWeatherEffects` and uses `showFrost`. The own `-5` check is removed. The frost shows as a white-blue inset shadow about 6 px wide and two static inline-SVG ice crystals, top left and bottom right. Checked in the browser at −12 °C at 390 and 1280 px.
 
-### 50. Clouds dim the sun and the sky — M — R6, R9
+### 50. Clouds dim the sun and the sky — M — R6, R9 — **✅ Done**
 
 - **Now:** overcast, fog, drizzle, rain and snow keep a bright cyan sky and the full sun with its halo. Only a storm hides the sun. `WEATHER_GRADIENT_SHIFT` (`SunTracker.tsx`) changes the sky only a little. On a phone the snowflakes cannot be seen against the bright sky.
 - **Spec:**
@@ -591,6 +591,7 @@ A visual review of `main` at `6da35c1`. The method: 47 scene states in headless 
   - **Sun (item 46):** clear and partly: full. Cloudy: disc 80 %, halo 60 %. Drizzle and snow: a pale disc at 50 %, a small halo. Overcast, fog and rain: no disc, only a soft light patch where the sun is. Storm and hail: nothing, as now.
   - **Snow on the phone:** give the flakes a thin, darker blue-grey outline, or make them larger (at least 10 px), so they read on the greyer sky.
 - **Done when:** tests for the sky mix and the sun visibility per weather type. In the browser at 11:00, clear, overcast, rain and snow look clearly different, and snowflakes are visible at 390 px.
+- **Built:** `getSkyOvercastMix` (`weatherEffectsUtils.ts`) gives the mix per weather type, multiplied by the cloud cover when there is one (only for real weather, not for a weather picked by hand). `mixGradientTowardOvercast` (`sunUtils.ts`) replaces `shiftGradientBrightness` and `WEATHER_GRADIENT_SHIFT`. It mixes each stop toward `--scene-sky-overcast` (#8A949D), but the grey is never lighter than the stop, so night skies stay dark. `getSunVisibility` gives the disc and halo opacity and the halo size. With no disc, the halo is a white light patch and the water reflection is hidden. Hail now hides the sun like a storm. Snowflakes are at least 10 px, with a thin `--scene-snow-outline`.
 
 ### 51. Storm: a closed cloud deck and dark water — S — R7
 

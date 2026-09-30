@@ -1,4 +1,4 @@
-import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, getStarCloudFactor, getTwilightStars } from '../src/utils/weatherEffectsUtils';
+import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, getStarCloudFactor, getTwilightStars, getSkyOvercastMix, getSunVisibility } from '../src/utils/weatherEffectsUtils';
 
 describe('getWeatherEffects (ROADMAP item 10)', () => {
   it('shows fog only for the fog type', () => {
@@ -125,5 +125,60 @@ describe('getTwilightStars (ROADMAP item 52)', () => {
     for (const t of ['civil-twilight', 'dawn', 'midday', 'evening'] as const) {
       expect(getTwilightStars(t).share).toBe(0);
     }
+  });
+});
+
+describe('getSkyOvercastMix (ROADMAP item 50)', () => {
+  it('mixes the sky toward grey per weather type without a cloud cover', () => {
+    const expected = {
+      clear: 0, partly: 0.1, cloudy: 0.25, drizzle: 0.45, snow: 0.45,
+      overcast: 0.6, fog: 0.6, rain: 0.6, storm: 0.75, hail: 0.75,
+    } as const;
+    for (const [type, mix] of Object.entries(expected)) {
+      expect(getSkyOvercastMix(type as keyof typeof expected, null)).toBe(mix);
+      expect(getSkyOvercastMix(type as keyof typeof expected, undefined)).toBe(mix);
+    }
+  });
+
+  it('scales the mix by a measured cloud cover, clamped to 0-100 %', () => {
+    expect(getSkyOvercastMix('rain', 100)).toBe(0.6);
+    expect(getSkyOvercastMix('rain', 50)).toBeCloseTo(0.3);
+    expect(getSkyOvercastMix('cloudy', 0)).toBe(0);
+    expect(getSkyOvercastMix('storm', 150)).toBe(0.75);
+    expect(getSkyOvercastMix('clear', 100)).toBe(0);
+  });
+});
+
+describe('getSunVisibility (ROADMAP item 50)', () => {
+  it('shows the full sun for clear and partly', () => {
+    expect(getSunVisibility('clear')).toEqual({ disc: 1, halo: 1, haloScale: 1 });
+    expect(getSunVisibility('partly')).toEqual({ disc: 1, halo: 1, haloScale: 1 });
+  });
+
+  it('dims the disc to 80 % and the halo to 60 % when cloudy', () => {
+    expect(getSunVisibility('cloudy')).toEqual({ disc: 0.8, halo: 0.6, haloScale: 1 });
+  });
+
+  it('shows a pale disc at 50 % with a small halo for drizzle and snow', () => {
+    for (const t of ['drizzle', 'snow'] as const) {
+      const v = getSunVisibility(t);
+      expect(v.disc).toBe(0.5);
+      expect(v.halo).toBeGreaterThan(0);
+      expect(v.haloScale).toBeLessThan(1);
+    }
+  });
+
+  it('shows no disc, only a soft light patch, for overcast, fog and rain', () => {
+    for (const t of ['overcast', 'fog', 'rain'] as const) {
+      const v = getSunVisibility(t);
+      expect(v.disc).toBe(0);
+      expect(v.halo).toBeGreaterThan(0);
+      expect(v.halo).toBeLessThan(1);
+    }
+  });
+
+  it('hides the sun completely for storm and hail', () => {
+    expect(getSunVisibility('storm')).toEqual({ disc: 0, halo: 0, haloScale: 0 });
+    expect(getSunVisibility('hail')).toEqual({ disc: 0, halo: 0, haloScale: 0 });
   });
 });

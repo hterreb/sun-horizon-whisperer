@@ -94,6 +94,11 @@
     --scene-sky-dusk-1: 23.9 97.9% 81.4%;
     --scene-sky-dusk-2: 24.6 95% 53.1%;
     --scene-sky-dusk-3: 223.3 25.7% 13.7%;
+    /* Clouds dim the sky (ROADMAP item 50): the grey the sky gradient mixes toward,
+       mirrored as #8A949D in sunUtils' mixGradientTowardOvercast */
+    --scene-sky-overcast: 208.4 8.8% 57.8%;
+    /* The thin outline that keeps snowflakes readable on the grey sky (item 50) */
+    --scene-snow-outline: 210 25% 40%;
 
     /* Scene palette — sun glow, matching the 3 altitude bands in
        SunVisualization's getGlowIntensity (yellow / orange / tomato) */
