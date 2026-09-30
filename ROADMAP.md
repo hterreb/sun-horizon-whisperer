@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44 and 47–63, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), the checks listed under Verification, easter eggs, backlog. [AUDIT.md](AUDIT.md) has no open findings.
+Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44 and 47–63, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built except the whale (→ item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), the device and dashboard checks listed under Verification (status 2026-10-01), backlog (i18n, share card, sunset reminder). [AUDIT.md](AUDIT.md) has no open findings.
 
 ## Verification (2026-09-28)
 
@@ -869,7 +869,7 @@ These items come from the re-shoot of all states after items 46–56.
 
 ## P2 — Flagship: line of sight (Premium later, free now)
 
-### 13. Line of sight with terrain — L — **✅ Done** (alpine 5-min reference check still open)
+### 13. Line of sight with terrain — L — **✅ Done**
 
 - **Why:** the astronomical sunset is for a flat horizon. In the mountains, the sun disappears behind a ridge much earlier. At a high viewpoint, it sets later. No free web app shows this well.
 - **Spec:**
@@ -902,7 +902,7 @@ These items come from the re-shoot of all states after items 46–56.
   - Checked with real tiles: beaches (Guincho, Sylt) differ from the astronomical sunset by 0 min. Zugspitze summit sets 9 min later. Innsbruck sets 31 min earlier.
   - Viganella: no sun from 5 Nov to 6 Feb (documented: about 11 Nov to 2 Feb). Rattenberg: no sun on 21 Dec.
   - Tiles are not cached by the service worker. Only the computed profile is cached (`localStorage`).
-- **Open:** compare an alpine sunset with PeakFinder or a real observation (5-min target).
+- **Checked (2026-10-01):** Sion (CH) against a second-hand PeakFinder value: sunrise −2.5 min, sunset +4.3 min, inside the 5-min target. A first-hand PeakFinder check or an observation would make it stronger (see Verification).
 
 ### 14. Premium gating (deferred) — M
 
