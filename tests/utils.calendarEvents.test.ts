@@ -1,0 +1,59 @@
+import { getCalendarEvent, getSeasonInstant } from '@/utils/calendarEvents';
+
+// vitest pins TZ=UTC, so local dates below are UTC dates.
+describe('getSeasonInstant', () => {
+  it('is within an hour of the published 2026 solstices and equinoxes', () => {
+    const published: [2 | 5 | 8 | 11, string][] = [
+      [2, '2026-03-20T14:46Z'],
+      [5, '2026-06-21T08:24Z'],
+      [8, '2026-09-23T00:05Z'],
+      [11, '2026-12-21T20:50Z'],
+    ];
+    for (const [month, iso] of published) {
+      expect(Math.abs(getSeasonInstant(2026, month).getTime() - Date.parse(iso))).toBeLessThan(3_600_000);
+    }
+  });
+});
+
+describe('getCalendarEvent', () => {
+  it('returns null on an ordinary day', () => {
+    expect(getCalendarEvent(new Date(2026, 8, 30, 12))).toBeNull();
+  });
+
+  it('returns new-year only in the first minute of Jan 1', () => {
+    expect(getCalendarEvent(new Date(2027, 0, 1, 0, 0, 30))).toBe('new-year');
+    expect(getCalendarEvent(new Date(2027, 0, 1, 0, 1))).toBeNull();
+    expect(getCalendarEvent(new Date(2026, 11, 31, 23, 59, 59))).toBeNull();
+  });
+
+  it('returns friday-13 on a Friday the 13th only', () => {
+    expect(getCalendarEvent(new Date(2026, 10, 13, 20))).toBe('friday-13'); // a Friday
+    expect(getCalendarEvent(new Date(2026, 9, 13, 20))).toBeNull(); // a Tuesday
+  });
+
+  it('flips longest/shortest day by hemisphere', () => {
+    expect(getCalendarEvent(new Date(2026, 5, 21, 12), 47.8)).toBe('solstice-longest');
+    expect(getCalendarEvent(new Date(2026, 5, 21, 12), -33.9)).toBe('solstice-shortest');
+    expect(getCalendarEvent(new Date(2026, 11, 21, 12), 47.8)).toBe('solstice-shortest');
+    expect(getCalendarEvent(new Date(2026, 11, 21, 12))).toBe('solstice-shortest'); // no latitude: north
+    expect(getCalendarEvent(new Date(2026, 5, 22, 12), 47.8)).toBeNull();
+  });
+
+  it('returns equinox on the equinox day', () => {
+    expect(getCalendarEvent(new Date(2026, 2, 20, 9))).toBe('equinox');
+    expect(getCalendarEvent(new Date(2026, 8, 23, 20), -33.9)).toBe('equinox');
+    expect(getCalendarEvent(new Date(2026, 8, 22, 20))).toBeNull();
+  });
+
+  it('gives Halloween a pumpkin moon only when the full moon is within 3 days', () => {
+    expect(getCalendarEvent(new Date(2020, 9, 31, 22))).toBe('halloween-pumpkin'); // full moon Oct 31
+    expect(getCalendarEvent(new Date(2026, 9, 31, 22))).toBe('halloween-bats'); // full moon Oct 26
+    expect(getCalendarEvent(new Date(2026, 9, 30, 22))).toBeNull();
+  });
+
+  it('returns christmas on Dec 24-26 only', () => {
+    expect(getCalendarEvent(new Date(2026, 11, 23, 12))).toBeNull();
+    for (const day of [24, 25, 26]) expect(getCalendarEvent(new Date(2026, 11, day, 12))).toBe('christmas');
+    expect(getCalendarEvent(new Date(2026, 11, 27, 12))).toBeNull();
+  });
+});

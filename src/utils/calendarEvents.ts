@@ -1,0 +1,58 @@
+import { getNextFullMoon } from './moonUtils';
+
+// Calendar easter eggs (ROADMAP "Ongoing - Easter eggs", Calendar list). Pure date
+// checks in local time; the scene shows at most one event at a time.
+export type CalendarEvent =
+  | 'new-year' // 00:00-00:00:59 on Jan 1: fireworks
+  | 'friday-13' // a black cat walks along the horizon once
+  | 'solstice-longest' // the solstice day with the longest day for this hemisphere
+  | 'solstice-shortest'
+  | 'equinox'
+  | 'halloween-pumpkin' // Oct 31, full moon within 3 days: a pumpkin moon
+  | 'halloween-bats' // Oct 31, else: bats all night
+  | 'christmas'; // Dec 24-26: light snow
+
+// Mean solstice/equinox instants, Meeus "Astronomical Algorithms" table 27.B
+// (years 2000-3000). No periodic terms, so the error is up to about 30 min; this
+// matters only when the instant is close to local midnight.
+const SEASON_JDE0: Record<number, number[]> = {
+  2: [2451623.80984, 365242.37404, 0.05169, -0.00411, -0.00057], // March equinox
+  5: [2451716.56767, 365241.62603, 0.00325, 0.00888, -0.0003], // June solstice
+  8: [2451810.21715, 365242.01767, -0.11575, 0.00337, 0.00078], // September equinox
+  11: [2451900.05952, 365242.74049, -0.06223, -0.00823, 0.00032], // December solstice
+};
+
+export const getSeasonInstant = (year: number, month: 2 | 5 | 8 | 11): Date => {
+  const y = (year - 2000) / 1000;
+  const jde = SEASON_JDE0[month].reduce((sum, c, i) => sum + c * y ** i, 0);
+  return new Date((jde - 2440587.5) * 86_400_000);
+};
+
+const sameLocalDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+
+const getSeasonEvent = (date: Date, latitude: number): CalendarEvent | null => {
+  const month = date.getMonth();
+  if (month !== 2 && month !== 5 && month !== 8 && month !== 11) return null;
+  if (!sameLocalDay(getSeasonInstant(date.getFullYear(), month), date)) return null;
+  if (month === 2 || month === 8) return 'equinox';
+  // June is the longest day in the north and the shortest in the south.
+  return (month === 5) === (latitude >= 0) ? 'solstice-longest' : 'solstice-shortest';
+};
+
+// The full moon is "within 3 days of Oct 31" when it falls on Oct 28 - Nov 3.
+const isHalloweenFullMoon = (year: number) => getNextFullMoon(new Date(year, 9, 28)) < new Date(year, 10, 4);
+
+// One event id, or null. When two could apply, the most specific (shortest) wins:
+// the New Year minute, then single days (Friday the 13th, solstice/equinox,
+// Halloween), then the 3 Christmas days. Without a latitude, the north is assumed.
+export const getCalendarEvent = (date: Date, latitude = 0): CalendarEvent | null => {
+  const month = date.getMonth();
+  const day = date.getDate();
+  if (month === 0 && day === 1 && date.getHours() === 0 && date.getMinutes() === 0) return 'new-year';
+  if (day === 13 && date.getDay() === 5) return 'friday-13';
+  const season = getSeasonEvent(date, latitude);
+  if (season) return season;
+  if (month === 9 && day === 31) return isHalloweenFullMoon(date.getFullYear()) ? 'halloween-pumpkin' : 'halloween-bats';
+  if (month === 11 && day >= 24 && day <= 26) return 'christmas';
+  return null;
+};

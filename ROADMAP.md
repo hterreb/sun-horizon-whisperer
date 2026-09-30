@@ -921,11 +921,11 @@ Rules for all items:
 Items:
 
 - **Calendar:**
-  - New Year: fireworks at 00:00 on Jan 1 (reuse `Fireworks`).
-  - Solstice and equinox: a small badge and the longest/shortest-day text.
-  - Halloween: a pumpkin moon when the full moon is within 3 days of Oct 31. Otherwise bats all night.
-  - Christmas: light snow on Dec 24–26, even when the weather is clear.
-  - Friday the 13th: a black cat walks along the horizon once.
+  - ✅ New Year: fireworks at 00:00 on Jan 1 (reuse `Fireworks`). Done: the clock tick starts the show when it enters 00:00; the midnight ghost stays away.
+  - ✅ Solstice and equinox: a small badge and the longest/shortest-day text. Done: a glass pill on the water, text by hemisphere.
+  - ✅ Halloween: a pumpkin moon when the full moon is within 3 days of Oct 31. Otherwise bats all night. Done: pumpkin over the moon; 5 slow gliding bats.
+  - ✅ Christmas: light snow on Dec 24–26, even when the weather is clear. Done: slow small flakes, off when it already snows.
+  - ✅ Friday the 13th: a black cat walks along the horizon once. Done: a 45 s straight glide, no bounce.
 - **Astronomy:**
   - Solar and lunar eclipses: a darkened sun or red moon at the correct time (hardcoded date list for 10 years).
   - Supermoon: a bigger moon when the full moon is near perigee.
