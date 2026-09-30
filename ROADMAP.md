@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-09-30. Done: items 1–13, 15 and 17–40 (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14, 16 and 41–45 (Sentry feedback, round 3), 46–56 ([scene review](#scene-review-2026-09-30)), the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
+Status: last updated 2026-10-01. Done: items 1–13, 15, 17–41, 46–49, 52 and 54–56 (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14, 16 and 42–45 (Sentry feedback, round 3), 50, 51 and 53 ([scene review](#scene-review-2026-09-30)), the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
 
 ## Verification (2026-09-28)
 
