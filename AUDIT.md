@@ -3,7 +3,7 @@
 > summary: Audit of the Sun Chaser repository (a React/Vite PWA that shows sun and moon positions and live weather, plus unused Supabase/Stripe edge functions).
 > It lists findings by area (security, correctness, performance, build/CI, dependencies, accessibility, docs) with severity, file location, and a recommended fix.
 > The top of the file has the verification results and a prioritized quick-win list.
-> Audit date: 2026-09-24. Commit audited: `365d8a7` (main). Re-verified 2026-09-28 at `a9882c4`: 44 fixed, 5 partly fixed, 10 new open findings (see the status notes in §3). Since then all 15 of them fixed.
+> Audit date: 2026-09-24. Commit audited: `365d8a7` (main). Re-verified 2026-09-28 at `a9882c4`: 44 fixed, 5 partly fixed, 10 new open findings (see the status notes in §3). As of 2026-10-01, all findings are fixed; none is open.
 
 ## 1. Verification results
 
