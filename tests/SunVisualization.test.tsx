@@ -1,8 +1,8 @@
 import React from 'react';
 import fs from 'node:fs';
 import path from 'node:path';
-import { render, screen, within } from '@testing-library/react';
-import { describe, it, expect, afterEach, beforeEach } from 'vitest';
+import { render, screen, within, fireEvent } from '@testing-library/react';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import SunVisualization, {
   getAzimuthScreenFraction,
   getCompassScreenFraction,
@@ -1063,5 +1063,36 @@ describe('sun and altitude pill (ROADMAP items 46, 48)', () => {
     rerender(<SunVisualization {...baseProps} sunsetCountdown={{ seconds: 3, lineOfSight: true }} />);
     expect(pill()).toHaveTextContent('Sunset in 3 s');
     expect(within(pill()).getByTestId('premium-badge')).toBeInTheDocument();
+  });
+});
+
+describe('SunVisualization sunglasses egg', () => {
+  beforeEach(() => {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { value: 800, configurable: true });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { value: 600, configurable: true });
+  });
+
+  const props = {
+    sunPosition: { azimuth: 180, altitude: 40 },
+    moonPosition: { azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false },
+    sunPath: [],
+    moonPath: [],
+    timeOfDay: 'midday' as const,
+    weatherType: 'clear' as const,
+    latitude: 51,
+  };
+
+  it('the sun is a button that reports taps', () => {
+    const onSunTap = vi.fn();
+    render(<SunVisualization {...props} onSunTap={onSunTap} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Sun' }));
+    expect(onSunTap).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the sunglasses only when on', () => {
+    const { rerender } = render(<SunVisualization {...props} />);
+    expect(screen.queryByTestId('sun-sunglasses')).toBeNull();
+    rerender(<SunVisualization {...props} sunglasses />);
+    expect(screen.getByTestId('sun-sunglasses')).toBeInTheDocument();
   });
 });
