@@ -273,7 +273,9 @@ describe('SunTracker', () => {
       expect(screen.getByRole('status')).toHaveTextContent('Waiting for location access');
       expect(screen.getByTestId('loading-mark-sun')).toHaveClass('animate-mark-sink');
 
-      fireEvent.click(screen.getByRole('button', { name: /choose a place/i }));
+      const chooseButton = screen.getByRole('button', { name: /choose a place/i });
+      expect(chooseButton.querySelector('[data-testid="premium-badge"]')).not.toBeNull();
+      fireEvent.click(chooseButton);
       const search = screen.getByLabelText(/search for a place/i);
       expect(search).toHaveFocus();
 
