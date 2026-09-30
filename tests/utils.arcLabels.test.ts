@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { getSunArcLabels, getMoonArcLabels, getTerrainArcLabels } from '../src/utils/arcLabels';
-import { getTerrainSunTimes, type HorizonProfile } from '../src/utils/horizonUtils';
+import { getSunArcLabels, getMoonArcLabels, getTerrainArcLabels, getTerrainMoonArcLabels } from '../src/utils/arcLabels';
+import { getTerrainSunTimes, getTerrainMoonTimes, type HorizonProfile } from '../src/utils/horizonUtils';
 import { getSunTimes, getSunPosition } from '../src/utils/sunUtils';
 import { getMoonTimes, getMoonPosition } from '../src/utils/moonUtils';
 
@@ -154,6 +154,39 @@ describe('getTerrainArcLabels (ROADMAP item 42, line-of-sight labels on the sun 
     const expected = getSunPosition(sunrise, latitude, longitude);
 
     expect(labels.rise).toEqual({ time: sunrise, azimuth: expected.azimuth, altitude: expected.altitude });
+    expect(labels.set).toBeNull();
+  });
+});
+
+describe('getTerrainMoonArcLabels (ROADMAP item 63, line-of-sight labels on the moon arc)', () => {
+  // The moon is up at this date/location (rise ~02:52 UTC, set ~20:23 UTC).
+  const date = new Date('2026-06-15T12:00:00Z');
+  const latitude = 48;
+  const longitude = 11;
+  const ridge: HorizonProfile = { angles: new Array(360).fill(5), observerElevation: 0, eyeHeight: 1.7 };
+
+  it('puts the rise and set labels at the getTerrainMoonTimes times, on the 5° ridge', () => {
+    const terrainTimes = getTerrainMoonTimes(date, latitude, longitude, ridge);
+    const labels = getTerrainMoonArcLabels(terrainTimes, latitude, longitude);
+
+    expect(terrainTimes.rise).not.toBeNull();
+    expect(terrainTimes.set).not.toBeNull();
+    expect(labels.rise?.time.getTime()).toBe(terrainTimes.rise?.getTime());
+    expect(labels.set?.time.getTime()).toBe(terrainTimes.set?.getTime());
+    // Geocentric altitude: the ridge angle plus the moon's rise/set threshold (~0.7°).
+    for (const point of [labels.rise, labels.set]) {
+      expect(point?.altitude).toBeGreaterThan(4.5);
+      expect(point?.altitude).toBeLessThan(6.5);
+    }
+    expect(labels.zenith).toBeNull();
+  });
+
+  it('returns the moon position at each time, and null for a null time', () => {
+    const rise = new Date('2026-06-15T04:00:00Z');
+    const labels = getTerrainMoonArcLabels({ rise, set: null }, latitude, longitude);
+    const expected = getMoonPosition(rise, latitude, longitude);
+
+    expect(labels.rise).toEqual({ time: rise, azimuth: expected.azimuth, altitude: expected.altitude });
     expect(labels.set).toBeNull();
   });
 });

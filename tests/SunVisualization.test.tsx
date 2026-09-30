@@ -19,6 +19,7 @@ import SunVisualization, {
 } from '../src/components/SunVisualization';
 import type { HorizonProfile } from '../src/utils/horizonUtils';
 import { getSunTimes, formatTime, getWaterColors } from '../src/utils/sunUtils';
+import { getSunArcLabels, getMoonArcLabels } from '../src/utils/arcLabels';
 
 describe('getAzimuthScreenFraction (C-3, static/non-compass mode)', () => {
   it('northern hemisphere: culmination (180°, South) stays centered', () => {
@@ -704,6 +705,113 @@ describe('SunVisualization (rendered): line-of-sight labels on the sun arc (ROAD
     const labels = screen.getByTestId('arc-labels');
     expect(labels).toHaveClass('opacity-0');
     expect(within(labels).getByTestId('arc-label-sun-terrain-set')).toBeInTheDocument();
+  });
+});
+
+describe('SunVisualization (rendered): line-of-sight labels on the moon arc (ROADMAP item 63)', () => {
+  const originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+  const originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
+
+  afterEach(() => {
+    if (originalClientWidth) Object.defineProperty(HTMLElement.prototype, 'clientWidth', originalClientWidth);
+    if (originalClientHeight) Object.defineProperty(HTMLElement.prototype, 'clientHeight', originalClientHeight);
+  });
+
+  // The moon is up at this date/location (see 'renders moon labels only when the moon arc
+  // is actually drawn' above).
+  const moonDate = new Date('2026-06-15T12:00:00Z');
+  const flat = getMoonArcLabels(moonDate, 48, 11);
+  const ridgeProfile: HorizonProfile = { angles: new Array(360).fill(5), observerElevation: 0, eyeHeight: 1.7 };
+  // An hour inside the flat times: far enough that the pills do not overlap.
+  const terrainMoonTimes = {
+    rise: new Date(flat.rise!.time.getTime() + 60 * 60_000),
+    set: new Date(flat.set!.time.getTime() - 60 * 60_000),
+  };
+  const moonProps = {
+    sunPosition: { azimuth: 180, altitude: 60 },
+    moonPosition: { azimuth: 180, altitude: 30, phase: 0.5, illumination: 0.5, visible: true },
+    sunPath: [],
+    moonPath: [
+      { azimuth: 170, altitude: 20, phase: 0.5, illumination: 0.5, visible: true },
+      { azimuth: 180, altitude: 30, phase: 0.5, illumination: 0.5, visible: true },
+      { azimuth: 190, altitude: 20, phase: 0.5, illumination: 0.5, visible: true },
+    ],
+    timeOfDay: 'night' as const,
+    weatherType: 'clear' as const,
+    latitude: 48,
+    longitude: 11,
+    date: moonDate,
+  };
+
+  beforeEach(() => {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { value: 800, configurable: true });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { value: 600, configurable: true });
+  });
+
+  it('renders the terrain moonrise and moonset labels next to the flat labels', () => {
+    render(<SunVisualization {...moonProps} horizonProfile={ridgeProfile} terrainMoonTimes={terrainMoonTimes} />);
+
+    const set = screen.getByTestId('arc-label-moon-terrain-set');
+    expect(set).toHaveTextContent(formatTime(terrainMoonTimes.set));
+    expect(within(set).getByTestId('premium-badge')).toBeInTheDocument();
+    expect(screen.getByTestId('arc-label-moon-terrain-rise')).toHaveTextContent(formatTime(terrainMoonTimes.rise));
+    expect(screen.getByTestId('arc-label-moon-set')).toHaveTextContent(formatTime(flat.set!.time));
+    expect(screen.getByTestId('arc-label-moon-rise')).toHaveTextContent(formatTime(flat.rise!.time));
+    // Sits above the flat set label: the ridge is higher than the flat horizon.
+    expect(parseFloat(set.style.top)).toBeLessThan(parseFloat(screen.getByTestId('arc-label-moon-set').style.top));
+  });
+
+  it('renders no terrain moon labels without a profile, or while the moon arc is not drawn', () => {
+    const { rerender } = render(<SunVisualization {...moonProps} terrainMoonTimes={terrainMoonTimes} />);
+    expect(screen.queryByTestId('arc-label-moon-terrain-rise')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('arc-label-moon-terrain-set')).not.toBeInTheDocument();
+
+    rerender(
+      <SunVisualization {...moonProps} timeOfDay="midday" horizonProfile={ridgeProfile} terrainMoonTimes={terrainMoonTimes} />
+    );
+    expect(screen.queryByTestId('arc-label-moon-terrain-rise')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('arc-label-moon-terrain-set')).not.toBeInTheDocument();
+  });
+
+  it('renders only the terrain label when it shows the same minute as the flat label', () => {
+    render(
+      <SunVisualization
+        {...moonProps}
+        horizonProfile={ridgeProfile}
+        terrainMoonTimes={{ rise: flat.rise!.time, set: null }}
+      />
+    );
+    expect(screen.getByTestId('arc-label-moon-terrain-rise')).toHaveTextContent(formatTime(flat.rise!.time));
+    expect(screen.queryByTestId('arc-label-moon-rise')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('arc-label-moon-terrain-set')).not.toBeInTheDocument();
+    expect(screen.getByTestId('arc-label-moon-set')).toBeInTheDocument();
+  });
+
+  it('steps a moon label up until it clears the sun labels, not just once', () => {
+    // 13 June: the sun sets at 307°, the moon at 309° (19:17 and 17:55 UTC). A terrain
+    // sunset 10 min early sits a few px above the flat horizon, so one step up is not enough.
+    const date = new Date('2026-06-12T21:00:00Z');
+    const sunSet = getSunArcLabels(date, 48, 11).set!.time;
+    render(
+      <SunVisualization
+        {...moonProps}
+        sunPath={moonProps.moonPath}
+        date={date}
+        horizonProfile={ridgeProfile}
+        terrainSunTimes={{ sunrise: null, sunset: new Date(sunSet.getTime() - 10 * 60_000) }}
+      />
+    );
+    const pills = screen.getAllByTestId(/^arc-label-/).map((el) => ({
+      id: el.dataset.testid,
+      x: parseFloat(el.style.left),
+      y: parseFloat(el.style.top),
+    }));
+    expect(pills.map((p) => p.id)).toEqual(expect.arrayContaining(['arc-label-sun-terrain-set', 'arc-label-moon-set']));
+    for (const a of pills) {
+      for (const b of pills) {
+        if (a !== b) expect(Math.abs(a.x - b.x) < 64 && Math.abs(a.y - b.y) < 22, `${a.id} overlaps ${b.id}`).toBe(false);
+      }
+    }
   });
 });
 
