@@ -132,6 +132,12 @@ describe('CloudLayer', () => {
       expect(container.textContent).not.toContain('🦇');
     });
 
+    it('draws bats as a solid dark silhouette (ROADMAP item 64, B2)', () => {
+      const bat = spawn({ timeOfDay: 'civil-twilight' }, 6000).querySelector('[data-testid="scene-bat"]') as SVGElement;
+      expect(bat.getAttribute('fill')).toBe('currentColor');
+      expect(bat.style.color).toBe('hsl(var(--scene-critter-silhouette) / 0.9)');
+    });
+
     it('flies bats right after sunset, in civil twilight (ROADMAP item 40)', () => {
       const container = spawn({ timeOfDay: 'civil-twilight' }, 6000);
       expect(container.querySelector('[data-testid="scene-bat"]')).not.toBeNull();
