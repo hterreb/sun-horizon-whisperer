@@ -934,10 +934,10 @@ Items:
   - Aurora: green curtains at night when |latitude| > 60°. Later, add live data from the NOAA Kp index.
   - Green flash: 1 in 20 chance of a short green flash at a clear sunset.
 - **Hidden:**
-  - Tap the sun 7 times: it wears sunglasses for one minute.
-  - A UFO crosses the night sky (1 in 200 chance per night view).
-  - A whale instead of fish (1% chance).
-  - The Konami code gives a disco sky for 10 seconds.
+  - ✅ Tap the sun 7 times: it wears sunglasses for one minute. (The sun is now a button; `?egg=sunglasses`.)
+  - ✅ A UFO crosses the night sky (1 in 200 chance per night view). (40 s straight glide; `?egg=ufo`.)
+  - A whale instead of fish (1% chance). → item 62
+  - ✅ The Konami code gives a disco sky for 10 seconds. (Soft colour spots, one slow hue turn; `?egg=disco`.)
 
 ---
 
