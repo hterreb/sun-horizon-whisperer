@@ -943,8 +943,19 @@ Items:
 
 ## Backlog (not prioritized)
 
-- Unit toggle °C/°F.
 - German and English UI (i18n).
 - Share card: an image of today's sunset with the time and score.
 - Sunset reminder notification (after item 16, when notifications are practical).
 - Date/time scrubber to preview any day or time of the year: now item 44.
+
+### Unit toggle °C/°F — S — **✅ Done**
+
+- **Now:** the app shows temperatures in °C only.
+- **Spec:**
+  1. Add a small °C/°F segmented toggle to the "Current Weather" section of the InfoPanel. Use the same style as the "Real / Manual" weather-mode toggle.
+  2. The default comes from the locale: °F for `en-US` and the other Fahrenheit regions (US, LR, MM, BS, KY, PW, FM, MH). °C for all other regions.
+  3. Save the choice in `localStorage` (`temperature-unit`). Wrap the read and the write in try/catch.
+  4. The toggle changes only the display. The effects keep °C internally: the iceberg below 0 °C, the frost, the heat shimmer above 30 °C.
+  5. If there is a manual weather temperature input, it shows and accepts the chosen unit.
+- **Done when:** unit tests for the conversion, the format and the locale default. In the browser, `en-US` shows °F and `de-DE` shows °C, and a toggled choice stays after a reload.
+- **Built:** `src/utils/temperatureUnit.ts` has the pure functions: `getDefaultTemperatureUnit` (region from `Intl.Locale(...).maximize()`, so `en` also gives °F), `loadTemperatureUnit` / `saveTemperatureUnit` (try/catch), `celsiusToFahrenheit` and `formatTemperature` (whole degrees). `SunTracker` holds the unit in state (default from `navigator.language`) and gives it to `InfoPanel`. The toggle is next to the temperature value. The weather data and all effect thresholds stay in °C. The manual weather mode has no temperature input, so spec step 5 has no work.
