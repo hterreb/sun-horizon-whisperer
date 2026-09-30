@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward } from 'lucide-react';
+import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward, Bell, BellRing } from 'lucide-react';
 import { isFeedbackAvailable, openFeedbackForm } from '@/utils/feedback';
 import { ScrollArea } from './ui/scroll-area';
 import { Button } from './ui/button';
@@ -111,6 +111,9 @@ interface InfoPanelProps {
   timePlayDirection?: -1 | 0 | 1;
   onTimePlay?: (direction: -1 | 1) => void;
   onTimeJump?: (date: Date) => void;
+  // Sunset countdown (ROADMAP item 43): the bell toggle in the Sunset row.
+  isSunsetCountdownOn?: boolean;
+  onSunsetCountdownToggle?: () => void;
 }
 
 const InfoPanel: React.FC<InfoPanelProps> = ({
@@ -144,7 +147,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   isTimePreview = false,
   timePlayDirection = 0,
   onTimePlay = () => {},
-  onTimeJump = () => {}
+  onTimeJump = () => {},
+  isSunsetCountdownOn = false,
+  onSunsetCountdownToggle,
 }) => {
   const [locationName, setLocationName] = useState<string>('');
   const [loadingLocation, setLoadingLocation] = useState(false);
@@ -730,6 +735,17 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               <div className="flex items-center">
                 <Sunset size={18} className="mr-2" />
                 <span className="text-body">Sunset</span>
+                {onSunsetCountdownToggle && (
+                  <button
+                    type="button"
+                    onClick={onSunsetCountdownToggle}
+                    className={`${INLINE_ICON_TOGGLE} ml-1 ${isSunsetCountdownOn ? 'bg-white/20' : ''}`}
+                    aria-label="Sunset countdown"
+                    aria-pressed={isSunsetCountdownOn}
+                  >
+                    {isSunsetCountdownOn ? <BellRing size={14} /> : <Bell size={14} />}
+                  </button>
+                )}
               </div>
               <span className="font-semibold text-body tabular-nums">{polarSunLabel ?? formatTime(shownSunset)}</span>
             </div>

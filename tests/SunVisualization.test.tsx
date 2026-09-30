@@ -946,4 +946,14 @@ describe('sun and altitude pill (ROADMAP items 46, 48)', () => {
     render(<SunVisualization {...baseProps} sunPosition={{ azimuth: 290, altitude: -8 }} timeOfDay="nautical-twilight" />);
     expect(screen.getByTestId('sun-altitude')).toHaveTextContent('-8.0°');
   });
+
+  it('shows the sunset countdown in the altitude pill, with the gold plus for line of sight (ROADMAP item 43)', () => {
+    const { rerender } = render(<SunVisualization {...baseProps} sunsetCountdown={{ seconds: 7, lineOfSight: false }} />);
+    const pill = () => screen.getByTestId('sun-altitude');
+    expect(pill()).toHaveTextContent('Sunset in 7 s');
+    expect(within(pill()).queryByTestId('premium-badge')).not.toBeInTheDocument();
+    rerender(<SunVisualization {...baseProps} sunsetCountdown={{ seconds: 3, lineOfSight: true }} />);
+    expect(pill()).toHaveTextContent('Sunset in 3 s');
+    expect(within(pill()).getByTestId('premium-badge')).toBeInTheDocument();
+  });
 });

@@ -42,6 +42,7 @@ import { useWakeLock } from '@/hooks/useWakeLock';
 import { useCompassHeading } from '@/hooks/useCompassHeading';
 import { useHorizonProfile } from '@/hooks/useHorizonProfile';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
+import { useSunsetCountdown, primeCountdownAudio } from '@/hooks/useSunsetCountdown';
 import { loadManualLocation, saveManualLocation, clearManualLocation } from '../utils/manualLocation';
 import {
   hasSeenCompassCalibrationHint,
@@ -50,7 +51,7 @@ import {
 import { getTerrainSunTimes, getTerrainMoonTimes } from '../utils/horizonUtils';
 import { getSunArcLabels, getMoonArcLabels } from '../utils/arcLabels';
 import { isLineOfSightEnabled } from '../utils/premium';
-import { passesSunEvent } from '../utils/sunEvents';
+import { passesSunEvent, getCountdownTarget } from '../utils/sunEvents';
 import { PLAY_SPEED, PLAY_TICK_MS, clampTimeOffset } from '@/utils/timeTravel';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
 
@@ -58,6 +59,8 @@ import { GLASS_SURFACE } from '@/utils/glassChrome';
 // building floor or a tower, clamped to a sane 0-1000 m range and persisted like
 // manualLocation.ts's try/catch-wrapped localStorage pattern.
 const EYE_HEIGHT_STORAGE_KEY = 'eye-height-m';
+// Sunset countdown toggle (ROADMAP item 43), off by default.
+const SUNSET_COUNTDOWN_STORAGE_KEY = 'sunset-countdown';
 const DEFAULT_EYE_HEIGHT_M = 1.7;
 const MAX_EYE_HEIGHT_M = 1000;
 
@@ -552,6 +555,29 @@ const SunTracker: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per clock tick
   }, [date]);
 
+  // Sunset countdown (ROADMAP item 43): 10 s of ticks and a chime at the next sunset
+  // (line of sight when there is one). Live time only; the tap that turns it on
+  // starts the audio (browsers allow sound only after a user gesture).
+  const [isCountdownOn, setIsCountdownOn] = useState(() => {
+    try {
+      return localStorage.getItem(SUNSET_COUNTDOWN_STORAGE_KEY) === 'on';
+    } catch {
+      return false;
+    }
+  });
+  const handleCountdownToggle = useCallback(() => {
+    const next = !isCountdownOn;
+    setIsCountdownOn(next);
+    try {
+      localStorage.setItem(SUNSET_COUNTDOWN_STORAGE_KEY, next ? 'on' : 'off');
+    } catch (error) {
+      console.error('Error saving sunset countdown:', error);
+    }
+    if (next) primeCountdownAudio();
+  }, [isCountdownOn]);
+  const countdownTarget = getCountdownTarget(date, sunTimes, terrainExtras.terrainSunTimes, isLineOfSightEnabled());
+  const countdownSeconds = useSunsetCountdown(countdownTarget?.time ?? null, date, isCountdownOn && !isTimePreview);
+
   const skyGradient = useMemo(() => {
     // Clouds dim the sky (ROADMAP item 50): mix toward grey per weather type, scaled
     // by the measured cloud cover. A manually picked weather ignores the real cover.
@@ -635,6 +661,7 @@ const SunTracker: React.FC = () => {
             isFullscreen={isFullscreen}
             showCursor={showCursor}
             fireworksTrigger={fireworksTrigger}
+            sunsetCountdown={countdownSeconds === null ? null : { seconds: countdownSeconds, lineOfSight: !!countdownTarget?.lineOfSight }}
           />
           <InfoPanel
             sunPosition={sunPosition}
@@ -668,6 +695,8 @@ const SunTracker: React.FC = () => {
             timePlayDirection={playDirection}
             onTimePlay={handleTimePlay}
             onTimeJump={handleTimeJump}
+            isSunsetCountdownOn={isCountdownOn}
+            onSunsetCountdownToggle={handleCountdownToggle}
           />
         </>
       )}
