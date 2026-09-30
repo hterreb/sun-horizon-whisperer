@@ -15,7 +15,6 @@ import SunVisualization, {
   COMPASS_FOV_DEG,
   buildTerrainSegments,
   avoidCollapsedPanel,
-  getSunDiscToken,
   formatSunAltitude,
 } from '../src/components/SunVisualization';
 import type { HorizonProfile } from '../src/utils/horizonUtils';
@@ -749,11 +748,11 @@ describe('SunVisualization (rendered): sea visible at the horizon (ROADMAP item 
     expect(stops).toEqual([water.surface, water.deep]);
   });
 
-  it('draws a shimmering glitter strip under a visible sun, and none when clouds hide the disc (ROADMAP items 50, 53)', () => {
+  it('draws the reflection bars under a visible sun, and none when clouds hide the sun (ROADMAP items 50, 53 rollback)', () => {
     setMockedContainerSize(800, 600);
     const { unmount } = render(<SunVisualization {...baseProps} />);
     const strip = screen.getByTestId('water-reflection');
-    expect(strip.querySelectorAll('.animate-shimmer').length).toBeGreaterThan(10);
+    expect(strip.querySelectorAll('rect')).toHaveLength(7);
     unmount();
 
     render(<SunVisualization {...baseProps} weatherType="overcast" />);
@@ -794,7 +793,7 @@ describe('avoidCollapsedPanel (AUDIT C-15, ROADMAP item 38)', () => {
   });
 });
 
-describe('sun disc and altitude pill (ROADMAP items 46, 48)', () => {
+describe('sun and altitude pill (ROADMAP items 46, 48)', () => {
   const baseProps = {
     sunPosition: { azimuth: 180, altitude: 30 },
     moonPosition: { azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false },
@@ -805,15 +804,19 @@ describe('sun disc and altitude pill (ROADMAP items 46, 48)', () => {
     latitude: 51,
   };
 
-  it('picks the sun disc colour token per altitude band', () => {
-    expect(getSunDiscToken(30)).toBe('--scene-sun-high');
-    expect(getSunDiscToken(4.9)).toBe('--scene-sun-low');
-    expect(getSunDiscToken(-0.3)).toBe('--scene-sun-horizon');
+  it('draws the line sun with rays, coloured per altitude band (item 46 rollback)', () => {
+    render(<SunVisualization {...baseProps} sunPosition={{ azimuth: 270, altitude: 2.4 }} timeOfDay="evening" />);
+    const sunDot = screen.getByTestId('sun-dot');
+    expect(sunDot.querySelector('svg.lucide-sun')).not.toBeNull();
+    expect(sunDot.className).toContain('text-orange-400');
   });
 
-  it('fills the sun dot with the band token', () => {
-    render(<SunVisualization {...baseProps} sunPosition={{ azimuth: 270, altitude: 2.4 }} timeOfDay="evening" />);
-    expect(screen.getByTestId('sun-dot').style.background).toContain('--scene-sun-low');
+  it('mixes the line sun toward grey in drizzle, and not in clear weather (ROADMAP item 59)', () => {
+    const { unmount } = render(<SunVisualization {...baseProps} weatherType="drizzle" />);
+    expect(screen.getByTestId('sun-dot').querySelector('svg')?.getAttribute('style')).toContain('color-mix');
+    unmount();
+    render(<SunVisualization {...baseProps} />);
+    expect(screen.getByTestId('sun-dot').querySelector('svg')?.getAttribute('style') ?? '').not.toContain('color-mix');
   });
 
   it('never shows "-0.0°"', () => {

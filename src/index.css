@@ -106,13 +106,6 @@
     --scene-sun-glow-low: 38.8 100% 50%;
     --scene-sun-glow-horizon: 9.1 100% 63.9%;
 
-    /* Scene palette — the filled sun disc (ROADMAP item 46), same 3 bands:
-       pale warm white-yellow above 10°, deep gold-red 0–10° (darker than the
-       orange evening sky), deep red for the upper limb below 0° */
-    --scene-sun-high: 48 100% 90%;
-    --scene-sun-low: 20 100% 42%;
-    --scene-sun-horizon: 4 85% 38%;
-
     /* Scene palette — moon, water (the water's gradient comes from the sky, ROADMAP item 53) */
     --scene-moon: 216 12.2% 83.9%;
     --scene-moon-dark: 224 14.9% 19.8%; /* the moon disc's unlit-side fill */
