@@ -18,3 +18,18 @@ export const passesSunEvent = (prev: Date, now: Date, flatTimes: RiseSet, terrai
   const event = getNextSunEvent(prev, flatTimes, terrainTimes);
   return !!event && event.getTime() <= now.getTime();
 };
+
+// Sunset countdown target (ROADMAP item 43): the next sunset. With line of sight on
+// (premium; everyone while PREMIUM_ENFORCED is false) it is the line-of-sight sunset
+// when the terrain profile has one, else the flat sunset. Null when it is not ahead.
+export const getCountdownTarget = (
+  now: Date,
+  flatTimes: RiseSet,
+  terrainTimes: RiseSet,
+  lineOfSight: boolean
+): { time: Date; lineOfSight: boolean } | null => {
+  const sunsetOnly = (times: RiseSet): RiseSet => times && { sunrise: null, sunset: times.sunset };
+  const terrain = lineOfSight ? sunsetOnly(terrainTimes) : null;
+  const time = getNextSunEvent(now, sunsetOnly(flatTimes), terrain);
+  return time && { time, lineOfSight: !!terrain?.sunset };
+};

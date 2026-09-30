@@ -1,4 +1,4 @@
-import { getNextSunEvent, passesSunEvent } from '../src/utils/sunEvents';
+import { getNextSunEvent, passesSunEvent, getCountdownTarget } from '../src/utils/sunEvents';
 
 const at = (hms: string) => new Date(`2026-09-30T${hms}+02:00`);
 const flat = { sunrise: at('07:22:00'), sunset: at('19:05:49') };
@@ -41,5 +41,23 @@ describe('passesSunEvent (ROADMAP item 41)', () => {
     expect(passesSunEvent(at('19:05:40'), at('19:05:46'), { ...flat, sunset: at('19:05:45') }, null)).toBe(false);
     expect(passesSunEvent(at('19:00:00'), at('19:10:00'), flat, null)).toBe(false);
     expect(passesSunEvent(at('19:05:45'), at('19:05:50'), flat, null)).toBe(true);
+  });
+});
+
+describe('getCountdownTarget (ROADMAP item 43)', () => {
+  it('gives the terrain sunset when there is one and line of sight is enabled', () => {
+    expect(getCountdownTarget(at('12:00:00'), flat, terrain, true)).toEqual({ time: terrain.sunset, lineOfSight: true });
+  });
+
+  it('gives the flat sunset without line of sight, or without a terrain sunset', () => {
+    expect(getCountdownTarget(at('12:00:00'), flat, terrain, false)).toEqual({ time: flat.sunset, lineOfSight: false });
+    expect(getCountdownTarget(at('12:00:00'), flat, null, true)).toEqual({ time: flat.sunset, lineOfSight: false });
+    expect(getCountdownTarget(at('12:00:00'), flat, { sunrise: terrain.sunrise, sunset: null }, true)).toEqual({ time: flat.sunset, lineOfSight: false });
+  });
+
+  it('never targets the sunrise, and gives null once the sunset has passed', () => {
+    expect(getCountdownTarget(at('03:00:00'), flat, terrain, true)!.time).toEqual(terrain.sunset);
+    expect(getCountdownTarget(at('18:55:00'), flat, terrain, true)).toBeNull();
+    expect(getCountdownTarget(at('22:00:00'), flat, null, false)).toBeNull();
   });
 });
