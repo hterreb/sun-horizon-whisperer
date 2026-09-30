@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { Sun, ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp, Mountain } from 'lucide-react';
 import { type SunPosition, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors, getReflectionFade } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
-import { getSunArcLabels, getMoonArcLabels, getTerrainArcLabels, type ArcLabels, type ArcLabelPoint } from '../utils/arcLabels';
+import { getSunArcLabels, getMoonArcLabels, getTerrainArcLabels, getTerrainMoonArcLabels, type ArcLabels, type ArcLabelPoint } from '../utils/arcLabels';
 import { shortestHeadingDelta } from '../utils/compassUtils';
 import { type HorizonProfile, horizonAngleAt } from '../utils/horizonUtils';
 import CloudLayer, { type WeatherType } from './CloudLayer';
@@ -52,6 +52,9 @@ interface SunVisualizationProps {
   // Line-of-sight sunrise/sunset from SunTracker (terrainExtras.terrainSunTimes), drawn as
   // extra sun-arc labels where the arc meets the ridge (ROADMAP item 42). Null = none.
   terrainSunTimes?: { sunrise: Date | null; sunset: Date | null } | null;
+  // Line-of-sight moonrise/moonset (terrainExtras.terrainMoonTimes), the same on the moon
+  // arc (ROADMAP item 63). Null = none.
+  terrainMoonTimes?: { rise: Date | null; set: Date | null } | null;
   // Sunset countdown (ROADMAP item 43): the seconds left, shown in the altitude pill.
   sunsetCountdown?: { seconds: number; lineOfSight: boolean } | null;
   // Fade the cardinal labels out together with the top-left buttons while idle in
@@ -480,6 +483,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   compassHeading = null,
   horizonProfile = null,
   terrainSunTimes = null,
+  terrainMoonTimes = null,
   sunsetCountdown = null,
   isFullscreen = false,
   showCursor = true,
@@ -638,6 +642,15 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     () => (moonArcPath ? getArcLabelGeometry(moonArcLabels, latitude, compassHeading) : []),
     [moonArcPath, moonArcLabels, latitude, compassHeading]
   );
+  // Line-of-sight moonrise/moonset labels (ROADMAP item 63): the sun's rules, and only
+  // while the moon arc is drawn.
+  const moonTerrainArcLabelGeometry = useMemo(
+    () =>
+      isLineOfSightEnabled() && horizonProfile && terrainMoonTimes && moonArcPath
+        ? getArcLabelGeometry(getTerrainMoonArcLabels(terrainMoonTimes, latitude, longitude), latitude, compassHeading, false)
+        : [],
+    [horizonProfile, terrainMoonTimes, moonArcPath, latitude, longitude, compassHeading]
+  );
 
   const getSunColor = () => {
     if (sunPosition.altitude > 10) {
@@ -731,22 +744,32 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     .map(toArcLabelPosition)
     .map((label) => avoidCollapsedPanel(label, containerDimensions.width));
   // A flat rise/set label that overlaps the terrain label of the same kind, or shows the
-  // same minute (a flat coast), gives way to the terrain label (ROADMAP item 42).
-  const sunArcLabelPositions = sunArcLabelGeometry
-    .map(toArcLabelPosition)
-    .map((label) => avoidCollapsedPanel(label, containerDimensions.width))
-    .filter((label) => !terrainArcLabelPositions.some(
+  // same minute (a flat coast), gives way to the terrain label (ROADMAP items 42, 63).
+  const notCoveredBy = (terrainLabels: ReturnType<typeof toArcLabelPosition>[]) =>
+    (label: ReturnType<typeof toArcLabelPosition>) => !terrainLabels.some(
       (terrain) =>
         terrain.kind === label.kind &&
         (labelsOverlap(terrain, label) || formatTime(terrain.time) === formatTime(label.time))
-    ));
-  const moonArcLabelPositions = moonArcLabelGeometry.map(toArcLabelPosition).map((moonLabel) => {
-    const overlapsSunLabel = [...sunArcLabelPositions, ...terrainArcLabelPositions].some(
-      (sunLabel) => labelsOverlap(sunLabel, moonLabel)
     );
-    const shifted = overlapsSunLabel ? { ...moonLabel, y: moonLabel.y - ARC_LABEL_HEIGHT } : moonLabel;
+  const sunArcLabelPositions = sunArcLabelGeometry
+    .map(toArcLabelPosition)
+    .map((label) => avoidCollapsedPanel(label, containerDimensions.width))
+    .filter(notCoveredBy(terrainArcLabelPositions));
+  // A moon label that overlaps a sun label steps up until it is clear (ponytail: max 3
+  // steps, it then stays overlapped rather than float off the arc).
+  const offSunLabels = (moonLabel: ReturnType<typeof toArcLabelPosition>) => {
+    const sunLabels = [...sunArcLabelPositions, ...terrainArcLabelPositions];
+    let shifted = moonLabel;
+    for (let step = 0; step < 3 && sunLabels.some((sunLabel) => labelsOverlap(sunLabel, shifted)); step++) {
+      shifted = { ...shifted, y: shifted.y - ARC_LABEL_HEIGHT };
+    }
     return avoidCollapsedPanel(shifted, containerDimensions.width);
-  });
+  };
+  const moonTerrainArcLabelPositions = moonTerrainArcLabelGeometry.map(toArcLabelPosition).map(offSunLabels);
+  const moonArcLabelPositions = moonArcLabelGeometry
+    .map(toArcLabelPosition)
+    .map(offSunLabels)
+    .filter(notCoveredBy(moonTerrainArcLabelPositions));
 
   // Rainbow (ROADMAP item 10): raining/drizzling, opposite the sun's azimuth, using the
   // same azimuth->x mapping as the sun/moon.
@@ -994,7 +1017,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         </div>
       )}
 
-      {containerDimensions.width > 0 && (sunArcLabelPositions.length > 0 || terrainArcLabelPositions.length > 0 || moonArcLabelPositions.length > 0) && (
+      {containerDimensions.width > 0 && (sunArcLabelPositions.length > 0 || terrainArcLabelPositions.length > 0 || moonArcLabelPositions.length > 0 || moonTerrainArcLabelPositions.length > 0) && (
         // Rise/zenith/set labels for the arcs above: subtler pills than the cardinal
         // labels, tinted with each arc's own color, fading together with them in
         // fullscreen (same `cardinalLabelsVisible` condition as ROADMAP item 29). The
@@ -1048,6 +1071,19 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
               </div>
             );
           })}
+          {moonTerrainArcLabelPositions.map((label) => (
+            // Line-of-sight moon label (ROADMAP item 63): the sun's terrain pill in the moon colour.
+            <div
+              key={`moon-terrain-${label.kind}`}
+              data-testid={`arc-label-moon-terrain-${label.kind}`}
+              className="absolute flex items-center gap-1 text-caption tabular-nums bg-panel-background/70 border border-panel-border/40 px-1.5 py-0.5 rounded-full"
+              style={{ left: `${label.x}px`, top: `${label.y}px`, transform: 'translate(-50%, -50%)', color: 'hsl(var(--scene-moon))' }}
+            >
+              <Mountain size={10} />
+              {formatTime(label.time)}
+              <PremiumBadge className="absolute -right-1 -top-1 h-2.5 w-2.5" />
+            </div>
+          ))}
         </div>
       )}
 

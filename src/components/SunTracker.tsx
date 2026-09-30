@@ -658,6 +658,7 @@ const SunTracker: React.FC = () => {
             compassHeading={activeCompassHeading}
             horizonProfile={horizonProfile}
             terrainSunTimes={terrainExtras.terrainSunTimes}
+            terrainMoonTimes={terrainExtras.terrainMoonTimes}
             isFullscreen={isFullscreen}
             showCursor={showCursor}
             fireworksTrigger={fireworksTrigger}
