@@ -3,6 +3,7 @@ import { Search } from 'lucide-react';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
 import { FOCUS_RING } from './InfoPanel';
 import PlaceSearch from './PlaceSearch';
+import PremiumBadge from './PremiumBadge';
 
 // A location that arrives sooner than this skips the rise: SunTracker fades the scene
 // in instead, and the rise animation waits this long before it starts
@@ -115,6 +116,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ still, onSelectPlace }) =
           >
             <Search className="h-4 w-4" aria-hidden="true" />
             Choose a place
+            <PremiumBadge />
           </button>
         ))}
       </div>
