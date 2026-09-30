@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44 and 47–64, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
+Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44 and 47–64, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built except the whale (→ item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), the device and dashboard checks listed under Verification (status 2026-10-01), backlog (i18n, share card, sunset reminder). [AUDIT.md](AUDIT.md) has no open findings.
 
 ## Verification (2026-09-28)
 
@@ -877,7 +877,7 @@ These items come from the re-shoot of all states after items 46–56.
 
 ## P2 — Flagship: line of sight (Premium later, free now)
 
-### 13. Line of sight with terrain — L — **✅ Done** (alpine 5-min reference check still open)
+### 13. Line of sight with terrain — L — **✅ Done**
 
 - **Why:** the astronomical sunset is for a flat horizon. In the mountains, the sun disappears behind a ridge much earlier. At a high viewpoint, it sets later. No free web app shows this well.
 - **Spec:**
@@ -910,7 +910,7 @@ These items come from the re-shoot of all states after items 46–56.
   - Checked with real tiles: beaches (Guincho, Sylt) differ from the astronomical sunset by 0 min. Zugspitze summit sets 9 min later. Innsbruck sets 31 min earlier.
   - Viganella: no sun from 5 Nov to 6 Feb (documented: about 11 Nov to 2 Feb). Rattenberg: no sun on 21 Dec.
   - Tiles are not cached by the service worker. Only the computed profile is cached (`localStorage`).
-- **Open:** compare an alpine sunset with PeakFinder or a real observation (5-min target).
+- **Checked (2026-10-01):** Sion (CH) against a second-hand PeakFinder value: sunrise −2.5 min, sunset +4.3 min, inside the 5-min target. A first-hand PeakFinder check or an observation would make it stronger (see Verification).
 
 ### 14. Premium gating (deferred) — M
 
@@ -1009,6 +1009,7 @@ Rules for all items:
 - Keep the rAF id in a `useRef`.
 - Put the trigger logic (date and astronomy checks) in a pure util with tests.
 - Show at most one special event at a time.
+- Test override: `?egg=<kind>` forces one astronomy event (`solarEclipse`, `lunarEclipse`, `greenFlash`, `supermoon`, `blueMoon`, `meteorShower`, `aurora`).
 
 Items:
 
@@ -1019,12 +1020,12 @@ Items:
   - ✅ Christmas: light snow on Dec 24–26, even when the weather is clear. Done: slow small flakes, off when it already snows.
   - ✅ Friday the 13th: a black cat walks along the horizon once. Done: a 45 s straight glide, no bounce.
 - **Astronomy:**
-  - Solar and lunar eclipses: a darkened sun or red moon at the correct time (hardcoded date list for 10 years).
-  - Supermoon: a bigger moon when the full moon is near perigee.
-  - Blue moon: the second full moon in a month has a faint blue tint.
-  - Meteor showers: more shooting stars at night, via `NightStars`, during the Perseids (~Aug 12), Geminids (~Dec 14) and Quadrantids (~Jan 3).
-  - Aurora: green curtains at night when |latitude| > 60°. Later, add live data from the NOAA Kp index.
-  - Green flash: 1 in 20 chance of a short green flash at a clear sunset.
+  - ✅ Solar and lunar eclipses: a darkened sun or red moon at the correct time (hardcoded date list for 10 years). Done: NASA GSFC list 2026–2035 in `astroEvents.ts`; solar only within ~3500 km of the greatest-eclipse point.
+  - ✅ Supermoon: a bigger moon when the full moon is near perigee. Done: 14 % bigger moon when the full moon is closer than 360 000 km (Meeus distance).
+  - ✅ Blue moon: the second full moon in a month has a faint blue tint. Done: `MoonTint`, ±1 day around the full moon.
+  - ✅ Meteor showers: more shooting stars at night, via `NightStars`, during the Perseids (~Aug 12), Geminids (~Dec 14) and Quadrantids (~Jan 3). Done: 8× the shooting-star rate on the 3 peak days.
+  - ✅ Aurora: green curtains at night when |latitude| > 60°. Later, add live data from the NOAA Kp index. Done: static rule, `Aurora` with a slow CSS drift; Kp index still open.
+  - ✅ Green flash: 1 in 20 chance of a short green flash at a clear sunset. Done: `GreenFlash`, 4 s after the (line-of-sight) sunset, roll seeded per day and place.
 - **Hidden:**
   - ✅ Tap the sun 7 times: it wears sunglasses for one minute. (The sun is now a button; `?egg=sunglasses`.)
   - ✅ A UFO crosses the night sky (1 in 200 chance per night view). (40 s straight glide; `?egg=ufo`.)
