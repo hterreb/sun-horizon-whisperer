@@ -631,6 +631,7 @@ const SunTracker: React.FC = () => {
             windDirectionDeg={weatherData?.windDirectionDeg ?? null}
             compassHeading={activeCompassHeading}
             horizonProfile={horizonProfile}
+            terrainSunTimes={terrainExtras.terrainSunTimes}
             isFullscreen={isFullscreen}
             showCursor={showCursor}
             fireworksTrigger={fireworksTrigger}
