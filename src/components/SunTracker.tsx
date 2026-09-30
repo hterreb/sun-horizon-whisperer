@@ -51,6 +51,8 @@ import { getTerrainSunTimes, getTerrainMoonTimes } from '../utils/horizonUtils';
 import { getSunArcLabels, getMoonArcLabels } from '../utils/arcLabels';
 import { isLineOfSightEnabled } from '../utils/premium';
 import { passesSunEvent } from '../utils/sunEvents';
+import { PLAY_SPEED, PLAY_TICK_MS, clampTimeOffset } from '@/utils/timeTravel';
+import { GLASS_SURFACE } from '@/utils/glassChrome';
 
 // Eye height above ground for line of sight with terrain (ROADMAP item 13): e.g. a
 // building floor or a tower, clamped to a sane 0-1000 m range and persisted like
@@ -106,17 +108,15 @@ const SunTracker: React.FC = () => {
   const [manualPlaceName, setManualPlaceName] = useState<string | null>(
     () => loadManualLocation()?.name ?? null
   );
-  const [sunPosition, setSunPosition] = useState<SunPosition>({ azimuth: 0, altitude: 0 });
-  const [moonPosition, setMoonPosition] = useState<MoonPosition>({ 
-    azimuth: 0, 
-    altitude: 0, 
-    phase: 0, 
-    illumination: 0, 
-    visible: false 
-  });
-  const [sunTimes, setSunTimes] = useState<SunTimes | null>(null);
-  const [nextGoldenBlueHours, setNextGoldenBlueHours] = useState<NextGoldenBlueHours | null>(null);
-  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('midday');
+  // Time travel (ROADMAP item 44): the one time source. `date` is always
+  // `Date.now() + timeOffsetMs`; 0 is live. Play moves the offset (-1 back, 1 forward).
+  const [timeOffsetMs, setTimeOffsetMs] = useState(0);
+  const [playDirection, setPlayDirection] = useState<-1 | 0 | 1>(0);
+  const timeOffsetRef = React.useRef(0);
+  // A preview (any other time than now) is active. The weather, the sunset score and
+  // the spawns stay live; the fireworks (item 41) and the countdown (item 43) run only
+  // when this is false.
+  const isTimePreview = timeOffsetMs !== 0;
   const [weatherType, setWeatherType] = useState<WeatherType>('clear');
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [isLoadingWeather, setIsLoadingWeather] = useState(false);
@@ -231,14 +231,47 @@ const SunTracker: React.FC = () => {
     };
   }, [isFullscreen]);
 
-  // Update time every second for smooth clock display
+  // Update time every second for smooth clock display, every PLAY_TICK_MS during play.
   useEffect(() => {
+    let last = Date.now();
     const timer = setInterval(() => {
-      setDate(new Date());
-    }, 1000);
-    
+      const now = Date.now();
+      if (playDirection !== 0) {
+        // Real time already moves the clock at 1x; the offset adds the rest.
+        const wanted = timeOffsetRef.current + (playDirection * PLAY_SPEED - 1) * (now - last);
+        const offset = clampTimeOffset(wanted, new Date(now));
+        if (offset !== wanted) setPlayDirection(0);
+        timeOffsetRef.current = offset;
+        setTimeOffsetMs(offset);
+      }
+      last = now;
+      setDate(new Date(now + timeOffsetRef.current));
+    }, playDirection !== 0 ? PLAY_TICK_MS : 1000);
+
     return () => clearInterval(timer);
+  }, [playDirection]);
+
+  const applyTimeOffset = useCallback((offsetMs: number) => {
+    const now = new Date();
+    const offset = clampTimeOffset(offsetMs, now);
+    timeOffsetRef.current = offset;
+    setTimeOffsetMs(offset);
+    setDate(new Date(now.getTime() + offset));
   }, []);
+
+  // A second tap on the same direction pauses.
+  const handleTimePlay = useCallback((direction: -1 | 1) => {
+    setPlayDirection((current) => (current === direction ? 0 : direction));
+  }, []);
+
+  const handleTimeJump = useCallback((target: Date) => {
+    applyTimeOffset(target.getTime() - Date.now());
+  }, [applyTimeOffset]);
+
+  const handleBackToNow = useCallback(() => {
+    setPlayDirection(0);
+    applyTimeOffset(0);
+  }, [applyTimeOffset]);
 
   const fetchWeatherData = useCallback(async () => {
     if (!location.loaded) return;
@@ -312,29 +345,6 @@ const SunTracker: React.FC = () => {
 
     return () => clearInterval(weatherRefreshTimer);
   }, [location.loaded, useRealWeather, fetchWeatherData]);
-
-  useEffect(() => {
-    const sunUpdateTimer = setInterval(() => {
-      if (location.loaded) {
-        const currentDate = new Date();
-        const sunPos = getSunPosition(currentDate, location.latitude, location.longitude);
-        const moonPos = getMoonPosition(currentDate, location.latitude, location.longitude);
-        const times = getSunTimes(currentDate, location.latitude, location.longitude);
-
-        setSunPosition(sunPos);
-        setMoonPosition(moonPos);
-        setSunTimes(times);
-        setNextGoldenBlueHours(getNextGoldenBlueHours(currentDate, location.latitude, location.longitude));
-
-        if (times) {
-          const tod = getTimeOfDay(currentDate, times);
-          setTimeOfDay(tod);
-        }
-      }
-    }, 30000);
-    
-    return () => clearInterval(sunUpdateTimer);
-  }, [location]);
 
   useEffect(() => {
     // Manual location and the no-geolocation-support fallback are already applied
@@ -427,27 +437,36 @@ const SunTracker: React.FC = () => {
     );
   }, []);
 
-  // Compute sun/moon position and time-of-day the moment location first becomes
-  // available or changes (the 30s interval effect above keeps them in sync
-  // afterwards). Adjusting state during render, keyed on the location itself rather
-  // than `date`, avoids re-running this on every one-second clock tick.
-  const locationKey = location.loaded ? `${location.latitude},${location.longitude}` : null;
-  const [prevLocationKey, setPrevLocationKey] = useState<string | null>(null);
-  if (locationKey !== null && locationKey !== prevLocationKey) {
-    setPrevLocationKey(locationKey);
-    const sunPos = getSunPosition(date, location.latitude, location.longitude);
-    const moonPos = getMoonPosition(date, location.latitude, location.longitude);
-    const times = getSunTimes(date, location.latitude, location.longitude);
-
-    setSunPosition(sunPos);
-    setMoonPosition(moonPos);
-    setSunTimes(times);
-    setNextGoldenBlueHours(getNextGoldenBlueHours(date, location.latitude, location.longitude));
-
-    if (times) {
-      setTimeOfDay(getTimeOfDay(date, times));
+  // Sun/moon position, sun times, golden/blue hour and time of day, derived from `date`
+  // (ROADMAP item 44). Keyed on the 30 s step, so live mode keeps its 30 s rhythm and a
+  // time jump or a location change updates the scene at once.
+  const sunStepKey = Math.floor(date.getTime() / 30_000);
+  const { sunPosition, moonPosition, sunTimes, nextGoldenBlueHours, timeOfDay } = useMemo((): {
+    sunPosition: SunPosition;
+    moonPosition: MoonPosition;
+    sunTimes: SunTimes | null;
+    nextGoldenBlueHours: NextGoldenBlueHours | null;
+    timeOfDay: TimeOfDay;
+  } => {
+    if (!location.loaded) {
+      return {
+        sunPosition: { azimuth: 0, altitude: 0 },
+        moonPosition: { azimuth: 0, altitude: 0, phase: 0, illumination: 0, visible: false },
+        sunTimes: null,
+        nextGoldenBlueHours: null,
+        timeOfDay: 'midday',
+      };
     }
-  }
+    const times = getSunTimes(date, location.latitude, location.longitude);
+    return {
+      sunPosition: getSunPosition(date, location.latitude, location.longitude),
+      moonPosition: getMoonPosition(date, location.latitude, location.longitude),
+      sunTimes: times,
+      nextGoldenBlueHours: getNextGoldenBlueHours(date, location.latitude, location.longitude),
+      timeOfDay: getTimeOfDay(date, times),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on sunStepKey (the 30 s step), not `date` itself
+  }, [sunStepKey, location.loaded, location.latitude, location.longitude]);
 
   // Moonrise/moonset, next full/new moon, and the sun's and moon's arcs (for
   // SunVisualization, a ±12 h window around now - ROADMAP item 17) change slowly,
@@ -523,12 +542,13 @@ const SunTracker: React.FC = () => {
 
   // Fireworks (ROADMAP item 41): start a show when the 1 s clock passes the next
   // sunrise or sunset (terrain time when there is one), not after a long clock jump.
+  // Live mode only: a time preview (item 44) never starts them.
   const [fireworksTrigger, setFireworksTrigger] = useState(0);
   const prevClockRef = React.useRef(date);
   useEffect(() => {
     const prev = prevClockRef.current;
     prevClockRef.current = date;
-    if (passesSunEvent(prev, date, sunTimes, terrainExtras.terrainSunTimes)) setFireworksTrigger(date.getTime());
+    if (!isTimePreview && passesSunEvent(prev, date, sunTimes, terrainExtras.terrainSunTimes)) setFireworksTrigger(date.getTime());
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per clock tick
   }, [date]);
 
@@ -644,8 +664,24 @@ const SunTracker: React.FC = () => {
             terrainMoonTimes={terrainExtras.terrainMoonTimes}
             eyeHeightMeters={eyeHeight}
             onEyeHeightChange={handleEyeHeightChange}
+            isTimePreview={isTimePreview}
+            timePlayDirection={playDirection}
+            onTimePlay={handleTimePlay}
+            onTimeJump={handleTimeJump}
           />
         </>
+      )}
+      {/* Time travel (ROADMAP item 44): bottom centre, above the radio; stays visible
+          in fullscreen. */}
+      {isTimePreview && (
+        <button
+          type="button"
+          onClick={handleBackToNow}
+          className={`fixed left-1/2 z-20 -translate-x-1/2 ${GLASS_SURFACE} rounded-full px-4 py-2 text-caption font-semibold text-white hover:bg-[hsl(var(--panel-background)/0.65)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70`}
+          style={{ bottom: `calc(${isMobile ? '7.5rem' : '4.5rem'} + env(safe-area-inset-bottom))` }}
+        >
+          Back to now
+        </button>
       )}
     </div>
     </>
