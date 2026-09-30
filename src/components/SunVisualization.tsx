@@ -597,7 +597,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   const isSunVisible = sunAltitudeVisible && sunDotVisible;
   const isMoonVisible = moonAltitudeVisible && moonDotVisible;
   const moonCloudFactor = getMoonCloudFactor(weatherType, cloudCoverPercent); // clouds hide the moon (ROADMAP item 57)
-  // The pool of moonlight for the night fish (ROADMAP item 64, NR3): as bright as the moon
+  // The pool of moonlight for the night fish (ROADMAP item 65, NR3): as bright as the moon
   // is full, dimmed by clouds, and fading as the moon sets, like its reflection bars.
   const nightWater = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
   const moonPool = nightWater && isMoonVisible && weatherType !== 'storm'
@@ -1019,7 +1019,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
         return (
           <svg className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true" data-testid="water-reflection">
-            {/* The pool of moonlight the night fish swim through (item 64): a faint cone
+            {/* The pool of moonlight the night fish swim through (item 65): a faint cone
                 under the moon, 40 % of the width, from the horizon down. The rect is twice
                 the water's height, so the gradient's ellipse fades out at its sides and at
                 the bottom of the screen, with no hard edge. */}
