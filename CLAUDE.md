@@ -13,7 +13,9 @@
 ## Architecture
 
 - `src/components/SunTracker.tsx` is the root state owner. It holds location, date, sun/moon position, sun times, time-of-day, and weather in state, and passes them down as props. Child components do not fetch or compute this state themselves.
-- `src/utils/*.ts` (`sunUtils`, `moonUtils`, `weatherUtils`) are pure functions. They take inputs, return outputs, and do not touch React state or `localStorage` beyond the weather cache in `weatherUtils`.
+- `src/utils/*.ts` are pure functions. They take inputs, return outputs, and do not touch React state. Exceptions that do I/O:
+  - `weatherUtils` (fetch and the weather cache) and `terrainTiles` (tile fetch, canvas decode, the horizon profile cache).
+  - `manualLocation`, `temperatureUnit` and `compassUtils` read and write one `localStorage` key each. Every access is in a try/catch, because `localStorage` can throw (private mode, quota).
 - `src/components/ui/` is shadcn-generated. Do not hand-edit these files. Regenerate with `npx shadcn add <component>` instead.
 - `supabase/functions/*` are independent Deno Edge Functions for a Stripe subscription. The frontend does not call them yet.
 
@@ -26,5 +28,5 @@
 ## Gotchas
 
 - Do not mutate `Date` arguments. Copy first: `const d = new Date(date); d.setHours(...)`. `sunUtils.getSunTimes` does this for its fallback times.
-- Animation loops (`CloudLayer`, `Fireworks`, `MidnightGhost`, `TemperatureIceberg`, `NightStars`) keep their `requestAnimationFrame` ID in a `useRef`, not in state, so cleanup can always cancel the current frame.
+- Most scene motion is CSS animation. The `requestAnimationFrame` loops are in `Fireworks`, `Ufo` and `useCompassHeading`, which keep the frame ID in a `useRef`, and in `NightStars`, which keeps it in a local variable of its effect. In both cases the effect cleanup cancels the current frame. Never keep a frame ID in React state.
 - Supabase functions are Deno, not Node. Each function is self-contained (its own imports, no shared `src/` code) and runs in its own directory under `supabase/functions/`.
