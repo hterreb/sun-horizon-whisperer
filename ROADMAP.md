@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-01. Done: items 1–13, 15, 17–41 and 47–62, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14, 16 and 42–45 (Sentry feedback, round 3), the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
+Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44 and 47–62, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
 
 ## Verification (2026-09-28)
 
@@ -466,7 +466,7 @@ Seven feedback reports from production (Ravensburg, release `6da35c1`, 29 Sep 16
   - `getNextSunEvent` and `passesSunEvent` in `src/utils/sunEvents.ts` select the terrain time when there is one, else the flat time. `SunTracker` starts the show when the 1 s clock passes that time, but not after a clock step longer than 5 s. The altitude-sign effect in `SunVisualization` is removed.
   - Browser check (Ravensburg, 2026-09-30, 390×844): with the terrain profile, the show starts at 18:57:14 (terrain sunset) and ends at 18:57:27. Without the profile, it starts at 19:05:50 (flat sunset 19:05:49) and ends at 19:06:03. The sparks are clearly visible on the orange sky.
 
-### 42. Line-of-sight sunrise and sunset on the sun arc — S — [SUN-CHASER-C](https://ainabler.sentry.io/issues/SUN-CHASER-C)
+### 42. Line-of-sight sunrise and sunset on the sun arc — S — [SUN-CHASER-C](https://ainabler.sentry.io/issues/SUN-CHASER-C) — **✅ Done**
 
 - **Feedback:** "For premium show sunrise and sunset line of sight times on the arc."
 - **Now:** the sun arc has three labels: rise, zenith and set (from `getSunArcLabels`). Rise and set sit on the flat horizon line and show the flat SunCalc times. The line-of-sight times (`getTerrainSunTimes`, computed in `SunTracker` as `terrainExtras.terrainSunTimes`) show only in the panel, behind the `Mountain` button (item 30).
@@ -482,8 +482,9 @@ Seven feedback reports from production (Ravensburg, release `6da35c1`, 29 Sep 16
   - Unit test with a synthetic profile (a 5° ridge in the west): the set label has the `getTerrainSunTimes` sunset time and an altitude of 5° ± 0.5°.
   - Component tests: the terrain labels render with a profile and terrain times, and do not render without them. When the minute is the same, only the terrain label renders.
   - In the browser at Innsbruck (sunset about 31 min early, item 13), 390×844: the set label sits on the arc where the arc meets the ridge. At 360 px no labels overlap.
+- **Built:** `SunTracker` passes `terrainExtras.terrainSunTimes` to `SunVisualization`. `getTerrainArcLabels` (`arcLabels.ts`) returns the sun position at each terrain time. `getArcLabelGeometry` has a new `onHorizon` flag, so the terrain pills sit 22 px above their true altitude, on the ridge. A flat rise/set pill that overlaps the terrain pill of the same kind, or shows the same minute, is dropped. The moon collision check includes the terrain pills. Innsbruck, 2026-09-30 17:30: terrain set 18:29, flat set 18:58, terrain rise 07:44, flat rise 07:12; no pill boxes overlap at 390×844 and 360×800.
 
-### 43. Sunset countdown: 10 s of sound — S — [SUN-CHASER-B](https://ainabler.sentry.io/issues/SUN-CHASER-B)
+### 43. Sunset countdown: 10 s of sound — S — [SUN-CHASER-B](https://ainabler.sentry.io/issues/SUN-CHASER-B) — **✅ Done**
 
 - **Feedback:** "10s acoustics count down for sunset, premium version to sunset line of sight times."
 - **Depends on:** item 41 (`getNextSunEvent`).
@@ -499,8 +500,13 @@ Seven feedback reports from production (Ravensburg, release `6da35c1`, 29 Sep 16
   - Unit test: the target is the terrain sunset when there is one and line of sight is enabled, else the flat sunset.
   - Component test (fake timers, mocked `AudioContext`): with the toggle on, 11 tones are scheduled at T−11 s, 1 s apart. With the toggle off, or with the page hidden, none are scheduled.
   - On a phone: the ticks are audible with the radio on and off, and the chime sounds at the target time ± 0.5 s.
+- **Built:**
+  - `getCountdownTarget` in `src/utils/sunEvents.ts` reuses `getNextSunEvent` with the sunsets only: the line-of-sight sunset when `isLineOfSightEnabled()` and the terrain profile has one, else the flat sunset.
+  - `src/hooks/useSunsetCountdown.ts` holds the Web Audio code. `primeCountdownAudio` (the toggle tap) creates or resumes the one `AudioContext` and plays one tick. The hook schedules the 10 ticks (660 Hz, 80 ms) and the chime (one oscillator, 660 Hz then 990 Hz, 1.2 s fade) at once when the 1 s clock is 10 to 11.5 s before the target, and returns the seconds left. Toggle off, a preview or unmount stops the tones still to come.
+  - `SunTracker` owns the toggle (`localStorage` `sunset-countdown`) and passes it to the bell button in the `InfoPanel` Sunset row, and the seconds to the `SunVisualization` altitude pill ("Sunset in 7 s", `Mountain` icon and gold plus for line of sight).
+  - Browser check (Ravensburg, 2026-09-30, 390×844): the line-of-sight sunset is 18:57:14. With the bell on, 11 oscillators start 1 s apart (T0 10.8 s ahead on the audio clock), the pill shows "Sunset in 7 s" at 18:57:07, and the fireworks start at T0. The radio volume is not changed; the phone check (ticks audible over the radio, chime ± 0.5 s) is still open.
 
-### 44. Time travel: set the time, play it forward and backward — M — [SUN-CHASER-F](https://ainabler.sentry.io/issues/SUN-CHASER-F)
+### 44. Time travel: set the time, play it forward and backward — M — [SUN-CHASER-F](https://ainabler.sentry.io/issues/SUN-CHASER-F) — **✅ Done**
 
 - **Feedback:** "Another premium feature to set time or fast forward and backward in time." This item replaces the backlog item "Date/time scrubber".
 - **Now (`SunTracker.tsx`):**
@@ -521,8 +527,14 @@ Seven feedback reports from production (Ravensburg, release `6da35c1`, 29 Sep 16
 - **Done when:**
   - Tests: an offset of +6 h gives `getSunPosition(now + 6 h)`. Play forward moves `date` by 10 min per second (fake timers). "Back to now" returns to live. A preview does not fetch the weather again. No countdown and no fireworks during a preview.
   - In the browser: play through a sunset. The sun moves along its arc, the sky colours change, and the panel times follow. One play tick takes less than 16 ms in the profiler.
+- **Built:**
+  - `SunTracker` has `timeOffsetMs` and `playDirection` state. The clock sets `date = Date.now() + offset`, every 1 s live and every 100 ms during play; during play each tick adds `(direction × 600 − 1) × elapsed` to the offset, so `date` moves exactly 10 min per second. One `useMemo` keyed on the 30 s step and the location derives sun and moon position, sun times, golden and blue hour and time of day from `date`; the 30 s interval and the location-change block are removed.
+  - `isTimePreview` (`timeOffsetMs !== 0`) in `SunTracker` is the preview flag. It gates the fireworks, and item 43 (countdown, not built) can use the same flag. The weather fetch still uses its own `new Date()`, so a preview does not fetch again, and the sunset score and the spawns stay live.
+  - `src/utils/timeTravel.ts`: `getTimeTravelRange` (start of today − 1 year to end of today + 1 year), `clampTimeOffset` (play stops at the range edge) and `toDateTimeLocalValue`.
+  - InfoPanel row: Rewind, the time and FastForward (`aria-pressed` on the playing direction), plus the gold plus. A tap on the time shows a `datetime-local` input; blur closes it. In a preview the row reads "Time" and `formatMoonDate` ("Sep 30, 19:08"), because "Current Time" plus the date does not fit on one line at 390 px. The "Back to now" glass pill is fixed at the bottom centre, above the radio, and does not fade in fullscreen.
+  - Browser check (Ravensburg, 2026-09-30 18:30, 1280×800 and 390×844): the play runs through the sunset (18:44 → 20:09); the sun sets along its arc, the sky goes from orange to civil and nautical twilight, and the sunrise/sunset rows follow the next pass. "Back to now" returns to the live clock. The jump to Dec 24 16:30 shows the winter arc (sunset 16:34). No weather request during the preview. With a real clock, play adds about 9 ms of main-thread work per 100 ms tick, with no frame gap above 16.8 ms and no long task.
 
-### 45. Premium as a one-time purchase on Google Play: price and billing — S *(decision)* — [SUN-CHASER-E](https://ainabler.sentry.io/issues/SUN-CHASER-E)
+### 45. Premium as a one-time purchase on Google Play: price and billing — S *(decision)* — **✅ Decided** — [SUN-CHASER-E](https://ainabler.sentry.io/issues/SUN-CHASER-E)
 
 - **Feedback:** "Premium buy once in play store - what would be a good pricing start point?"
 - **Conflict:** item 14 is built for a Stripe subscription (US$1.99 per month, 7-day trial). The feedback asks for a one-time purchase in the Play Store. Inside an Android app, digital features must use Google Play Billing (see the note in item 14), so Stripe covers only the web. Decide this before items 14 and 16.
@@ -538,6 +550,7 @@ Seven feedback reports from production (Ravensburg, release `6da35c1`, 29 Sep 16
   - No backend for the first version. Before the release, check how the Digital Goods API acknowledges a one-time purchase: Play refunds a purchase that is not acknowledged within 3 days.
   - Keep the Stripe subscription functions in `supabase/functions`, unused. Do not delete them until this decision is final.
 - **Done when:** the price and the billing plan are decided, and items 14 and 16 are updated to match.
+- **Decision (2026-09-30):** Premium is sold only in the Play app, as the one-time product `premium`. The web stays free, with all features and no gate. The billing plan above applies. The working price is €3.99 / US$3.99; confirm it in the Play Console before the release. Items 14 and 16 are updated.
 
 ### Scene review (2026-09-30)
 
@@ -861,14 +874,20 @@ These items come from the re-shoot of all states after items 46–56.
 ### 14. Premium gating (deferred) — M
 
 - **Status:** backend ready, frontend not started. Only start this when `PREMIUM_ENFORCED` should become `true`.
-- **Update (2026-09-30):** item 45 proposes a one-time Google Play purchase in place of the Stripe subscription for the Play app.
+- **Update (2026-09-30), decision in item 45:** Premium is a one-time Google Play purchase in the Play app only. The web stays free. The Stripe steps below are not needed for the first release. They are kept for a possible later web sale.
 - **Depends on:** item 13.
 - **Exists today:**
   - `supabase/functions/create-checkout`: Stripe Checkout session, $1.99/month, 7-day trial for new customers only.
   - `supabase/functions/check-subscription`: syncs Stripe status to the `subscribers` table.
   - `supabase/functions/customer-portal`: Stripe billing portal session.
   - `supabase/migrations/20260927000000_create_subscribers.sql`: table + RLS.
-- **To build:**
+- **To build (Play app, first release):**
+  1. A `usePremium` check: when the Digital Goods API exists (`getDigitalGoodsService('https://play.google.com/billing')`), call `listPurchases()` at start and cache the result. When the API does not exist (the web), Premium is always unlocked.
+  2. Buy: a tap on a feature with the gold plus opens the Payment Request API for the product `premium`, with the local price from `getDetails()`. After the purchase, the plus goes away.
+  3. Acknowledge the purchase. Play refunds a purchase that is not acknowledged within 3 days (see item 45).
+  4. Gate the gold-plus features only where the Digital Goods API exists and `PREMIUM_ENFORCED` is true.
+  5. Tests with a mocked Digital Goods service: no API → unlocked; API without a purchase → locked; API with a purchase → unlocked.
+- **Later, only for a web sale (not planned):**
   1. Supabase Auth in the frontend (sign-in, session handling, `@supabase/supabase-js` client).
   2. Upgrade UI: pricing dialog → call `create-checkout` → redirect to Stripe.
   3. Handle the return URLs `/?checkout=success` and `/?checkout=cancel` (toast + call `check-subscription`).
@@ -934,8 +953,9 @@ These items come from the re-shoot of all states after items 46–56.
   2. Serve `/.well-known/assetlinks.json` with the app signing key's SHA-256 fingerprint, so the TWA shows no URL bar.
   3. Run `bubblewrap init --manifest https://<domain>/manifest.webmanifest`, then `bubblewrap build`. Set `display: fullscreen` for true fullscreen.
   4. Use Play App Signing. Keep the upload key out of git.
-  5. Store listing: privacy policy (location use, no tracking), data-safety form, content rating, and the graphics from item 15.
-  6. Note: new personal developer accounts must run a closed test with 12+ testers for 14 days before the production release. Plan for this time.
+  5. Turn on Play Billing in the TWA (`playBilling` in the Bubblewrap manifest), and create the managed one-time product `premium` in the Play Console at the price from item 45.
+  6. Store listing: privacy policy (location use, no tracking), data-safety form, content rating, and the graphics from item 15.
+  7. Note: new personal developer accounts must run a closed test with 12+ testers for 14 days before the production release. Plan for this time.
 - **Done when:** the app is live on Google Play, opens fullscreen without a URL bar, and web deploys update it without a new store release.
 
 ---
@@ -974,8 +994,19 @@ Items:
 
 ## Backlog (not prioritized)
 
-- Unit toggle °C/°F.
 - German and English UI (i18n).
 - Share card: an image of today's sunset with the time and score.
 - Sunset reminder notification (after item 16, when notifications are practical).
 - Date/time scrubber to preview any day or time of the year: now item 44.
+
+### Unit toggle °C/°F — S — **✅ Done**
+
+- **Now:** the app shows temperatures in °C only.
+- **Spec:**
+  1. Add a small °C/°F segmented toggle to the "Current Weather" section of the InfoPanel. Use the same style as the "Real / Manual" weather-mode toggle.
+  2. The default comes from the locale: °F for `en-US` and the other Fahrenheit regions (US, LR, MM, BS, KY, PW, FM, MH). °C for all other regions.
+  3. Save the choice in `localStorage` (`temperature-unit`). Wrap the read and the write in try/catch.
+  4. The toggle changes only the display. The effects keep °C internally: the iceberg below 0 °C, the frost, the heat shimmer above 30 °C.
+  5. If there is a manual weather temperature input, it shows and accepts the chosen unit.
+- **Done when:** unit tests for the conversion, the format and the locale default. In the browser, `en-US` shows °F and `de-DE` shows °C, and a toggled choice stays after a reload.
+- **Built:** `src/utils/temperatureUnit.ts` has the pure functions: `getDefaultTemperatureUnit` (region from `Intl.Locale(...).maximize()`, so `en` also gives °F), `loadTemperatureUnit` / `saveTemperatureUnit` (try/catch), `celsiusToFahrenheit` and `formatTemperature` (whole degrees). `SunTracker` holds the unit in state (default from `navigator.language`) and gives it to `InfoPanel`. The toggle is next to the temperature value. The weather data and all effect thresholds stay in °C. The manual weather mode has no temperature input, so spec step 5 has no work.

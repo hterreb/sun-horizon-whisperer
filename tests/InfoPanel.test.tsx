@@ -96,6 +96,34 @@ describe('InfoPanel', () => {
     expect(screen.queryByTestId('panel-frost')).not.toBeInTheDocument();
   });
 
+  it('shows the temperature in the chosen unit, and the toggle reports the new unit', () => {
+    const weather: WeatherData = {
+      temperature: -3,
+      weatherType: 'snow',
+      weatherDescription: 'Snow',
+      lastUpdated: new Date(),
+      isRealWeather: true,
+      sunsetScoreToday: null,
+      sunsetScoreTomorrow: null,
+      cloudCoverPercent: null,
+      windSpeedKmh: null,
+      windDirectionDeg: null,
+    };
+    const onUnitChange = vi.fn();
+    const { rerender } = render(
+      <InfoPanel {...defaultProps} weatherData={weather} temperatureUnit="C" onTemperatureUnitChange={onUnitChange} />,
+    );
+    expect(screen.getByText('-3°C')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '°C' })).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: '°F' }));
+    expect(onUnitChange).toHaveBeenCalledWith('F');
+
+    rerender(<InfoPanel {...defaultProps} weatherData={weather} temperatureUnit="F" onTemperatureUnitChange={onUnitChange} />);
+    expect(screen.getByText('27°F')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '°F' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('shows "Change location" only while the panel is expanded (ROADMAP item 47)', () => {
     render(<InfoPanel {...defaultProps} />);
     expect(screen.getByRole('button', { name: /change location/i })).toBeInTheDocument();
@@ -291,6 +319,47 @@ describe('InfoPanel', () => {
       expect(screen.queryByText(/updated:/i)).not.toBeInTheDocument();
       expect(screen.getByText(/real weather unavailable/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/refresh weather/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('time travel in the Current Time row (ROADMAP item 44)', () => {
+    const at1842 = new Date(2026, 9, 3, 18, 42, 7);
+
+    it('shows the live clock with seconds, the play controls and the gold plus', () => {
+      render(<InfoPanel {...defaultProps} currentTime={at1842} />);
+      expect(screen.getByTitle('Set date and time')).toHaveTextContent('18:42:07');
+      expect(screen.getByRole('button', { name: 'Play time backward' })).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.getByRole('button', { name: 'Play time forward' })).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.getByText('Current Time').querySelector('[data-testid="premium-badge"]')).toBeInTheDocument();
+    });
+
+    it('in a preview, shows the date and time, labelled "Time" (not "Current Time")', () => {
+      render(<InfoPanel {...defaultProps} currentTime={at1842} isTimePreview />);
+      expect(screen.getByTitle('Set date and time')).toHaveTextContent('Oct 3, 18:42');
+      expect(screen.getByText('Time')).toBeInTheDocument();
+      expect(screen.queryByText('Current Time')).not.toBeInTheDocument();
+    });
+
+    it('hands a tap on play to onTimePlay, and marks the playing direction', () => {
+      const onTimePlay = vi.fn();
+      render(<InfoPanel {...defaultProps} timePlayDirection={1} onTimePlay={onTimePlay} />);
+      expect(screen.getByRole('button', { name: 'Play time forward' })).toHaveAttribute('aria-pressed', 'true');
+      fireEvent.click(screen.getByRole('button', { name: 'Play time backward' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Play time forward' }));
+      expect(onTimePlay.mock.calls).toEqual([[-1], [1]]);
+    });
+
+    it('a tap on the time opens a datetime-local input that jumps to the chosen time', () => {
+      const onTimeJump = vi.fn();
+      render(<InfoPanel {...defaultProps} currentTime={at1842} onTimeJump={onTimeJump} />);
+      fireEvent.click(screen.getByTitle('Set date and time'));
+      const input = screen.getByLabelText('Set date and time');
+      expect(input).toHaveAttribute('type', 'datetime-local');
+      expect(input).toHaveValue('2026-10-03T18:42');
+      fireEvent.change(input, { target: { value: '2026-12-24T17:00' } });
+      expect(onTimeJump).toHaveBeenCalledWith(new Date(2026, 11, 24, 17, 0));
+      fireEvent.blur(input);
+      expect(screen.queryByLabelText('Set date and time')).not.toBeInTheDocument();
     });
   });
 

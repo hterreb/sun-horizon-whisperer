@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { getSunArcLabels, getMoonArcLabels } from '../src/utils/arcLabels';
+import { getSunArcLabels, getMoonArcLabels, getTerrainArcLabels } from '../src/utils/arcLabels';
+import { getTerrainSunTimes, type HorizonProfile } from '../src/utils/horizonUtils';
 import { getSunTimes, getSunPosition } from '../src/utils/sunUtils';
 import { getMoonTimes, getMoonPosition } from '../src/utils/moonUtils';
 
@@ -120,5 +121,39 @@ describe('getMoonArcLabels (arc rise/zenith/set labels)', () => {
     expect(labels.set).toBeNull();
     // The moon still has a highest point during the fallback window.
     expect(labels.zenith).not.toBeNull();
+  });
+});
+
+describe('getTerrainArcLabels (ROADMAP item 42, line-of-sight labels on the sun arc)', () => {
+  // Innsbruck-like latitude, early autumn: sunset azimuth ~265°, sunrise ~95°.
+  const date = new Date('2026-09-30T12:00:00Z');
+  const latitude = 47.27;
+  const longitude = 11.4;
+  // A synthetic 5° ridge in the west (azimuth 180-359), flat elsewhere.
+  const westRidge: HorizonProfile = {
+    angles: Array.from({ length: 360 }, (_, az) => (az >= 180 ? 5 : 0)),
+    observerElevation: 0,
+    eyeHeight: 1.7,
+  };
+
+  it('puts the set label at the getTerrainSunTimes sunset, on the 5° ridge', () => {
+    const terrainTimes = getTerrainSunTimes(date, latitude, longitude, westRidge);
+    const labels = getTerrainArcLabels(terrainTimes, latitude, longitude);
+
+    expect(terrainTimes.sunset).not.toBeNull();
+    expect(labels.set?.time.getTime()).toBe(terrainTimes.sunset?.getTime());
+    expect(labels.set?.altitude).toBeGreaterThan(4.5);
+    expect(labels.set?.altitude).toBeLessThan(5.5);
+    expect(labels.set?.azimuth).toBeGreaterThan(180);
+    expect(labels.zenith).toBeNull();
+  });
+
+  it('returns the sun position at each time, and null for a null time', () => {
+    const sunrise = new Date('2026-09-30T05:30:00Z');
+    const labels = getTerrainArcLabels({ sunrise, sunset: null }, latitude, longitude);
+    const expected = getSunPosition(sunrise, latitude, longitude);
+
+    expect(labels.rise).toEqual({ time: sunrise, azimuth: expected.azimuth, altitude: expected.altitude });
+    expect(labels.set).toBeNull();
   });
 });
