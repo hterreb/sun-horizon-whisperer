@@ -327,15 +327,24 @@ describe('sunUtils', () => {
         const topHsl = hexHsl(top.rgb);
 
         const { surface, deep } = getWaterColors(gradient);
-        const [sh, ss, sl] = parseHsl(surface);
+        const [sh, , sl] = parseHsl(surface);
         const [dh, , dl] = parseHsl(deep);
-        expect(sh).toBeCloseTo(horizon[0], 0);
-        expect(ss).toBeCloseTo(Math.min(100, horizon[1] * 1.3), 0);
         expect(sl).toBeCloseTo(Math.min(horizon[2] * 0.85, horizon[2] - 5), 0);
-        expect(dh).toBeCloseTo(topHsl[0], 0);
         expect(dl).toBeCloseTo(topHsl[2] * 0.45, 0);
+        // The sea stays blue, whatever the sky's hue (item 61).
+        for (const hue of [sh, dh]) {
+          expect(hue).toBeGreaterThan(190);
+          expect(hue).toBeLessThan(240);
+        }
       });
     }
+
+    it('mirrors a warm dusk sky as a muted blue, not an orange sea (item 61)', () => {
+      const dusk = parseHsl(getWaterColors(getBackgroundGradient('evening')).surface);
+      const midday = parseHsl(getWaterColors(getBackgroundGradient('midday')).surface);
+      expect(dusk[0]).toBeGreaterThan(190);
+      expect(dusk[1]).toBeLessThan(midday[1] / 2);
+    });
 
     it('follows the weather mix of the sky (item 50)', () => {
       const clear = getWaterColors(getBackgroundGradient('evening'));

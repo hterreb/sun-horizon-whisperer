@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-01. Done: items 1–13, 15, 17–41 and 47–60, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14, 16 and 42–45 (Sentry feedback, round 3), the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
+Status: last updated 2026-10-01. Done: items 1–13, 15, 17–41 and 47–61, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14, 16 and 42–45 (Sentry feedback, round 3), the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
 
 ## Verification (2026-09-28)
 
@@ -679,6 +679,13 @@ These items come from the re-shoot of all states after items 46–56.
 - **Spec:** put the compass chips, the time labels and the altitude pill above the fog veil in z-order. The fog still covers the ridge, the water and the sun.
 - **Done when:** in the browser at 11:00 with fog, the chips and labels are as sharp as in clear weather.
 - **Built:** the compass chips, the arc time labels (sun and moon) and the altitude pill get `z-[9]`, one above the fog veil (`WeatherEffects`, `z-[8]`). The ridge, the water and the sun have no z-index, so the fog still covers them.
+
+### 61. The sea stays blue at dusk — S — **✅ Done**
+
+- **Now:** the water takes the sky's hue 1:1 (item 53), with 1.3× saturation. At dusk the sea is saturated orange-red.
+- **Spec:** the water can mirror the sky, but keeps a blue tone.
+- **Done when:** a test that the water hue stays blue in every time of day. In the browser at 18:45, the sea is blue under the orange sky.
+- **Built:** `getWaterColors` sends both colours through `toSea` (`sunUtils.ts`): a sea blue (hue 205°) with the sky colour's saturation and lightness, with 35 % of the sky colour mixed in (`SKY_TINT`). The lightness stays the sky's, so night, storm and weather dimming work as before. The sun's glitter strip gives the warm reflection.
 
 ---
 
