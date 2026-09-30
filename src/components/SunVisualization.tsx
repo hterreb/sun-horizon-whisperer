@@ -7,6 +7,7 @@ import { shortestHeadingDelta } from '../utils/compassUtils';
 import { type HorizonProfile, horizonAngleAt } from '../utils/horizonUtils';
 import CloudLayer, { type WeatherType } from './CloudLayer';
 import Fireworks from './Fireworks';
+import SunSunglasses from './SunSunglasses';
 import PremiumBadge from './PremiumBadge';
 import WeatherEffects from './WeatherEffects';
 import { getSunVisibility, getMoonCloudFactor } from '@/utils/weatherEffectsUtils';
@@ -61,6 +62,9 @@ interface SunVisualizationProps {
   showCursor?: boolean;
   // Start time (ms) of the sunrise/sunset fireworks show from SunTracker; 0 = none (ROADMAP item 41).
   fireworksTrigger?: number;
+  // Hidden sunglasses egg: the sun wears sunglasses; tapping the sun reports each tap to SunTracker.
+  sunglasses?: boolean;
+  onSunTap?: () => void;
 }
 
 // Maps an azimuth (0-360°, 0 = North) to a horizontal screen fraction (0-1), for the
@@ -483,7 +487,9 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   sunsetCountdown = null,
   isFullscreen = false,
   showCursor = true,
-  fireworksTrigger = 0
+  fireworksTrigger = 0,
+  sunglasses = false,
+  onSunTap
 }) => {
   // Compass mode (ROADMAP item 19): a real field of view centered on the heading,
   // replacing the static full-circle mapping - also turns off the CSS transitions
@@ -844,9 +850,13 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
       {isSunVisible && sunVisibility.disc > 0 && (
         // The line sun with rays (item 46's filled disc was rolled back to it on request).
-        <div
+        // A button, so the sun is a tap target for the sunglasses egg (ROADMAP "Ongoing — Easter eggs").
+        <button
+          type="button"
+          aria-label="Sun"
+          onClick={onSunTap}
           data-testid="sun-dot"
-          className={`absolute ${compassActive ? '' : 'transition-transform duration-1000'} ${getSunColor()} ${getGlowIntensity()} animate-glow`}
+          className={`absolute rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${compassActive ? '' : 'transition-transform duration-1000'} ${getSunColor()} ${getGlowIntensity()} animate-glow`}
           style={{
             left: `${sunX}px`,
             top: `${sunY}px`,
@@ -862,7 +872,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             strokeWidth={1}
             style={sunVisibility.pale > 0 ? { color: `color-mix(in srgb, currentColor, hsl(var(--scene-sky-overcast)) ${sunVisibility.pale * 100}%)` } : undefined}
           />
-        </div>
+          {sunglasses && <SunSunglasses />}
+        </button>
       )}
 
       {offFovHintSide && (

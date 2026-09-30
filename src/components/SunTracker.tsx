@@ -54,6 +54,9 @@ import { isLineOfSightEnabled } from '../utils/premium';
 import { passesSunEvent, getCountdownTarget } from '../utils/sunEvents';
 import { PLAY_SPEED, PLAY_TICK_MS, clampTimeOffset } from '@/utils/timeTravel';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
+import { DISCO_MS, KONAMI_SEQUENCE, SUNGLASSES_MS, advanceKonami, getEggOverride, registerSunTap, rollUfo } from '@/utils/hiddenEggs';
+import DiscoSky from './DiscoSky';
+import Ufo from './Ufo';
 
 // Eye height above ground for line of sight with terrain (ROADMAP item 13): e.g. a
 // building floor or a tower, clamped to a sane 0-1000 m range and persisted like
@@ -555,6 +558,51 @@ const SunTracker: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per clock tick
   }, [date]);
 
+  // Hidden easter eggs (ROADMAP "Ongoing — Easter eggs"): sunglasses after 7 taps on
+  // the sun, a rare UFO per night view, and a disco sky from the Konami code.
+  // `?egg=sunglasses|ufo|disco` shows one at once, for testing.
+  const [eggOverride] = useState(() => getEggOverride(window.location.search));
+  const [sunglassesOn, setSunglassesOn] = useState(eggOverride === 'sunglasses');
+  const [discoOn, setDiscoOn] = useState(eggOverride === 'disco');
+  const [ufoOn, setUfoOn] = useState(eggOverride === 'ufo');
+  const sunTapsRef = React.useRef({ count: 0, lastMs: -Infinity });
+  const handleSunTap = useCallback(() => {
+    const { taps, triggered } = registerSunTap(sunTapsRef.current, Date.now());
+    sunTapsRef.current = taps;
+    if (triggered) setSunglassesOn(true);
+  }, []);
+  useEffect(() => {
+    if (!sunglassesOn) return;
+    const id = setTimeout(() => setSunglassesOn(false), SUNGLASSES_MS);
+    return () => clearTimeout(id);
+  }, [sunglassesOn]);
+  useEffect(() => {
+    let progress = 0;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLElement && e.target.closest('input, textarea, [contenteditable]')) return;
+      progress = advanceKonami(progress, e.key);
+      if (progress === KONAMI_SEQUENCE.length) {
+        progress = 0;
+        setDiscoOn(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  useEffect(() => {
+    if (!discoOn) return;
+    const id = setTimeout(() => setDiscoOn(false), DISCO_MS);
+    return () => clearTimeout(id);
+  }, [discoOn]);
+  const isNight = timeOfDay === 'night';
+  // One roll each time night starts (adjusting state during render, like MidnightGhost).
+  const [prevIsNight, setPrevIsNight] = useState(false);
+  if (isNight !== prevIsNight) {
+    setPrevIsNight(isNight);
+    if (isNight && rollUfo()) setUfoOn(true);
+  }
+  const handleUfoDone = useCallback(() => setUfoOn(false), []);
+
   // Sunset countdown (ROADMAP item 43): 10 s of ticks and a chime at the next sunset
   // (line of sight when there is one). Live time only; the tap that turns it on
   // starts the audio (browsers allow sound only after a user gesture).
@@ -618,6 +666,8 @@ const SunTracker: React.FC = () => {
       style={{ background: skyGradient }}
     >
       <NightStars timeOfDay={timeOfDay} moonPosition={moonPosition} weatherType={weatherType} cloudCoverPercent={weatherData?.cloudCoverPercent} />
+      {discoOn && <DiscoSky />}
+      {ufoOn && <Ufo onDone={handleUfoDone} />}
       {reveal === 'done' && (
         <>
           <MusicPlayer isFullscreen={isFullscreen} />
@@ -661,6 +711,8 @@ const SunTracker: React.FC = () => {
             isFullscreen={isFullscreen}
             showCursor={showCursor}
             fireworksTrigger={fireworksTrigger}
+            sunglasses={sunglassesOn}
+            onSunTap={handleSunTap}
             sunsetCountdown={countdownSeconds === null ? null : { seconds: countdownSeconds, lineOfSight: !!countdownTarget?.lineOfSight }}
           />
           <InfoPanel
