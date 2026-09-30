@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp } from 'lucide-react';
-import { type SunPosition, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors } from '../utils/sunUtils';
+import { type SunPosition, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors, getReflectionFade } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
 import { getSunArcLabels, getMoonArcLabels, type ArcLabels, type ArcLabelPoint } from '../utils/arcLabels';
 import { shortestHeadingDelta } from '../utils/compassUtils';
@@ -8,7 +8,7 @@ import { type HorizonProfile, horizonAngleAt } from '../utils/horizonUtils';
 import CloudLayer, { type WeatherType } from './CloudLayer';
 import Fireworks from './Fireworks';
 import WeatherEffects from './WeatherEffects';
-import { getSunVisibility } from '@/utils/weatherEffectsUtils';
+import { getSunVisibility, getMoonCloudFactor } from '@/utils/weatherEffectsUtils';
 
 // A fixed fallback seed date for callers that don't pass one (e.g. existing tests) -
 // a stable constant, not `new Date()`, so it never changes identity across renders.
@@ -571,6 +571,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
   const isSunVisible = sunAltitudeVisible && sunDotVisible;
   const isMoonVisible = moonAltitudeVisible && moonDotVisible;
+  const moonCloudFactor = getMoonCloudFactor(weatherType, cloudCoverPercent); // clouds hide the moon (ROADMAP item 57)
 
   // The sun's and moon's arcs for their current pass (above-horizon, in-FOV points
   // only): same screen mapping as their current-position dots, just unclamped and
@@ -811,7 +812,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         // A filled disc with a soft rim, no rays (ROADMAP item 46, direction D's soft glowing sun).
         <div
           data-testid="sun-dot"
-          className={`absolute rounded-full ${compassActive ? '' : 'transition-transform duration-1000'} ${getGlowIntensity()} animate-glow`}
+          className={`absolute rounded-full ${compassActive ? '' : 'transition-transform duration-1000'} ${getGlowIntensity()} ${sunVisibility.pale > 0 ? 'blur-[1.5px]' : ''} animate-glow`}
           style={{
             left: `${sunX}px`,
             top: `${sunY}px`,
@@ -819,7 +820,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             height: 56,
             transform: 'translate(-50%, -50%)',
             opacity: sunVisibility.disc,
-            background: `hsl(var(${getSunDiscToken(sunPosition.altitude)}))`,
+            // Drizzle and snow: the disc colour mixes toward the overcast grey (ROADMAP item 59).
+            background: `color-mix(in srgb, hsl(var(${getSunDiscToken(sunPosition.altitude)})), hsl(var(--scene-sky-overcast)) ${sunVisibility.pale * 100}%)`,
             boxShadow: `0 0 6px 2px hsl(var(${getSunDiscToken(sunPosition.altitude)}) / 0.6)`
           }}
         />
@@ -836,14 +838,14 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         </div>
       )}
 
-      {isMoonVisible && (
+      {isMoonVisible && moonCloudFactor > 0 && (
         <div
           className={`absolute ${compassActive ? '' : 'transition-all duration-1000'}`}
           style={{
             left: `${moonX}px`,
             top: `${moonY}px`,
             transform: 'translate(-50%, -50%)',
-            opacity: weatherType === 'storm' ? 0.3 : moonPosition.illumination * 0.8 + 0.2,
+            opacity: (moonPosition.illumination * 0.8 + 0.2) * moonCloudFactor,
             filter: `drop-shadow(0 0 ${moonPosition.illumination * 15}px hsl(var(--scene-glow-white) / 0.4))`
           }}
         >
@@ -894,12 +896,16 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         // with depth. Each short blurred highlight shimmers slowly (opacity only);
         // the global reduced-motion rule in index.css keeps it still.
         const nightReflection = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
-        const reflectionVisible = nightReflection ? isMoonVisible : isSunVisible && sunVisibility.disc > 0;
-        if (!reflectionVisible) return null;
+        // Only while that body is above the horizon, fading out between +2° and 0°
+        // (ROADMAP item 58); clouds also hide the moon strip (item 57).
+        const reflectionFade = nightReflection
+          ? (isMoonVisible ? getReflectionFade(moonPosition.altitude) * moonCloudFactor : 0)
+          : (isSunVisible && sunVisibility.disc > 0 ? getReflectionFade(sunPosition.altitude) : 0);
+        if (reflectionFade <= 0) return null;
 
         const reflectX = nightReflection ? moonX : sunX;
         const reflectToken = nightReflection ? '--scene-moon' : '--scene-sun-high';
-        const baseOpacity = nightReflection ? 0.5 : 0.8;
+        const baseOpacity = (nightReflection ? 0.5 : 0.8) * reflectionFade;
         const discWidth = nightReflection ? moonRadius * 2 : 56;
         const stripDepth = (containerDimensions.height - horizonLabelY) * 0.55;
 
@@ -945,7 +951,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
       {containerDimensions.width > 0 && (
         <div
-          className={`absolute inset-0 pointer-events-none transition-opacity duration-300 ${
+          // z-[9]: above the fog veil (WeatherEffects, z-[8]), so the chips stay readable (ROADMAP item 60).
+          className={`absolute inset-0 z-[9] pointer-events-none transition-opacity duration-300 ${
             cardinalLabelsVisible ? 'opacity-100' : 'opacity-0'
           }`}
           data-testid="cardinal-labels"
@@ -975,7 +982,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         // fullscreen (same `cardinalLabelsVisible` condition as ROADMAP item 29). The
         // panel carries the same times for assistive tech, so these pills are decorative.
         <div
-          className={`absolute inset-0 pointer-events-none transition-opacity duration-300 ${
+          className={`absolute inset-0 z-[9] pointer-events-none transition-opacity duration-300 ${
             cardinalLabelsVisible ? 'opacity-100' : 'opacity-0'
           }`}
           data-testid="arc-labels"
@@ -1015,7 +1022,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       {timeOfDay !== 'night' && (
         <div
           data-testid="sun-altitude"
-          className="absolute left-1/2 transform -translate-x-1/2 bottom-1/3 -translate-y-12
+          className="absolute z-[9] left-1/2 transform -translate-x-1/2 bottom-1/3 -translate-y-12
                      bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm"
         >
           {formatSunAltitude(sunPosition.altitude)}
