@@ -93,6 +93,23 @@ export const getSunArcLabels = (date: Date, latitude: number, longitude: number)
   };
 };
 
+// Line-of-sight rise/set labels for the sun arc (ROADMAP item 42): the sun's position at
+// each terrain time from getTerrainSunTimes (computed once in SunTracker), i.e. the point
+// where the arc meets the terrain silhouette. A null time (the sun does not clear the
+// terrain that day) gives a null label. No zenith: the terrain does not move it.
+export const getTerrainArcLabels = (
+  terrainSunTimes: { sunrise: Date | null; sunset: Date | null },
+  latitude: number,
+  longitude: number
+): ArcLabels => {
+  const { sunrise, sunset } = terrainSunTimes;
+  return {
+    rise: sunrise ? toPoint(sunrise, getSunPosition(sunrise, latitude, longitude)) : null,
+    zenith: null,
+    set: sunset ? toPoint(sunset, getSunPosition(sunset, latitude, longitude)) : null,
+  };
+};
+
 // Golden-section search for the time of maximum altitude in [loMs, hiMs] (a unimodal
 // rise-then-set climb over one pass) - refines the moon's zenith to well under a minute,
 // far tighter than the arc's own ~30 min sampling step.
