@@ -110,6 +110,22 @@ describe('SunTracker', () => {
     expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ title: 'Weather updated' }));
   });
 
+  it('a manually picked weather ignores the real cloud cover for the stars and the moon (items 52, 57)', async () => {
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 7, longitude: 8 } }) } });
+    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({
+      current_weather: { temperature: 20, weathercode: 3, windspeed: 0, winddirection: 0, time: '' },
+      current: { cloud_cover: 100, wind_speed_10m: 0, wind_direction_10m: 0 },
+    }) })) as unknown as typeof fetch;
+
+    render(<SunTracker />);
+    await waitFor(() => expect(visProps.current?.cloudCoverPercent).toBe(100));
+
+    fireEvent.click(screen.getByRole('button', { name: /manual/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    expect(visProps.current!.weatherType).toBe('clear');
+    expect(visProps.current!.cloudCoverPercent).toBeNull();
+  });
+
   it('toasts when the weather refresh fails (A-5)', async () => {
     // Distinct coordinates from the previous test, so the weather cache (keyed on
     // location, not test) doesn't serve a stale successful result here.
