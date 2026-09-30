@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-01. Done: items 1–13, 15, 17–41 and 46–56 (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14, 16 and 42–45 (Sentry feedback, round 3), the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
+Status: last updated 2026-10-01. Done: items 1–13, 15, 17–41 and 46–56 (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Open: items 14, 16 and 42–45 (Sentry feedback, round 3), 57–60 (scene re-check), the checks listed under Verification, the new findings in [AUDIT.md](AUDIT.md) (§3, status 2026-09-28), easter eggs, backlog.
 
 ## Verification (2026-09-28)
 
@@ -644,6 +644,34 @@ A visual review of `main` at `6da35c1`. The method: 47 scene states in headless 
 - **Spec:** a band about 40 px high just above the horizon, with a slow vertical wave distortion (an SVG `feTurbulence` + `feDisplacementMap` filter on a copy of the horizon strip, or a CSS mask with a slow translate). A 6–8 s cycle. Only in daylight, as now. With reduced motion: a still, pale haze band.
 - **Done when:** at 35 °C and 14:00 in the browser, the shimmer over the ridge can be seen in a screenshot, and it moves slowly.
 - **Built:** `WeatherEffects` draws a 40 px SVG band on the horizon: a pale haze gradient plus thin light lines. An `feTurbulence` + `feDisplacementMap` filter bends the lines, and an `feOffset` moves the noise over a 7 s cycle. With reduced motion, only the still haze shows. The old CSS keyframes are removed.
+
+### Scene re-check (2026-09-30)
+
+These items come from the re-shoot of all states after items 46–56.
+
+### 57. Clouds hide the moon — S
+
+- **Now:** at night in rain, fog and storm (100 % cover), the moon shows at full brightness. The stars are already dimmed (item 52).
+- **Spec:** dim the moon disc and its glow with the same cloud factor as the stars (`getStarCloudFactor`). Keep a faint light patch where the moon is (at least 15 % opacity) when the cover is not 100 %, or when the weather type is cloudy or overcast. Storm and fog: moon hidden.
+- **Done when:** a test for the moon opacity per weather type. In the browser at 22:30, the moon cannot be seen in rain, fog and storm, and it shows at full brightness when the sky is clear.
+
+### 58. No reflection when the sun or moon is below the horizon — S
+
+- **Now:** the glitter strip (item 53) shows in nautical twilight at −9°, under the moon at −3.1°, and at −1° after sunset.
+- **Spec:** show the sun or moon strip only when that body's altitude is above 0°. Fade the strip out between +2° and 0°. Clouds also hide the moon strip (item 57).
+- **Done when:** a test for the strip visibility by altitude. In the browser at 06:30, 19:20 and 19:55, there is no strip under a body that is below the horizon.
+
+### 59. Drizzle and snow: a pale sun — S
+
+- **Now:** drizzle and snow set the disc to 50 % opacity (item 50). On the light sky the disc still looks almost fully bright.
+- **Spec:** in drizzle and snow, mix the disc colour toward the sky's grey (`--scene-sky-overcast`) by about 50 % instead of only lowering the opacity, and blur its edge a little. Keep the small halo.
+- **Done when:** in the browser at 11:00, the sun in drizzle and snow is clearly paler than in the cloudy state, and it can still be seen.
+
+### 60. Fog: labels stay readable — S
+
+- **Now:** the fog veil covers the compass chips and the sun time labels, so they are hard to read.
+- **Spec:** put the compass chips, the time labels and the altitude pill above the fog veil in z-order. The fog still covers the ridge, the water and the sun.
+- **Done when:** in the browser at 11:00 with fog, the chips and labels are as sharp as in clear weather.
 
 ---
 
