@@ -54,6 +54,7 @@ import { isLineOfSightEnabled } from '../utils/premium';
 import { passesSunEvent, getCountdownTarget } from '../utils/sunEvents';
 import { PLAY_SPEED, PLAY_TICK_MS, clampTimeOffset } from '@/utils/timeTravel';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
+import { loadTemperatureUnit, saveTemperatureUnit, type TemperatureUnit } from '@/utils/temperatureUnit';
 
 // Eye height above ground for line of sight with terrain (ROADMAP item 13): e.g. a
 // building floor or a tower, clamped to a sane 0-1000 m range and persisted like
@@ -124,6 +125,12 @@ const SunTracker: React.FC = () => {
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [isLoadingWeather, setIsLoadingWeather] = useState(false);
   const [useRealWeather, setUseRealWeather] = useState(true);
+  // Display unit only (ROADMAP backlog "Unit toggle °C/°F"); effects stay in °C.
+  const [temperatureUnit, setTemperatureUnit] = useState<TemperatureUnit>(() => loadTemperatureUnit(navigator.language));
+  const handleTemperatureUnitChange = useCallback((unit: TemperatureUnit) => {
+    setTemperatureUnit(unit);
+    saveTemperatureUnit(unit);
+  }, []);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showCursor, setShowCursor] = useState(true);
   const isMobile = useIsMobile();
@@ -680,6 +687,8 @@ const SunTracker: React.FC = () => {
             weatherData={weatherData}
             isLoadingWeather={isLoadingWeather}
             useRealWeather={useRealWeather}
+            temperatureUnit={temperatureUnit}
+            onTemperatureUnitChange={handleTemperatureUnitChange}
             isFullscreen={isFullscreen}
             onWeatherChange={handleWeatherChange}
             onWeatherModeToggle={handleWeatherModeToggle}
