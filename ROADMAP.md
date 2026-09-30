@@ -11,23 +11,47 @@ Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44 and 47–63, it
 
 - **Method:** each done item was checked against its Spec and Done-when in the code and the tests (`main` at `a9882c4`: 487 tests, lint, typecheck and build pass). It was also checked in the running app with Playwright: 390×844 and 360×640, Ravensburg by day and at night, Sydney, fullscreen idle and wake, compass mode with synthetic headings, denied geolocation, place search.
 - **Result:** items 1–13, 15 and 17–30 are built as specified, or as a later item changed them. The check found two new bugs (items 37 and 38). Items 31–36 were built after this check and are not part of it.
-- **Still open:**
+- **Checks (table updated 2026-10-01):**
 
-| Item | Open point | Needs |
+| Item | Check | Status |
 |---|---|---|
-| 2 | Touch scroll in the panel does not pan the scene. | Real device |
-| 4 | The installed PWA shows no browser bars and no gaps (Android); it draws under the status bar (iOS). | Real device |
-| 8, 19 | Labels match a hardware compass within about 10°. Pointing the phone at the sun puts it at screen centre; a 45° turn moves it to the edge. | Real Android phone and iPhone |
-| 9 | Moon times match timeanddate.com within 2 minutes. | External reference |
-| 13 | An alpine sunset matches PeakFinder or an observation within 5 minutes. | External reference |
-| 15 | The maskable icon is not cropped on a launcher. | Real Android device |
-| 21 | A thrown test error has readable stack frames and no coordinates; a feedback message has no name or email. Sentry in the privacy policy (item 16). | Sentry dashboard |
-| 23 | In fullscreen on a phone, a tap shows the feedback button and it opens the form. | Real device |
-| 14, 16 | Not started. Decide Stripe or Google Play Billing before item 16 (proposal: item 45). | Decision |
-| 37, 38 | New bugs, see below (AUDIT C-14, C-15). | Fix |
-| 39 | Built. The hand-off from the Android splash to the loading screen on a phone. | Real device |
-| 40 | Built. Look at the boat speeds and sizes on a phone. | Real device |
-| 41–45 | New, from Sentry feedback round 3, see below. | Build; decision for 45 |
+| 2 | Touch scroll in the panel does not pan the scene. | Open: real device |
+| 4 | The installed PWA shows no browser bars and no gaps (Android); it draws under the status bar (iOS). | Open: real device |
+| 8, 19 | Labels match a hardware compass within about 10°. Pointing the phone at the sun puts it at screen centre; a 45° turn moves it to the edge. | Open: real Android phone and iPhone |
+| 9 | Moon times match timeanddate.com within 2 minutes. | ✅ Done 2026-10-01: all 12 times within 1 minute |
+| 13 | An alpine sunset matches PeakFinder or an observation within 5 minutes. | ✅ Done 2026-10-01: Sion within 4.3 minutes (second-hand PeakFinder value) |
+| 15 | The maskable icon is not cropped on a launcher. | Open: real Android device |
+| 21 | A thrown test error has readable stack frames and no coordinates; a feedback message has no name or email. Sentry in the privacy policy (item 16). | Open: Sentry dashboard |
+| 23 | In fullscreen on a phone, a tap shows the feedback button and it opens the form. | Open: real device |
+| 14, 16 | Not started. Item 45 decides the billing: Premium in the Play app only, web free. | Open: build |
+| 37, 38 | Built (AUDIT C-14, C-15). | ✅ Done |
+| 39 | Built. The hand-off from the Android splash to the loading screen on a phone. | Open: real device |
+| 40 | Built. Look at the boat speeds and sizes on a phone. | Open: real device |
+| 41–44 | Built (Sentry feedback round 3). | ✅ Done |
+| 43 | The ticks are audible with the radio on and off, and the chime sounds at T0 ± 0.5 s on a real phone. | Open: real device |
+| 45 | Decided: Premium in the Play app only, web free. | ✅ Done |
+
+- **Results (2026-10-01):**
+  - **Item 9, moon times:** the app times come from `getMoonTimes` (`moonUtils.ts`), run in Vitest with the zone of each city. The reference times come from timeanddate.com (`/moon/germany/ravensburg` and `/moon/australia/sydney`, October 2026). timeanddate.com shows whole minutes. All 12 app times are 0–57 s after the reference minute, so each delta is less than 1 minute. Pass.
+
+    | City | Date | Event | App | timeanddate.com | Delta |
+    |---|---|---|---|---|---|
+    | Ravensburg (47.78, 9.61) | 5 Oct | Rise | 00:49:36 | 00:49 | +36 s |
+    | | | Set | 16:44:36 | 16:44 | +36 s |
+    | | 15 Oct | Rise | 13:09:27 | 13:09 | +27 s |
+    | | | Set | 20:40:23 | 20:40 | +23 s |
+    | | 28 Oct | Set | 10:11:57 | 10:11 | +57 s |
+    | | | Rise | 18:09:08 | 18:09 | +8 s |
+    | Sydney (−33.87, 151.21) | 5 Oct | Rise | 03:05:32 | 03:05 | +32 s |
+    | | | Set | 13:15:23 | 13:15 | +23 s |
+    | | 15 Oct | Rise | 08:34:08 | 08:34 | +8 s |
+    | | | Set | 23:46:47 | 23:46 | +47 s |
+    | | 28 Oct | Set | 06:51:47 | 06:51 | +47 s |
+    | | | Rise | 21:59:08 | 21:59 | +8 s |
+
+    The dates include days after a clock change (Sydney 4 Oct, Ravensburg 25 Oct).
+  - **Item 13, line-of-sight sunset:** reference: a PeakFinder value for Sion, Switzerland (46.22746, 7.35933), 22 May 2025, quoted in a [Home Assistant forum post](https://community.home-assistant.io/t/use-peakfinder-for-exact-sunrise-sunset-hours/893259): sunrise 06:21, sunset 19:57 (flat: 05:49, 21:05). The app (`loadHorizonProfile` with real AWS tiles, eye height 1.7 m, then `getTerrainSunTimes`) gives sunrise 06:18:31 (horizon 3.8° at azimuth 64°) and sunset 20:01:20 (horizon 9.4° at azimuth 290°). The deltas are −2.5 min and +4.3 min. Pass within 5 minutes. The reference is second-hand: the post does not give the eye height or the PeakFinder version. A first-hand PeakFinder check or an observation can make it stronger.
+  - **Item 21, Sentry:** no `sentry` CLI and no Sentry MCP tool is available. The check needs the Sentry dashboard.
 
 ## Priority rules
 
