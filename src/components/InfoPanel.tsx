@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Moon, RefreshCw, Thermometer, MessageSquare, Mountain } from 'lucide-react';
+import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward } from 'lucide-react';
 import { isFeedbackAvailable, openFeedbackForm } from '@/utils/feedback';
 import { ScrollArea } from './ui/scroll-area';
 import { Button } from './ui/button';
@@ -23,6 +23,7 @@ import { getWeatherEffects } from '../utils/weatherEffectsUtils';
 import { isValidLatitude, isValidLongitude } from '../utils/manualLocation';
 import { type HorizonProfileStatus } from '../hooks/useHorizonProfile';
 import { type WeatherType } from './CloudLayer';
+import { getTimeTravelRange, toDateTimeLocalValue } from '@/utils/timeTravel';
 
 // Direction D "Polished Classic" (ROADMAP items 7 & 15): shared classes so every
 // row/section/focus ring in the panel reads as one system. ROW, ICON_TOGGLE and
@@ -104,6 +105,12 @@ interface InfoPanelProps {
   terrainMoonTimes?: { rise: Date | null; set: Date | null } | null;
   eyeHeightMeters?: number;
   onEyeHeightChange?: (meters: number) => void;
+  // Time travel (ROADMAP item 44): a preview shows the date and time instead of the
+  // live clock. -1 plays backward, 1 forward, 0 is paused.
+  isTimePreview?: boolean;
+  timePlayDirection?: -1 | 0 | 1;
+  onTimePlay?: (direction: -1 | 1) => void;
+  onTimeJump?: (date: Date) => void;
 }
 
 const InfoPanel: React.FC<InfoPanelProps> = ({
@@ -133,7 +140,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   terrainSunTimes = null,
   terrainMoonTimes = null,
   eyeHeightMeters = 1.7,
-  onEyeHeightChange = () => {}
+  onEyeHeightChange = () => {},
+  isTimePreview = false,
+  timePlayDirection = 0,
+  onTimePlay = () => {},
+  onTimeJump = () => {}
 }) => {
   const [locationName, setLocationName] = useState<string>('');
   const [loadingLocation, setLoadingLocation] = useState(false);
@@ -155,6 +166,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   // Line of sight details (ROADMAP item 30): closed by default, and independent for
   // the sun rows and the moon rows.
   const [isSunTerrainOpen, setIsSunTerrainOpen] = useState(false);
+  // Time travel (ROADMAP item 44): the datetime-local input shows while this is set,
+  // with its min/max (today ± 1 year) taken when it opens.
+  const [timePickerRange, setTimePickerRange] = useState<{ min: Date; max: Date } | null>(null);
   const [isMoonTerrainOpen, setIsMoonTerrainOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [hoveredTwilight, setHoveredTwilight] = useState<string | null>(null);
@@ -641,9 +655,55 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             <div className={ROW}>
               <div className="flex items-center">
                 <Clock size={18} className="mr-2" />
-                <span className="text-body">Current Time</span>
+                <span className="text-body inline-flex items-center gap-1 whitespace-nowrap">{isTimePreview ? 'Time' : 'Current Time'}<PremiumBadge /></span>
               </div>
-              <span className="font-semibold text-body tabular-nums">{currentTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })}</span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => onTimePlay(-1)}
+                  className={`${INLINE_ICON_TOGGLE} ${timePlayDirection === -1 ? 'bg-white/20' : ''}`}
+                  aria-label="Play time backward"
+                  aria-pressed={timePlayDirection === -1}
+                >
+                  <Rewind size={14} />
+                </button>
+                {timePickerRange ? (
+                  <input
+                    type="datetime-local"
+                    aria-label="Set date and time"
+                    autoFocus
+                    value={toDateTimeLocalValue(currentTime)}
+                    min={toDateTimeLocalValue(timePickerRange.min)}
+                    max={toDateTimeLocalValue(timePickerRange.max)}
+                    onChange={(e) => {
+                      const target = new Date(e.target.value);
+                      if (!Number.isNaN(target.getTime())) onTimeJump(target);
+                    }}
+                    onBlur={() => setTimePickerRange(null)}
+                    className={`bg-black bg-opacity-30 rounded px-1 text-caption text-white tabular-nums [color-scheme:dark] ${FOCUS_RING}`}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setTimePickerRange(getTimeTravelRange(new Date()))}
+                    className={`font-semibold text-body tabular-nums whitespace-nowrap rounded ${FOCUS_RING}`}
+                    title="Set date and time"
+                  >
+                    {isTimePreview
+                      ? formatMoonDate(currentTime)
+                      : currentTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => onTimePlay(1)}
+                  className={`${INLINE_ICON_TOGGLE} ${timePlayDirection === 1 ? 'bg-white/20' : ''}`}
+                  aria-label="Play time forward"
+                  aria-pressed={timePlayDirection === 1}
+                >
+                  <FastForward size={14} />
+                </button>
+              </div>
             </div>
 
             <div className={ROW}>

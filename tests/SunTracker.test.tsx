@@ -3,6 +3,22 @@ import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import SunTracker from '../src/components/SunTracker';
 import { vi } from 'vitest';
 import { loadManualLocation, saveManualLocation } from '../src/utils/manualLocation';
+import { getSunPosition, getSunTimes } from '../src/utils/sunUtils';
+import type SunVisualizationType from '../src/components/SunVisualization';
+
+// Records the props SunTracker hands to SunVisualization (time travel, ROADMAP item 44),
+// and still renders the real component.
+const visProps = vi.hoisted(() => ({ current: null as null | React.ComponentProps<typeof SunVisualizationType> }));
+vi.mock('../src/components/SunVisualization', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/components/SunVisualization')>();
+  const { createElement } = await import('react');
+  return {
+    default: (props: React.ComponentProps<typeof SunVisualizationType>) => {
+      visProps.current = props;
+      return createElement(actual.default, props);
+    },
+  };
+});
 
 // Mock the toast function
 vi.mock('@/hooks/use-toast', () => ({
@@ -324,6 +340,134 @@ describe('SunTracker', () => {
       expect(container.lastElementChild).toHaveClass('animate-scene-fade');
       expect(container.lastElementChild).not.toHaveClass('animate-scene-iris');
       matchMedia.mockRestore();
+    });
+  });
+
+  describe('time travel (ROADMAP item 44)', () => {
+    const RAVENSBURG = { latitude: 47.78, longitude: 9.61 };
+    const NOON = new Date('2026-09-30T12:00:00Z');
+    const advance = (ms: number) => act(() => {
+      vi.advanceTimersByTime(ms);
+    });
+    // One act() per clock tick, so every tick commits (and runs the fireworks effect)
+    // on its own instead of being batched into one render.
+    const tickFor = (ms: number, tickMs: number) => {
+      for (let t = 0; t < ms; t += tickMs) advance(tickMs);
+    };
+    const shownDate = () => visProps.current!.date!.getTime();
+    const weatherFetches = () =>
+      vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes('api.open-meteo.com/v1/forecast')).length;
+    const jumpTo = (value: string) => {
+      fireEvent.click(screen.getByTitle('Set date and time'));
+      fireEvent.change(screen.getByLabelText('Set date and time'), { target: { value } });
+      fireEvent.blur(screen.getByLabelText('Set date and time'));
+    };
+    const start = (now: Date) => {
+      vi.setSystemTime(now);
+      saveManualLocation(RAVENSBURG.latitude, RAVENSBURG.longitude, 'Ravensburg');
+      render(<SunTracker />);
+      advance(300);
+    };
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      visProps.current = null;
+      global.fetch = vi.fn(() => Promise.reject(new Error('offline'))) as unknown as typeof fetch;
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('a jump of +6 h shows the sun at now + 6 h, and the row shows the date and time', () => {
+      start(NOON);
+      jumpTo('2026-09-30T18:00');
+      const target = new Date('2026-09-30T18:00:00');
+      expect(shownDate()).toBe(target.getTime());
+      expect(visProps.current!.sunPosition).toEqual(getSunPosition(target, RAVENSBURG.latitude, RAVENSBURG.longitude));
+      expect(screen.getByTitle('Set date and time')).toHaveTextContent('Sep 30, 18:00');
+      expect(screen.getByRole('button', { name: 'Back to now' })).toBeInTheDocument();
+    });
+
+    it('limits the date and time input to today ± 1 year', () => {
+      start(NOON);
+      fireEvent.click(screen.getByTitle('Set date and time'));
+      const input = screen.getByLabelText('Set date and time');
+      expect(input).toHaveAttribute('type', 'datetime-local');
+      expect(input).toHaveAttribute('min', '2025-09-30T00:00');
+      expect(input).toHaveAttribute('max', '2027-09-30T23:59');
+    });
+
+    it('play forward moves the time by 10 min per second, and a second tap pauses', () => {
+      start(NOON);
+      fireEvent.click(screen.getByRole('button', { name: 'Play time forward' }));
+      advance(1000);
+      const afterOne = shownDate();
+      advance(1000);
+      expect(shownDate() - afterOne).toBe(10 * 60_000);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Play time forward' }));
+      const paused = shownDate();
+      advance(1000);
+      expect(shownDate() - paused).toBe(1000);
+    });
+
+    it('play backward moves the time back by 10 min per second', () => {
+      start(NOON);
+      fireEvent.click(screen.getByRole('button', { name: 'Play time backward' }));
+      advance(1000);
+      const afterOne = shownDate();
+      advance(1000);
+      expect(shownDate() - afterOne).toBe(-10 * 60_000);
+    });
+
+    it('"Back to now" stops play and returns to live', () => {
+      start(NOON);
+      fireEvent.click(screen.getByRole('button', { name: 'Play time forward' }));
+      advance(2000);
+      fireEvent.click(screen.getByRole('button', { name: 'Back to now' }));
+      expect(shownDate()).toBe(Date.now());
+      expect(screen.queryByRole('button', { name: 'Back to now' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Play time forward' })).toHaveAttribute('aria-pressed', 'false');
+      advance(1000);
+      expect(shownDate()).toBe(Date.now());
+      expect(screen.getByTitle('Set date and time')).toHaveTextContent('12:00:03');
+    });
+
+    it('a preview does not fetch the weather again', () => {
+      start(NOON);
+      const before = weatherFetches();
+      expect(before).toBeGreaterThan(0);
+      jumpTo('2026-10-03T18:42');
+      fireEvent.click(screen.getByRole('button', { name: 'Play time forward' }));
+      advance(5000);
+      expect(weatherFetches()).toBe(before);
+    });
+
+    it('starts the fireworks when live time passes the sunset (control)', () => {
+      const sunset = getSunTimes(NOON, RAVENSBURG.latitude, RAVENSBURG.longitude).sunset!;
+
+      // Live control: the 1 s clock passes the sunset.
+      start(new Date(sunset.getTime() - 3000));
+      tickFor(5000, 1000);
+      expect(visProps.current!.fireworksTrigger).not.toBe(0);
+    });
+
+    it('does not start the fireworks during a preview, paused or playing', () => {
+      const sunset = getSunTimes(NOON, RAVENSBURG.latitude, RAVENSBURG.longitude).sunset!;
+      start(NOON);
+      // Paused preview a minute before the sunset: the 1 s clock passes it.
+      const minuteBefore = new Date(sunset.getTime() - 60_000);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      jumpTo(`2026-09-30T${pad(minuteBefore.getHours())}:${pad(minuteBefore.getMinutes())}`);
+      tickFor(150_000, 1000);
+      expect(shownDate()).toBeGreaterThan(sunset.getTime());
+      expect(visProps.current!.fireworksTrigger).toBe(0);
+      // Play forward through the sunset.
+      jumpTo(`2026-09-30T${pad(minuteBefore.getHours())}:${pad(minuteBefore.getMinutes())}`);
+      fireEvent.click(screen.getByRole('button', { name: 'Play time forward' }));
+      tickFor(3000, 100);
+      expect(shownDate()).toBeGreaterThan(sunset.getTime());
+      expect(visProps.current!.fireworksTrigger).toBe(0);
     });
   });
 });
