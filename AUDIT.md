@@ -54,6 +54,7 @@ Re-verification, 2026-09-28 (`a9882c4`):
 > P-7 step 1: react-router (one page) and date-fns (3 format calls, now `Intl`) removed. Bundle 580 → 524 kB (190 → 171 kB gzip). The rest of the gap is Sentry (~125 kB, feedback form 38 kB).
 > P-7 step 2: decided to keep one chunk; `build.chunkSizeWarningLimit: 600` on purpose. P-7 done. Open: C-16, A-6, A-7 (ROADMAP item 39).
 > C-16, A-6, A-7: fixed by ROADMAP item 39 (loading screen). None of the re-verification findings is open.
+> P-4 `Fireworks`: fixed by ROADMAP item 41 (one canvas, particles and rAF id in refs, no React state per frame).
 
 1. Remove the third-party `gptengineer.js` script from production HTML (S-1).
 2. Run `npm audit fix` and commit the lockfile (D-1).
