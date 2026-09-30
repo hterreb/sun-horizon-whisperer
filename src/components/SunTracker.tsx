@@ -642,13 +642,16 @@ const SunTracker: React.FC = () => {
   const countdownTarget = getCountdownTarget(date, sunTimes, terrainExtras.terrainSunTimes, isLineOfSightEnabled());
   const countdownSeconds = useSunsetCountdown(countdownTarget?.time ?? null, date, isCountdownOn && !isTimePreview);
 
+  // A manually picked weather ignores the real cloud cover: the sky, the stars and
+  // the moon then follow the weather type alone (ROADMAP items 50, 52, 57).
+  const cloudCover = useRealWeather ? weatherData?.cloudCoverPercent ?? null : null;
+
   const skyGradient = useMemo(() => {
     // Clouds dim the sky (ROADMAP item 50): mix toward grey per weather type, scaled
-    // by the measured cloud cover. A manually picked weather ignores the real cover.
+    // by the measured cloud cover.
     // The water takes its colours from this same gradient (ROADMAP item 53).
-    const cover = useRealWeather ? weatherData?.cloudCoverPercent : null;
-    return mixGradientTowardOvercast(getBackgroundGradient(timeOfDay), getSkyOvercastMix(weatherType, cover));
-  }, [timeOfDay, weatherType, useRealWeather, weatherData?.cloudCoverPercent]);
+    return mixGradientTowardOvercast(getBackgroundGradient(timeOfDay), getSkyOvercastMix(weatherType, cloudCover));
+  }, [timeOfDay, weatherType, cloudCover]);
 
   const handleWeatherChange = (newWeather: WeatherType) => {
     setWeatherType(newWeather);
@@ -681,7 +684,7 @@ const SunTracker: React.FC = () => {
       }`} 
       style={{ background: skyGradient }}
     >
-      <NightStars timeOfDay={timeOfDay} moonPosition={moonPosition} weatherType={weatherType} cloudCoverPercent={weatherData?.cloudCoverPercent} />
+      <NightStars timeOfDay={timeOfDay} moonPosition={moonPosition} weatherType={weatherType} cloudCoverPercent={cloudCover} />
       {discoOn && <DiscoSky />}
       {ufoOn && <Ufo onDone={handleUfoDone} />}
       {reveal === 'done' && (
@@ -719,7 +722,7 @@ const SunTracker: React.FC = () => {
             longitude={location.longitude}
             date={date}
             temperatureC={weatherData?.temperature ?? null}
-            cloudCoverPercent={weatherData?.cloudCoverPercent ?? null}
+            cloudCoverPercent={cloudCover}
             windSpeedKmh={weatherData?.windSpeedKmh ?? null}
             windDirectionDeg={weatherData?.windDirectionDeg ?? null}
             compassHeading={activeCompassHeading}
