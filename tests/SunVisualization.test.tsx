@@ -1,8 +1,8 @@
 import React from 'react';
 import fs from 'node:fs';
 import path from 'node:path';
-import { render, screen } from '@testing-library/react';
-import { describe, it, expect, afterEach } from 'vitest';
+import { render, screen, within } from '@testing-library/react';
+import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 import SunVisualization, {
   getAzimuthScreenFraction,
   getCompassScreenFraction,
@@ -594,6 +594,119 @@ describe('SunVisualization (rendered): arc rise/zenith/set labels', () => {
   });
 });
 
+describe('SunVisualization (rendered): line-of-sight labels on the sun arc (ROADMAP item 42)', () => {
+  const originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+  const originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
+
+  afterEach(() => {
+    if (originalClientWidth) Object.defineProperty(HTMLElement.prototype, 'clientWidth', originalClientWidth);
+    if (originalClientHeight) Object.defineProperty(HTMLElement.prototype, 'clientHeight', originalClientHeight);
+  });
+
+  const summerDay = new Date('2026-06-21T12:00:00Z');
+  const latitude = 51.5;
+  const longitude = 0;
+  const times = getSunTimes(summerDay, latitude, longitude);
+  const ridgeProfile: HorizonProfile = { angles: new Array(360).fill(5), observerElevation: 0, eyeHeight: 1.7 };
+  // An hour inside the flat times: far enough that the pills do not overlap.
+  const terrainSunTimes = {
+    sunrise: new Date(times.sunrise.getTime() + 60 * 60_000),
+    sunset: new Date(times.sunset.getTime() - 60 * 60_000),
+  };
+
+  const baseProps = {
+    sunPosition: { azimuth: 180, altitude: 60 },
+    moonPosition: { azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false },
+    sunPath: [
+      { azimuth: 170, altitude: 20 },
+      { azimuth: 180, altitude: 60 },
+      { azimuth: 190, altitude: 20 },
+    ],
+    moonPath: [],
+    timeOfDay: 'midday' as const,
+    weatherType: 'clear' as const,
+    latitude,
+    longitude,
+    date: summerDay,
+  };
+
+  beforeEach(() => {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { value: 800, configurable: true });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { value: 600, configurable: true });
+  });
+
+  it('renders the terrain rise and set labels with a profile and terrain times, next to the flat labels', () => {
+    render(<SunVisualization {...baseProps} horizonProfile={ridgeProfile} terrainSunTimes={terrainSunTimes} />);
+
+    const set = screen.getByTestId('arc-label-sun-terrain-set');
+    expect(set).toHaveTextContent(formatTime(terrainSunTimes.sunset));
+    expect(within(set).getByTestId('premium-badge')).toBeInTheDocument();
+    expect(screen.getByTestId('arc-label-sun-terrain-rise')).toHaveTextContent(formatTime(terrainSunTimes.sunrise));
+    expect(screen.getByTestId('arc-label-sun-set')).toHaveTextContent(formatTime(times.sunset));
+    expect(screen.getByTestId('arc-label-sun-rise')).toHaveTextContent(formatTime(times.sunrise));
+    // Sits above the flat set label: the ridge is higher than the flat horizon.
+    expect(parseFloat(set.style.top)).toBeLessThan(parseFloat(screen.getByTestId('arc-label-sun-set').style.top));
+  });
+
+  it('renders no terrain labels without a profile or without terrain times', () => {
+    const { rerender } = render(<SunVisualization {...baseProps} terrainSunTimes={terrainSunTimes} />);
+    expect(screen.queryByTestId('arc-label-sun-terrain-rise')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('arc-label-sun-terrain-set')).not.toBeInTheDocument();
+
+    rerender(<SunVisualization {...baseProps} horizonProfile={ridgeProfile} />);
+    expect(screen.queryByTestId('arc-label-sun-terrain-rise')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('arc-label-sun-terrain-set')).not.toBeInTheDocument();
+    expect(screen.getByTestId('arc-label-sun-set')).toBeInTheDocument();
+  });
+
+  it('renders no terrain label for a null time (the sun does not clear the terrain)', () => {
+    render(
+      <SunVisualization {...baseProps} horizonProfile={ridgeProfile} terrainSunTimes={{ sunrise: null, sunset: null }} />
+    );
+    expect(screen.queryByTestId('arc-label-sun-terrain-rise')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('arc-label-sun-terrain-set')).not.toBeInTheDocument();
+    expect(screen.getByTestId('arc-label-sun-set')).toBeInTheDocument();
+  });
+
+  it('renders only the terrain label when it shows the same minute as the flat label', () => {
+    render(
+      <SunVisualization
+        {...baseProps}
+        horizonProfile={ridgeProfile}
+        terrainSunTimes={{ sunrise: times.sunrise, sunset: times.sunset }}
+      />
+    );
+    expect(screen.getByTestId('arc-label-sun-terrain-set')).toHaveTextContent(formatTime(times.sunset));
+    expect(screen.getByTestId('arc-label-sun-terrain-rise')).toHaveTextContent(formatTime(times.sunrise));
+    expect(screen.queryByTestId('arc-label-sun-set')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('arc-label-sun-rise')).not.toBeInTheDocument();
+    expect(screen.getByTestId('arc-label-sun-zenith')).toBeInTheDocument();
+  });
+
+  it('drops a terrain label outside the compass field of view (ROADMAP item 19)', () => {
+    render(
+      <SunVisualization {...baseProps} horizonProfile={ridgeProfile} terrainSunTimes={terrainSunTimes} compassHeading={45} />
+    );
+    expect(screen.getByTestId('arc-label-sun-terrain-rise')).toBeInTheDocument();
+    expect(screen.queryByTestId('arc-label-sun-terrain-set')).not.toBeInTheDocument();
+  });
+
+  it('fades with the other arc labels while idle in fullscreen (ROADMAP item 29)', () => {
+    render(
+      <SunVisualization
+        {...baseProps}
+        horizonProfile={ridgeProfile}
+        terrainSunTimes={terrainSunTimes}
+        isFullscreen={true}
+        showCursor={false}
+      />
+    );
+    const labels = screen.getByTestId('arc-labels');
+    expect(labels).toHaveClass('opacity-0');
+    expect(within(labels).getByTestId('arc-label-sun-terrain-set')).toBeInTheDocument();
+  });
+});
+
 describe('buildTerrainSegments (ROADMAP item 13, line of sight with terrain)', () => {
   const flatProfile: HorizonProfile = { angles: new Array(360).fill(0), observerElevation: 0, eyeHeight: 1.7 };
   const ridgeProfile: HorizonProfile = { angles: new Array(360).fill(10), observerElevation: 0, eyeHeight: 1.7 };
@@ -832,5 +945,15 @@ describe('sun and altitude pill (ROADMAP items 46, 48)', () => {
     unmount();
     render(<SunVisualization {...baseProps} sunPosition={{ azimuth: 290, altitude: -8 }} timeOfDay="nautical-twilight" />);
     expect(screen.getByTestId('sun-altitude')).toHaveTextContent('-8.0°');
+  });
+
+  it('shows the sunset countdown in the altitude pill, with the gold plus for line of sight (ROADMAP item 43)', () => {
+    const { rerender } = render(<SunVisualization {...baseProps} sunsetCountdown={{ seconds: 7, lineOfSight: false }} />);
+    const pill = () => screen.getByTestId('sun-altitude');
+    expect(pill()).toHaveTextContent('Sunset in 7 s');
+    expect(within(pill()).queryByTestId('premium-badge')).not.toBeInTheDocument();
+    rerender(<SunVisualization {...baseProps} sunsetCountdown={{ seconds: 3, lineOfSight: true }} />);
+    expect(pill()).toHaveTextContent('Sunset in 3 s');
+    expect(within(pill()).getByTestId('premium-badge')).toBeInTheDocument();
   });
 });
