@@ -360,12 +360,34 @@ const rgbToHsl = ([r, g, b]: number[]): [number, number, number] => {
 
 const hsl = ([h, s, l]: [number, number, number]) => `hsl(${h.toFixed(1)}, ${Math.min(100, s).toFixed(1)}%, ${l.toFixed(1)}%)`;
 
+const hslToRgb = ([h, s, l]: [number, number, number]): number[] => {
+  const a = (Math.min(100, s) / 100) * Math.min(l / 100, 1 - l / 100);
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12;
+    return 255 * (l / 100 - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)));
+  };
+  return [f(0), f(8), f(4)];
+};
+
+// The sea stays blue (ROADMAP item 61): a sea blue with the sky colour's saturation
+// and lightness, with SKY_TINT of the sky colour mixed in (RGB). The lightness stays
+// the sky's. A warm dusk sky so gives a muted blue, not an orange sea; the sun's
+// glitter strip adds the warm reflection. Raise SKY_TINT for a stronger mirror.
+const SEA_HUE = 205;
+const SKY_TINT = 0.35;
+
+const toSea = (sky: [number, number, number]): [number, number, number] => {
+  const blue = hslToRgb([SEA_HUE, sky[1], sky[2]]);
+  const [h, s] = rgbToHsl(hslToRgb(sky).map((c, i) => blue[i] + (c - blue[i]) * SKY_TINT));
+  return [h, s, sky[2]];
+};
+
 // The water follows the sky (ROADMAP item 53): takes the sky gradient string (after
 // item 50's weather mix) and returns the water's surface and deep colours. Surface:
 // the sky colour at the horizon line, 15 % darker (and at least 5 points of lightness,
 // so a dark night sea still reads against the night sky) and more saturated. Deep:
 // a dark version of the sky's top colour. A storm (item 51) darkens both by 40 % and
-// greys them a little.
+// greys them a little. Both then go through toSea (item 61).
 export const getWaterColors = (skyGradient: string, storm = false): { surface: string; deep: string } => {
   const stops = [...skyGradient.matchAll(/#([0-9a-fA-F]{6})\s+([\d.]+)%/g)].map(([, hex, at]) => {
     const num = parseInt(hex, 16);
@@ -383,8 +405,8 @@ export const getWaterColors = (skyGradient: string, storm = false): { surface: s
   const dim = storm ? 0.6 : 1;
   const grey = storm ? 0.7 : 1;
   return {
-    surface: hsl([horizon[0], horizon[1] * 1.3 * grey, Math.max(0, Math.min(horizon[2] * 0.85, horizon[2] - 5)) * dim]),
-    deep: hsl([top[0], top[1] * grey, top[2] * 0.45 * dim]),
+    surface: hsl(toSea([horizon[0], horizon[1] * 1.3 * grey, Math.max(0, Math.min(horizon[2] * 0.85, horizon[2] - 5)) * dim])),
+    deep: hsl(toSea([top[0], top[1] * grey, top[2] * 0.45 * dim])),
   };
 };
 
