@@ -12,6 +12,10 @@ import CalendarEggs from './CalendarEggs';
 import { type CalendarEvent } from '@/utils/calendarEvents';
 import PremiumBadge from './PremiumBadge';
 import WeatherEffects from './WeatherEffects';
+import SolarEclipse from '@/components/SolarEclipse';
+import GreenFlash from '@/components/GreenFlash';
+import MoonTint from '@/components/MoonTint';
+import { type AstroEvent } from '@/utils/astroEvents';
 import { getSunVisibility, getMoonCloudFactor } from '@/utils/weatherEffectsUtils';
 import { isLineOfSightEnabled } from '@/utils/premium';
 
@@ -67,6 +71,8 @@ interface SunVisualizationProps {
   showCursor?: boolean;
   // Start time (ms) of the sunrise/sunset fireworks show from SunTracker; 0 = none (ROADMAP item 41).
   fireworksTrigger?: number;
+  // The astronomy easter egg from SunTracker (astroEvents.getAstroEvent), or null.
+  astroEvent?: AstroEvent | null;
   // Hidden sunglasses egg: the sun wears sunglasses; tapping the sun reports each tap to SunTracker.
   sunglasses?: boolean;
   onSunTap?: () => void;
@@ -496,6 +502,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   isFullscreen = false,
   showCursor = true,
   fireworksTrigger = 0,
+  astroEvent = null,
   sunglasses = false,
   onSunTap,
   calendarEvent = null
@@ -717,7 +724,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     return 'hsl(var(--scene-ridge-golden))'; // civil-twilight/dawn/morning/evening
   };
 
-  const moonRadius = 18 + moonPosition.illumination * 6; // same footprint as the old 36 + illumination*12 diameter
+  const moonRadius = (18 + moonPosition.illumination * 6) * (astroEvent?.kind === 'supermoon' ? 1.14 : 1); // same footprint as the old 36 + illumination*12 diameter
   const moonPhasePath = useMemo(
     () => getMoonPhasePath(moonPosition.illumination, moonPosition.phase, latitude, moonRadius),
     [moonPosition.illumination, moonPosition.phase, latitude, moonRadius]
@@ -904,6 +911,13 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         </button>
       )}
 
+      {isSunVisible && sunVisibility.disc > 0 && astroEvent?.kind === 'solarEclipse' && (
+        <SolarEclipse x={sunX} y={sunY} strength={astroEvent.strength} radius={sunPosition.altitude > 0 ? 16 : 13} />
+      )}
+      {astroEvent?.kind === 'greenFlash' && sunDotVisible && containerDimensions.height > 0 && (
+        <GreenFlash x={sunX} y={Math.min(sunY, containerDimensions.height * 0.65)} />
+      )}
+
       {offFovHintSide && (
         <div
           className="absolute top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-panel-background border border-panel-border text-white/90 pointer-events-none"
@@ -933,6 +947,9 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           >
             <circle cx={0} cy={0} r={moonRadius - 0.5} fill="hsl(var(--scene-moon-dark))" stroke="hsl(var(--scene-moon))" strokeOpacity={0.3} />
             <path d={moonPhasePath} fill="hsl(var(--scene-moon))" />
+            {(astroEvent?.kind === 'lunarEclipse' || astroEvent?.kind === 'blueMoon') && (
+              <MoonTint kind={astroEvent.kind} strength={astroEvent.strength} radius={moonRadius - 0.5} />
+            )}
           </svg>
         </div>
       )}

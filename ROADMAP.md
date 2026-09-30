@@ -1000,6 +1000,7 @@ Rules for all items:
 - Keep the rAF id in a `useRef`.
 - Put the trigger logic (date and astronomy checks) in a pure util with tests.
 - Show at most one special event at a time.
+- Test override: `?egg=<kind>` forces one astronomy event (`solarEclipse`, `lunarEclipse`, `greenFlash`, `supermoon`, `blueMoon`, `meteorShower`, `aurora`).
 
 Items:
 
@@ -1010,12 +1011,12 @@ Items:
   - ✅ Christmas: light snow on Dec 24–26, even when the weather is clear. Done: slow small flakes, off when it already snows.
   - ✅ Friday the 13th: a black cat walks along the horizon once. Done: a 45 s straight glide, no bounce.
 - **Astronomy:**
-  - Solar and lunar eclipses: a darkened sun or red moon at the correct time (hardcoded date list for 10 years).
-  - Supermoon: a bigger moon when the full moon is near perigee.
-  - Blue moon: the second full moon in a month has a faint blue tint.
-  - Meteor showers: more shooting stars at night, via `NightStars`, during the Perseids (~Aug 12), Geminids (~Dec 14) and Quadrantids (~Jan 3).
-  - Aurora: green curtains at night when |latitude| > 60°. Later, add live data from the NOAA Kp index.
-  - Green flash: 1 in 20 chance of a short green flash at a clear sunset.
+  - ✅ Solar and lunar eclipses: a darkened sun or red moon at the correct time (hardcoded date list for 10 years). Done: NASA GSFC list 2026–2035 in `astroEvents.ts`; solar only within ~3500 km of the greatest-eclipse point.
+  - ✅ Supermoon: a bigger moon when the full moon is near perigee. Done: 14 % bigger moon when the full moon is closer than 360 000 km (Meeus distance).
+  - ✅ Blue moon: the second full moon in a month has a faint blue tint. Done: `MoonTint`, ±1 day around the full moon.
+  - ✅ Meteor showers: more shooting stars at night, via `NightStars`, during the Perseids (~Aug 12), Geminids (~Dec 14) and Quadrantids (~Jan 3). Done: 8× the shooting-star rate on the 3 peak days.
+  - ✅ Aurora: green curtains at night when |latitude| > 60°. Later, add live data from the NOAA Kp index. Done: static rule, `Aurora` with a slow CSS drift; Kp index still open.
+  - ✅ Green flash: 1 in 20 chance of a short green flash at a clear sunset. Done: `GreenFlash`, 4 s after the (line-of-sight) sunset, roll seeded per day and place.
 - **Hidden:**
   - ✅ Tap the sun 7 times: it wears sunglasses for one minute. (The sun is now a button; `?egg=sunglasses`.)
   - ✅ A UFO crosses the night sky (1 in 200 chance per night view). (40 s straight glide; `?egg=ufo`.)
