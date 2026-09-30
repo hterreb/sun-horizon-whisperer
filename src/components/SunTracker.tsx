@@ -25,10 +25,12 @@ import {
   type MoonTimes
 } from '../utils/moonUtils';
 import { fetchCurrentWeather, type WeatherData } from '../utils/weatherUtils';
-import { getSkyOvercastMix } from '@/utils/weatherEffectsUtils';
+import { getSkyOvercastMix, getStarCloudFactor } from '@/utils/weatherEffectsUtils';
+import { getAstroEvent, parseEggOverride, METEOR_SHOWER_RATE } from '@/utils/astroEvents';
 import SunVisualization from './SunVisualization';
 import InfoPanel from './InfoPanel';
 import NightStars from './NightStars';
+import Aurora from '@/components/Aurora';
 import MusicPlayer from './MusicPlayer';
 import TopLeftButtons from './TopLeftButtons';
 import PWAInstallPrompt from './PWAInstallPrompt';
@@ -554,6 +556,22 @@ const SunTracker: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on terrainDateKey (the day) and the profile identity, not `date` itself
   }, [terrainDateKey, horizonProfile, location.latitude, location.longitude]);
 
+  // Astronomy easter eggs: at most one at a time; `?egg=<kind>` forces one for testing.
+  const [astroEggOverride] = useState(() => (typeof window === 'undefined' ? null : parseEggOverride(window.location.search)));
+  const astroEvent = location.loaded
+    ? getAstroEvent({
+        date,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        sunAltitude: sunPosition.altitude,
+        moonAltitude: moonPosition.altitude,
+        timeOfDay,
+        weatherType,
+        // The line-of-sight sunset when there is one, like the fireworks.
+        sunset: terrainExtras.terrainSunTimes?.sunset ?? sunTimes?.sunset ?? null,
+      }, astroEggOverride)
+    : null;
+
   // Fireworks (ROADMAP item 41): start a show when the 1 s clock passes the next
   // sunrise or sunset (terrain time when there is one), not after a long clock jump.
   // Live mode only: a time preview (item 44) never starts them.
@@ -681,7 +699,14 @@ const SunTracker: React.FC = () => {
       }`} 
       style={{ background: skyGradient }}
     >
-      <NightStars timeOfDay={timeOfDay} moonPosition={moonPosition} weatherType={weatherType} cloudCoverPercent={weatherData?.cloudCoverPercent} />
+      <NightStars
+        timeOfDay={timeOfDay}
+        moonPosition={moonPosition}
+        weatherType={weatherType}
+        cloudCoverPercent={weatherData?.cloudCoverPercent}
+        shootingStarRate={astroEvent?.kind === 'meteorShower' ? METEOR_SHOWER_RATE : undefined}
+      />
+      {astroEvent?.kind === 'aurora' && <Aurora opacity={getStarCloudFactor(weatherType, weatherData?.cloudCoverPercent)} />}
       {discoOn && <DiscoSky />}
       {ufoOn && <Ufo onDone={handleUfoDone} />}
       {reveal === 'done' && (
@@ -725,6 +750,7 @@ const SunTracker: React.FC = () => {
             compassHeading={activeCompassHeading}
             horizonProfile={horizonProfile}
             terrainSunTimes={terrainExtras.terrainSunTimes}
+            astroEvent={astroEvent}
             terrainMoonTimes={terrainExtras.terrainMoonTimes}
             isFullscreen={isFullscreen}
             showCursor={showCursor}
