@@ -7,7 +7,7 @@ import {
   getTimeOfDay,
   getTimeOfDayLabel,
   getBackgroundGradient,
-  shiftGradientBrightness,
+  mixGradientTowardOvercast,
   getNextGoldenBlueHours,
   type LocationData,
   type SunPosition,
@@ -25,6 +25,7 @@ import {
   type MoonTimes
 } from '../utils/moonUtils';
 import { fetchCurrentWeather, type WeatherData } from '../utils/weatherUtils';
+import { getSkyOvercastMix } from '@/utils/weatherEffectsUtils';
 import SunVisualization from './SunVisualization';
 import InfoPanel from './InfoPanel';
 import NightStars from './NightStars';
@@ -50,22 +51,6 @@ import { getTerrainSunTimes, getTerrainMoonTimes } from '../utils/horizonUtils';
 import { getSunArcLabels, getMoonArcLabels } from '../utils/arcLabels';
 import { isLineOfSightEnabled } from '../utils/premium';
 import { passesSunEvent } from '../utils/sunEvents';
-
-// Sky gradient brightness shift per weather type (ROADMAP item 10), in per-channel
-// RGB units - see shiftGradientBrightness. Grey/wet weather darkens the sky; snow
-// brightens it slightly; clear/partly/cloudy are left alone.
-const WEATHER_GRADIENT_SHIFT: Record<WeatherType, number> = {
-  clear: 0,
-  partly: 0,
-  cloudy: 0,
-  overcast: -10,
-  fog: -5,
-  drizzle: -10,
-  rain: -20,
-  storm: -40,
-  hail: -25,
-  snow: 15,
-};
 
 // Eye height above ground for line of sight with terrain (ROADMAP item 13): e.g. a
 // building floor or a tower, clamped to a sane 0-1000 m range and persisted like
@@ -548,14 +533,11 @@ const SunTracker: React.FC = () => {
   }, [date]);
 
   const getBackgroundStyle = useCallback(() => {
-    const baseGradient = getBackgroundGradient(timeOfDay);
-    // Per-channel brightness shift (ROADMAP item 10): darker for grey/wet weather,
-    // a touch brighter for snow. `shiftGradientBrightness` works on the #rrggbb
-    // colors getBackgroundGradient actually returns (the old code here matched
-    // "rgb(...)", which never appears in that gradient and so never applied).
-    const shift = WEATHER_GRADIENT_SHIFT[weatherType];
-    return { background: shiftGradientBrightness(baseGradient, shift) };
-  }, [timeOfDay, weatherType]);
+    // Clouds dim the sky (ROADMAP item 50): mix toward grey per weather type, scaled
+    // by the measured cloud cover. A manually picked weather ignores the real cover.
+    const cover = useRealWeather ? weatherData?.cloudCoverPercent : null;
+    return { background: mixGradientTowardOvercast(getBackgroundGradient(timeOfDay), getSkyOvercastMix(weatherType, cover)) };
+  }, [timeOfDay, weatherType, useRealWeather, weatherData?.cloudCoverPercent]);
 
   const handleWeatherChange = (newWeather: WeatherType) => {
     setWeatherType(newWeather);

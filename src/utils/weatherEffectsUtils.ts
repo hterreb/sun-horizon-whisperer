@@ -107,3 +107,26 @@ export const getTwilightStars = (timeOfDay: TimeOfDay): { share: number; opacity
   timeOfDay === 'astronomical-twilight' ? { share: 0.5, opacity: 0.7 } :
   timeOfDay === 'nautical-twilight' ? { share: 0.15, opacity: 0.4 } :
   { share: 0, opacity: 0 };
+
+// Clouds dim the sky (ROADMAP item 50): how far the sky gradient mixes toward the
+// overcast grey (0-1). A measured cloud cover scales the weather type's mix.
+const SKY_OVERCAST_MIX: Record<WeatherType, number> = {
+  clear: 0, partly: 0.1, cloudy: 0.25,
+  drizzle: 0.45, snow: 0.45,
+  overcast: 0.6, fog: 0.6, rain: 0.6,
+  storm: 0.75, hail: 0.75,
+};
+
+export const getSkyOvercastMix = (type: WeatherType, cloudCoverPercent: number | null | undefined): number =>
+  SKY_OVERCAST_MIX[type] * (cloudCoverPercent == null ? 1 : Math.min(1, Math.max(0, cloudCoverPercent / 100)));
+
+// Clouds dim the sun (ROADMAP item 50): opacity of the sun disc and its halo (0-1),
+// and the halo's size factor. Overcast, fog and rain leave only a soft light patch.
+export interface SunVisibility { disc: number; halo: number; haloScale: number }
+
+export const getSunVisibility = (type: WeatherType): SunVisibility =>
+  type === 'clear' || type === 'partly' ? { disc: 1, halo: 1, haloScale: 1 } :
+  type === 'cloudy' ? { disc: 0.8, halo: 0.6, haloScale: 1 } :
+  type === 'drizzle' || type === 'snow' ? { disc: 0.5, halo: 0.5, haloScale: 0.6 } :
+  type === 'overcast' || type === 'fog' || type === 'rain' ? { disc: 0, halo: 0.6, haloScale: 1.2 } :
+  { disc: 0, halo: 0, haloScale: 0 }; // storm, hail

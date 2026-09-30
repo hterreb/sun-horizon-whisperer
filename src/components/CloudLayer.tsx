@@ -204,7 +204,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       id: i,
       x: seededRandom(i * 4 + 1) * 100,
       y: -10 - seededRandom(i * 4 + 2) * 100,
-      size: 0.5 + seededRandom(i * 4 + 3) * 1.5,
+      size: 0.625 + seededRandom(i * 4 + 3) * 1.375, // rem: at least 10 px (ROADMAP item 50)
       delay: seededRandom(i * 4 + 4) * 8
     }));
     return newSnowflakes;
@@ -529,6 +529,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             left: `${flake.x}%`,
             top: `${flake.y}%`,
             fontSize: `${flake.size}rem`,
+            // A thin blue-grey outline so the flakes read on the grey sky (ROADMAP item 50).
+            textShadow: '0 0 1px hsl(var(--scene-snow-outline)), 0 0 1px hsl(var(--scene-snow-outline))',
             animationDelay: `${flake.delay}s`,
             animation: 'snowfall 6s linear infinite'
           }}
