@@ -24,6 +24,7 @@ import { isValidLatitude, isValidLongitude } from '../utils/manualLocation';
 import { type HorizonProfileStatus } from '../hooks/useHorizonProfile';
 import { type WeatherType } from './CloudLayer';
 import { getTimeTravelRange, toDateTimeLocalValue } from '@/utils/timeTravel';
+import { formatTemperature, type TemperatureUnit } from '@/utils/temperatureUnit';
 
 // Direction D "Polished Classic" (ROADMAP items 7 & 15): shared classes so every
 // row/section/focus ring in the panel reads as one system. ROW, ICON_TOGGLE and
@@ -91,6 +92,9 @@ interface InfoPanelProps {
   weatherData: WeatherData | null;
   isLoadingWeather: boolean;
   useRealWeather: boolean;
+  // Display unit for temperatures (°C/°F toggle). Defaults to °C for existing callers.
+  temperatureUnit?: TemperatureUnit;
+  onTemperatureUnitChange?: (unit: TemperatureUnit) => void;
   isFullscreen?: boolean;
   onWeatherChange: (weather: WeatherType) => void;
   onWeatherModeToggle: (useReal: boolean) => void;
@@ -133,6 +137,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   weatherData,
   isLoadingWeather,
   useRealWeather,
+  temperatureUnit = 'C',
+  onTemperatureUnitChange = () => {},
   isFullscreen = false,
   onWeatherChange,
   onWeatherModeToggle,
@@ -588,7 +594,25 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               <div className="space-y-1">
                 <div className={ROW}>
                   <span className="opacity-80 text-body">Temperature:</span>
-                  <span className="font-semibold text-body tabular-nums">{weatherData.temperature}°C</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-body tabular-nums">{formatTemperature(weatherData.temperature, temperatureUnit)}</span>
+                    <div className="flex bg-white bg-opacity-10 rounded-full p-1" role="group" aria-label="Temperature unit">
+                      {(['C', 'F'] as const).map((unit) => (
+                        <button
+                          key={unit}
+                          onClick={() => onTemperatureUnitChange(unit)}
+                          aria-pressed={temperatureUnit === unit}
+                          className={`text-caption px-2 py-1 rounded-full transition-colors ${FOCUS_RING} ${
+                            temperatureUnit === unit
+                              ? 'bg-white bg-opacity-20 text-white'
+                              : 'text-white opacity-60'
+                          }`}
+                        >
+                          °{unit}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
                 <div className={ROW}>
                   <span className="opacity-80 text-body">Condition:</span>
