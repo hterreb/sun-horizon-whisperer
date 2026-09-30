@@ -75,7 +75,7 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherTy
             animation: `egg-glide ${b.duration}s linear ${b.delay}s infinite`,
           }}
         >
-          <Bat size={30} strokeWidth={1.5} className="text-gray-300 text-opacity-60" />
+          <Bat size={30} strokeWidth={0.6} fill="currentColor" style={{ color: 'hsl(var(--scene-critter-silhouette) / 0.9)' }} />
         </div>
       ))}
 

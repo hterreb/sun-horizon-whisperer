@@ -39,6 +39,10 @@ describe('CalendarEggs', () => {
   it('flies Halloween bats at night only', () => {
     const { rerender } = render(<CalendarEggs {...base} event="halloween-bats" />);
     expect(screen.getAllByTestId('halloween-bat').length).toBeGreaterThan(0);
+    // ROADMAP item 64: the same solid dark silhouette as the dusk bats.
+    const bat = screen.getAllByTestId('halloween-bat')[0].querySelector('svg') as SVGElement;
+    expect(bat.getAttribute('fill')).toBe('currentColor');
+    expect(bat.style.color).toBe('hsl(var(--scene-critter-silhouette) / 0.9)');
     rerender(<CalendarEggs {...base} event="halloween-bats" timeOfDay="midday" />);
     expect(screen.queryByTestId('halloween-bat')).toBeNull();
   });
