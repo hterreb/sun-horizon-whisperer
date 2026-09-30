@@ -1,6 +1,6 @@
 import React, { Profiler } from 'react';
 import { render, act } from '@testing-library/react';
-import CloudLayer, { WeatherType } from '../src/components/CloudLayer';
+import CloudLayer, { WeatherType, createFish } from '../src/components/CloudLayer';
 import type { TimeOfDay } from '../src/utils/sunUtils';
 
 const mockReducedMotion = (matches: boolean) =>
@@ -203,6 +203,85 @@ describe('CloudLayer', () => {
       const container = spawn({ windSpeedKmh: 50 }, 5000);
       expect(container.querySelector('[data-testid="scene-leaf"]')).not.toBeNull();
       expect(container.textContent).not.toContain('🍃');
+    });
+  });
+
+  // ROADMAP item 62 (Fish & Currents lookbook picks F1-F13, P1, P3-P6, P8, P9, E1-E4).
+  describe('fish (ROADMAP item 62)', () => {
+    const spawnFish = (props: Partial<React.ComponentProps<typeof CloudLayer>>, ms: number, random = 0) => {
+      vi.useFakeTimers();
+      const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(random);
+      const view = render(<CloudLayer weatherType="clear" timeOfDay="midday" {...props} />);
+      act(() => { vi.advanceTimersByTime(ms); });
+      randomSpy.mockRestore();
+      vi.useRealTimers();
+      return view.container;
+    };
+    const always = (r: number) => () => r;
+
+    it('sends the whale always far out, about the size of the rowboat', () => {
+      expect(createFish('whale', false, false, 390, always(0)).depth).toBe(0.75);
+      const farthest = createFish('whale', false, false, 390, always(0.999));
+      expect(farthest.depth).toBeGreaterThan(0.99);
+      expect(createFish('whale', false, false, 390, always(0)).size).toBeLessThanOrEqual(48);
+    });
+
+    it('draws far fish smaller, slower, paler and higher than near ones (P3)', () => {
+      const near = createFish('trout', false, false, 390, always(0));
+      const far = createFish('trout', false, false, 390, always(0.999));
+      expect(near.size).toBe(22);
+      expect(far.size).toBe(12);
+      expect(far.duration).toBeGreaterThan(near.duration * 1.7);
+      expect(far.opacity).toBeLessThan(near.opacity);
+      expect(near.y).toBeCloseTo(84, 5);
+      expect(far.y).toBeCloseTo(71, 0);
+    });
+
+    it('swims minnows in a school of 4 to 7, and deep fish paler (P5, P9)', () => {
+      expect(createFish('minnow', false, false, 390, always(0)).school).toHaveLength(4);
+      expect(createFish('minnow', false, false, 390, always(0.999)).school).toHaveLength(7);
+      expect(createFish('catfish', false, false, 390, always(0)).opacity)
+        .toBeLessThan(createFish('trout', false, false, 390, always(0)).opacity);
+    });
+
+    it('stops the pike, the turtle and the pufferfish on the way (P8)', () => {
+      for (const kind of ['pike', 'turtle', 'pufferfish'] as const) {
+        expect(createFish(kind, false, false, 390, always(0)).easing).toMatch(/^linear\(/);
+      }
+      expect(createFish('classic', false, false, 390, always(0)).easing).toBeUndefined();
+    });
+
+    it('draws a fish of the first species in the mix, in its own tint (E3)', () => {
+      const container = spawnFish({}, 9000);
+      const fishIcon = container.querySelector('[data-testid="scene-fish"]');
+      expect(fishIcon?.getAttribute('data-kind')).toBe('classic');
+      expect((fishIcon?.parentElement as HTMLElement).style.color).toBe('hsl(var(--scene-fish-classic))');
+    });
+
+    it('sends a companion 2 to 4 s behind (P6)', () => {
+      const container = spawnFish({}, 9000);
+      const [lead, companion] = [...container.querySelectorAll('[data-testid="scene-fish"]')]
+        .map(icon => (icon.parentElement as HTMLElement).style.animation);
+      expect(lead).toContain('linear 0s');
+      expect(companion).toContain('linear 2s');
+    });
+
+    it('lights a glow on the fish after sunset only (E1)', () => {
+      expect(spawnFish({ timeOfDay: 'civil-twilight' }, 9000).querySelector('[data-testid="fish-glow"]')).not.toBeNull();
+      expect(spawnFish({}, 9000).querySelector('[data-testid="fish-glow"]')).toBeNull();
+    });
+
+    it('sends half as many fish in rain (E2)', () => {
+      // A roll of 0.5 passes the 70 % chance in fair weather, but not the 35 % in rain.
+      expect(spawnFish({}, 9000, 0.5).querySelector('[data-testid="scene-fish"]')).not.toBeNull();
+      expect(spawnFish({ weatherType: 'rain' }, 9000, 0.5).querySelector('[data-testid="scene-fish"]')).toBeNull();
+      expect(spawnFish({ weatherType: 'drizzle' }, 9000, 0.5).querySelector('[data-testid="scene-fish"]')).toBeNull();
+    });
+
+    it('keeps at most five fish on screen (E4)', () => {
+      // A classic fish pair every 5.5 s; none finishes its 42 s crossing in the test.
+      const container = spawnFish({}, 40000);
+      expect(container.querySelectorAll('[data-testid="scene-fish"]').length).toBe(10); // 5 pairs
     });
   });
 });
