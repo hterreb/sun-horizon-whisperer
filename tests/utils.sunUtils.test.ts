@@ -1,4 +1,4 @@
-import { getSunPosition, getSunTimes, getTimeOfDay, getRelevantTwilightTimes, formatTime, getGoldenHourTimes, getBlueHourTimes, getNextGoldenBlueHours, mixGradientTowardOvercast, getSunPathAround, getBackgroundGradient, findSunPass, getWaterColors } from '../src/utils/sunUtils';
+import { getSunPosition, getSunTimes, getTimeOfDay, getRelevantTwilightTimes, formatTime, getGoldenHourTimes, getBlueHourTimes, getNextGoldenBlueHours, mixGradientTowardOvercast, getSunPathAround, getBackgroundGradient, findSunPass, getWaterColors, getReflectionFade } from '../src/utils/sunUtils';
 describe('sunUtils', () => {
   it('calculates sun position', () => {
     const pos = getSunPosition(new Date(), 0, 0);
@@ -278,6 +278,23 @@ describe('sunUtils', () => {
       expect(getBackgroundGradient('midday')).toBe(
         'linear-gradient(to bottom, #0EA5E9 0%, #33C3F0 62%, #FEC6A1 100%)'
       );
+    });
+  });
+
+  describe('getReflectionFade (ROADMAP item 58, no reflection below the horizon)', () => {
+    it('hides the strip at or below 0°', () => {
+      expect(getReflectionFade(0)).toBe(0);
+      expect(getReflectionFade(-1)).toBe(0);
+      expect(getReflectionFade(-9)).toBe(0);
+    });
+
+    it('fades the strip in between 0° and +2°', () => {
+      expect(getReflectionFade(1)).toBe(0.5);
+    });
+
+    it('shows the full strip from +2°', () => {
+      expect(getReflectionFade(2)).toBe(1);
+      expect(getReflectionFade(40)).toBe(1);
     });
   });
 

@@ -388,6 +388,10 @@ export const getWaterColors = (skyGradient: string, storm = false): { surface: s
   };
 };
 
+// No reflection below the horizon (ROADMAP item 58): the sun or moon glitter strip's
+// opacity factor by that body's altitude. Full above +2°, fading out to 0 at 0°.
+export const getReflectionFade = (altitude: number): number => Math.min(1, Math.max(0, altitude / 2));
+
 export interface TimeWindow {
   start: Date;
   end: Date;
