@@ -811,6 +811,14 @@ describe('sun and altitude pill (ROADMAP items 46, 48)', () => {
     expect(sunDot.className).toContain('text-orange-400');
   });
 
+  it('mixes the line sun toward grey in drizzle, and not in clear weather (ROADMAP item 59)', () => {
+    const { unmount } = render(<SunVisualization {...baseProps} weatherType="drizzle" />);
+    expect(screen.getByTestId('sun-dot').querySelector('svg')?.getAttribute('style')).toContain('color-mix');
+    unmount();
+    render(<SunVisualization {...baseProps} />);
+    expect(screen.getByTestId('sun-dot').querySelector('svg')?.getAttribute('style') ?? '').not.toContain('color-mix');
+  });
+
   it('never shows "-0.0°"', () => {
     expect(formatSunAltitude(-0.04)).toBe('0.0°');
     expect(formatSunAltitude(0.04)).toBe('0.0°');

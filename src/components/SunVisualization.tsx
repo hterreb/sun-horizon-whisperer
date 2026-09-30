@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { Sun, ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp } from 'lucide-react';
-import { type SunPosition, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors } from '../utils/sunUtils';
+import { type SunPosition, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors, getReflectionFade } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
 import { getSunArcLabels, getMoonArcLabels, type ArcLabels, type ArcLabelPoint } from '../utils/arcLabels';
 import { shortestHeadingDelta } from '../utils/compassUtils';
@@ -8,7 +8,7 @@ import { type HorizonProfile, horizonAngleAt } from '../utils/horizonUtils';
 import CloudLayer, { type WeatherType } from './CloudLayer';
 import Fireworks from './Fireworks';
 import WeatherEffects from './WeatherEffects';
-import { getSunVisibility } from '@/utils/weatherEffectsUtils';
+import { getSunVisibility, getMoonCloudFactor } from '@/utils/weatherEffectsUtils';
 
 // A fixed fallback seed date for callers that don't pass one (e.g. existing tests) -
 // a stable constant, not `new Date()`, so it never changes identity across renders.
@@ -562,6 +562,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
   const isSunVisible = sunAltitudeVisible && sunDotVisible;
   const isMoonVisible = moonAltitudeVisible && moonDotVisible;
+  const moonCloudFactor = getMoonCloudFactor(weatherType, cloudCoverPercent); // clouds hide the moon (ROADMAP item 57)
 
   // The sun's and moon's arcs for their current pass (above-horizon, in-FOV points
   // only): same screen mapping as their current-position dots, just unclamped and
@@ -820,7 +821,14 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             opacity: sunVisibility.disc
           }}
         >
-          <Sun size={sunPosition.altitude > 0 ? 96 : 80} strokeWidth={1} />
+          {/* Drizzle and snow: the line colour mixes toward the overcast grey (ROADMAP item 59).
+              `currentColor` here is the band colour the wrapper sets. No blur: it would wash out
+              the 1 px lines. */}
+          <Sun
+            size={sunPosition.altitude > 0 ? 96 : 80}
+            strokeWidth={1}
+            style={sunVisibility.pale > 0 ? { color: `color-mix(in srgb, currentColor, hsl(var(--scene-sky-overcast)) ${sunVisibility.pale * 100}%)` } : undefined}
+          />
         </div>
       )}
 
@@ -835,14 +843,14 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         </div>
       )}
 
-      {isMoonVisible && (
+      {isMoonVisible && moonCloudFactor > 0 && (
         <div
           className={`absolute ${compassActive ? '' : 'transition-all duration-1000'}`}
           style={{
             left: `${moonX}px`,
             top: `${moonY}px`,
             transform: 'translate(-50%, -50%)',
-            opacity: weatherType === 'storm' ? 0.3 : moonPosition.illumination * 0.8 + 0.2,
+            opacity: (moonPosition.illumination * 0.8 + 0.2) * moonCloudFactor,
             filter: `drop-shadow(0 0 ${moonPosition.illumination * 15}px hsl(var(--scene-glow-white) / 0.4))`
           }}
         >
@@ -893,12 +901,16 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         // with depth - the style book's water reflection streaks. Item 53's glitter
         // strip was rolled back to these bars on request.
         const nightReflection = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
-        const reflectionVisible = nightReflection ? isMoonVisible : isSunVisible && sunVisibility.disc > 0;
-        if (!reflectionVisible) return null;
+        // Only while that body is above the horizon, fading out between +2° and 0°
+        // (ROADMAP item 58); clouds also hide the moon strip (item 57).
+        const reflectionFade = nightReflection
+          ? (isMoonVisible ? getReflectionFade(moonPosition.altitude) * moonCloudFactor : 0)
+          : (isSunVisible && sunVisibility.disc > 0 ? getReflectionFade(sunPosition.altitude) : 0);
+        if (reflectionFade <= 0) return null;
 
         const reflectX = nightReflection ? moonX : sunX;
         const reflectColor = nightReflection ? 'hsl(var(--scene-moon))' : 'hsl(var(--scene-sun-glow-low))';
-        const baseOpacity = nightReflection ? 0.35 : 0.6;
+        const baseOpacity = (nightReflection ? 0.35 : 0.6) * reflectionFade;
         const bandHeight = (containerDimensions.height - horizonLabelY) * 0.07;
 
         return (
@@ -924,7 +936,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
       {containerDimensions.width > 0 && (
         <div
-          className={`absolute inset-0 pointer-events-none transition-opacity duration-300 ${
+          // z-[9]: above the fog veil (WeatherEffects, z-[8]), so the chips stay readable (ROADMAP item 60).
+          className={`absolute inset-0 z-[9] pointer-events-none transition-opacity duration-300 ${
             cardinalLabelsVisible ? 'opacity-100' : 'opacity-0'
           }`}
           data-testid="cardinal-labels"
@@ -954,7 +967,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         // fullscreen (same `cardinalLabelsVisible` condition as ROADMAP item 29). The
         // panel carries the same times for assistive tech, so these pills are decorative.
         <div
-          className={`absolute inset-0 pointer-events-none transition-opacity duration-300 ${
+          className={`absolute inset-0 z-[9] pointer-events-none transition-opacity duration-300 ${
             cardinalLabelsVisible ? 'opacity-100' : 'opacity-0'
           }`}
           data-testid="arc-labels"
@@ -994,7 +1007,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       {timeOfDay !== 'night' && (
         <div
           data-testid="sun-altitude"
-          className="absolute left-1/2 transform -translate-x-1/2 bottom-1/3 -translate-y-12
+          className="absolute z-[9] left-1/2 transform -translate-x-1/2 bottom-1/3 -translate-y-12
                      bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm"
         >
           {formatSunAltitude(sunPosition.altitude)}

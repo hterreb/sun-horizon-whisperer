@@ -100,6 +100,18 @@ export const getStarCloudFactor = (type: WeatherType, cloudCoverPercent: number 
     ? STAR_CLOUD_FACTOR[type] ?? 0 // ponytail: drizzle counts as covered too, same as rain
     : Math.min(1, Math.max(0, 1 - cloudCoverPercent / 100));
 
+// Clouds hide the moon (ROADMAP item 57): the factor for the moon disc, its glow and
+// its reflection. The same cloud factor as the stars, but partial cover, cloudy and
+// overcast keep a faint light patch (at least 15 %). Storm and fog hide the moon.
+const MOON_PATCH = 0.15;
+
+export const getMoonCloudFactor = (type: WeatherType, cloudCoverPercent: number | null | undefined): number => {
+  if (type === 'storm' || type === 'fog') return 0;
+  const factor = getStarCloudFactor(type, cloudCoverPercent);
+  const patch = (cloudCoverPercent != null && cloudCoverPercent < 100) || type === 'cloudy' || type === 'overcast';
+  return patch ? Math.max(MOON_PATCH, factor) : factor;
+};
+
 // Stars in twilight (ROADMAP item 52): which share of the stars shows (the brightest
 // first) and at which opacity. Day: none.
 export const getTwilightStars = (timeOfDay: TimeOfDay): { share: number; opacity: number } =>
@@ -122,11 +134,13 @@ export const getSkyOvercastMix = (type: WeatherType, cloudCoverPercent: number |
 
 // Clouds dim the sun (ROADMAP item 50): opacity of the sun disc and its halo (0-1),
 // and the halo's size factor. Overcast, fog and rain leave only a soft light patch.
-export interface SunVisibility { disc: number; halo: number; haloScale: number }
+// `pale` (ROADMAP item 59): how far the disc colour mixes toward the overcast grey
+// (0-1); a pale disc also gets a slightly blurred edge.
+export interface SunVisibility { disc: number; halo: number; haloScale: number; pale: number }
 
 export const getSunVisibility = (type: WeatherType): SunVisibility =>
-  type === 'clear' || type === 'partly' ? { disc: 1, halo: 1, haloScale: 1 } :
-  type === 'cloudy' ? { disc: 0.8, halo: 0.6, haloScale: 1 } :
-  type === 'drizzle' || type === 'snow' ? { disc: 0.5, halo: 0.5, haloScale: 0.6 } :
-  type === 'overcast' || type === 'fog' || type === 'rain' ? { disc: 0, halo: 0.6, haloScale: 1.2 } :
-  { disc: 0, halo: 0, haloScale: 0 }; // storm, hail
+  type === 'clear' || type === 'partly' ? { disc: 1, halo: 1, haloScale: 1, pale: 0 } :
+  type === 'cloudy' ? { disc: 0.8, halo: 0.6, haloScale: 1, pale: 0 } :
+  type === 'drizzle' || type === 'snow' ? { disc: 0.7, halo: 0.5, haloScale: 0.6, pale: 0.5 } :
+  type === 'overcast' || type === 'fog' || type === 'rain' ? { disc: 0, halo: 0.6, haloScale: 1.2, pale: 0 } :
+  { disc: 0, halo: 0, haloScale: 0, pale: 0 }; // storm, hail
