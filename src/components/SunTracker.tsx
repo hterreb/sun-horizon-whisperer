@@ -52,6 +52,7 @@ import { getTerrainSunTimes, getTerrainMoonTimes } from '../utils/horizonUtils';
 import { getSunArcLabels, getMoonArcLabels } from '../utils/arcLabels';
 import { isLineOfSightEnabled } from '../utils/premium';
 import { passesSunEvent, getCountdownTarget } from '../utils/sunEvents';
+import { getCalendarEvent } from '@/utils/calendarEvents';
 import { PLAY_SPEED, PLAY_TICK_MS, clampTimeOffset } from '@/utils/timeTravel';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
 import { loadTemperatureUnit, saveTemperatureUnit, type TemperatureUnit } from '@/utils/temperatureUnit';
@@ -558,9 +559,18 @@ const SunTracker: React.FC = () => {
   useEffect(() => {
     const prev = prevClockRef.current;
     prevClockRef.current = date;
-    if (!isTimePreview && passesSunEvent(prev, date, sunTimes, terrainExtras.terrainSunTimes)) setFireworksTrigger(date.getTime());
+    // New Year (ROADMAP "Ongoing", Calendar): also when the clock enters 00:00 on Jan 1.
+    const entersNewYear = getCalendarEvent(date) === 'new-year' && getCalendarEvent(prev) !== 'new-year';
+    if (!isTimePreview && (entersNewYear || passesSunEvent(prev, date, sunTimes, terrainExtras.terrainSunTimes))) setFireworksTrigger(date.getTime());
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per clock tick
   }, [date]);
+
+  // Calendar easter eggs (ROADMAP "Ongoing"): one event id per minute.
+  const calendarEvent = useMemo(
+    () => getCalendarEvent(date, location.latitude),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on passMinuteKey, not `date` itself
+    [passMinuteKey, location.latitude]
+  );
 
   // Sunset countdown (ROADMAP item 43): 10 s of ticks and a chime at the next sunset
   // (line of sight when there is one). Live time only; the tap that turns it on
@@ -639,7 +649,8 @@ const SunTracker: React.FC = () => {
         </>
       )}
       <PWAInstallPrompt />
-      <MidnightGhost currentTime={date} />
+      {/* One special event at a time: New Year's fireworks replace the midnight ghost. */}
+      {calendarEvent !== 'new-year' && <MidnightGhost currentTime={date} />}
       <TemperatureIceberg 
         temperature={weatherData?.temperature || 20} 
         isVisible={location.loaded && weatherData !== null} 
@@ -669,6 +680,7 @@ const SunTracker: React.FC = () => {
             isFullscreen={isFullscreen}
             showCursor={showCursor}
             fireworksTrigger={fireworksTrigger}
+            calendarEvent={calendarEvent}
             sunsetCountdown={countdownSeconds === null ? null : { seconds: countdownSeconds, lineOfSight: !!countdownTarget?.lineOfSight }}
           />
           <InfoPanel
