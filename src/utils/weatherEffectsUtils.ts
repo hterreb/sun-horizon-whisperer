@@ -98,7 +98,8 @@ export const pickBoat = (type: WeatherType, windKmh: number | null | undefined, 
 // The weights are each species' share of all spawns (sum 100). The sea visitors are rare.
 export type FishKind =
   | 'classic' | 'minnow' | 'perch' | 'pike' | 'carp' | 'catfish' | 'trout'
-  | 'ray' | 'turtle' | 'jellyfish' | 'seahorse' | 'whale' | 'pufferfish';
+  | 'ray' | 'turtle' | 'jellyfish' | 'seahorse' | 'whale' | 'pufferfish'
+  | 'burbot' | 'eel' | 'lanternfish' | 'anglerfish' | 'squid'; // night only (item 64)
 
 export const FISH_WEIGHTS: [FishKind, number][] = [
   ['classic', 25], ['minnow', 18], ['perch', 14], ['pike', 8], ['carp', 10], ['catfish', 4], ['trout', 12],
@@ -107,13 +108,28 @@ export const FISH_WEIGHTS: [FishKind, number][] = [
 
 export const pickFish = (r: number): FishKind => pickWeighted(FISH_WEIGHTS, r);
 
-// At most five fish on screen (E4). A school or a pair is one entry. Turtles and
-// jellyfish are not fish, so they neither count nor wait for a free place.
+// Night mix (ROADMAP item 64, Night waters lookbook), from nautical twilight on. 'moonlit'
+// is a day fish in the moon tone (NF1); pickMoonlitDayFish then picks its species with
+// the day weights of the lake fish, without the minnow school.
+export type NightFishPick = 'moonlit' | 'burbot' | 'eel' | 'lanternfish' | 'jellyfish' | 'anglerfish' | 'squid';
+
+export const NIGHT_FISH_WEIGHTS: [NightFishPick, number][] = [
+  ['moonlit', 25], ['burbot', 15], ['eel', 12], ['lanternfish', 30], ['jellyfish', 8], ['anglerfish', 5], ['squid', 5],
+];
+const MOONLIT_DAY_FISH: FishKind[] = ['classic', 'perch', 'pike', 'carp', 'catfish', 'trout'];
+
+export const pickNightFish = (r: number): NightFishPick => pickWeighted(NIGHT_FISH_WEIGHTS, r);
+export const pickMoonlitDayFish = (r: number): FishKind =>
+  pickWeighted(FISH_WEIGHTS.filter(([kind]) => MOONLIT_DAY_FISH.includes(kind)), r);
+
+// At most five fish on screen (E4), three at night (item 64, NR1). A school or a pair is
+// one entry. Turtles and jellyfish are not fish, so they neither count nor wait for a free place.
 export const MAX_FISH = 5;
+export const MAX_NIGHT_FISH = 3;
 const NOT_FISH: FishKind[] = ['turtle', 'jellyfish'];
 
-export const canSpawnFish = (onScreen: FishKind[], next: FishKind): boolean =>
-  NOT_FISH.includes(next) || onScreen.filter(kind => !NOT_FISH.includes(kind)).length < MAX_FISH;
+export const canSpawnFish = (onScreen: FishKind[], next: FishKind, max = MAX_FISH): boolean =>
+  NOT_FISH.includes(next) || onScreen.filter(kind => !NOT_FISH.includes(kind)).length < max;
 
 // Rest stop (P8): cruise at `speed`, slow to a stop over 3 s so that it stands still
 // `stopAt` along the path, hold for `holdSec`, speed up over 3 s and cruise on. Distances
