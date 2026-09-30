@@ -77,6 +77,13 @@ const DEFAULT_CLOUD_COVER: Record<WeatherType, number> = {
   hail: 90,
 };
 
+// Storm deck puffs (ROADMAP item 51) as [cx, cy, rx, ry] in the deck's 100 x 40
+// viewBox: two overlapping rows that make the deck's lower edge lumpy.
+const STORM_DECK_PUFFS: [number, number, number, number][] = [
+  [0, 28, 12, 7], [18, 30, 14, 8], [38, 28, 13, 7], [57, 31, 15, 8], [78, 29, 13, 7], [98, 30, 13, 8],
+  [9, 18, 14, 9], [29, 15, 15, 9], [48, 19, 14, 9], [68, 16, 15, 9], [88, 18, 14, 9],
+];
+
 const CLOUD_DRIFT_AMPLITUDE_VW = 6; // how far clouds glide before easing back
 
 interface MovingEntity {
@@ -449,6 +456,27 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       <div data-testid="iceberg" />
       {getOvercastLayer()}
 
+      {weatherType === 'storm' && (
+        // Storm deck (ROADMAP item 51): a closed dark cloud cover across the top third
+        // of the sky - a solid band with large overlapping, blurred cloud shapes along
+        // its lower edge, so no sky shows through. It overhangs the edges so the blur
+        // does not fade them in.
+        <svg
+          data-testid="storm-deck"
+          className="absolute"
+          style={{ left: '-3%', top: '-3%', width: '106%', height: '40%', filter: 'blur(4px)' }}
+          viewBox="0 0 100 40"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <rect x="0" y="0" width="100" height="28" fill={getCloudColor()} />
+          {STORM_DECK_PUFFS.map(([cx, cy, rx, ry], i) => (
+            // The upper row is a shade darker, so the deck reads as heavy clouds, not a band.
+            <ellipse key={i} cx={cx} cy={cy} rx={rx} ry={ry} fill={i < 6 ? getCloudColor() : 'rgba(0, 0, 0, 0.22)'} />
+          ))}
+        </svg>
+      )}
+
       {/* Clouds: count/opacity from cloud_cover, drift from wind, positions from a
           seeded layout stable for the day/place (see cloudLayoutUtils.getCloudLayout). */}
       {clouds.map((cloud) => (
@@ -457,7 +485,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
           className="absolute transition-colors duration-[5000ms]"
           style={{
             left: `${cloud.x}%`,
-            top: `${cloud.y}%`,
+            // In a storm the drifting clouds sit below the deck (ROADMAP item 51).
+            top: `${weatherType === 'storm' ? 30 + cloud.y * 0.5 : cloud.y}%`,
             opacity: cloudOpacity,
             // Soft blurred clouds (ROADMAP item 15 D polish, style book scene()
             // k==='d'). On the wrapper, not the <svg>, so it doesn't touch the

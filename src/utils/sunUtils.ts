@@ -343,6 +343,51 @@ export const mixGradientTowardOvercast = (gradient: string, mix: number): string
   });
 };
 
+// The horizon line sits at 65 % of the scene height (SunVisualization's horizonY).
+const HORIZON_FRACTION = 0.65;
+
+const rgbToHsl = ([r, g, b]: number[]): [number, number, number] => {
+  const [rn, gn, bn] = [r / 255, g / 255, b / 255];
+  const max = Math.max(rn, gn, bn);
+  const min = Math.min(rn, gn, bn);
+  const l = (max + min) / 2;
+  const d = max - min;
+  if (d === 0) return [0, 0, l * 100];
+  const s = d / (1 - Math.abs(2 * l - 1));
+  const h = max === rn ? ((gn - bn) / d + 6) % 6 : max === gn ? (bn - rn) / d + 2 : (rn - gn) / d + 4;
+  return [h * 60, s * 100, l * 100];
+};
+
+const hsl = ([h, s, l]: [number, number, number]) => `hsl(${h.toFixed(1)}, ${Math.min(100, s).toFixed(1)}%, ${l.toFixed(1)}%)`;
+
+// The water follows the sky (ROADMAP item 53): takes the sky gradient string (after
+// item 50's weather mix) and returns the water's surface and deep colours. Surface:
+// the sky colour at the horizon line, 15 % darker (and at least 5 points of lightness,
+// so a dark night sea still reads against the night sky) and more saturated. Deep:
+// a dark version of the sky's top colour. A storm (item 51) darkens both by 40 % and
+// greys them a little.
+export const getWaterColors = (skyGradient: string, storm = false): { surface: string; deep: string } => {
+  const stops = [...skyGradient.matchAll(/#([0-9a-fA-F]{6})\s+([\d.]+)%/g)].map(([, hex, at]) => {
+    const num = parseInt(hex, 16);
+    return { rgb: [(num >> 16) & 0xff, (num >> 8) & 0xff, num & 0xff], at: Number(at) / 100 };
+  });
+  if (stops.length === 0) throw new Error(`getWaterColors: no #rrggbb stops in "${skyGradient}"`);
+
+  const next = stops.findIndex((stop) => stop.at >= HORIZON_FRACTION);
+  const b = stops[next === -1 ? stops.length - 1 : next];
+  const a = stops[Math.max(0, next - 1)];
+  const t = b.at > a.at ? Math.min(1, Math.max(0, (HORIZON_FRACTION - a.at) / (b.at - a.at))) : 0;
+  const horizon = rgbToHsl(a.rgb.map((c, i) => c + (b.rgb[i] - c) * t));
+  const top = rgbToHsl(stops[0].rgb);
+
+  const dim = storm ? 0.6 : 1;
+  const grey = storm ? 0.7 : 1;
+  return {
+    surface: hsl([horizon[0], horizon[1] * 1.3 * grey, Math.max(0, Math.min(horizon[2] * 0.85, horizon[2] - 5)) * dim]),
+    deep: hsl([top[0], top[1] * grey, top[2] * 0.45 * dim]),
+  };
+};
+
 export interface TimeWindow {
   start: Date;
   end: Date;
