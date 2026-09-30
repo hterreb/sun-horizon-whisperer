@@ -3,6 +3,7 @@ import { Fish, Leaf, Sailboat, Turtle, type LucideIcon } from 'lucide-react';
 import {
   Bat, FishingBoat, Freighter, LakeFerry, Rowboat,
   Carp, Catfish, Jellyfish, Minnow, Perch, Pike, Pufferfish, Ray, Seahorse, Trout, Whale,
+  Anglerfish, Burbot, Eel, FireflySquid, Lanternfish,
 } from './sceneIcons';
 import { type TimeOfDay } from '../utils/sunUtils';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
@@ -16,6 +17,7 @@ import {
 import {
   getWeatherEffects, pickBoat, type BoatKind,
   pickFish, canSpawnFish, getRestStopMotion, type FishKind,
+  pickNightFish, pickMoonlitDayFish, MAX_FISH, MAX_NIGHT_FISH,
 } from '../utils/weatherEffectsUtils';
 
 // ROADMAP item 10: more than the original 6 types - fog, drizzle and hail join the
@@ -48,6 +50,9 @@ interface CloudLayerProps {
   windDirectionDeg?: number | null;
   // Fullscreen fades the chrome away, so near boats can sail lower.
   isFullscreen?: boolean;
+  // The pool of moonlight for the night fish (ROADMAP item 65): the moon's x as a fraction
+  // of the width, and the pool's strength (0 = no pool, 1 = a full moon in a clear sky).
+  moonlight?: { x: number; strength: number } | null;
 }
 
 // Birds/fish/ships/leaves travel horizontally at a constant rate (in % of the layer's
@@ -121,8 +126,12 @@ const FAR_SHRINK = 0.45; // the farthest boat is 55% of the size, opacity and sp
 // second) are a near fish's; far fish shrink and slow down like the boats (FAR_SHRINK).
 // `haze` is how deep the species swims: 0 = at the surface (crisp) to 1 = deep (faint).
 // `glow` is the spot that lights up after sunset (E1), in the icon's 24 px grid.
+// `lights` (night fish, item 65) are always on: [cx, cy, r] in the 24 px grid.
 type FishPattern = 'glide' | 'school' | 'companions' | 'rest';
-const FISH: Record<FishKind, { Icon: LucideIcon; size: number; speed: number; haze: number; pattern: FishPattern; glow: [number, number] }> = {
+const FISH: Record<FishKind, {
+  Icon: LucideIcon; size: number; speed: number; haze: number; pattern: FishPattern; glow: [number, number];
+  lights?: [number, number, number][];
+}> = {
   classic: { Icon: Fish, size: 20, speed: 2.5, haze: 0.3, pattern: 'companions', glow: [14, 12] },
   minnow: { Icon: Minnow, size: 10, speed: 3, haze: 0.1, pattern: 'school', glow: [13, 12] },
   perch: { Icon: Perch, size: 22, speed: 2.2, haze: 0.35, pattern: 'companions', glow: [13.5, 12.5] },
@@ -136,7 +145,18 @@ const FISH: Record<FishKind, { Icon: LucideIcon; size: number; speed: number; ha
   seahorse: { Icon: Seahorse, size: 18, speed: 0.4, haze: 0.4, pattern: 'glide', glow: [12.5, 11] },
   whale: { Icon: Whale, size: 72, speed: 0.8, haze: 0.8, pattern: 'glide', glow: [13, 12] },
   pufferfish: { Icon: Pufferfish, size: 20, speed: 1, haze: 0.4, pattern: 'rest', glow: [12.5, 12] },
+  // Night only (ROADMAP item 65).
+  burbot: { Icon: Burbot, size: 30, speed: 1.2, haze: 0, pattern: 'glide', glow: [12, 12] },
+  eel: { Icon: Eel, size: 36, speed: 1.4, haze: 0, pattern: 'glide', glow: [12, 12] },
+  lanternfish: {
+    Icon: Lanternfish, size: 16, speed: 2.2, haze: 0, pattern: 'companions', glow: [13, 12],
+    lights: [[8, 13.4, 0.9], [10.5, 14.2, 0.9], [13, 14.7, 0.9], [15.5, 14.8, 0.9], [18, 14.3, 0.9]],
+  },
+  anglerfish: { Icon: Anglerfish, size: 26, speed: 0.9, haze: 0, pattern: 'rest', glow: [13, 12], lights: [[20.3, 2.6, 1.3]] },
+  squid: { Icon: FireflySquid, size: 7, speed: 2, haze: 0, pattern: 'school', glow: [12, 12] },
 };
+// Night fish with their own light (item 65); all other fish at night are lit by the moon.
+const GLOWING_AT_NIGHT: FishKind[] = ['lanternfish', 'anglerfish', 'squid', 'jellyfish'];
 // P5: a minnow school's fixed formation, in minnow widths x 1.15, the leader in front.
 const SCHOOL_FORMATION: [number, number][] = [[0, 0], [-1.4, -0.9], [-1.6, 0.9], [-2.9, -0.1], [-3.1, 1.6], [-4.2, -1.1], [-4.5, 0.7]];
 
@@ -148,17 +168,20 @@ interface FishEntity extends MovingEntity {
   height: number;
   opacity: number;
   glow: boolean;
+  light?: 'moon' | 'own'; // night fish (item 65): lit by the moon, or by their own light
   easing?: string; // rest stop (P8): a CSS linear() easing that holds still mid-crossing
   school?: { left: number; top: number }[]; // P5: each minnow's offset in px
   companion?: { lag: number; dy: number }; // P6: a second fish, `lag` s behind, `dy` % lower
 }
 
 // Builds one fish (ROADMAP item 62). `wet` = rain or drizzle, where fish swim deeper (E2).
+// `night` = a night fish (item 65): in the moon tone or with its own light, no depth haze.
 // eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
 export const createFish = (
-  kind: FishKind, sunDown: boolean, wet: boolean, viewportWidth: number, random = Math.random,
+  kind: FishKind, sunDown: boolean, wet: boolean, viewportWidth: number, random = Math.random, night = false,
 ): FishEntity => {
   const spec = FISH[kind];
+  const light = night ? (GLOWING_AT_NIGHT.includes(kind) ? 'own' : 'moon') : undefined;
   // P3: a random distance; the whale always passes far out.
   const depth = kind === 'whale' ? 0.75 + random() * 0.25 : random();
   const nearness = 1 - FAR_SHRINK * depth;
@@ -184,16 +207,17 @@ export const createFish = (
     : null;
   return {
     id: Date.now() + Math.random(),
-    kind, depth, size, width, height, school,
+    kind, depth, size, width, height, school, light,
     x: startX,
     // Far fish swim at 70 % of the height, near ones at 85 % (the old fish band), ±1 %.
     y: 70 + (1 - depth) * 15 + (random() - 0.5) * 2,
     dx,
     duration: rest ? rest.duration : dx / speed,
     easing: rest?.easing,
-    // Paler with distance (P3), with depth (P9 haze) and in rain (E2).
-    opacity: 0.7 * (1 - 0.3 * depth) * (1 - 0.4 * spec.haze) * (wet ? 0.75 : 1),
-    glow: sunDown && spec.pattern !== 'school' && random() < 0.35, // E1
+    // Paler with distance (P3), with depth (P9 haze) and in rain (E2). At night: moonlit
+    // fish at 70 %, fish with their own light at 95 %, both without the depth haze.
+    opacity: (light === 'own' ? 0.95 : 0.7) * (1 - 0.3 * depth) * (light ? 1 : 1 - 0.4 * spec.haze) * (wet ? 0.75 : 1),
+    glow: sunDown && !night && spec.pattern !== 'school' && random() < 0.35, // E1
     companion: spec.pattern === 'companions' && random() < 0.35 // P6
       ? { lag: 2 + random() * 2, dy: (random() - 0.5) * 2.8 }
       : undefined,
@@ -225,6 +249,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   windSpeedKmh = null,
   windDirectionDeg = null,
   isFullscreen = false,
+  moonlight = null,
 }) => {
   const [birds, setBirds] = useState<MovingEntity[]>([]);
   const [fish, setFish] = useState<FishEntity[]>([]);
@@ -314,6 +339,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   // Line icons (boats, leaves) share today's ship tone.
   const lineInk = timeOfDay === 'night' ? 'text-gray-300 text-opacity-60' : 'text-gray-600 text-opacity-80';
 
+  // The pool of moonlight (ROADMAP item 65, NF1/NR3): moonlit fish show only within ±9 %
+  // of the width from the moon, fading out to ±20 %, as bright as the pool is strong.
+  const moonUp = (moonlight?.strength ?? 0) > 0;
+  const poolX = (moonlight?.x ?? 0.5) * 100;
+  const poolMask = `linear-gradient(to right, transparent ${poolX - 20}%, #000 ${poolX - 9}%, #000 ${poolX + 9}%, transparent ${poolX + 20}%)`;
+
   // Spawn loop: periodically checks whether a new bird/fish/ship/leaf is due, and
   // clears each group when the weather/time no longer supports it. This is the only
   // place that calls `setBirds`/`setFish`/`setShips`/`setLeaves` — once per spawn or
@@ -329,11 +360,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     const shouldShowBirds = (weatherType === 'clear' || weatherType === 'partly' ||
                           weatherType === 'cloudy' || weatherType === 'overcast') &&
                           timeOfDay !== 'night';
-    const shouldShowFish = (weatherType === 'clear' || weatherType === 'partly' || weatherType === 'cloudy' ||
-                          weatherType === 'overcast' || weatherType === 'rain' || weatherType === 'drizzle') &&
-                          timeOfDay !== 'night' &&
-                          timeOfDay !== 'astronomical-twilight' &&
-                          timeOfDay !== 'nautical-twilight';
+    const fishWeather = weatherType === 'clear' || weatherType === 'partly' || weatherType === 'cloudy' ||
+                        weatherType === 'overcast' || weatherType === 'rain' || weatherType === 'drizzle';
+    // Night fish (ROADMAP item 65, NR2) take over in nautical twilight, where the day fish stop.
+    const nightWater = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
+    const shouldShowFish = fishWeather && !nightWater;
+    const shouldShowNightFish = fishWeather && nightWater;
     const wetForFish = weatherType === 'rain' || weatherType === 'drizzle';
     const shouldShowShips = weatherType !== 'storm' && weatherType !== 'hail';
 
@@ -365,14 +397,30 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         setBirds(prev => (prev.length > 0 ? [] : prev));
       }
 
-      if (shouldShowFish) {
-        if (currentTime - lastSpawnTimeRef.current.fish > 5000 + Math.random() * 3000) {
+      // At the switch between day and night fish, the fish on screen swim on (item 65).
+      if (shouldShowFish || shouldShowNightFish) {
+        // A quiet night (NR1): a check every 15-25 s instead of every 5-8 s.
+        const gapMs = shouldShowNightFish ? 15000 + Math.random() * 10000 : 5000 + Math.random() * 3000;
+        if (currentTime - lastSpawnTimeRef.current.fish > gapMs) {
           if (Math.random() < (wetForFish ? 0.35 : 0.7)) { // 70% chance, half of it in rain (E2)
-            const newFish = createFish(pickFish(Math.random()), isSunDown, wetForFish, window.innerWidth);
-            // At most five fish (E4). Far fish first, so a near fish swims in front.
-            setFish(prev => (canSpawnFish(prev.map(f => f.kind), newFish.kind)
-              ? [...prev, newFish].sort((a, b) => b.depth - a.depth)
-              : prev));
+            let newFish: FishEntity | null = null;
+            if (shouldShowNightFish) {
+              const pick = pickNightFish(Math.random());
+              const kind = pick === 'moonlit' ? pickMoonlitDayFish(Math.random()) : pick;
+              // Fish lit by the moon need the pool of moonlight (NR3).
+              if (GLOWING_AT_NIGHT.includes(kind) || moonUp) {
+                newFish = createFish(kind, false, wetForFish, window.innerWidth, Math.random, true);
+              }
+            } else {
+              newFish = createFish(pickFish(Math.random()), isSunDown, wetForFish, window.innerWidth);
+            }
+            if (newFish) {
+              const next = newFish;
+              // At most five fish (E4), three at night (NR1). Far fish first, so a near fish swims in front.
+              setFish(prev => (canSpawnFish(prev.map(f => f.kind), next.kind, shouldShowNightFish ? MAX_NIGHT_FISH : MAX_FISH)
+                ? [...prev, next].sort((a, b) => b.depth - a.depth)
+                : prev));
+            }
           }
           lastSpawnTimeRef.current.fish = currentTime;
         }
@@ -433,7 +481,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     return () => {
       clearInterval(intervalId);
     };
-  }, [weatherType, windSpeedKmh, timeOfDay, prefersReducedMotion, isSunDown, isFullscreen, effects.showLeaves, effects.birdSpeedFactor]);
+  }, [weatherType, windSpeedKmh, timeOfDay, prefersReducedMotion, isSunDown, isFullscreen, effects.showLeaves, effects.birdSpeedFactor, moonUp]);
 
   // The grey/wet-weather cloud tints below (storm/hail/rain/drizzle/fog/snow/
   // overcast) are ROADMAP item 10's weather-conditioned matrix, unchanged by the
@@ -532,6 +580,86 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   // one otherwise (partly/cloudy/snow).
   const isFlatCloudWeather = weatherType === 'storm' || weatherType === 'rain' || weatherType === 'overcast' ||
     weatherType === 'hail' || weatherType === 'drizzle' || weatherType === 'fog';
+
+  // One fish, or a pair (P6): the companion swims `lag` s behind and leaves last, so its
+  // onAnimationEnd removes the pair. Night fish (item 65) are in the moon tone or carry lights.
+  const renderFish = (fishItem: FishEntity) => {
+    const { Icon, glow, lights } = FISH[fishItem.kind];
+    // Lit by the moon, or an outline with lights: the moon tone. A jellyfish or squid with
+    // its own light: its glow colour, with a soft halo.
+    const color = fishItem.light === 'moon' || lights
+      ? 'hsl(var(--scene-moon))'
+      : `hsl(var(--scene-fish-${fishItem.light && fishItem.kind === 'jellyfish' ? 'jellyfish-glow' : fishItem.kind}))`;
+    const halo = fishItem.light === 'own' && !lights ? 'drop-shadow(0 0 3px currentColor)' : undefined;
+    const remove = () => setFish(prev => prev.filter(f => f.id !== fishItem.id));
+    const body = fishItem.school ? (
+      <div className="relative" style={{ width: fishItem.width, height: fishItem.height }}>
+        {fishItem.school.map((spot, i) => (
+          <Icon
+            key={i}
+            size={fishItem.size}
+            className="absolute"
+            style={{ left: spot.left, top: spot.top }}
+            data-testid="scene-fish"
+            data-kind={fishItem.kind}
+          />
+        ))}
+      </div>
+    ) : (
+      <Icon size={fishItem.size} strokeOpacity={lights ? 0.45 : undefined} data-testid="scene-fish" data-kind={fishItem.kind}>
+        {lights?.map(([cx, cy, r]) => (
+          <circle
+            key={`${cx}-${cy}`}
+            cx={cx}
+            cy={cy}
+            r={r}
+            stroke="none"
+            className="fill-brand-gold-light"
+            style={{ filter: 'drop-shadow(0 0 2px hsl(var(--brand-gold)))' }}
+            data-testid="fish-light"
+          />
+        ))}
+        {fishItem.glow && (
+          <circle
+            cx={glow[0]}
+            cy={glow[1]}
+            r={1.3}
+            stroke="none"
+            className="fill-brand-gold-light"
+            style={{ filter: 'drop-shadow(0 0 2px hsl(var(--brand-gold)))' }}
+            data-testid="fish-glow"
+          />
+        )}
+      </Icon>
+    );
+    const swimmer = (key: string, lag: number, dy: number, onEnd?: () => void) => (
+      <div
+        key={key}
+        className="absolute"
+        style={{
+          left: `${fishItem.x}%`,
+          top: `${fishItem.y + dy}%`,
+          zIndex: 5,
+          opacity: fishItem.opacity,
+          color,
+          filter: halo,
+          ['--dx' as string]: `${fishItem.dx}vw`,
+          animation: `moveAcrossX ${fishItem.duration}s linear ${lag}s forwards`,
+          // Rest stop (P8). A browser without CSS linear() ignores it and glides straight.
+          animationTimingFunction: fishItem.easing,
+        }}
+        onAnimationEnd={onEnd}
+      >
+        {body}
+      </div>
+    );
+    return fishItem.companion ? (
+      <React.Fragment key={fishItem.id}>
+        {swimmer('lead', 0, 0)}
+        {swimmer('companion', fishItem.companion.lag, fishItem.companion.dy, remove)}
+      </React.Fragment>
+    ) : swimmer(String(fishItem.id), 0, 0, remove);
+  };
 
   return (
     <div
@@ -701,66 +829,17 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         </div>
       ))}
 
-      {/* Fish (ROADMAP item 62): each species at its own distance, pace and tint. A pair's
-          companion swims `lag` s behind; it leaves last, so its onAnimationEnd removes the pair. */}
-      {fish.map((fishItem) => {
-        const { Icon, glow } = FISH[fishItem.kind];
-        const remove = () => setFish(prev => prev.filter(f => f.id !== fishItem.id));
-        const body = fishItem.school ? (
-          <div className="relative" style={{ width: fishItem.width, height: fishItem.height }}>
-            {fishItem.school.map((spot, i) => (
-              <Icon
-                key={i}
-                size={fishItem.size}
-                className="absolute"
-                style={{ left: spot.left, top: spot.top }}
-                data-testid="scene-fish"
-                data-kind={fishItem.kind}
-              />
-            ))}
-          </div>
-        ) : (
-          <Icon size={fishItem.size} data-testid="scene-fish" data-kind={fishItem.kind}>
-            {fishItem.glow && (
-              <circle
-                cx={glow[0]}
-                cy={glow[1]}
-                r={1.3}
-                stroke="none"
-                className="fill-brand-gold-light"
-                style={{ filter: 'drop-shadow(0 0 2px hsl(var(--brand-gold)))' }}
-                data-testid="fish-glow"
-              />
-            )}
-          </Icon>
-        );
-        const swimmer = (key: string, lag: number, dy: number, onEnd?: () => void) => (
-          <div
-            key={key}
-            className="absolute"
-            style={{
-              left: `${fishItem.x}%`,
-              top: `${fishItem.y + dy}%`,
-              zIndex: 5,
-              opacity: fishItem.opacity,
-              color: `hsl(var(--scene-fish-${fishItem.kind}))`,
-              ['--dx' as string]: `${fishItem.dx}vw`,
-              animation: `moveAcrossX ${fishItem.duration}s linear ${lag}s forwards`,
-              // Rest stop (P8). A browser without CSS linear() ignores it and glides straight.
-              animationTimingFunction: fishItem.easing,
-            }}
-            onAnimationEnd={onEnd}
-          >
-            {body}
-          </div>
-        );
-        return fishItem.companion ? (
-          <React.Fragment key={fishItem.id}>
-            {swimmer('lead', 0, 0)}
-            {swimmer('companion', fishItem.companion.lag, fishItem.companion.dy, remove)}
-          </React.Fragment>
-        ) : swimmer(String(fishItem.id), 0, 0, remove);
-      })}
+      {/* Fish (ROADMAP items 62, 64). Moonlit night fish swim in the masked pool layer, so
+          they show only in the moonlight; the layer is always there, so they can always leave. */}
+      {fish.filter(f => f.light !== 'moon').map(renderFish)}
+      <div
+        className="absolute inset-0"
+        style={{ zIndex: 5, opacity: moonlight?.strength ?? 0, maskImage: poolMask, WebkitMaskImage: poolMask }}
+        data-testid="moonlit-fish"
+      >
+        {fish.filter(f => f.light === 'moon').map(renderFish)}
+      </div>
+
 
       {/* Boats (ROADMAP item 36) */}
       {ships.map((ship) => {

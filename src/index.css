@@ -172,6 +172,9 @@
     --scene-fish-seahorse: 30 85% 60%;
     --scene-fish-whale: 215 25% 30%;
     --scene-fish-pufferfish: 50 90% 58%;
+    /* Night fish (ROADMAP item 65): the glowing jellyfish's line and the firefly squid's light. */
+    --scene-fish-jellyfish-glow: 190 90% 80%;
+    --scene-fish-squid: 200 100% 68%;
   }
 
   .dark {

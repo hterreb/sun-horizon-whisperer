@@ -597,6 +597,12 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   const isSunVisible = sunAltitudeVisible && sunDotVisible;
   const isMoonVisible = moonAltitudeVisible && moonDotVisible;
   const moonCloudFactor = getMoonCloudFactor(weatherType, cloudCoverPercent); // clouds hide the moon (ROADMAP item 57)
+  // The pool of moonlight for the night fish (ROADMAP item 65, NR3): as bright as the moon
+  // is full, dimmed by clouds, and fading as the moon sets, like its reflection bars.
+  const nightWater = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
+  const moonPool = nightWater && isMoonVisible && weatherType !== 'storm'
+    ? moonPosition.illumination * moonCloudFactor * getReflectionFade(moonPosition.altitude)
+    : 0;
 
   // The sun's and moon's arcs for their current pass (above-horizon, in-FOV points
   // only): same screen mapping as their current-position dots, just unclamped and
@@ -828,6 +834,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         windSpeedKmh={windSpeedKmh}
         windDirectionDeg={windDirectionDeg}
         isFullscreen={isFullscreen}
+        moonlight={{ x: containerDimensions.width > 0 ? moonX / containerDimensions.width : 0.5, strength: moonPool }}
       />
       <WeatherEffects
         weatherType={weatherType}
@@ -1012,6 +1019,29 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
         return (
           <svg className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true" data-testid="water-reflection">
+            {/* The pool of moonlight the night fish swim through (item 65): a faint cone
+                under the moon, 40 % of the width, from the horizon down. The rect is twice
+                the water's height, so the gradient's ellipse fades out at its sides and at
+                the bottom of the screen, with no hard edge. */}
+            {nightReflection && moonPool > 0 && (
+              <>
+                <defs>
+                  <radialGradient id="moon-pool" cx="50%" cy="0%" r="50%">
+                    <stop offset="0%" stopColor="hsl(var(--scene-moon))" stopOpacity={0.1} />
+                    <stop offset="100%" stopColor="hsl(var(--scene-moon))" stopOpacity={0} />
+                  </radialGradient>
+                </defs>
+                <rect
+                  x={moonX - containerDimensions.width * 0.2}
+                  y={horizonLabelY}
+                  width={containerDimensions.width * 0.4}
+                  height={(containerDimensions.height - horizonLabelY) * 2}
+                  fill="url(#moon-pool)"
+                  opacity={moonPool}
+                  data-testid="moon-pool"
+                />
+              </>
+            )}
             {Array.from({ length: 7 }, (_, i) => {
               const barWidth = Math.max(4, 26 - i * 3);
               return (
