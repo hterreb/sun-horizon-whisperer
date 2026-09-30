@@ -109,21 +109,7 @@ export default {
 					},
 					moon: 'hsl(var(--scene-moon))',
 					moonDark: 'hsl(var(--scene-moon-dark))',
-					horizon: {
-						night: 'hsl(var(--scene-horizon-night))',
-						'astro-twilight': 'hsl(var(--scene-horizon-astro-twilight))',
-						'nautical-twilight': 'hsl(var(--scene-horizon-nautical-twilight))',
-						dawn: 'hsl(var(--scene-horizon-dawn))',
-						day: 'hsl(var(--scene-horizon-day))'
-					},
 					water: 'hsl(var(--scene-water))',
-					waterDeep: {
-						night: 'hsl(var(--scene-water-deep-night))',
-						'astro-twilight': 'hsl(var(--scene-water-deep-astro-twilight))',
-						'nautical-twilight': 'hsl(var(--scene-water-deep-nautical-twilight))',
-						dawn: 'hsl(var(--scene-water-deep-dawn))',
-						day: 'hsl(var(--scene-water-deep-day))'
-					},
 					ridge: {
 						night: 'hsl(var(--scene-ridge-night))',
 						day: 'hsl(var(--scene-ridge-day))',
@@ -185,6 +171,11 @@ export default {
 					'0%, 100%': { opacity: '1' },
 					'50%': { opacity: '0.8' }
 				},
+				// Slow water glitter under the sun or the moon (ROADMAP item 53).
+				'shimmer': {
+					'0%, 100%': { opacity: '1' },
+					'50%': { opacity: '0.35' }
+				},
 				'fade-in': {
 					from: { opacity: '0' },
 					to: { opacity: '1' }
@@ -216,6 +207,7 @@ export default {
 				'sun-rise': 'sun-rise 3s ease-out',
 				'sun-set': 'sun-set 3s ease-out',
 				'glow': 'glow 5s ease-in-out infinite',
+				'shimmer': 'shimmer 5s ease-in-out infinite',
 				'fade-in': 'fade-in 0.5s ease-out',
 				// The rise waits 0.4 s, so a location that arrives sooner never shows it.
 				'mark-rise': 'mark-rise 2.6s cubic-bezier(0.22, 0.8, 0.3, 1) 0.4s both',

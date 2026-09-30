@@ -532,11 +532,12 @@ const SunTracker: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per clock tick
   }, [date]);
 
-  const getBackgroundStyle = useCallback(() => {
+  const skyGradient = useMemo(() => {
     // Clouds dim the sky (ROADMAP item 50): mix toward grey per weather type, scaled
     // by the measured cloud cover. A manually picked weather ignores the real cover.
+    // The water takes its colours from this same gradient (ROADMAP item 53).
     const cover = useRealWeather ? weatherData?.cloudCoverPercent : null;
-    return { background: mixGradientTowardOvercast(getBackgroundGradient(timeOfDay), getSkyOvercastMix(weatherType, cover)) };
+    return mixGradientTowardOvercast(getBackgroundGradient(timeOfDay), getSkyOvercastMix(weatherType, cover));
   }, [timeOfDay, weatherType, useRealWeather, weatherData?.cloudCoverPercent]);
 
   const handleWeatherChange = (newWeather: WeatherType) => {
@@ -568,7 +569,7 @@ const SunTracker: React.FC = () => {
       className={`relative min-h-dvh w-full overflow-hidden ${REVEAL_CLASS[reveal]} ${
         isFullscreen && !showCursor ? 'cursor-none' : ''
       }`} 
-      style={getBackgroundStyle()}
+      style={{ background: skyGradient }}
     >
       <NightStars timeOfDay={timeOfDay} moonPosition={moonPosition} weatherType={weatherType} cloudCoverPercent={weatherData?.cloudCoverPercent} />
       {reveal === 'done' && (
@@ -599,6 +600,7 @@ const SunTracker: React.FC = () => {
             sunPath={moonExtras.sunPath}
             moonPath={moonExtras.moonPath}
             timeOfDay={timeOfDay}
+            skyGradient={skyGradient}
             weatherType={weatherType}
             latitude={location.latitude}
             longitude={location.longitude}

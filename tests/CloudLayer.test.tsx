@@ -24,6 +24,11 @@ describe('CloudLayer', () => {
     expect(container.querySelectorAll('svg')).toMatchSnapshot(); // Should include fish icon
   });
 
+  it('draws the closed storm deck only in a storm (ROADMAP item 51)', () => {
+    expect(renderLayer('storm', 'afternoon').container.querySelector('[data-testid="storm-deck"]')).not.toBeNull();
+    expect(renderLayer('rain', 'afternoon').container.querySelector('[data-testid="storm-deck"]')).toBeNull();
+  });
+
   it('does not show fish at night', () => {
     const { container } = renderLayer('clear', 'night');
     expect(container.querySelectorAll('svg')).not.toContain('Fish');
