@@ -12,10 +12,10 @@
 
 ## Architecture
 
-- `src/components/SunTracker.tsx` is the root state owner. It holds location, date, sun/moon position, sun times, time-of-day, and weather in state, and passes them down as props. Child components do not fetch or compute this state themselves.
-- `src/utils/*.ts` (`sunUtils`, `moonUtils`, `weatherUtils`) are pure functions. They take inputs, return outputs, and do not touch React state or `localStorage` beyond the weather cache in `weatherUtils`.
+- `src/components/SunTracker.tsx` is the root state owner. It holds location, date, sun/moon position, sun times, time-of-day, and weather in state, and passes them down as props. Child components do not fetch or compute this state themselves. Two children fetch other data: `InfoPanel` (the place name from BigDataCloud) and `PlaceSearch` (search results through `geocodeUtils`).
+- `src/utils/*.ts` (`sunUtils`, `moonUtils`, `weatherUtils`, …) are pure functions. They take inputs, return outputs, and do not touch React state. Only these utils use `localStorage`: `weatherUtils` (weather cache), `terrainTiles` and `horizonUtils` (terrain profile cache), `manualLocation`, `compassUtils` and `temperatureUnit` (saved choices).
 - `src/components/ui/` is shadcn-generated. Do not hand-edit these files. Regenerate with `npx shadcn add <component>` instead.
-- `supabase/functions/*` are independent Deno Edge Functions for a Stripe subscription. The frontend does not call them yet.
+- `supabase/functions/*` are independent Deno Edge Functions for a Stripe subscription. The frontend does not call them. The first Premium release uses Google Play Billing instead (ROADMAP items 14 and 45).
 
 ## Conventions
 
@@ -26,5 +26,5 @@
 ## Gotchas
 
 - Do not mutate `Date` arguments. Copy first: `const d = new Date(date); d.setHours(...)`. `sunUtils.getSunTimes` does this for its fallback times.
-- Animation loops (`CloudLayer`, `Fireworks`, `MidnightGhost`, `TemperatureIceberg`, `NightStars`) keep their `requestAnimationFrame` ID in a `useRef`, not in state, so cleanup can always cancel the current frame.
+- `requestAnimationFrame` loops (`Fireworks`, `Ufo`, `useCompassHeading`) keep their frame ID in a `useRef`, not in state, so cleanup can always cancel the current frame. `NightStars` keeps it in a local variable of its effect, which the cleanup closes over. `CloudLayer` moves things with CSS animations, and `MidnightGhost` and `TemperatureIceberg` use an interval.
 - Supabase functions are Deno, not Node. Each function is self-contained (its own imports, no shared `src/` code) and runs in its own directory under `supabase/functions/`.
