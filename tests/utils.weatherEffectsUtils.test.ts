@@ -1,4 +1,4 @@
-import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, getStarCloudFactor, getTwilightStars, getSkyOvercastMix, getSunVisibility } from '../src/utils/weatherEffectsUtils';
+import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, getStarCloudFactor, getTwilightStars, getSkyOvercastMix, getSunVisibility, getMoonCloudFactor } from '../src/utils/weatherEffectsUtils';
 
 describe('getWeatherEffects (ROADMAP item 10)', () => {
   it('shows fog only for the fog type', () => {
@@ -151,18 +151,19 @@ describe('getSkyOvercastMix (ROADMAP item 50)', () => {
 
 describe('getSunVisibility (ROADMAP item 50)', () => {
   it('shows the full sun for clear and partly', () => {
-    expect(getSunVisibility('clear')).toEqual({ disc: 1, halo: 1, haloScale: 1 });
-    expect(getSunVisibility('partly')).toEqual({ disc: 1, halo: 1, haloScale: 1 });
+    expect(getSunVisibility('clear')).toEqual({ disc: 1, halo: 1, haloScale: 1, pale: 0 });
+    expect(getSunVisibility('partly')).toEqual({ disc: 1, halo: 1, haloScale: 1, pale: 0 });
   });
 
   it('dims the disc to 80 % and the halo to 60 % when cloudy', () => {
-    expect(getSunVisibility('cloudy')).toEqual({ disc: 0.8, halo: 0.6, haloScale: 1 });
+    expect(getSunVisibility('cloudy')).toEqual({ disc: 0.8, halo: 0.6, haloScale: 1, pale: 0 });
   });
 
-  it('shows a pale disc at 50 % with a small halo for drizzle and snow', () => {
+  it('shows a pale disc (50 % toward the grey) with a small halo for drizzle and snow (item 59)', () => {
     for (const t of ['drizzle', 'snow'] as const) {
       const v = getSunVisibility(t);
-      expect(v.disc).toBe(0.5);
+      expect(v.disc).toBeGreaterThan(0);
+      expect(v.pale).toBe(0.5);
       expect(v.halo).toBeGreaterThan(0);
       expect(v.haloScale).toBeLessThan(1);
     }
@@ -178,7 +179,44 @@ describe('getSunVisibility (ROADMAP item 50)', () => {
   });
 
   it('hides the sun completely for storm and hail', () => {
-    expect(getSunVisibility('storm')).toEqual({ disc: 0, halo: 0, haloScale: 0 });
-    expect(getSunVisibility('hail')).toEqual({ disc: 0, halo: 0, haloScale: 0 });
+    expect(getSunVisibility('storm')).toEqual({ disc: 0, halo: 0, haloScale: 0, pale: 0 });
+    expect(getSunVisibility('hail')).toEqual({ disc: 0, halo: 0, haloScale: 0, pale: 0 });
+  });
+
+  it('keeps the full disc colour outside drizzle and snow', () => {
+    for (const t of ['clear', 'partly', 'cloudy', 'overcast', 'fog', 'rain', 'storm', 'hail'] as const) {
+      expect(getSunVisibility(t).pale).toBe(0);
+    }
+  });
+});
+
+describe('getMoonCloudFactor (ROADMAP item 57)', () => {
+  it('shows the full moon under a clear sky', () => {
+    expect(getMoonCloudFactor('clear', 0)).toBe(1);
+    expect(getMoonCloudFactor('clear', null)).toBe(1);
+  });
+
+  it('hides the moon at 100 % cover in rain, snow, drizzle and hail', () => {
+    for (const type of ['rain', 'snow', 'drizzle', 'hail'] as const) {
+      expect(getMoonCloudFactor(type, 100)).toBe(0);
+      expect(getMoonCloudFactor(type, null)).toBe(0);
+    }
+  });
+
+  it('always hides the moon in storm and fog', () => {
+    for (const type of ['storm', 'fog'] as const) {
+      expect(getMoonCloudFactor(type, 0)).toBe(0);
+      expect(getMoonCloudFactor(type, 50)).toBe(0);
+      expect(getMoonCloudFactor(type, null)).toBe(0);
+    }
+  });
+
+  it('keeps a faint patch (at least 15 %) for partial cover, cloudy and overcast', () => {
+    expect(getMoonCloudFactor('rain', 95)).toBeCloseTo(0.15);
+    expect(getMoonCloudFactor('partly', 25)).toBe(0.75);
+    expect(getMoonCloudFactor('overcast', 100)).toBe(0.15);
+    expect(getMoonCloudFactor('overcast', null)).toBe(0.15);
+    expect(getMoonCloudFactor('cloudy', null)).toBe(0.4);
+    expect(getMoonCloudFactor('cloudy', 100)).toBe(0.15);
   });
 });
