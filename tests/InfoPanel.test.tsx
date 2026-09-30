@@ -294,6 +294,47 @@ describe('InfoPanel', () => {
     });
   });
 
+  describe('time travel in the Current Time row (ROADMAP item 44)', () => {
+    const at1842 = new Date(2026, 9, 3, 18, 42, 7);
+
+    it('shows the live clock with seconds, the play controls and the gold plus', () => {
+      render(<InfoPanel {...defaultProps} currentTime={at1842} />);
+      expect(screen.getByTitle('Set date and time')).toHaveTextContent('18:42:07');
+      expect(screen.getByRole('button', { name: 'Play time backward' })).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.getByRole('button', { name: 'Play time forward' })).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.getByText('Current Time').querySelector('[data-testid="premium-badge"]')).toBeInTheDocument();
+    });
+
+    it('in a preview, shows the date and time, labelled "Time" (not "Current Time")', () => {
+      render(<InfoPanel {...defaultProps} currentTime={at1842} isTimePreview />);
+      expect(screen.getByTitle('Set date and time')).toHaveTextContent('Oct 3, 18:42');
+      expect(screen.getByText('Time')).toBeInTheDocument();
+      expect(screen.queryByText('Current Time')).not.toBeInTheDocument();
+    });
+
+    it('hands a tap on play to onTimePlay, and marks the playing direction', () => {
+      const onTimePlay = vi.fn();
+      render(<InfoPanel {...defaultProps} timePlayDirection={1} onTimePlay={onTimePlay} />);
+      expect(screen.getByRole('button', { name: 'Play time forward' })).toHaveAttribute('aria-pressed', 'true');
+      fireEvent.click(screen.getByRole('button', { name: 'Play time backward' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Play time forward' }));
+      expect(onTimePlay.mock.calls).toEqual([[-1], [1]]);
+    });
+
+    it('a tap on the time opens a datetime-local input that jumps to the chosen time', () => {
+      const onTimeJump = vi.fn();
+      render(<InfoPanel {...defaultProps} currentTime={at1842} onTimeJump={onTimeJump} />);
+      fireEvent.click(screen.getByTitle('Set date and time'));
+      const input = screen.getByLabelText('Set date and time');
+      expect(input).toHaveAttribute('type', 'datetime-local');
+      expect(input).toHaveValue('2026-10-03T18:42');
+      fireEvent.change(input, { target: { value: '2026-12-24T17:00' } });
+      expect(onTimeJump).toHaveBeenCalledWith(new Date(2026, 11, 24, 17, 0));
+      fireEvent.blur(input);
+      expect(screen.queryByLabelText('Set date and time')).not.toBeInTheDocument();
+    });
+  });
+
   describe('manual location (A-4)', () => {
     it('opens a labeled, pre-filled form from "Change location" and closes on Cancel', () => {
       render(<InfoPanel {...defaultProps} location={{ latitude: 12.3456, longitude: -65.4321, loaded: true }} />);
