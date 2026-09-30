@@ -49,6 +49,7 @@ import {
 import { getTerrainSunTimes, getTerrainMoonTimes } from '../utils/horizonUtils';
 import { getSunArcLabels, getMoonArcLabels } from '../utils/arcLabels';
 import { isLineOfSightEnabled } from '../utils/premium';
+import { passesSunEvent } from '../utils/sunEvents';
 
 // Sky gradient brightness shift per weather type (ROADMAP item 10), in per-channel
 // RGB units - see shiftGradientBrightness. Grey/wet weather darkens the sky; snow
@@ -535,6 +536,17 @@ const SunTracker: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on terrainDateKey (the day) and the profile identity, not `date` itself
   }, [terrainDateKey, horizonProfile, location.latitude, location.longitude]);
 
+  // Fireworks (ROADMAP item 41): start a show when the 1 s clock passes the next
+  // sunrise or sunset (terrain time when there is one), not after a long clock jump.
+  const [fireworksTrigger, setFireworksTrigger] = useState(0);
+  const prevClockRef = React.useRef(date);
+  useEffect(() => {
+    const prev = prevClockRef.current;
+    prevClockRef.current = date;
+    if (passesSunEvent(prev, date, sunTimes, terrainExtras.terrainSunTimes)) setFireworksTrigger(date.getTime());
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per clock tick
+  }, [date]);
+
   const getBackgroundStyle = useCallback(() => {
     const baseGradient = getBackgroundGradient(timeOfDay);
     // Per-channel brightness shift (ROADMAP item 10): darker for grey/wet weather,
@@ -617,6 +629,7 @@ const SunTracker: React.FC = () => {
             horizonProfile={horizonProfile}
             isFullscreen={isFullscreen}
             showCursor={showCursor}
+            fireworksTrigger={fireworksTrigger}
           />
           <InfoPanel
             sunPosition={sunPosition}

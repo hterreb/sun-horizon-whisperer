@@ -1,154 +1,145 @@
-
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 
-interface FireworkParticle {
-  id: number;
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  color: string;
-  life: number;
-  maxLife: number;
-}
-
-interface Firework {
-  id: number;
-  x: number;
-  y: number;
-  particles: FireworkParticle[];
-  exploded: boolean;
-}
-
 interface FireworksProps {
-  trigger: boolean;
+  // Start time (ms) of the current show; 0 = none. A new value starts a new show.
+  // The show runs to its end, however long the prop keeps this value (ROADMAP item 41).
+  trigger: number;
 }
 
-// A celebratory rainbow burst, deliberately not tied to the D brand/scene palette
-// (ROADMAP item 15): fireworks are a once-a-crossing special effect, not part of the
-// everyday sky, so they keep their own saturated confetti colors.
-const FIREWORK_COLORS = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff'];
+// Burst colours that stand out on a sunset sky (no yellow or orange), plus a
+// white-gold core. Deliberately not the scene palette (ROADMAP item 15).
+const CORE = '#fff3d1';
+const COLORS = ['#6ff4ff', '#ff5ce1', '#b58cff', '#6dff9e'];
+const WATER_LINE = 0.65; // horizon y as a share of the height, as in SunVisualization
+const RISE_S = 1; // rocket rise time
+const GRAVITY = 30; // px/s²
+const DRAG = 0.6; // share of speed lost per second
+
+export interface PlannedBurst {
+  burstAt: number; // s after the show start
+  x: number; // share of the width
+  y: number; // share of the height
+  big: boolean;
+}
+
+// 13 bursts 0.62 s apart, then a larger last one at about 9 s. With a 1 s rocket
+// rise before and a 2.5–3.5 s fade after, the show lasts 12–13 s.
+// ponytail: a fixed 0.62 s gap, not a random 0.6–0.9 s one; the random x/y gives enough variety.
+// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
+export const planShow = (random = Math.random): PlannedBurst[] => [
+  ...Array.from({ length: 13 }, (_, i) => ({
+    burstAt: RISE_S + i * 0.62,
+    x: 0.15 + random() * 0.7,
+    y: 0.2 + random() * 0.25,
+    big: false,
+  })),
+  { burstAt: 9.1, x: 0.5, y: 0.28, big: true },
+];
+const MAX_FADE_S = 3.5;
+
+interface Spark {
+  x: number; y: number; vx: number; vy: number;
+  life: number; maxLife: number; color: string;
+  rocket?: PlannedBurst; // set while it is a rising rocket
+}
+
+const burst = (x: number, y: number, big: boolean): Spark[] => {
+  const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+  const n = big ? 110 : 60;
+  return Array.from({ length: n }, (_, i) => {
+    const angle = (i / n) * Math.PI * 2 + Math.random() * 0.1;
+    const speed = (60 + Math.random() * 80) * (big ? 1.3 : 1);
+    const maxLife = 2.5 + Math.random() * (MAX_FADE_S - 2.5);
+    return {
+      x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+      life: maxLife, maxLife, color: i % 3 === 0 ? CORE : color,
+    };
+  });
+};
 
 const Fireworks: React.FC<FireworksProps> = ({ trigger }) => {
-  // ponytail: React state per animation frame (AUDIT P-4). Accepted: it runs a few
-  // seconds at sunrise/sunset. Move particles to a ref + canvas if it ever runs longer.
-  const [fireworks, setFireworks] = useState<Firework[]>([]);
-  const animationIdRef = useRef<number | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const sparksRef = useRef<Spark[]>([]);
+  const rafRef = useRef<number | null>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
 
-  const createFirework = useCallback(() => {
-    const x = Math.random() * 100;
-    const y = 20 + Math.random() * 30; // Higher in the sky
-    
-    const particleCount = 30 + Math.random() * 20; // More particles
-    const particles: FireworkParticle[] = [];
-    
-    for (let i = 0; i < particleCount; i++) {
-      const angle = (i / particleCount) * Math.PI * 2;
-      const speed = 4 + Math.random() * 5; // Faster initial speed
-      
-      particles.push({
-        id: i,
-        x,
-        y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        color: FIREWORK_COLORS[Math.floor(Math.random() * FIREWORK_COLORS.length)],
-        life: 400 + Math.random() * 200, // 6-10 seconds at 60fps
-        maxLife: 400 + Math.random() * 200
-      });
-    }
-    
-    return {
-      id: Date.now() + Math.random(),
-      x,
-      y,
-      particles,
-      exploded: true
-    };
-  }, []);
-
-  const updateFireworks = () => {
-    setFireworks(prevFireworks => {
-      return prevFireworks
-        .map(firework => ({
-          ...firework,
-          particles: firework.particles
-            .map(particle => ({
-              ...particle,
-              x: particle.x + particle.vx,
-              y: particle.y + particle.vy,
-              vy: particle.vy + 0.08, // Reduced gravity for slower fall
-              vx: particle.vx * 0.995, // Less air resistance
-              life: particle.life - 1
-            }))
-            .filter(particle => particle.life > 0)
-        }))
-        .filter(firework => firework.particles.length > 0);
-    });
-  };
-
   useEffect(() => {
-    // Reduced motion: skip spawning the animated firework bursts entirely.
-    if (trigger && !prefersReducedMotion) {
-      // Create more fireworks when triggered - spread them out over time
-      const timeoutIds: ReturnType<typeof setTimeout>[] = [];
-      for (let i = 0; i < 8; i++) { // More fireworks
-        timeoutIds.push(setTimeout(() => {
-          setFireworks(prev => [...prev, createFirework()]);
-        }, i * 300)); // Longer delays between fireworks
+    const canvas = canvasRef.current;
+    if (!trigger || prefersReducedMotion || !canvas) return;
+    const pending = planShow();
+    const start = performance.now();
+    let last = start;
+
+    const frame = (nowMs: number) => {
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      const dpr = window.devicePixelRatio || 1;
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      if (canvas.width !== Math.round(w * dpr)) canvas.width = Math.round(w * dpr);
+      if (canvas.height !== Math.round(h * dpr)) canvas.height = Math.round(h * dpr);
+      const dt = Math.min(0.1, (nowMs - last) / 1000); // clamp after a hidden tab
+      last = nowMs;
+      const t = (nowMs - start) / 1000;
+
+      // Launch rockets that burst 1 s from now: a straight, slow rise from the water line.
+      while (pending.length && pending[0].burstAt - RISE_S <= t) {
+        const b = pending.shift()!;
+        const y0 = h * WATER_LINE;
+        sparksRef.current.push({
+          x: b.x * w, y: y0, vx: 0, vy: (b.y * h - y0) / RISE_S,
+          life: RISE_S, maxLife: RISE_S, color: CORE, rocket: b,
+        });
       }
-      return () => {
-        timeoutIds.forEach(clearTimeout);
-      };
-    }
-  }, [trigger, createFirework, prefersReducedMotion]);
 
-  const hasFireworks = fireworks.length > 0;
+      const next: Spark[] = [];
+      for (const s of sparksRef.current) {
+        s.life -= dt;
+        if (s.rocket) {
+          s.y += s.vy * dt;
+          if (s.life <= 0) next.push(...burst(s.x, s.y, s.rocket.big));
+          else next.push(s);
+          continue;
+        }
+        if (s.life <= 0) continue;
+        s.vx *= 1 - DRAG * dt;
+        s.vy = s.vy * (1 - DRAG * dt) + GRAVITY * dt;
+        s.x += s.vx * dt;
+        s.y += s.vy * dt;
+        next.push(s);
+      }
+      sparksRef.current = next;
 
-  useEffect(() => {
-    if (hasFireworks) {
-      const animate = () => {
-        updateFireworks();
-        animationIdRef.current = requestAnimationFrame(animate);
-      };
-      animationIdRef.current = requestAnimationFrame(animate);
-    } else if (animationIdRef.current !== null) {
-      cancelAnimationFrame(animationIdRef.current);
-      animationIdRef.current = null;
-    }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.lineCap = 'round';
+      for (const s of next) {
+        // Short trail behind the spark; it fades out with the spark's life.
+        ctx.globalAlpha = s.rocket ? 0.8 : Math.max(0, s.life / s.maxLife);
+        ctx.strokeStyle = s.color;
+        ctx.lineWidth = s.rocket ? 1.5 : 2.5;
+        ctx.beginPath();
+        ctx.moveTo(s.x - s.vx * 0.12, s.y - s.vy * 0.12);
+        ctx.lineTo(s.x, s.y);
+        ctx.stroke();
+      }
 
+      rafRef.current = next.length || pending.length ? requestAnimationFrame(frame) : null;
+    };
+    rafRef.current = requestAnimationFrame(frame);
+    // The trigger is a start time, so it changes only for a new show. Cleanup runs
+    // for a new show, reduced motion, or unmount - not while a show is running.
     return () => {
-      if (animationIdRef.current !== null) {
-        cancelAnimationFrame(animationIdRef.current);
-        animationIdRef.current = null;
-      }
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+      sparksRef.current = [];
     };
-  }, [hasFireworks]);
+  }, [trigger, prefersReducedMotion]);
 
-  return (
-    <div className="absolute inset-0 pointer-events-none">
-      {fireworks.map(firework =>
-        firework.particles.map(particle => (
-          <div
-            key={`${firework.id}-${particle.id}`}
-            className="absolute rounded-full"
-            style={{
-              left: `${particle.x}%`,
-              top: `${particle.y}%`,
-              backgroundColor: particle.color,
-              opacity: Math.min(1, particle.life / particle.maxLife * 1.2), // Brighter particles
-              boxShadow: `0 0 25px ${particle.color}, 0 0 50px ${particle.color}, 0 0 75px ${particle.color}`, // Much stronger glow
-              transform: 'translate(-50%, -50%)',
-              width: '6px', // Larger particles
-              height: '6px'
-            }}
-          />
-        ))
-      )}
-    </div>
-  );
+  if (prefersReducedMotion) return null;
+  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />;
 };
 
 export default Fireworks;
