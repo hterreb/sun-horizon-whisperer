@@ -1,14 +1,16 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { Sun, ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp } from 'lucide-react';
+import { Sun, ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp, Mountain } from 'lucide-react';
 import { type SunPosition, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors, getReflectionFade } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
-import { getSunArcLabels, getMoonArcLabels, type ArcLabels, type ArcLabelPoint } from '../utils/arcLabels';
+import { getSunArcLabels, getMoonArcLabels, getTerrainArcLabels, type ArcLabels, type ArcLabelPoint } from '../utils/arcLabels';
 import { shortestHeadingDelta } from '../utils/compassUtils';
 import { type HorizonProfile, horizonAngleAt } from '../utils/horizonUtils';
 import CloudLayer, { type WeatherType } from './CloudLayer';
 import Fireworks from './Fireworks';
+import PremiumBadge from './PremiumBadge';
 import WeatherEffects from './WeatherEffects';
 import { getSunVisibility, getMoonCloudFactor } from '@/utils/weatherEffectsUtils';
+import { isLineOfSightEnabled } from '@/utils/premium';
 
 // A fixed fallback seed date for callers that don't pass one (e.g. existing tests) -
 // a stable constant, not `new Date()`, so it never changes identity across renders.
@@ -47,6 +49,9 @@ interface SunVisualizationProps {
   // feature is disabled/loading/unavailable - null draws the flat horizon only, same
   // as before the feature existed.
   horizonProfile?: HorizonProfile | null;
+  // Line-of-sight sunrise/sunset from SunTracker (terrainExtras.terrainSunTimes), drawn as
+  // extra sun-arc labels where the arc meets the ridge (ROADMAP item 42). Null = none.
+  terrainSunTimes?: { sunrise: Date | null; sunset: Date | null } | null;
   // Fade the cardinal labels out together with the top-left buttons while idle in
   // fullscreen (ROADMAP item 29); both default to their non-fullscreen values so
   // existing callers/tests that don't pass them keep the labels always visible.
@@ -152,17 +157,20 @@ export interface ArcLabelGeometry {
 // Resolves an arcLabels.ts result (rise/zenith/set) to on-screen label geometry, the
 // same way getVisibleCardinalLabels resolves the 8 cardinal directions: dropped when
 // outside the compass field of view (ROADMAP item 19) instead of clamped to the edge.
+// `onHorizon = false` keeps the true rise/set altitude, for the line-of-sight labels that
+// sit on the ridge, not on the flat horizon (ROADMAP item 42).
 // eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
 export const getArcLabelGeometry = (
   labels: ArcLabels,
   latitude: number,
-  compassHeading?: number | null
+  compassHeading?: number | null,
+  onHorizon = true
 ): ArcLabelGeometry[] =>
   (
     [
-      { kind: 'rise', point: labels.rise, altitude: 0 },
+      { kind: 'rise', point: labels.rise, altitude: onHorizon ? 0 : labels.rise?.altitude ?? 0 },
       { kind: 'zenith', point: labels.zenith, altitude: labels.zenith?.altitude ?? 0 },
-      { kind: 'set', point: labels.set, altitude: 0 },
+      { kind: 'set', point: labels.set, altitude: onHorizon ? 0 : labels.set?.altitude ?? 0 },
     ] as { kind: ArcLabelKind; point: ArcLabelPoint | null; altitude: number }[]
   )
     .filter((entry): entry is { kind: ArcLabelKind; point: ArcLabelPoint; altitude: number } => entry.point !== null)
@@ -469,6 +477,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   windDirectionDeg = null,
   compassHeading = null,
   horizonProfile = null,
+  terrainSunTimes = null,
   isFullscreen = false,
   showCursor = true,
   fireworksTrigger = 0
@@ -611,6 +620,15 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     () => getArcLabelGeometry(sunArcLabels, latitude, compassHeading),
     [sunArcLabels, latitude, compassHeading]
   );
+  // Line-of-sight rise/set labels (ROADMAP item 42): only with line of sight on and a
+  // ready profile; a null terrain time gives no label.
+  const terrainArcLabelGeometry = useMemo(
+    () =>
+      isLineOfSightEnabled() && horizonProfile && terrainSunTimes
+        ? getArcLabelGeometry(getTerrainArcLabels(terrainSunTimes, latitude, longitude), latitude, compassHeading, false)
+        : [],
+    [horizonProfile, terrainSunTimes, latitude, longitude, compassHeading]
+  );
   // Only while the moon arc is actually drawn (moonArcPath's own gate above), not just
   // while getMoonArcLabels happens to find a pass.
   const moonArcLabelGeometry = useMemo(
@@ -696,20 +714,32 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     const x = Math.max(ARC_LABEL_HALF_WIDTH, Math.min(width - ARC_LABEL_HALF_WIDTH, geometry.fraction * width));
     // Zenith sits just BELOW the apex, inside the arc: above it, the collapsed InfoPanel
     // covers it on phones, where the apex is near the top of the screen.
+    // Rise/set sit just above their point: the flat horizon (altitude 0), or the ridge
+    // for a line-of-sight label (ROADMAP item 42).
     const y = geometry.kind === 'zenith'
       ? altitudeToY(geometry.altitude, height) + ARC_LABEL_HEIGHT
-      : horizonLabelY - ARC_LABEL_HEIGHT;
+      : altitudeToY(geometry.altitude, height) - ARC_LABEL_HEIGHT;
     return { kind: geometry.kind, time: geometry.time, x, y };
   };
 
-  const sunArcLabelPositions = sunArcLabelGeometry
+  const labelsOverlap = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+    Math.abs(a.x - b.x) < ARC_LABEL_HALF_WIDTH * 2 && Math.abs(a.y - b.y) < ARC_LABEL_HEIGHT;
+  const terrainArcLabelPositions = terrainArcLabelGeometry
     .map(toArcLabelPosition)
     .map((label) => avoidCollapsedPanel(label, containerDimensions.width));
+  // A flat rise/set label that overlaps the terrain label of the same kind, or shows the
+  // same minute (a flat coast), gives way to the terrain label (ROADMAP item 42).
+  const sunArcLabelPositions = sunArcLabelGeometry
+    .map(toArcLabelPosition)
+    .map((label) => avoidCollapsedPanel(label, containerDimensions.width))
+    .filter((label) => !terrainArcLabelPositions.some(
+      (terrain) =>
+        terrain.kind === label.kind &&
+        (labelsOverlap(terrain, label) || formatTime(terrain.time) === formatTime(label.time))
+    ));
   const moonArcLabelPositions = moonArcLabelGeometry.map(toArcLabelPosition).map((moonLabel) => {
-    const overlapsSunLabel = sunArcLabelPositions.some(
-      (sunLabel) =>
-        Math.abs(sunLabel.x - moonLabel.x) < ARC_LABEL_HALF_WIDTH * 2 &&
-        Math.abs(sunLabel.y - moonLabel.y) < ARC_LABEL_HEIGHT
+    const overlapsSunLabel = [...sunArcLabelPositions, ...terrainArcLabelPositions].some(
+      (sunLabel) => labelsOverlap(sunLabel, moonLabel)
     );
     const shifted = overlapsSunLabel ? { ...moonLabel, y: moonLabel.y - ARC_LABEL_HEIGHT } : moonLabel;
     return avoidCollapsedPanel(shifted, containerDimensions.width);
@@ -961,7 +991,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         </div>
       )}
 
-      {containerDimensions.width > 0 && (sunArcLabelPositions.length > 0 || moonArcLabelPositions.length > 0) && (
+      {containerDimensions.width > 0 && (sunArcLabelPositions.length > 0 || terrainArcLabelPositions.length > 0 || moonArcLabelPositions.length > 0) && (
         // Rise/zenith/set labels for the arcs above: subtler pills than the cardinal
         // labels, tinted with each arc's own color, fading together with them in
         // fullscreen (same `cardinalLabelsVisible` condition as ROADMAP item 29). The
@@ -987,6 +1017,20 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
               </div>
             );
           })}
+          {terrainArcLabelPositions.map((label) => (
+            // Line-of-sight label (ROADMAP item 42): the same pill with the Mountain icon
+            // and the gold plus (item 35) at its corner.
+            <div
+              key={`sun-terrain-${label.kind}`}
+              data-testid={`arc-label-sun-terrain-${label.kind}`}
+              className="absolute flex items-center gap-1 text-caption tabular-nums bg-panel-background/70 border border-panel-border/40 px-1.5 py-0.5 rounded-full"
+              style={{ left: `${label.x}px`, top: `${label.y}px`, transform: 'translate(-50%, -50%)', color: 'hsl(var(--brand-sunset))' }}
+            >
+              <Mountain size={10} />
+              {formatTime(label.time)}
+              <PremiumBadge className="absolute -right-1 -top-1 h-2.5 w-2.5" />
+            </div>
+          ))}
           {moonArcLabelPositions.map((label) => {
             const Icon = ARC_LABEL_ICONS[label.kind];
             return (
