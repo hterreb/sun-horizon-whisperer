@@ -149,6 +149,14 @@
     /* Bird/bat silhouette (CloudLayer) — matches the style book's D bird, a soft
        dark flock shape. */
     --scene-critter-silhouette: 0 0% 0%;
+
+    /* Astronomy easter eggs (astroEvents.ts): aurora curtains, green flash, the
+       copper moon of a lunar eclipse and the faint blue moon tint. */
+    --scene-aurora-green: 145 80% 55%;
+    --scene-aurora-violet: 280 60% 60%;
+    --scene-green-flash: 130 90% 60%;
+    --scene-eclipse-moon: 12 75% 38%;
+    --scene-blue-moon: 205 90% 72%;
   }
 
   .dark {

@@ -194,6 +194,15 @@ export default {
 				'scene-iris': {
 					from: { clipPath: 'circle(68px at 50% 36%)' },
 					to: { clipPath: 'circle(150vmax at 50% 36%)' }
+				},
+				// Astronomy easter eggs: the aurora drifts softly, the green flash glows once.
+				'aurora-drift': {
+					'0%, 100%': { transform: 'translateX(-4%) skewX(-8deg)', opacity: '0.55' },
+					'50%': { transform: 'translateX(4%) skewX(6deg)', opacity: '0.85' }
+				},
+				'green-flash': {
+					'0%, 100%': { opacity: '0' },
+					'40%, 60%': { opacity: '0.9' }
 				}
 			},
 			animation: {
@@ -209,7 +218,9 @@ export default {
 				'mark-glint': 'fade-in 1s ease-out 1.7s both',
 				'mark-glint-out': 'fade-out 1s ease-in-out both',
 				'scene-iris': 'scene-iris 1s cubic-bezier(0.65, 0, 0.25, 1) both',
-				'scene-fade': 'fade-in 0.2s ease-out both'
+				'scene-fade': 'fade-in 0.2s ease-out both',
+				'aurora-drift': 'aurora-drift 40s ease-in-out infinite',
+				'green-flash': 'green-flash 2.5s ease-in-out both'
 			}
 		}
 	},

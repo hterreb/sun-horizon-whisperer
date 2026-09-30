@@ -11,6 +11,8 @@ interface NightStarsProps {
   moonPosition?: MoonPosition;
   weatherType?: WeatherType;
   cloudCoverPercent?: number | null;
+  // Chance of a new shooting star per frame; higher during a meteor shower (astroEvents).
+  shootingStarRate?: number;
 }
 
 interface Star {
@@ -32,7 +34,7 @@ const createStars = (width: number, height: number): Star[] =>
     brightness: Math.random(),
   }));
 
-const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition, weatherType = 'clear', cloudCoverPercent = null }) => {
+const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition, weatherType = 'clear', cloudCoverPercent = null, shootingStarRate = 0.001 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const starsRef = useRef<Star[]>([]);
   const moonBrightnessRef = useRef(moonPosition?.illumination || 0);
@@ -133,7 +135,7 @@ const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition, weathe
       });
 
       // Occasionally create shooting stars (full night only, not in twilight)
-      if (timeOfDay === 'night' && Math.random() < 0.001) {
+      if (timeOfDay === 'night' && Math.random() < shootingStarRate) {
         shootingStars.push({
           x: Math.random() * canvas.width,
           y: Math.random() * canvas.height * 0.3,
@@ -174,7 +176,7 @@ const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition, weathe
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-  }, [timeOfDay, cloudFactor, prefersReducedMotion]);
+  }, [timeOfDay, cloudFactor, prefersReducedMotion, shootingStarRate]);
 
   return (
     <canvas
