@@ -157,6 +157,21 @@
     --scene-green-flash: 130 90% 60%;
     --scene-eclipse-moon: 12 75% 38%;
     --scene-blue-moon: 205 90% 72%;
+    /* Fish tints (ROADMAP item 62, E3): one soft colour per species, drawn at 70 %
+       opacity. The classic fish keeps today's blue (text-blue-400). */
+    --scene-fish-classic: 213.1 93.9% 67.8%;
+    --scene-fish-minnow: 200 70% 82%;
+    --scene-fish-perch: 88 40% 50%;
+    --scene-fish-pike: 70 30% 42%;
+    --scene-fish-carp: 40 80% 56%;
+    --scene-fish-catfish: 30 18% 40%;
+    --scene-fish-trout: 350 55% 76%;
+    --scene-fish-ray: 215 20% 35%;
+    --scene-fish-turtle: 150 35% 38%;
+    --scene-fish-jellyfish: 285 70% 82%;
+    --scene-fish-seahorse: 30 85% 60%;
+    --scene-fish-whale: 215 25% 30%;
+    --scene-fish-pufferfish: 50 90% 58%;
   }
 
   .dark {
