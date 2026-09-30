@@ -670,7 +670,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         >
           <div style={{ transform: `${isSunDown ? 'scale(0.5)' : 'scale(0.3)'} translateX(-100%)` }}>
             {isSunDown ? (
-              <Bat size={76} strokeWidth={1.5} className="text-gray-300 text-opacity-60" data-testid="scene-bat" />
+              <Bat size={76} strokeWidth={0.6} fill="currentColor" style={{ color: 'hsl(var(--scene-critter-silhouette) / 0.9)' }} data-testid="scene-bat" />
             ) : (
               <svg
                 version="1.1"
