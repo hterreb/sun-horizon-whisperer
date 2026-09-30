@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp } from 'lucide-react';
+import { Sun, ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp } from 'lucide-react';
 import { type SunPosition, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
 import { getSunArcLabels, getMoonArcLabels, type ArcLabels, type ArcLabelPoint } from '../utils/arcLabels';
@@ -73,10 +73,6 @@ export const getAzimuthScreenFraction = (azimuth: number, latitude: number): num
 // maps onto the screen width, centered on the current device heading. Named/exported
 // so it's easy to tune from real-device testing.
 export const COMPASS_FOV_DEG = 90;
-
-// Horizontal offsets of the reflection's highlights, as a share of the strip's
-// width, from the horizon down (ROADMAP item 53). Fixed, so the strip never jumps.
-const GLINT_OFFSETS = [0, -0.25, 0.2, -0.1, 0.28, -0.22, 0.08, -0.15, 0.18, -0.05, 0.12, -0.18];
 
 export interface CompassScreenFraction {
   fraction: number; // 0.5 = screen center (the heading); continues outside [0, 1] when not visible
@@ -442,11 +438,6 @@ export const avoidCollapsedPanel = <T extends { x: number; y: number }>(label: T
   return covered ? { ...label, y: box.bottom + ARC_LABEL_HEIGHT / 2 + 4 } : label;
 };
 
-// Sun disc fill token per altitude band (ROADMAP item 46).
-// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
-export const getSunDiscToken = (altitude: number): string =>
-  altitude > 10 ? '--scene-sun-high' : altitude > 0 ? '--scene-sun-low' : '--scene-sun-horizon';
-
 // Sun altitude pill text (ROADMAP item 48): a value that rounds to 0 reads "0.0°", never "-0.0°".
 // eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
 export const formatSunAltitude = (altitude: number): string => {
@@ -625,6 +616,16 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     () => (moonArcPath ? getArcLabelGeometry(moonArcLabels, latitude, compassHeading) : []),
     [moonArcPath, moonArcLabels, latitude, compassHeading]
   );
+
+  const getSunColor = () => {
+    if (sunPosition.altitude > 10) {
+      return 'text-yellow-300';
+    } else if (sunPosition.altitude > 0) {
+      return 'text-orange-400';
+    } else {
+      return 'text-amber-600';
+    }
+  };
 
   // Sun glow color, by altitude band (ROADMAP item 15 D polish: the style book's
   // soft glowing sun) - the same 3 tokens/bands as getGlowIntensity below, also used
@@ -808,21 +809,19 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       )}
 
       {isSunVisible && sunVisibility.disc > 0 && (
-        // A filled disc with a soft rim, no rays (ROADMAP item 46, direction D's soft glowing sun).
+        // The line sun with rays (item 46's filled disc was rolled back to it on request).
         <div
           data-testid="sun-dot"
-          className={`absolute rounded-full ${compassActive ? '' : 'transition-transform duration-1000'} ${getGlowIntensity()} animate-glow`}
+          className={`absolute ${compassActive ? '' : 'transition-transform duration-1000'} ${getSunColor()} ${getGlowIntensity()} animate-glow`}
           style={{
             left: `${sunX}px`,
             top: `${sunY}px`,
-            width: 56,
-            height: 56,
             transform: 'translate(-50%, -50%)',
-            opacity: sunVisibility.disc,
-            background: `hsl(var(${getSunDiscToken(sunPosition.altitude)}))`,
-            boxShadow: `0 0 6px 2px hsl(var(${getSunDiscToken(sunPosition.altitude)}) / 0.6)`
+            opacity: sunVisibility.disc
           }}
-        />
+        >
+          <Sun size={sunPosition.altitude > 0 ? 96 : 80} strokeWidth={1} />
+        </div>
       )}
 
       {offFovHintSide && (
@@ -889,57 +888,37 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       </svg>
 
       {containerDimensions.height > 0 && weatherType !== 'storm' && (() => {
-        // Sun/moon reflection (ROADMAP item 53): a soft glitter strip under whichever
-        // body is shown, about the disc's width at the horizon, narrower and fainter
-        // with depth. Each short blurred highlight shimmers slowly (opacity only);
-        // the global reduced-motion rule in index.css keeps it still.
+        // Sun/moon reflection on the water (ROADMAP item 15 deliverable 2): a few
+        // short glinting bars under whichever body is currently shown, fading out
+        // with depth - the style book's water reflection streaks. Item 53's glitter
+        // strip was rolled back to these bars on request.
         const nightReflection = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
         const reflectionVisible = nightReflection ? isMoonVisible : isSunVisible && sunVisibility.disc > 0;
         if (!reflectionVisible) return null;
 
         const reflectX = nightReflection ? moonX : sunX;
-        const reflectToken = nightReflection ? '--scene-moon' : '--scene-sun-high';
-        const baseOpacity = nightReflection ? 0.5 : 0.8;
-        const discWidth = nightReflection ? moonRadius * 2 : 56;
-        const stripDepth = (containerDimensions.height - horizonLabelY) * 0.55;
+        const reflectColor = nightReflection ? 'hsl(var(--scene-moon))' : 'hsl(var(--scene-sun-glow-low))';
+        const baseOpacity = nightReflection ? 0.35 : 0.6;
+        const bandHeight = (containerDimensions.height - horizonLabelY) * 0.07;
 
         return (
-          <div className="absolute inset-0 pointer-events-none" aria-hidden="true" data-testid="water-reflection">
-            {/* A faint soft band behind the highlights, so they read as one strip of light. */}
-            <div
-              className="absolute"
-              style={{
-                left: reflectX - discWidth / 2,
-                top: horizonLabelY,
-                width: discWidth,
-                height: stripDepth,
-                // An ellipse centred on the horizon: widest at the top, it tapers and fades with depth.
-                background: `radial-gradient(ellipse 50% 100% at 50% 0%, hsl(var(${reflectToken}) / ${baseOpacity * 0.35}), transparent)`
-              }}
-            />
-            {GLINT_OFFSETS.flatMap((offset, i) => {
-              const depth = i / GLINT_OFFSETS.length; // 0 at the horizon, near 1 at the strip's end
-              const bandWidth = discWidth * (1 - 0.65 * depth);
-              const glintWidth = bandWidth * (0.3 + 0.1 * (i % 3));
-              // Two highlights per row, on either side of the strip's centre line.
-              return [offset, offset > 0 ? offset - 0.45 : offset + 0.45].map((x, j) => (
-                <div
-                  key={`${i}-${j}`}
-                  className="absolute rounded-full animate-shimmer"
-                  style={{
-                    left: reflectX + x * bandWidth - glintWidth / 2,
-                    top: horizonLabelY + 5 + depth * depth * stripDepth,
-                    width: glintWidth,
-                    height: 3,
-                    // The depth fade sits in the colour's alpha, since the shimmer animates opacity.
-                    background: `hsl(var(${reflectToken}) / ${baseOpacity * (1 - 0.8 * depth)})`,
-                    filter: 'blur(1.5px)',
-                    animationDelay: `${-((i * 1.3 + j * 2.5) % 5)}s`
-                  }}
+          <svg className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true" data-testid="water-reflection">
+            {Array.from({ length: 7 }, (_, i) => {
+              const barWidth = Math.max(4, 26 - i * 3);
+              return (
+                <rect
+                  key={i}
+                  x={reflectX - barWidth / 2 + (i % 2 ? 3 : -3)}
+                  y={horizonLabelY + 6 + i * bandHeight}
+                  width={barWidth}
+                  height={1.6}
+                  rx={0.8}
+                  fill={reflectColor}
+                  opacity={Math.max(0, baseOpacity - i * 0.05)}
                 />
-              ));
+              );
             })}
-          </div>
+          </svg>
         );
       })()}
 
