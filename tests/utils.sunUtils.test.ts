@@ -1,4 +1,4 @@
-import { getSunPosition, getSunTimes, getTimeOfDay, getRelevantTwilightTimes, formatTime, getGoldenHourTimes, getBlueHourTimes, getNextGoldenBlueHours, shiftGradientBrightness, getSunPathAround, getBackgroundGradient, findSunPass } from '../src/utils/sunUtils';
+import { getSunPosition, getSunTimes, getTimeOfDay, getRelevantTwilightTimes, formatTime, getGoldenHourTimes, getBlueHourTimes, getNextGoldenBlueHours, mixGradientTowardOvercast, getSunPathAround, getBackgroundGradient, findSunPass } from '../src/utils/sunUtils';
 describe('sunUtils', () => {
   it('calculates sun position', () => {
     const pos = getSunPosition(new Date(), 0, 0);
@@ -226,32 +226,30 @@ describe('sunUtils', () => {
     });
   });
 
-  describe('shiftGradientBrightness (ROADMAP item 10, weather sky tint)', () => {
-    it('darkens every #rrggbb color by the same amount per channel', () => {
-      const result = shiftGradientBrightness('linear-gradient(to bottom, #0F1016 0%, #1A1F2C 100%)', -10);
-      expect(result).toBe('linear-gradient(to bottom, #05060c 0%, #101522 100%)');
-    });
-
-    it('brightens colors with a positive delta', () => {
-      const result = shiftGradientBrightness('#000000', 15);
-      expect(result).toBe('#0f0f0f');
-    });
-
-    it('clamps channels to [0, 255]', () => {
-      expect(shiftGradientBrightness('#000000', -50)).toBe('#000000');
-      expect(shiftGradientBrightness('#ffffff', 50)).toBe('#ffffff');
-    });
-
-    it('returns the input unchanged for a zero shift', () => {
+  describe('mixGradientTowardOvercast (ROADMAP item 50, clouds dim the sky)', () => {
+    it('returns the input unchanged for a zero mix', () => {
       const gradient = 'linear-gradient(to bottom, #0EA5E9 0%, #33C3F0 100%)';
-      expect(shiftGradientBrightness(gradient, 0)).toBe(gradient);
+      expect(mixGradientTowardOvercast(gradient, 0)).toBe(gradient);
+    });
+
+    it('turns a light color fully into the overcast grey at mix 1', () => {
+      expect(mixGradientTowardOvercast('#FEC6A1', 1)).toBe('#8a949d');
+    });
+
+    it('mixes part of the way at a partial mix', () => {
+      // #FFFFFF halfway toward #8A949D.
+      expect(mixGradientTowardOvercast('#FFFFFF', 0.5)).toBe('#c5cace');
+    });
+
+    it('keeps a dark night color dark (the grey is never lighter than the color)', () => {
+      const mixed = mixGradientTowardOvercast('#0F1016', 0.75);
+      const num = parseInt(mixed.slice(1), 16);
+      expect(Math.max((num >> 16) & 0xff, (num >> 8) & 0xff, num & 0xff)).toBeLessThanOrEqual(0x16);
     });
 
     it('leaves non-color text untouched', () => {
-      const result = shiftGradientBrightness('linear-gradient(to bottom, #FFFFFF 0%, #000000 100%)', -1);
-      expect(result).toContain('linear-gradient(to bottom,');
-      expect(result).toContain('0%');
-      expect(result).toContain('100%)');
+      const result = mixGradientTowardOvercast('linear-gradient(to bottom, #FFFFFF 0%, #000000 100%)', 0.6);
+      expect(result).toMatch(/^linear-gradient\(to bottom, #[0-9a-f]{6} 0%, #000000 100%\)$/);
     });
   });
 
@@ -268,9 +266,9 @@ describe('sunUtils', () => {
       }
     });
 
-    it('keeps literal #rrggbb hex (not a CSS var) so shiftGradientBrightness (ROADMAP item 10) still applies', () => {
+    it('keeps literal #rrggbb hex (not a CSS var) so mixGradientTowardOvercast (ROADMAP item 50) still applies', () => {
       const gradient = getBackgroundGradient('midday');
-      const shifted = shiftGradientBrightness(gradient, -10);
+      const shifted = mixGradientTowardOvercast(gradient, 0.6);
       expect(shifted).not.toBe(gradient);
       expect(shifted).toMatch(/^linear-gradient\(to bottom, #[0-9a-fA-F]{6} 0%, #[0-9a-fA-F]{6} 62%, #[0-9a-fA-F]{6} 100%\)$/);
     });
