@@ -189,6 +189,18 @@ describe('CloudLayer', () => {
       expect(container.querySelectorAll('[data-testid="scene-boat"]').length).toBe(3);
     });
 
+    it('sends more boats far out, toward the horizon (ROADMAP item 71)', () => {
+      // A roll of 0.25 gives the distance √0.25 = 0.5, so the waterline is at 67 + 0.5 × 20 = 77 %.
+      vi.useFakeTimers();
+      const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.25);
+      const { container } = render(<CloudLayer weatherType="clear" timeOfDay="midday" />);
+      act(() => { vi.advanceTimersByTime(21000); });
+      randomSpy.mockRestore();
+      vi.useRealTimers();
+      const wrapper = container.querySelector('[data-testid="scene-boat"]')?.parentElement?.parentElement as HTMLElement;
+      expect(wrapper.style.top).toBe('77%');
+    });
+
     it('lets more boats out on a wide screen (ROADMAP item 70)', () => {
       // 1290 px is three phones wide: up to 9 boats, so all four spawns stay.
       const container = atWidth(1290, () => spawn({}, 180000));
@@ -258,8 +270,9 @@ describe('CloudLayer', () => {
       expect(far.size).toBe(12);
       expect(far.duration).toBeGreaterThan(near.duration * 1.7);
       expect(far.opacity).toBeLessThan(near.opacity);
-      expect(near.y).toBeCloseTo(84, 5);
-      expect(far.y).toBeCloseTo(71, 0);
+      // The whole water (item 71): near fish in the front, far ones just below the horizon.
+      expect(near.y).toBeCloseTo(92, 5);
+      expect(far.y).toBeCloseTo(68, 0);
     });
 
     it('swims minnows in a school of 4 to 7, and deep fish paler (P5, P9)', () => {
