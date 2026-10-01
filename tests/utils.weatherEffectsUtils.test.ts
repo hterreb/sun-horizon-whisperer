@@ -1,4 +1,4 @@
-import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, pickFish, FISH_WEIGHTS, canSpawnFish, getRestStopMotion, pickNightFish, pickMoonlitDayFish, NIGHT_FISH_WEIGHTS, MAX_NIGHT_FISH, getStarCloudFactor, getTwilightStars, getSkyOvercastMix, getSunVisibility, getMoonCloudFactor } from '../src/utils/weatherEffectsUtils';
+import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, pickFish, FISH_WEIGHTS, canSpawnFish, getRestStopMotion, pickNightFish, pickMoonlitDayFish, NIGHT_FISH_WEIGHTS, MAX_NIGHT_FISH, getWaterSpeedFactor, getStarCloudFactor, getTwilightStars, getSkyOvercastMix, getSunVisibility, getMoonCloudFactor } from '../src/utils/weatherEffectsUtils';
 
 describe('getWeatherEffects (ROADMAP item 10)', () => {
   it('shows fog only for the fog type', () => {
@@ -134,6 +134,14 @@ describe('night fish mix (ROADMAP item 65)', () => {
     expect(canSpawnFish(three.slice(0, 2), 'eel', MAX_NIGHT_FISH)).toBe(true);
     expect(canSpawnFish([...three], 'eel', MAX_NIGHT_FISH)).toBe(false);
     expect(canSpawnFish([...three], 'jellyfish', MAX_NIGHT_FISH)).toBe(true);
+  });
+});
+
+describe('getWaterSpeedFactor (ROADMAP item 66)', () => {
+  it('leaves phones alone and slows wider screens to a 430 px phone\'s pixels per second', () => {
+    expect(getWaterSpeedFactor(390)).toBe(1);
+    expect(getWaterSpeedFactor(430)).toBe(1);
+    expect(getWaterSpeedFactor(1290)).toBeCloseTo(1 / 3, 10);
   });
 });
 
