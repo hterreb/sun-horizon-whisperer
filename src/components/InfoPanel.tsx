@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward, Bell, BellRing, AlarmClock, AlarmClockCheck } from 'lucide-react';
+import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Wind, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward, Bell, BellRing, AlarmClock, AlarmClockCheck } from 'lucide-react';
 import { isFeedbackAvailable, openFeedbackForm } from '@/utils/feedback';
 import { ScrollArea } from './ui/scroll-area';
 import { Button } from './ui/button';
@@ -101,6 +101,9 @@ interface InfoPanelProps {
   onTemperatureUnitChange?: (unit: TemperatureUnit) => void;
   isFullscreen?: boolean;
   onWeatherChange: (weather: WeatherType) => void;
+  // Manual mode's strong-wind switch (ROADMAP item 73): leaves, slower birds, boat wakes.
+  manualWindy?: boolean;
+  onManualWindyChange?: (windy: boolean) => void;
   onWeatherModeToggle: (useReal: boolean) => void;
   onWeatherRefresh: () => void;
   onLocationChange: (latitude: number, longitude: number, name?: string) => void;
@@ -151,6 +154,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   onTemperatureUnitChange = () => {},
   isFullscreen = false,
   onWeatherChange,
+  manualWindy = false,
+  onManualWindyChange = () => {},
   onWeatherModeToggle,
   onWeatherRefresh,
   onLocationChange,
@@ -685,6 +690,19 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   </button>
                 ))}
               </div>
+              <button
+                type="button"
+                onClick={() => onManualWindyChange(!manualWindy)}
+                aria-pressed={manualWindy}
+                className={`mt-1 w-full flex items-center justify-center p-2 rounded-full text-caption transition-colors ${FOCUS_RING} ${
+                  manualWindy
+                    ? 'bg-white bg-opacity-20 text-white'
+                    : 'bg-white bg-opacity-5 text-white opacity-60 hover:opacity-80'
+                }`}
+              >
+                <Wind size={16} className="mr-1" />
+                {t('weather.strongWind')}
+              </button>
             </div>
           )}
 

@@ -57,6 +57,7 @@ export const es: Record<keyof typeof en, string> = {
   'weather.real': "Real",
   'weather.manual': "Manual",
   'weather.manualTitle': "Tiempo manual",
+  'weather.strongWind': "Viento fuerte",
   'weatherType.clear': "Despejado",
   'weatherType.partly': "Parcial",
   'weatherType.cloudy': "Nuboso",
