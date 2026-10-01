@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { Fish, Leaf, Sailboat, Turtle, type LucideIcon } from 'lucide-react';
+import { Fish, Leaf, Turtle, type LucideIcon } from 'lucide-react';
+import SceneBoat from './SceneBoat';
 import {
-  Bat, FishingBoat, Freighter, LakeFerry, Rowboat,
+  Bat,
   Carp, Catfish, Jellyfish, Minnow, Perch, Pike, Pufferfish, Ray, Seahorse, Trout, Whale,
   Anglerfish, Burbot, Eel, FireflySquid, Lanternfish,
 } from './sceneIcons';
@@ -15,7 +16,7 @@ import {
   getPrecipitationSlantPx,
 } from '../utils/cloudLayoutUtils';
 import {
-  getWeatherEffects, pickBoat, type BoatKind,
+  getWeatherEffects, pickBoat, hasBoatWake, getBoatTone, type BoatKind,
   pickFish, canSpawnFish, getRestStopMotion, type FishKind,
   pickNightFish, pickMoonlitDayFish, MAX_FISH, MAX_NIGHT_FISH, getWaterSpeedFactor, getWaterLimit,
 } from '../utils/weatherEffectsUtils';
@@ -112,14 +113,14 @@ interface Boat extends MovingEntity {
   depth: number; // 0 = near, 1 = far: far boats are smaller, paler and slower
 }
 
-// `lights` are the boat's warm lights after sunset, in the icon's 24 px grid. `speed` is a
-// near boat's rate in % of the layer width per second (ROADMAP item 40): each type its own.
-const BOATS: Record<BoatKind, { Icon: LucideIcon; scale: number; speed: number; lights: [number, number][] }> = {
-  sailboat: { Icon: Sailboat, scale: 0.95, speed: 1.2, lights: [[10, 2]] },
-  ferry: { Icon: LakeFerry, scale: 1.2, speed: 1.8, lights: [[8, 13], [12, 13], [16, 13]] },
-  fishing: { Icon: FishingBoat, scale: 0.95, speed: 1.5, lights: [[15, 3], [7.5, 11]] },
-  rowboat: { Icon: Rowboat, scale: 0.7, speed: 0.9, lights: [[19.5, 14.5]] },
-  freighter: { Icon: Freighter, scale: 1.5, speed: 1.3, lights: [[5, 6.5], [5.25, 11]] },
+// `speed` is a near boat's rate in % of the layer width per second (ROADMAP item 40):
+// each type its own. `scale` keeps each hull as long as its old line icon's (item 73).
+const BOATS: Record<BoatKind, { scale: number; speed: number }> = {
+  sailboat: { scale: 1, speed: 1.2 },
+  ferry: { scale: 1.1, speed: 1.8 },
+  fishing: { scale: 1, speed: 1.5 },
+  rowboat: { scale: 1, speed: 0.9 },
+  freighter: { scale: 1.4, speed: 1.3 },
 };
 const FAR_SHRINK = 0.45; // the farthest boat is 55% of the size, opacity and speed of the nearest
 
@@ -339,7 +340,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
                     timeOfDay === 'astronomical-twilight' ||
                     timeOfDay === 'nautical-twilight' ||
                     timeOfDay === 'civil-twilight';
-  // Line icons (boats, leaves) share today's ship tone.
+  const boatTone = getBoatTone(timeOfDay);
+  // The line leaves keep the old ship tone.
   const lineInk = timeOfDay === 'night' ? 'text-gray-300 text-opacity-60' : 'text-gray-600 text-opacity-80';
 
   // The pool of moonlight (ROADMAP item 65, NF1/NR3): moonlit fish show only within ±9 %
@@ -370,7 +372,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     const shouldShowFish = fishWeather && !nightWater;
     const shouldShowNightFish = fishWeather && nightWater;
     const wetForFish = weatherType === 'rain' || weatherType === 'drizzle';
-    const shouldShowShips = weatherType !== 'storm' && weatherType !== 'hail';
+    // A storm sends out only the big boats (pickBoat, item 73); hail has none.
+    const shouldShowShips = weatherType !== 'hail';
 
     const spawnTick = () => {
       const currentTime = Date.now();
@@ -850,9 +853,9 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       </div>
 
 
-      {/* Boats (ROADMAP item 36) */}
+      {/* Boats (ROADMAP item 36), drawn in soft light (item 73) */}
       {ships.map((ship) => {
-        const { Icon, scale, lights } = BOATS[ship.kind];
+        const { scale } = BOATS[ship.kind];
         const nearness = 1 - FAR_SHRINK * ship.depth;
         return (
           <div
@@ -868,22 +871,9 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             }}
             onAnimationEnd={() => setShips(prev => prev.filter(s => s.id !== ship.id))}
           >
-            {/* Scale from the bottom-left corner, then lift by the icon's height, so `top` is the waterline. */}
+            {/* Scale from the bottom-left corner, then lift by the boat's height, so `top` is the waterline. */}
             <div style={{ transform: `translateY(-100%) scale(${1.4 * scale * nearness})`, transformOrigin: 'bottom left' }}>
-              <Icon size={48} className={`transition-colors duration-1000 ${lineInk}`} data-testid="scene-boat" data-kind={ship.kind}>
-                {isSunDown && lights.map(([cx, cy]) => (
-                  <circle
-                    key={`${cx}-${cy}`}
-                    cx={cx}
-                    cy={cy}
-                    r={1.1}
-                    stroke="none"
-                    className="fill-brand-gold-light"
-                    style={{ filter: 'drop-shadow(0 0 2px hsl(var(--brand-gold)))' }}
-                    data-testid="boat-light"
-                  />
-                ))}
-              </Icon>
+              <SceneBoat kind={ship.kind} tone={boatTone} lit={isSunDown} wake={hasBoatWake(ship.kind, windSpeedKmh)} />
             </div>
           </div>
         );
