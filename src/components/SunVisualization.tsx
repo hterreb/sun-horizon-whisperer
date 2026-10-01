@@ -587,6 +587,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   // independent of the compass field of view, so the off-FOV hint below can tell "it's
   // up, just off to one side" apart from "it's not up right now" (ROADMAP item 19).
   const sunVisibility = getSunVisibility(weatherType); // clouds dim the sun (ROADMAP item 50)
+  const sunShines = sunVisibility.disc >= 0.5; // the faint overcast disc (item 72) gets no yellow glow and no glints
   const sunAltitudeVisible = sunPosition.altitude > -18 && sunVisibility.halo > 0;
   const moonAltitudeVisible = moonPosition.visible && (
     timeOfDay === 'night' ||
@@ -884,8 +885,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             height: (sunPosition.altitude > 0 ? 200 : 160) * sunVisibility.haloScale,
             transform: 'translate(-50%, -50%)',
             opacity: sunVisibility.halo,
-            // No disc (overcast, fog, rain): a white light patch, not a yellow glow on grey.
-            background: `radial-gradient(circle, hsl(var(${sunVisibility.disc > 0 ? getSunGlowToken() : '--scene-glow-white'}) / 0.55) 0%, transparent 70%)`
+            // Faint or no disc (overcast, fog, rain): a white light patch, not a yellow glow on grey.
+            background: `radial-gradient(circle, hsl(var(${sunShines ? getSunGlowToken() : '--scene-glow-white'}) / 0.55) 0%, transparent 70%)`
           }}
         />
       )}
@@ -902,17 +903,20 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           style={{
             left: `${sunX}px`,
             top: `${sunY}px`,
-            transform: 'translate(-50%, -50%)',
-            opacity: sunVisibility.disc
+            transform: 'translate(-50%, -50%)'
           }}
         >
-          {/* Drizzle and snow: the line colour mixes toward the overcast grey (ROADMAP item 59).
-              `currentColor` here is the band colour the wrapper sets. No blur: it would wash out
-              the 1 px lines. */}
+          {/* Drizzle, snow and overcast: the line colour mixes toward the overcast grey (ROADMAP
+              items 59, 72). `currentColor` here is the band colour the wrapper sets. No blur: it
+              would wash out the 1 px lines. The cloud opacity sits here, not on the button:
+              animate-glow animates the button's opacity and would override it. */}
           <Sun
             size={sunPosition.altitude > 0 ? 96 : 80}
             strokeWidth={1}
-            style={sunVisibility.pale > 0 ? { color: `color-mix(in srgb, currentColor, hsl(var(--scene-sky-overcast)) ${sunVisibility.pale * 100}%)` } : undefined}
+            style={{
+              opacity: sunVisibility.disc,
+              ...(sunVisibility.pale > 0 && { color: `color-mix(in srgb, currentColor, hsl(var(--scene-sky-overcast)) ${sunVisibility.pale * 100}%)` }),
+            }}
           />
           {sunglasses && <SunSunglasses />}
         </button>
@@ -1009,7 +1013,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         // (ROADMAP item 58); clouds also hide the moon strip (item 57).
         const reflectionFade = nightReflection
           ? (isMoonVisible ? getReflectionFade(moonPosition.altitude) * moonCloudFactor : 0)
-          : (isSunVisible && sunVisibility.disc > 0 ? getReflectionFade(sunPosition.altitude) : 0);
+          : (isSunVisible && sunShines ? getReflectionFade(sunPosition.altitude) : 0);
         if (reflectionFade <= 0) return null;
 
         const reflectX = nightReflection ? moonX : sunX;
