@@ -16,6 +16,16 @@ const mockReducedMotion = (matches: boolean) =>
     dispatchEvent: () => false,
   } as unknown as MediaQueryList);
 
+// The window width the spawn loop sees (jsdom's default is 1024 px). Fish and boat limits
+// grow with the width (ROADMAP item 67), so the limit tests pin a phone or a desktop width.
+const atWidth = <T,>(width: number, run: () => T): T => {
+  const original = window.innerWidth;
+  Object.defineProperty(window, 'innerWidth', { value: width, configurable: true, writable: true });
+  try { return run(); } finally {
+    Object.defineProperty(window, 'innerWidth', { value: original, configurable: true, writable: true });
+  }
+};
+
 describe('CloudLayer', () => {
   const renderLayer = (weatherType: WeatherType, timeOfDay: string) =>
     render(<CloudLayer weatherType={weatherType} timeOfDay={timeOfDay as TimeOfDay} />);
@@ -173,10 +183,16 @@ describe('CloudLayer', () => {
       expect(container.querySelectorAll('[data-testid="scene-boat"]').length).toBe(2);
     });
 
-    it('never has more than 3 boats out at once (ROADMAP item 40)', () => {
+    it('never has more than 3 boats out at once on a phone (ROADMAP item 40)', () => {
       // Spawns at ~5, 60, 115 and 170 s; no boat finishes its crossing in the test.
-      const container = spawn({}, 180000);
+      const container = atWidth(390, () => spawn({}, 180000));
       expect(container.querySelectorAll('[data-testid="scene-boat"]').length).toBe(3);
+    });
+
+    it('lets more boats out on a wide screen (ROADMAP item 67)', () => {
+      // 1290 px is three phones wide: up to 9 boats, so all four spawns stay.
+      const container = atWidth(1290, () => spawn({}, 180000));
+      expect(container.querySelectorAll('[data-testid="scene-boat"]').length).toBe(4);
     });
 
     it('sails each boat type at its own speed (ROADMAP item 40)', () => {
@@ -319,10 +335,16 @@ describe('CloudLayer', () => {
       expect((desktop.dx / desktop.duration) * 1290).toBeCloseTo(1.15 * 430, 5);
     });
 
-    it('keeps at most five fish on screen (E4)', () => {
-      // A classic fish pair every 5.5 s; none finishes its 42 s crossing in the test.
-      const container = spawnFish({}, 40000);
+    it('keeps at most five fish on screen on a phone (E4)', () => {
+      // A classic fish pair every 5.5 s; none finishes its crossing in the test.
+      const container = atWidth(390, () => spawnFish({}, 40000));
       expect(container.querySelectorAll('[data-testid="scene-fish"]').length).toBe(10); // 5 pairs
+    });
+
+    it('allows five fish per phone width on a wide screen (ROADMAP item 67)', () => {
+      // 1290 px: up to 15 fish, so all seven pairs from 40 s stay; by 90 s the 15 are reached.
+      expect(atWidth(1290, () => spawnFish({}, 40000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(14);
+      expect(atWidth(1290, () => spawnFish({}, 90000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(30);
     });
   });
 
@@ -362,8 +384,10 @@ describe('CloudLayer', () => {
 
     it('keeps the night quiet: a check every 15-25 s, at most three fish (NR1)', () => {
       expect(spawnNight({ moonlight: moon }, 14000).querySelector('[data-testid="scene-fish"]')).toBeNull();
-      // A moonlit classic pair every 15.5 s; six tries in 100 s, three pairs stay.
-      expect(spawnNight({ moonlight: moon }, 100000).querySelectorAll('[data-testid="scene-fish"]').length).toBe(6);
+      // A moonlit classic pair every 15.5 s; six tries in 100 s, three pairs stay on a phone.
+      expect(atWidth(390, () => spawnNight({ moonlight: moon }, 100000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(6);
+      // Three phones wide: up to nine, so all six pairs stay (item 67).
+      expect(atWidth(1290, () => spawnNight({ moonlight: moon }, 100000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(12);
     });
   });
 });
