@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44, 47–66 and 72, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), items 67–69 (five languages, share card, sunset reminder), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
+Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44, 47–66, 70 and 72, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), items 67–69 (five languages, share card, sunset reminder), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
 
 ## Verification (2026-09-28)
 
@@ -873,17 +873,35 @@ These items come from the re-shoot of all states after items 46–56.
   5. Colours come from the scene tokens, so the card looks like the app.
 - **Done when:** unit tests for the card layout data (texts, which times show). In the browser, the button gives a PNG with the expected content for Ravensburg (flat) and Sion (terrain). On an Android phone the share sheet opens.
 
-### 69. Sunset reminder notification — M — Depends on 16
+### 69. Sunset reminder notification — S — **✅ Done**
 
+- **Decision (2026-10-01):** "no i dont want a server part, specify item 69 without server just a po up notification a fixed time before the sunset".
 - **Spec:**
-  1. A bell option in the Sunset row: "Remind me N minutes before sunset" (N = 10, 20 or 30, default 20). It asks for the notification permission only when the user turns it on.
-  2. A browser cannot schedule a local notification for a later time (the Notification Triggers API was stopped). So the reminder uses Web Push: the app saves a push subscription, the rounded location (2 decimals, about 1 km), the time zone and N. A scheduled Supabase Edge Function runs every 5 minutes, calculates the sunset for each subscription and sends the push N minutes before it.
-  3. The notification text: "Sunset in N minutes, at HH:MM", plus the sunset score when it is 60 or more. A tap opens the app.
-  4. Turning the option off, or a push endpoint that returns 404/410, deletes the subscription row.
-  5. Privacy: the privacy policy (item 16) names the stored data and its use. No other data is stored.
-  6. Works in the Play app (TWA) and the installed PWA, also on iOS 16.4+ (installed only). In a browser tab without push support, hide the option.
-- **Done when:** unit tests for the send-time calculation (time zones, the polar day and night with no sunset). A test push arrives on an Android phone and an installed iPhone PWA N minutes before sunset, within 5 minutes.
-- **Note:** this needs a server part (VAPID keys, a subscriptions table, a scheduled function). It is the first backend the frontend uses.
+  1. A bell option in the Sunset row: "Remind me 15 minutes before sunset". The lead time is fixed (`SUNSET_REMINDER_MIN = 15`). The app asks for the notification permission only when the user turns it on. Save the choice in `localStorage` (`sunset-reminder`), with try/catch.
+  2. No server and no Web Push. The app sets a timer to the next reminder time (the line-of-sight sunset when there is one, else the flat sunset, minus 15 minutes). At that time it shows a system notification with `registration.showNotification` of the service worker: "Sunset in 15 minutes, at HH:MM". A tap opens or focuses the app.
+  3. Browsers slow down timers in background tabs. So the app also checks the time on `visibilitychange` and once a minute, and shows the notification when the reminder time has passed by less than 5 minutes and it has not shown it for that sunset yet.
+  4. After the sunset, set the timer for the next day. Time travel (item 44) does not trigger a reminder. No sunset (polar day or night): no reminder.
+  5. When the browser has no Notification API, or the permission is denied, hide the option or show it as off with a short hint.
+- **Limit:** the reminder only comes while the app is open, also in the background. When the user closes the app or the system stops it, no reminder comes. The option text says this: "while the app is open".
+- **Done when:** unit tests for the reminder time (line-of-sight and flat sunset, time zones, no sunset, a reminder time that has passed). In the browser with a fake clock, the notification shows 15 minutes before sunset, once. On an Android phone, the notification comes with the app in the background.
+- **Built:**
+  - `src/utils/sunsetReminder.ts`: `SUNSET_REMINDER_MIN = 15`, `getReminderTime` (the sunset minus 15 min, null without a sunset), `isReminderDue` (the reminder time has passed by less than 5 min and the reminder for that sunset day is not shown yet) and `getReminderText` ("Sunset in 15 minutes, at 18:57").
+  - `src/hooks/useSunsetReminder.ts` sets a timeout to the reminder time, checks once a minute and on `visibilitychange`, and shows the notification with `registration.showNotification`. Without a service worker registration (the dev server) it uses `new Notification`. One key per sunset day, so a line-of-sight time that comes in after the flat one does not show a second reminder.
+  - `public/sw-notification-click.js` (loaded with workbox `importScripts`) focuses an open app window on a tap, else opens the app.
+  - `SunTracker` owns the toggle (`localStorage` `sunset-reminder`) and uses the countdown target from item 43 (`getCountdownTarget`), so the reminder follows the line-of-sight sunset when there is one. The reminder runs only in live time (`isTimePreview`). After the sunset there is no target until the day changes; then the sunset of the new day sets the next timer.
+  - InfoPanel Sunset row: an `AlarmClock` button (`AlarmClockCheck` when on) next to the countdown bell, `aria-label` and tooltip "Remind me 15 minutes before sunset (while the app is open)". The tap that turns it on asks for the permission and shows a toast with the "while the app is open" limit. Without the Notification API the button is hidden. With the permission denied it stays off and a toast tells the user to allow notifications in the browser settings.
+- **Checked:** 17 new tests (724 in all), lint, typecheck and build pass. In Chromium at 390×844 with a fake clock (Ravensburg, 2026-09-30, from 18:30): the line-of-sight sunset is 18:57:14. One notification "Sunset in 15 minutes, at 18:57" came at 18:42:13, and no second one until 19:07. At 360×640 the row fits with both buttons. The Android check with the app in the background is still open.
+
+### Fish follow-up (2026-10-01)
+
+### 70. More room on wide screens — S — **✅ Done**
+
+- **Feedback (2026-10-01):** "as they are so slow we can raise the limit for fish and boats, what do you propose?" Then: "build the full rule and lets review it if it gets too crowded".
+- **Now:** since item 66, a crossing on a wide screen takes as long as the width needs at phone speed (3.35× longer at 1440 px). The limits (5 fish, 3 at night, 3 boats) stayed, so at 1440 px there was one fish per 290 px of water (a phone has one per 80 px), and a new fish came only about every 100 s.
+- **Spec:** the limits count per 430 px of width (`getWaterLimit` = round(limit / `getWaterSpeedFactor`)). A phone keeps 5 fish, 3 night fish and 3 boats. At 1280 px: 15, 9, 9. At 1440 px: 17, 10, 10. At 1920 px: 22, 13, 13. The spawn timing does not change: at 1440 px a new fish comes about every 30 s. The boats come about once a minute, so they stay at about 6 on average, below their limit.
+- **Review:** Lutz checks on his Mac whether it gets too crowded. If it does, the fallback is half the rule (8 fish, 5 night fish, 5 boats at 1440 px).
+- **Built:** `getWaterLimit` (`weatherEffectsUtils.ts`), used for the fish limit (day and night) and the boat limit in `CloudLayer`.
+- **Checked:** 4 new tests (707 in all), lint, typecheck and build pass. The limit tests now pin a phone width (390 px) or a wide one (1290 px), because jsdom's window is 1024 px. In Chromium at 1440×900, after two simulated minutes: 12 fish groups (25 fish) on screen.
 
 ### 72. Overcast: a faint sun in the light patch — S — **✅ Done**
 
@@ -894,7 +912,7 @@ These items come from the re-shoot of all states after items 46–56.
   - A faint disc (below 50 %) keeps the white light patch and gets no water glints, as with no disc.
   - The cloud opacity sits on the `Sun` icon, not on the animated button.
 - **Built:** `getSunVisibility` (`weatherEffectsUtils.ts`); `sunShines` and the opacity on the `Sun` icon (`SunVisualization.tsx`).
-- **Checked:** 1 new test (706 in all), lint and typecheck pass. In Chromium at 390×844 (Friedrichshafen, 2026-10-01 11:27, overcast): versions at 5, 10, 20 and 30 % compared; 30 % shows the rays faintly in the light patch.
+- **Checked:** 1 new test (726 in all), lint and typecheck pass. In Chromium at 390×844 (Friedrichshafen, 2026-10-01 11:27, overcast): versions at 5, 10, 20 and 30 % compared; 30 % shows the rays faintly in the light patch.
 
 ---
 

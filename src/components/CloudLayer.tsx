@@ -17,7 +17,7 @@ import {
 import {
   getWeatherEffects, pickBoat, type BoatKind,
   pickFish, canSpawnFish, getRestStopMotion, type FishKind,
-  pickNightFish, pickMoonlitDayFish, MAX_FISH, MAX_NIGHT_FISH, getWaterSpeedFactor,
+  pickNightFish, pickMoonlitDayFish, MAX_FISH, MAX_NIGHT_FISH, getWaterSpeedFactor, getWaterLimit,
 } from '../utils/weatherEffectsUtils';
 
 // ROADMAP item 10: more than the original 6 types - fog, drizzle and hail join the
@@ -64,7 +64,8 @@ const BIRD_RATE_PERCENT_PER_SEC = 5; // was 0.08%/16ms in the old rAF loop
 const LEAF_RATE_PERCENT_PER_SEC = 6;
 // A new boat at least every 55 s. The random part is re-rolled on every 500 ms check, so
 // most gaps end within ~10 s of the minimum. A crossing takes 64-234 s (ROADMAP item 40),
-// so 1-2 boats are out at once, never more than MAX_BOATS. The first sails out ~5 s after load.
+// so 1-2 boats are out at once, never more than MAX_BOATS (on a phone; more on wide screens,
+// item 70). The first sails out ~5 s after load.
 const BOAT_GAP_MIN_MS = 55000;
 const BOAT_GAP_RANGE_MS = 60000;
 const MAX_BOATS = 3;
@@ -417,8 +418,10 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             }
             if (newFish) {
               const next = newFish;
-              // At most five fish (E4), three at night (NR1). Far fish first, so a near fish swims in front.
-              setFish(prev => (canSpawnFish(prev.map(f => f.kind), next.kind, shouldShowNightFish ? MAX_NIGHT_FISH : MAX_FISH)
+              // At most five fish (E4), three at night (NR1), per phone width (item 70). Far fish
+              // first, so a near fish swims in front.
+              const limit = getWaterLimit(shouldShowNightFish ? MAX_NIGHT_FISH : MAX_FISH, window.innerWidth);
+              setFish(prev => (canSpawnFish(prev.map(f => f.kind), next.kind, limit)
                 ? [...prev, next].sort((a, b) => b.depth - a.depth)
                 : prev));
             }
@@ -449,7 +452,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
               depth,
             };
             // Far boats first, so a near boat always sails in front of a far one.
-            setShips(prev => (prev.length >= MAX_BOATS ? prev : [...prev, newShip].sort((a, b) => b.depth - a.depth)));
+            const boatLimit = getWaterLimit(MAX_BOATS, window.innerWidth);
+            setShips(prev => (prev.length >= boatLimit ? prev : [...prev, newShip].sort((a, b) => b.depth - a.depth)));
           }
           lastSpawnTimeRef.current.ships = currentTime;
         }
