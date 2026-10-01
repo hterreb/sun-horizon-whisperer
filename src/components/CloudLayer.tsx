@@ -65,7 +65,7 @@ const LEAF_RATE_PERCENT_PER_SEC = 6;
 // A new boat at least every 55 s. The random part is re-rolled on every 500 ms check, so
 // most gaps end within ~10 s of the minimum. A crossing takes 64-234 s (ROADMAP item 40),
 // so 1-2 boats are out at once, never more than MAX_BOATS (on a phone; more on wide screens,
-// item 67). The first sails out ~5 s after load.
+// item 70). The first sails out ~5 s after load.
 const BOAT_GAP_MIN_MS = 55000;
 const BOAT_GAP_RANGE_MS = 60000;
 const MAX_BOATS = 3;
@@ -418,7 +418,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             }
             if (newFish) {
               const next = newFish;
-              // At most five fish (E4), three at night (NR1), per phone width (item 67). Far fish
+              // At most five fish (E4), three at night (NR1), per phone width (item 70). Far fish
               // first, so a near fish swims in front.
               const limit = getWaterLimit(shouldShowNightFish ? MAX_NIGHT_FISH : MAX_FISH, window.innerWidth);
               setFish(prev => (canSpawnFish(prev.map(f => f.kind), next.kind, limit)

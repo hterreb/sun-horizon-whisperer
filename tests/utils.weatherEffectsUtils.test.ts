@@ -145,7 +145,7 @@ describe('getWaterSpeedFactor (ROADMAP item 66)', () => {
   });
 });
 
-describe('getWaterLimit (ROADMAP item 67)', () => {
+describe('getWaterLimit (ROADMAP item 70)', () => {
   it('keeps the phone limits and grows them with the width on wide screens', () => {
     expect(getWaterLimit(5, 390)).toBe(5);
     expect(getWaterLimit(5, 1440)).toBe(17);

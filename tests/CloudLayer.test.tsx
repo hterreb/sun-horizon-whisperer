@@ -17,7 +17,7 @@ const mockReducedMotion = (matches: boolean) =>
   } as unknown as MediaQueryList);
 
 // The window width the spawn loop sees (jsdom's default is 1024 px). Fish and boat limits
-// grow with the width (ROADMAP item 67), so the limit tests pin a phone or a desktop width.
+// grow with the width (ROADMAP item 70), so the limit tests pin a phone or a desktop width.
 const atWidth = <T,>(width: number, run: () => T): T => {
   const original = window.innerWidth;
   Object.defineProperty(window, 'innerWidth', { value: width, configurable: true, writable: true });
@@ -189,7 +189,7 @@ describe('CloudLayer', () => {
       expect(container.querySelectorAll('[data-testid="scene-boat"]').length).toBe(3);
     });
 
-    it('lets more boats out on a wide screen (ROADMAP item 67)', () => {
+    it('lets more boats out on a wide screen (ROADMAP item 70)', () => {
       // 1290 px is three phones wide: up to 9 boats, so all four spawns stay.
       const container = atWidth(1290, () => spawn({}, 180000));
       expect(container.querySelectorAll('[data-testid="scene-boat"]').length).toBe(4);
@@ -341,7 +341,7 @@ describe('CloudLayer', () => {
       expect(container.querySelectorAll('[data-testid="scene-fish"]').length).toBe(10); // 5 pairs
     });
 
-    it('allows five fish per phone width on a wide screen (ROADMAP item 67)', () => {
+    it('allows five fish per phone width on a wide screen (ROADMAP item 70)', () => {
       // 1290 px: up to 15 fish, so all seven pairs from 40 s stay; by 90 s the 15 are reached.
       expect(atWidth(1290, () => spawnFish({}, 40000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(14);
       expect(atWidth(1290, () => spawnFish({}, 90000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(30);
@@ -386,7 +386,7 @@ describe('CloudLayer', () => {
       expect(spawnNight({ moonlight: moon }, 14000).querySelector('[data-testid="scene-fish"]')).toBeNull();
       // A moonlit classic pair every 15.5 s; six tries in 100 s, three pairs stay on a phone.
       expect(atWidth(390, () => spawnNight({ moonlight: moon }, 100000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(6);
-      // Three phones wide: up to nine, so all six pairs stay (item 67).
+      // Three phones wide: up to nine, so all six pairs stay (item 70).
       expect(atWidth(1290, () => spawnNight({ moonlight: moon }, 100000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(12);
     });
   });
