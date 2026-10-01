@@ -17,7 +17,7 @@ import {
 import {
   getWeatherEffects, pickBoat, type BoatKind,
   pickFish, canSpawnFish, getRestStopMotion, type FishKind,
-  pickNightFish, pickMoonlitDayFish, MAX_FISH, MAX_NIGHT_FISH,
+  pickNightFish, pickMoonlitDayFish, MAX_FISH, MAX_NIGHT_FISH, getWaterSpeedFactor,
 } from '../utils/weatherEffectsUtils';
 
 // ROADMAP item 10: more than the original 6 types - fog, drizzle and hail join the
@@ -124,6 +124,7 @@ const FAR_SHRINK = 0.45; // the farthest boat is 55% of the size, opacity and sp
 
 // ROADMAP item 62 (Fish & Currents lookbook). `size` (px) and `speed` (% of the width per
 // second) are a near fish's; far fish shrink and slow down like the boats (FAR_SHRINK).
+// Calm speeds (item 66): no fish is faster than the sailboat (1.2 %/s), none slower than 0.4.
 // `haze` is how deep the species swims: 0 = at the surface (crisp) to 1 = deep (faint).
 // `glow` is the spot that lights up after sunset (E1), in the icon's 24 px grid.
 // `lights` (night fish, item 65) are always on: [cx, cy, r] in the 24 px grid.
@@ -132,28 +133,28 @@ const FISH: Record<FishKind, {
   Icon: LucideIcon; size: number; speed: number; haze: number; pattern: FishPattern; glow: [number, number];
   lights?: [number, number, number][];
 }> = {
-  classic: { Icon: Fish, size: 20, speed: 2.5, haze: 0.3, pattern: 'companions', glow: [14, 12] },
-  minnow: { Icon: Minnow, size: 10, speed: 3, haze: 0.1, pattern: 'school', glow: [13, 12] },
-  perch: { Icon: Perch, size: 22, speed: 2.2, haze: 0.35, pattern: 'companions', glow: [13.5, 12.5] },
-  pike: { Icon: Pike, size: 32, speed: 2, haze: 0.45, pattern: 'rest', glow: [13, 12] },
-  carp: { Icon: Carp, size: 26, speed: 1.6, haze: 0.65, pattern: 'glide', glow: [12, 12] },
-  catfish: { Icon: Catfish, size: 34, speed: 1.1, haze: 0.85, pattern: 'glide', glow: [12, 13] },
-  trout: { Icon: Trout, size: 22, speed: 2.8, haze: 0, pattern: 'glide', glow: [13, 12] },
-  ray: { Icon: Ray, size: 30, speed: 1.5, haze: 0.75, pattern: 'glide', glow: [12.5, 12] },
-  turtle: { Icon: Turtle, size: 26, speed: 1.2, haze: 0.5, pattern: 'rest', glow: [10, 7] },
-  jellyfish: { Icon: Jellyfish, size: 18, speed: 0.5, haze: 0.3, pattern: 'glide', glow: [12, 9] },
+  classic: { Icon: Fish, size: 20, speed: 1.15, haze: 0.3, pattern: 'companions', glow: [14, 12] },
+  minnow: { Icon: Minnow, size: 10, speed: 1.2, haze: 0.1, pattern: 'school', glow: [13, 12] },
+  perch: { Icon: Perch, size: 22, speed: 1, haze: 0.35, pattern: 'companions', glow: [13.5, 12.5] },
+  pike: { Icon: Pike, size: 32, speed: 0.9, haze: 0.45, pattern: 'rest', glow: [13, 12] },
+  carp: { Icon: Carp, size: 26, speed: 0.7, haze: 0.65, pattern: 'glide', glow: [12, 12] },
+  catfish: { Icon: Catfish, size: 34, speed: 0.5, haze: 0.85, pattern: 'glide', glow: [12, 13] },
+  trout: { Icon: Trout, size: 22, speed: 1.2, haze: 0, pattern: 'glide', glow: [13, 12] },
+  ray: { Icon: Ray, size: 30, speed: 0.7, haze: 0.75, pattern: 'glide', glow: [12.5, 12] },
+  turtle: { Icon: Turtle, size: 26, speed: 0.55, haze: 0.5, pattern: 'rest', glow: [10, 7] },
+  jellyfish: { Icon: Jellyfish, size: 18, speed: 0.4, haze: 0.3, pattern: 'glide', glow: [12, 9] },
   seahorse: { Icon: Seahorse, size: 18, speed: 0.4, haze: 0.4, pattern: 'glide', glow: [12.5, 11] },
-  whale: { Icon: Whale, size: 72, speed: 0.8, haze: 0.8, pattern: 'glide', glow: [13, 12] },
-  pufferfish: { Icon: Pufferfish, size: 20, speed: 1, haze: 0.4, pattern: 'rest', glow: [12.5, 12] },
+  whale: { Icon: Whale, size: 72, speed: 0.4, haze: 0.8, pattern: 'glide', glow: [13, 12] },
+  pufferfish: { Icon: Pufferfish, size: 20, speed: 0.45, haze: 0.4, pattern: 'rest', glow: [12.5, 12] },
   // Night only (ROADMAP item 65).
-  burbot: { Icon: Burbot, size: 30, speed: 1.2, haze: 0, pattern: 'glide', glow: [12, 12] },
-  eel: { Icon: Eel, size: 36, speed: 1.4, haze: 0, pattern: 'glide', glow: [12, 12] },
+  burbot: { Icon: Burbot, size: 30, speed: 0.55, haze: 0, pattern: 'glide', glow: [12, 12] },
+  eel: { Icon: Eel, size: 36, speed: 0.65, haze: 0, pattern: 'glide', glow: [12, 12] },
   lanternfish: {
-    Icon: Lanternfish, size: 16, speed: 2.2, haze: 0, pattern: 'companions', glow: [13, 12],
+    Icon: Lanternfish, size: 16, speed: 1, haze: 0, pattern: 'companions', glow: [13, 12],
     lights: [[8, 13.4, 0.9], [10.5, 14.2, 0.9], [13, 14.7, 0.9], [15.5, 14.8, 0.9], [18, 14.3, 0.9]],
   },
-  anglerfish: { Icon: Anglerfish, size: 26, speed: 0.9, haze: 0, pattern: 'rest', glow: [13, 12], lights: [[20.3, 2.6, 1.3]] },
-  squid: { Icon: FireflySquid, size: 7, speed: 2, haze: 0, pattern: 'school', glow: [12, 12] },
+  anglerfish: { Icon: Anglerfish, size: 26, speed: 0.4, haze: 0, pattern: 'rest', glow: [13, 12], lights: [[20.3, 2.6, 1.3]] },
+  squid: { Icon: FireflySquid, size: 7, speed: 0.9, haze: 0, pattern: 'school', glow: [12, 12] },
 };
 // Night fish with their own light (item 65); all other fish at night are lit by the moon.
 const GLOWING_AT_NIGHT: FishKind[] = ['lanternfish', 'anglerfish', 'squid', 'jellyfish'];
@@ -200,7 +201,7 @@ export const createFish = (
   }
   const startX = -(width / viewportWidth) * 100 - 1;
   const dx = 101 - startX;
-  const speed = spec.speed * nearness; // P4
+  const speed = spec.speed * nearness * getWaterSpeedFactor(viewportWidth); // P4, wide screens (item 66)
   // P8: stop with the fish's left edge at 30-65 % of the width, for 5-8 s.
   const rest = spec.pattern === 'rest'
     ? getRestStopMotion(dx, speed, 30 + random() * 35 - startX, 5 + random() * 3)
@@ -442,7 +443,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
               // music player, or to 94% in fullscreen.
               y: 67 + (1 - depth) * (isFullscreen ? 27 : 20),
               dx: endX - startX,
-              duration: (endX - startX) / (BOATS[kind].speed * (1 - FAR_SHRINK * depth)),
+              // Wide screens: the phone's pixels per second (item 66).
+              duration: (endX - startX) / (BOATS[kind].speed * (1 - FAR_SHRINK * depth) * getWaterSpeedFactor(window.innerWidth)),
               kind,
               depth,
             };
