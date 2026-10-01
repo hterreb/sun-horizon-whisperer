@@ -5,6 +5,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { Button } from './ui/button';
 import LineOfSightDetails from './LineOfSightDetails';
 import PremiumBadge from './PremiumBadge';
+import ShareCardButton from '@/components/ShareCardButton';
 import PlaceSearch from './PlaceSearch';
 import {
   type SunPosition,
@@ -22,6 +23,7 @@ import { type WeatherData } from '../utils/weatherUtils';
 import { getWeatherEffects } from '../utils/weatherEffectsUtils';
 import { isValidLatitude, isValidLongitude } from '../utils/manualLocation';
 import { type HorizonProfileStatus } from '../hooks/useHorizonProfile';
+import { type HorizonProfile } from '@/utils/horizonUtils';
 import { type WeatherType } from './CloudLayer';
 import { getTimeTravelRange, toDateTimeLocalValue } from '@/utils/timeTravel';
 import { formatTemperature, type TemperatureUnit } from '@/utils/temperatureUnit';
@@ -118,6 +120,8 @@ interface InfoPanelProps {
   // Sunset countdown (ROADMAP item 43): the bell toggle in the Sunset row.
   isSunsetCountdownOn?: boolean;
   onSunsetCountdownToggle?: () => void;
+  // Share card (ROADMAP item 68): the terrain silhouette on the card.
+  horizonProfile?: HorizonProfile | null;
   // Sunset reminder (ROADMAP item 69): the alarm-clock toggle next to the bell. Not
   // passed when the browser has no Notification API.
   isSunsetReminderOn?: boolean;
@@ -160,6 +164,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   onTimeJump = () => {},
   isSunsetCountdownOn = false,
   onSunsetCountdownToggle,
+  horizonProfile = null,
   isSunsetReminderOn = false,
   onSunsetReminderToggle,
 }) => {
@@ -787,6 +792,22 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   >
                     {isSunsetReminderOn ? <AlarmClockCheck size={14} /> : <AlarmClock size={14} />}
                   </button>
+                )}
+                {!polarSunLabel && shownSunset && (
+                  <ShareCardButton
+                    className={INLINE_ICON_TOGGLE}
+                    card={{
+                      placeName: hasPlaceName ? locationName : null,
+                      now: currentTime,
+                      flatSunset: shownSunset,
+                      terrainSunset: horizonProfile ? terrainSunTimes?.sunset ?? null : undefined,
+                      scoreToday: weatherData?.sunsetScoreToday,
+                      scoreTomorrow: weatherData?.sunsetScoreTomorrow,
+                    }}
+                    latitude={location.latitude}
+                    longitude={location.longitude}
+                    horizonProfile={horizonProfile}
+                  />
                 )}
               </div>
               <span className="font-semibold text-body tabular-nums">{polarSunLabel ?? formatTime(shownSunset)}</span>

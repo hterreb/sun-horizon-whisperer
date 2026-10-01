@@ -841,6 +841,7 @@ const SunTracker: React.FC = () => {
             onTimeJump={handleTimeJump}
             isSunsetCountdownOn={isCountdownOn}
             onSunsetCountdownToggle={handleCountdownToggle}
+            horizonProfile={horizonProfile}
             isSunsetReminderOn={isReminderOn}
             onSunsetReminderToggle={notificationPermission === 'unsupported' ? undefined : handleReminderToggle}
           />
