@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward, Bell, BellRing } from 'lucide-react';
+import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward, Bell, BellRing, AlarmClock, AlarmClockCheck } from 'lucide-react';
 import { isFeedbackAvailable, openFeedbackForm } from '@/utils/feedback';
 import { ScrollArea } from './ui/scroll-area';
 import { Button } from './ui/button';
 import LineOfSightDetails from './LineOfSightDetails';
 import PremiumBadge from './PremiumBadge';
+import ShareCardButton from '@/components/ShareCardButton';
 import PlaceSearch from './PlaceSearch';
 import {
   type SunPosition,
@@ -22,6 +23,7 @@ import { type WeatherData } from '../utils/weatherUtils';
 import { getWeatherEffects } from '../utils/weatherEffectsUtils';
 import { isValidLatitude, isValidLongitude } from '../utils/manualLocation';
 import { type HorizonProfileStatus } from '../hooks/useHorizonProfile';
+import { type HorizonProfile } from '@/utils/horizonUtils';
 import { type WeatherType } from './CloudLayer';
 import { getTimeTravelRange, toDateTimeLocalValue } from '@/utils/timeTravel';
 import { formatTemperature, type TemperatureUnit } from '@/utils/temperatureUnit';
@@ -118,6 +120,12 @@ interface InfoPanelProps {
   // Sunset countdown (ROADMAP item 43): the bell toggle in the Sunset row.
   isSunsetCountdownOn?: boolean;
   onSunsetCountdownToggle?: () => void;
+  // Share card (ROADMAP item 68): the terrain silhouette on the card.
+  horizonProfile?: HorizonProfile | null;
+  // Sunset reminder (ROADMAP item 69): the alarm-clock toggle next to the bell. Not
+  // passed when the browser has no Notification API.
+  isSunsetReminderOn?: boolean;
+  onSunsetReminderToggle?: () => void;
 }
 
 const InfoPanel: React.FC<InfoPanelProps> = ({
@@ -156,6 +164,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   onTimeJump = () => {},
   isSunsetCountdownOn = false,
   onSunsetCountdownToggle,
+  horizonProfile = null,
+  isSunsetReminderOn = false,
+  onSunsetReminderToggle,
 }) => {
   const [locationName, setLocationName] = useState<string>('');
   const [loadingLocation, setLoadingLocation] = useState(false);
@@ -769,6 +780,34 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   >
                     {isSunsetCountdownOn ? <BellRing size={14} /> : <Bell size={14} />}
                   </button>
+                )}
+                {onSunsetReminderToggle && (
+                  <button
+                    type="button"
+                    onClick={onSunsetReminderToggle}
+                    className={`${INLINE_ICON_TOGGLE} ml-1 ${isSunsetReminderOn ? 'bg-white/20' : ''}`}
+                    aria-label="Remind me 15 minutes before sunset (while the app is open)"
+                    title="Remind me 15 minutes before sunset (while the app is open)"
+                    aria-pressed={isSunsetReminderOn}
+                  >
+                    {isSunsetReminderOn ? <AlarmClockCheck size={14} /> : <AlarmClock size={14} />}
+                  </button>
+                )}
+                {!polarSunLabel && shownSunset && (
+                  <ShareCardButton
+                    className={INLINE_ICON_TOGGLE}
+                    card={{
+                      placeName: hasPlaceName ? locationName : null,
+                      now: currentTime,
+                      flatSunset: shownSunset,
+                      terrainSunset: horizonProfile ? terrainSunTimes?.sunset ?? null : undefined,
+                      scoreToday: weatherData?.sunsetScoreToday,
+                      scoreTomorrow: weatherData?.sunsetScoreTomorrow,
+                    }}
+                    latitude={location.latitude}
+                    longitude={location.longitude}
+                    horizonProfile={horizonProfile}
+                  />
                 )}
               </div>
               <span className="font-semibold text-body tabular-nums">{polarSunLabel ?? formatTime(shownSunset)}</span>

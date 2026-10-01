@@ -252,8 +252,12 @@ describe('getSunVisibility (ROADMAP item 50)', () => {
     }
   });
 
-  it('shows no disc, only a soft light patch, for overcast, fog and rain', () => {
-    for (const t of ['overcast', 'fog', 'rain'] as const) {
+  it('shows a faint pale disc in a soft light patch for overcast (item 72)', () => {
+    expect(getSunVisibility('overcast')).toEqual({ disc: 0.3, halo: 0.6, haloScale: 1.2, pale: 0.6 });
+  });
+
+  it('shows no disc, only a soft light patch, for fog and rain', () => {
+    for (const t of ['fog', 'rain'] as const) {
       const v = getSunVisibility(t);
       expect(v.disc).toBe(0);
       expect(v.halo).toBeGreaterThan(0);
@@ -266,8 +270,8 @@ describe('getSunVisibility (ROADMAP item 50)', () => {
     expect(getSunVisibility('hail')).toEqual({ disc: 0, halo: 0, haloScale: 0, pale: 0 });
   });
 
-  it('keeps the full disc colour outside drizzle and snow', () => {
-    for (const t of ['clear', 'partly', 'cloudy', 'overcast', 'fog', 'rain', 'storm', 'hail'] as const) {
+  it('keeps the full disc colour outside drizzle, snow and overcast', () => {
+    for (const t of ['clear', 'partly', 'cloudy', 'fog', 'rain', 'storm', 'hail'] as const) {
       expect(getSunVisibility(t).pale).toBe(0);
     }
   });

@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44, 47–66, 70 and 71, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), items 67–69 (five languages, share card, sunset reminder), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
+Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44, 47–66 and 70–72, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), items 67–69 (five languages, share card, sunset reminder), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
 
 ## Verification (2026-09-28)
 
@@ -863,7 +863,7 @@ These items come from the re-shoot of all states after items 46–56.
 - **Done when:** a test fails when a key is missing in a dictionary or is not used. In the browser, `de-DE`, `es-ES`, `it-IT` and `fr-FR` show the full UI in that language, with no English left, and the panel layout does not break with the longest strings (390×844 and 360×640).
 - **Note:** this touches almost every component. Build it alone, not in parallel with other UI items. A native speaker should review the four translations.
 
-### 68. Share card: today's sunset as an image — M — Premium
+### 68. Share card: today's sunset as an image — M — Premium — **✅ Done**
 
 - **Spec:**
   1. A "Share" button in the Sunset row of the InfoPanel, with the gold plus (item 35). Free while `PREMIUM_ENFORCED` is false. Item 14 adds it to the gated list.
@@ -872,8 +872,10 @@ These items come from the re-shoot of all states after items 46–56.
   4. No coordinates on the card, only the place name.
   5. Colours come from the scene tokens, so the card looks like the app.
 - **Done when:** unit tests for the card layout data (texts, which times show). In the browser, the button gives a PNG with the expected content for Ravensburg (flat) and Sion (terrain). On an Android phone the share sheet opens.
+- **Built:** `getShareCardData` (`shareCard.ts`) selects the texts: the place name (no coordinates), the date, the line-of-sight sunset with the flat time and the difference, or only the flat time when there is no profile, and the score of the day of the shown sunset. `drawShareCard` draws the 1080×1350 PNG with the scene tokens (`getComputedStyle`): the dusk sky, the sun disc on the horizon or the ridge, the ridge (90° around the sunset azimuth), and the app mark. `shareOrDownload` uses `navigator.canShare({ files })`, else it downloads the PNG; a cancelled share sheet ends quietly. `ShareCardButton` (lucide `Share2`, gold plus) sits after the bell in the Sunset row. It does not show at polar day or night. `SunTracker` passes `horizonProfile` to the InfoPanel.
+- **Checked:** 13 new tests (720 in all), lint, typecheck and build pass. In headless Chromium at 390×844, 2026-10-01 14:00: the Share button sits in the Sunset row. Ravensburg: the card shows line of sight 18:55, flat 19:03 (−9 min), a low ridge and the score. Sion: line of sight 18:36, flat 19:13 (−37 min), with the real ridge from AWS terrain tiles. Headless Chromium has no `canShare`, so both cards came as a download. The Android share sheet is not checked yet.
 
-### 69. Sunset reminder notification — S
+### 69. Sunset reminder notification — S — **✅ Done**
 
 - **Decision (2026-10-01):** "no i dont want a server part, specify item 69 without server just a po up notification a fixed time before the sunset".
 - **Spec:**
@@ -884,6 +886,13 @@ These items come from the re-shoot of all states after items 46–56.
   5. When the browser has no Notification API, or the permission is denied, hide the option or show it as off with a short hint.
 - **Limit:** the reminder only comes while the app is open, also in the background. When the user closes the app or the system stops it, no reminder comes. The option text says this: "while the app is open".
 - **Done when:** unit tests for the reminder time (line-of-sight and flat sunset, time zones, no sunset, a reminder time that has passed). In the browser with a fake clock, the notification shows 15 minutes before sunset, once. On an Android phone, the notification comes with the app in the background.
+- **Built:**
+  - `src/utils/sunsetReminder.ts`: `SUNSET_REMINDER_MIN = 15`, `getReminderTime` (the sunset minus 15 min, null without a sunset), `isReminderDue` (the reminder time has passed by less than 5 min and the reminder for that sunset day is not shown yet) and `getReminderText` ("Sunset in 15 minutes, at 18:57").
+  - `src/hooks/useSunsetReminder.ts` sets a timeout to the reminder time, checks once a minute and on `visibilitychange`, and shows the notification with `registration.showNotification`. Without a service worker registration (the dev server) it uses `new Notification`. One key per sunset day, so a line-of-sight time that comes in after the flat one does not show a second reminder.
+  - `public/sw-notification-click.js` (loaded with workbox `importScripts`) focuses an open app window on a tap, else opens the app.
+  - `SunTracker` owns the toggle (`localStorage` `sunset-reminder`) and uses the countdown target from item 43 (`getCountdownTarget`), so the reminder follows the line-of-sight sunset when there is one. The reminder runs only in live time (`isTimePreview`). After the sunset there is no target until the day changes; then the sunset of the new day sets the next timer.
+  - InfoPanel Sunset row: an `AlarmClock` button (`AlarmClockCheck` when on) next to the countdown bell, `aria-label` and tooltip "Remind me 15 minutes before sunset (while the app is open)". The tap that turns it on asks for the permission and shows a toast with the "while the app is open" limit. Without the Notification API the button is hidden. With the permission denied it stays off and a toast tells the user to allow notifications in the browser settings.
+- **Checked:** 17 new tests (724 in all), lint, typecheck and build pass. In Chromium at 390×844 with a fake clock (Ravensburg, 2026-09-30, from 18:30): the line-of-sight sunset is 18:57:14. One notification "Sunset in 15 minutes, at 18:57" came at 18:42:13, and no second one until 19:07. At 360×640 the row fits with both buttons. The Android check with the app in the background is still open.
 
 ### Fish follow-up (2026-10-01)
 
@@ -896,7 +905,6 @@ These items come from the re-shoot of all states after items 46–56.
 - **Built:** `getWaterLimit` (`weatherEffectsUtils.ts`), used for the fish limit (day and night) and the boat limit in `CloudLayer`.
 - **Checked:** 4 new tests (707 in all), lint, typecheck and build pass. The limit tests now pin a phone width (390 px) or a wide one (1290 px), because jsdom's window is 1024 px. In Chromium at 1440×900, after two simulated minutes: 12 fish groups (25 fish) on screen.
 
-
 ### 71. Fish and boats over the whole water — S — **✅ Done**
 
 - **Feedback (2026-10-01, on the item 70 preview):** "i like it but it feels a bit crowded vertically in the middle, so no fish or boats near the horizon and no fish in the front".
@@ -906,6 +914,17 @@ These items come from the re-shoot of all states after items 46–56.
   - More boats far out: the distance is √random, so 44 % of the boats sail in the farthest quarter, small and pale near the horizon, and big near boats mid-water are rarer. The waterline range stays (67–87 %, 94 % in fullscreen), so boats still go below the music player only in fullscreen.
 - **Built:** `createFish` (`y` = 67 + (1 − depth) × 26 ± 1) and the boat spawn (`depth = Math.sqrt(Math.random())`) in `CloudLayer.tsx`.
 - **Checked:** 1 new test, the fish height test updated (708 in all); lint and typecheck pass. In Chromium at 1440×900, after six simulated minutes: 22 fish groups at 68–94 % of the height, 5 boats at 70–79 %.
+
+### 72. Overcast: a faint sun in the light patch — S — **✅ Done**
+
+- **Feedback (2026-10-01):** "somehow the sund and moon are not visible anymore seems like there is a layer over it". Friedrichshafen, 11:27, weather code 3 (overcast) at 100 % cloud cover. Item 50 hides the disc when overcast, so only the white light patch showed. Then: "it still is too visible, make different versions with 5%, 10% and 20% visibility", and after the comparison: "do the 30%".
+- **Bug found:** the sun button's `animate-glow` animates its opacity (1 ↔ 0.8), and that overrode the inline cloud opacity on the same element. So the disc never dimmed: cloudy (item 50, 80 %), drizzle and snow (item 59, 70 %) all showed at 80–100 %.
+- **Spec:**
+  - Overcast: the disc at 30 % opacity, mixed 60 % toward the overcast grey (`getSunVisibility('overcast')` = disc 0.3, halo 0.6, haloScale 1.2, pale 0.6). Fog and rain still hide the disc.
+  - A faint disc (below 50 %) keeps the white light patch and gets no water glints, as with no disc.
+  - The cloud opacity sits on the `Sun` icon, not on the animated button.
+- **Built:** `getSunVisibility` (`weatherEffectsUtils.ts`); `sunShines` and the opacity on the `Sun` icon (`SunVisualization.tsx`).
+- **Checked:** 1 new test (726 in all), lint and typecheck pass. In Chromium at 390×844 (Friedrichshafen, 2026-10-01 11:27, overcast): versions at 5, 10, 20 and 30 % compared; 30 % shows the rays faintly in the light patch.
 
 ---
 
