@@ -5,6 +5,10 @@
 
 @layer base {
   :root {
+    /* The scene paints its own day and night: keep Chrome's auto dark mode from
+       darkening its light colours (the sun's halo, the white of the boats). */
+    color-scheme: only light;
+
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
 

@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44, 47–74, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
+Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44, 47–75, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
 
 ## Verification (2026-09-28)
 
@@ -997,6 +997,14 @@ These items come from the re-shoot of all states after items 46–56.
   - 19:15, civil twilight: 4 bats, 38 px, 2.5 %/s.
   - 1440×900, 11:00: birds at 5–11 px/s (was 72 px/s). After the fix, every bird, fish and boat moved linearly at its planned speed.
   - No console errors.
+
+### 75. Chrome's auto dark mode darkens the scene — S — **✅ Done**
+
+- **Feedback (2026-10-01, Sentry SUN-CHASER-H):** "I have dark mode in my chrome and the halo around the sun's is not white but dark". Then: "its the same with the white of the boats".
+- **Now:** the app has no dark mode of its own (`darkMode: ["class"]`, and nothing sets `.dark`) and does not declare a `color-scheme`. Chrome's "Auto Dark Mode for Web Contents" then repaints the page: the light sun halo turns dark, the boats' white cabins turn dark and their navy roofs and masts turn pale. The compass ticks, the label rings and the music switch change too.
+- **Spec:** `:root { color-scheme: only light; }` (`src/index.css`). `only light` tells Chrome that the page must not be darkened. The scene already paints its own day and night.
+- **Built:** the one line in `src/index.css`.
+- **Checked:** in Chrome with `--enable-features=WebContentsForceDark` and a dark system theme, Ravensburg, 2026-10-01 13:00, clear: before the fix the halo was a dark ring; after it, the halo is pale yellow-white as in light mode. On a near fishing boat at 3× scale, the fix restores the white cabin, the navy roof and the navy mast. Lint, typecheck and tests pass.
 
 ---
 
