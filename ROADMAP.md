@@ -873,17 +873,17 @@ These items come from the re-shoot of all states after items 46–56.
   5. Colours come from the scene tokens, so the card looks like the app.
 - **Done when:** unit tests for the card layout data (texts, which times show). In the browser, the button gives a PNG with the expected content for Ravensburg (flat) and Sion (terrain). On an Android phone the share sheet opens.
 
-### 69. Sunset reminder notification — M — Depends on 16
+### 69. Sunset reminder notification — S
 
+- **Decision (2026-10-01):** "no i dont want a server part, specify item 69 without server just a po up notification a fixed time before the sunset".
 - **Spec:**
-  1. A bell option in the Sunset row: "Remind me N minutes before sunset" (N = 10, 20 or 30, default 20). It asks for the notification permission only when the user turns it on.
-  2. A browser cannot schedule a local notification for a later time (the Notification Triggers API was stopped). So the reminder uses Web Push: the app saves a push subscription, the rounded location (2 decimals, about 1 km), the time zone and N. A scheduled Supabase Edge Function runs every 5 minutes, calculates the sunset for each subscription and sends the push N minutes before it.
-  3. The notification text: "Sunset in N minutes, at HH:MM", plus the sunset score when it is 60 or more. A tap opens the app.
-  4. Turning the option off, or a push endpoint that returns 404/410, deletes the subscription row.
-  5. Privacy: the privacy policy (item 16) names the stored data and its use. No other data is stored.
-  6. Works in the Play app (TWA) and the installed PWA, also on iOS 16.4+ (installed only). In a browser tab without push support, hide the option.
-- **Done when:** unit tests for the send-time calculation (time zones, the polar day and night with no sunset). A test push arrives on an Android phone and an installed iPhone PWA N minutes before sunset, within 5 minutes.
-- **Note:** this needs a server part (VAPID keys, a subscriptions table, a scheduled function). It is the first backend the frontend uses.
+  1. A bell option in the Sunset row: "Remind me 15 minutes before sunset". The lead time is fixed (`SUNSET_REMINDER_MIN = 15`). The app asks for the notification permission only when the user turns it on. Save the choice in `localStorage` (`sunset-reminder`), with try/catch.
+  2. No server and no Web Push. The app sets a timer to the next reminder time (the line-of-sight sunset when there is one, else the flat sunset, minus 15 minutes). At that time it shows a system notification with `registration.showNotification` of the service worker: "Sunset in 15 minutes, at HH:MM". A tap opens or focuses the app.
+  3. Browsers slow down timers in background tabs. So the app also checks the time on `visibilitychange` and once a minute, and shows the notification when the reminder time has passed by less than 5 minutes and it has not shown it for that sunset yet.
+  4. After the sunset, set the timer for the next day. Time travel (item 44) does not trigger a reminder. No sunset (polar day or night): no reminder.
+  5. When the browser has no Notification API, or the permission is denied, hide the option or show it as off with a short hint.
+- **Limit:** the reminder only comes while the app is open, also in the background. When the user closes the app or the system stops it, no reminder comes. The option text says this: "while the app is open".
+- **Done when:** unit tests for the reminder time (line-of-sight and flat sunset, time zones, no sunset, a reminder time that has passed). In the browser with a fake clock, the notification shows 15 minutes before sunset, once. On an Android phone, the notification comes with the app in the background.
 
 ---
 
