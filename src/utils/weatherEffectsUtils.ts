@@ -148,6 +148,34 @@ const NOT_FISH: FishKind[] = ['turtle', 'jellyfish'];
 export const canSpawnFish = (onScreen: FishKind[], next: FishKind, max = MAX_FISH): boolean =>
   NOT_FISH.includes(next) || onScreen.filter(kind => !NOT_FISH.includes(kind)).length < max;
 
+// Birds & Skies lookbook (ROADMAP item 74). The share of day spawns (sums to 100); a pair,
+// a V, a line or a flock is one spawn.
+export type BirdKind = 'gull' | 'heron' | 'stork' | 'swan' | 'geese' | 'cormorant' | 'kestrel' | 'starlings';
+
+export const BIRD_WEIGHTS: [BirdKind, number][] = [
+  ['gull', 38], ['heron', 10], ['stork', 8], ['swan', 8], ['geese', 10], ['cormorant', 10], ['kestrel', 8], ['starlings', 8],
+];
+
+// Seasons (C1): the months (1 = January) each bird flies at Lake Constance. The others
+// fly all year. South of the equator the seasons shift by half a year.
+const BIRD_MONTHS: Partial<Record<BirdKind, number[]>> = {
+  stork: [3, 4, 5, 6, 7, 8],
+  geese: [3, 4, 9, 10, 11],
+  starlings: [9, 10, 11],
+};
+
+export const isBirdInSeason = (kind: BirdKind, month: number, latitude: number): boolean =>
+  BIRD_MONTHS[kind]?.includes(latitude < 0 ? (month + 5) % 12 + 1 : month) ?? true;
+
+// `evening` = the hour before sunset (C2), the only time the starling flocks come. The
+// gull flies all year, so the mix is never empty.
+export const pickBird = (r: number, month: number, latitude: number, evening: boolean): BirdKind =>
+  pickWeighted(BIRD_WEIGHTS.filter(([kind]) =>
+    isBirdInSeason(kind, month, latitude) && (kind !== 'starlings' || evening)), r);
+
+// At most four birds or groups in the sky (C3), per phone width like the fish (item 70).
+export const MAX_BIRDS = 4;
+
 // Calm water on wide screens (ROADMAP item 66). Fish and boat speeds are a share of the
 // width per second, so on a desktop they move 3-5x more pixels per second than on a phone.
 // Above a large phone's width, this factor slows them to the phone's pixels per second.
