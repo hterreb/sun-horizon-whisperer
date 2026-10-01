@@ -1,6 +1,6 @@
 import React, { Profiler } from 'react';
 import { render, act } from '@testing-library/react';
-import CloudLayer, { WeatherType, createFish } from '../src/components/CloudLayer';
+import CloudLayer, { WeatherType, createFish, createBird } from '../src/components/CloudLayer';
 import { FISH_WEIGHTS, NIGHT_FISH_WEIGHTS, getWaterSpeedFactor } from '../src/utils/weatherEffectsUtils';
 import type { TimeOfDay } from '../src/utils/sunUtils';
 
@@ -138,24 +138,24 @@ describe('CloudLayer', () => {
     };
 
     it('draws bats as a line icon in twilight, not as the emoji', () => {
-      const container = spawn({ timeOfDay: 'nautical-twilight' }, 6000);
+      const container = spawn({ timeOfDay: 'nautical-twilight' }, 9000);
       expect(container.querySelector('[data-testid="scene-bat"]')).not.toBeNull();
       expect(container.textContent).not.toContain('🦇');
     });
 
     it('draws bats as a solid dark silhouette (ROADMAP item 64, B2)', () => {
-      const bat = spawn({ timeOfDay: 'civil-twilight' }, 6000).querySelector('[data-testid="scene-bat"]') as SVGElement;
+      const bat = spawn({ timeOfDay: 'civil-twilight' }, 9000).querySelector('[data-testid="scene-bat"]') as SVGElement;
       expect(bat.getAttribute('fill')).toBe('currentColor');
       expect(bat.style.color).toBe('hsl(var(--scene-critter-silhouette) / 0.9)');
     });
 
     it('flies bats right after sunset, in civil twilight (ROADMAP item 40)', () => {
-      const container = spawn({ timeOfDay: 'civil-twilight' }, 6000);
+      const container = spawn({ timeOfDay: 'civil-twilight' }, 9000);
       expect(container.querySelector('[data-testid="scene-bat"]')).not.toBeNull();
     });
 
     it('keeps the sky quiet in full night: no bats, no birds', () => {
-      const container = spawn({ timeOfDay: 'night' }, 6000);
+      const container = spawn({ timeOfDay: 'night' }, 9000);
       expect(container.querySelector('[data-testid="scene-bat"]')).toBeNull();
     });
 
@@ -423,6 +423,83 @@ describe('CloudLayer', () => {
       expect(atWidth(390, () => spawnNight({ moonlight: moon }, 100000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(6);
       // Three phones wide: up to nine, so all six pairs stay (item 70).
       expect(atWidth(1290, () => spawnNight({ moonlight: moon }, 100000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(12);
+    });
+  });
+
+  describe('birds (ROADMAP item 74)', () => {
+    const spawnBirds = (props: Partial<React.ComponentProps<typeof CloudLayer>>, ms: number, random = 0) => {
+      vi.useFakeTimers();
+      const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(random);
+      const view = render(<CloudLayer weatherType="clear" timeOfDay="midday" {...props} />);
+      act(() => { vi.advanceTimersByTime(ms); });
+      randomSpy.mockRestore();
+      vi.useRealTimers();
+      return view.container;
+    };
+    const always = (r: number) => () => r;
+    const speed = (bird: ReturnType<typeof createBird>) => bird.dx / bird.duration; // % of the width per second
+
+    it('flies no bird faster than 2.5 %/s, half of the old 5 %/s, and the bats too (M2)', () => {
+      for (const kind of ['gull', 'heron', 'stork', 'swan', 'geese', 'cormorant', 'starlings', 'bat'] as const) {
+        expect(speed(createBird(kind, 390, 1, always(0)))).toBeLessThanOrEqual(2.5 + 1e-9);
+      }
+      expect(speed(createBird('bat', 390, 1, always(0)))).toBeCloseTo(2.5, 10);
+      expect(speed(createBird('heron', 390, 1, always(0)))).toBeCloseTo(1.6, 10);
+      expect(speed(createBird('gull', 390, 0.6, always(0)))).toBeCloseTo(1.5, 10); // strong wind (item 10)
+    });
+
+    it('moves birds at most at a phone\'s pixels per second on wide screens (C4)', () => {
+      const pxPerSec = (width: number) => speed(createBird('gull', width, 1, always(0))) / 100 * width;
+      expect(pxPerSec(390)).toBeCloseTo(9.75, 5);
+      expect(pxPerSec(1440)).toBeCloseTo(10.75, 5);
+    });
+
+    it('flies far birds lower, smaller, slower and paler than near ones (M3)', () => {
+      const near = createBird('gull', 390, 1, always(0));
+      const far = createBird('gull', 390, 1, always(0.999));
+      expect(near.size).toBe(34);
+      expect(far.size).toBe(19);
+      // Near birds high, far ones low, but well above the horizon at 65 %.
+      expect(near.y).toBeCloseTo(18, 5);
+      expect(far.y).toBeCloseTo(52, 0);
+      expect(speed(far)).toBeLessThan(speed(near) * 0.6);
+      expect(far.opacity).toBeLessThan(near.opacity);
+    });
+
+    it('flies storks and swans in pairs, geese in a V, cormorants in a line, starlings in a far flock (M4-M7)', () => {
+      expect(createBird('stork', 390, 1, always(0)).group).toHaveLength(2);
+      expect(createBird('swan', 390, 1, always(0)).group).toHaveLength(2);
+      expect(createBird('geese', 390, 1, always(0)).group).toHaveLength(5);
+      expect(createBird('geese', 390, 1, always(0.999)).group).toHaveLength(9);
+      expect(createBird('cormorant', 390, 1, always(0)).group).toHaveLength(3);
+      expect(createBird('cormorant', 390, 1, always(0.999)).group).toHaveLength(5);
+      const flock = createBird('starlings', 390, 1, always(0.999));
+      expect(flock.group).toHaveLength(30);
+      expect(flock.depth).toBeGreaterThanOrEqual(0.8);
+      expect(createBird('gull', 390, 1, always(0)).group).toBeUndefined();
+    });
+
+    it('lets the kestrel hang in the wind; the others glide straight (M8)', () => {
+      expect(createBird('kestrel', 390, 1, always(0.5)).easing).toMatch(/^linear\(/);
+      expect(createBird('gull', 390, 1, always(0.5)).easing).toBeUndefined();
+    });
+
+    it('keeps at most four birds or groups in the sky, more on wide screens (C3)', () => {
+      // A roll of 0 sends a gull every 8.5 s. jsdom never ends the animations, so they stay.
+      expect(spawnBirds({}, 8000).querySelector('[data-testid="scene-bird"]')).toBeNull();
+      expect(atWidth(390, () => spawnBirds({}, 120000)).querySelectorAll('[data-testid="scene-bird"]').length).toBe(4);
+      expect(atWidth(1290, () => spawnBirds({}, 120000)).querySelectorAll('[data-testid="scene-bird"]').length).toBe(12);
+    });
+
+    it('crosses the moon with a V of geese at night, in the migration months only (W14)', () => {
+      const night = { timeOfDay: 'night' as const, date: new Date('2026-10-01T23:00:00'), latitude: 47.8 };
+      const geese = spawnBirds({ ...night, moon: { x: 70, y: 22.4 } }, 31000)
+        .querySelectorAll('[data-testid="scene-bird"][data-kind="geese"]');
+      expect(geese.length).toBe(5);
+      expect((geese[0].parentElement?.parentElement as HTMLElement).style.top).toBe('22%');
+      expect(spawnBirds(night, 31000).querySelector('[data-testid="scene-bird"]')).toBeNull();
+      const july = { ...night, date: new Date('2026-07-01T23:00:00'), moon: { x: 70, y: 22 } };
+      expect(spawnBirds(july, 31000).querySelector('[data-testid="scene-bird"]')).toBeNull();
     });
   });
 });

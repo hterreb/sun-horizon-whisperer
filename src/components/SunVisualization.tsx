@@ -848,6 +848,9 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         windDirectionDeg={windDirectionDeg}
         isFullscreen={isFullscreen}
         moonlight={{ x: containerDimensions.width > 0 ? moonX / containerDimensions.width : 0.5, strength: moonPool }}
+        moon={isMoonVisible && moonCloudFactor > 0 && containerDimensions.height > 0
+          ? { x: (moonX / containerDimensions.width) * 100, y: (moonY / containerDimensions.height) * 100 }
+          : null}
       />
       <WeatherEffects
         weatherType={weatherType}
