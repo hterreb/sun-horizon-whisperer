@@ -1,4 +1,4 @@
-import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, hasBoatWake, getBoatTone, pickFish, FISH_WEIGHTS, canSpawnFish, getRestStopMotion, pickNightFish, pickMoonlitDayFish, NIGHT_FISH_WEIGHTS, MAX_NIGHT_FISH, getWaterSpeedFactor, getWaterLimit, getStarCloudFactor, getTwilightStars, getSkyOvercastMix, getSunVisibility, getMoonCloudFactor } from '../src/utils/weatherEffectsUtils';
+import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, hasBoatWake, getBoatTone, pickFish, FISH_WEIGHTS, canSpawnFish, getRestStopMotion, pickNightFish, pickMoonlitDayFish, NIGHT_FISH_WEIGHTS, MAX_NIGHT_FISH, getWaterSpeedFactor, getWaterLimit, getStarCloudFactor, getTwilightStars, getSkyOvercastMix, getSunVisibility, getMoonCloudFactor, BIRD_WEIGHTS, pickBird, isBirdInSeason } from '../src/utils/weatherEffectsUtils';
 
 describe('getWeatherEffects (ROADMAP item 10)', () => {
   it('shows fog only for the fog type', () => {
@@ -187,6 +187,33 @@ describe('getWaterLimit (ROADMAP item 70)', () => {
     expect(getWaterLimit(5, 1440)).toBe(17);
     expect(getWaterLimit(3, 1440)).toBe(10);
     expect(getWaterLimit(5, 1920)).toBe(22);
+  });
+});
+
+describe('bird mix and seasons (ROADMAP item 74)', () => {
+  const picks = (month: number, latitude: number, evening: boolean) =>
+    new Set(Array.from({ length: 100 }, (_, i) => pickBird(i / 100, month, latitude, evening)));
+
+  it('has weights that sum to 100; in October before sunset all but the storks fly', () => {
+    expect(BIRD_WEIGHTS.reduce((sum, [, weight]) => sum + weight, 0)).toBe(100);
+    expect(picks(10, 47.8, true)).toEqual(new Set(['gull', 'heron', 'swan', 'geese', 'cormorant', 'kestrel', 'starlings']));
+  });
+
+  it('sends the starling flocks only in the hour before sunset (C2)', () => {
+    expect(picks(10, 47.8, false).has('starlings')).toBe(false);
+  });
+
+  it('flies each bird in its months, half a year later south of the equator (C1)', () => {
+    expect(isBirdInSeason('stork', 5, 47.8)).toBe(true);
+    expect(isBirdInSeason('stork', 10, 47.8)).toBe(false);
+    expect(isBirdInSeason('geese', 10, 47.8)).toBe(true);
+    expect(isBirdInSeason('geese', 7, 47.8)).toBe(false);
+    expect(isBirdInSeason('stork', 11, -33.9)).toBe(true);
+    expect(isBirdInSeason('stork', 5, -33.9)).toBe(false);
+    expect(isBirdInSeason('gull', 1, 47.8)).toBe(true);
+    const july = picks(7, 47.8, true);
+    expect(july.has('stork')).toBe(true);
+    expect(july.has('geese') || july.has('starlings')).toBe(false);
   });
 });
 
