@@ -875,7 +875,7 @@ These items come from the re-shoot of all states after items 46–56.
 - **Built:** `getShareCardData` (`shareCard.ts`) selects the texts: the place name (no coordinates), the date, the line-of-sight sunset with the flat time and the difference, or only the flat time when there is no profile, and the score of the day of the shown sunset. `drawShareCard` draws the 1080×1350 PNG with the scene tokens (`getComputedStyle`): the dusk sky, the sun disc on the horizon or the ridge, the ridge (90° around the sunset azimuth), and the app mark. `shareOrDownload` uses `navigator.canShare({ files })`, else it downloads the PNG; a cancelled share sheet ends quietly. `ShareCardButton` (lucide `Share2`, gold plus) sits after the bell in the Sunset row. It does not show at polar day or night. `SunTracker` passes `horizonProfile` to the InfoPanel.
 - **Checked:** 13 new tests (720 in all), lint, typecheck and build pass. In headless Chromium at 390×844, 2026-10-01 14:00: the Share button sits in the Sunset row. Ravensburg: the card shows line of sight 18:55, flat 19:03 (−9 min), a low ridge and the score. Sion: line of sight 18:36, flat 19:13 (−37 min), with the real ridge from AWS terrain tiles. Headless Chromium has no `canShare`, so both cards came as a download. The Android share sheet is not checked yet.
 
-### 69. Sunset reminder notification — S
+### 69. Sunset reminder notification — S — **✅ Done**
 
 - **Decision (2026-10-01):** "no i dont want a server part, specify item 69 without server just a po up notification a fixed time before the sunset".
 - **Spec:**
@@ -886,6 +886,13 @@ These items come from the re-shoot of all states after items 46–56.
   5. When the browser has no Notification API, or the permission is denied, hide the option or show it as off with a short hint.
 - **Limit:** the reminder only comes while the app is open, also in the background. When the user closes the app or the system stops it, no reminder comes. The option text says this: "while the app is open".
 - **Done when:** unit tests for the reminder time (line-of-sight and flat sunset, time zones, no sunset, a reminder time that has passed). In the browser with a fake clock, the notification shows 15 minutes before sunset, once. On an Android phone, the notification comes with the app in the background.
+- **Built:**
+  - `src/utils/sunsetReminder.ts`: `SUNSET_REMINDER_MIN = 15`, `getReminderTime` (the sunset minus 15 min, null without a sunset), `isReminderDue` (the reminder time has passed by less than 5 min and the reminder for that sunset day is not shown yet) and `getReminderText` ("Sunset in 15 minutes, at 18:57").
+  - `src/hooks/useSunsetReminder.ts` sets a timeout to the reminder time, checks once a minute and on `visibilitychange`, and shows the notification with `registration.showNotification`. Without a service worker registration (the dev server) it uses `new Notification`. One key per sunset day, so a line-of-sight time that comes in after the flat one does not show a second reminder.
+  - `public/sw-notification-click.js` (loaded with workbox `importScripts`) focuses an open app window on a tap, else opens the app.
+  - `SunTracker` owns the toggle (`localStorage` `sunset-reminder`) and uses the countdown target from item 43 (`getCountdownTarget`), so the reminder follows the line-of-sight sunset when there is one. The reminder runs only in live time (`isTimePreview`). After the sunset there is no target until the day changes; then the sunset of the new day sets the next timer.
+  - InfoPanel Sunset row: an `AlarmClock` button (`AlarmClockCheck` when on) next to the countdown bell, `aria-label` and tooltip "Remind me 15 minutes before sunset (while the app is open)". The tap that turns it on asks for the permission and shows a toast with the "while the app is open" limit. Without the Notification API the button is hidden. With the permission denied it stays off and a toast tells the user to allow notifications in the browser settings.
+- **Checked:** 17 new tests (724 in all), lint, typecheck and build pass. In Chromium at 390×844 with a fake clock (Ravensburg, 2026-09-30, from 18:30): the line-of-sight sunset is 18:57:14. One notification "Sunset in 15 minutes, at 18:57" came at 18:42:13, and no second one until 19:07. At 360×640 the row fits with both buttons. The Android check with the app in the background is still open.
 
 ### Fish follow-up (2026-10-01)
 
