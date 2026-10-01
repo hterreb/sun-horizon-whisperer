@@ -241,6 +241,14 @@ describe('InfoPanel', () => {
     expect(screen.getAllByText(/sun does not set/i).length).toBeGreaterThan(0);
   });
 
+  it('shows the Share button in the Sunset row, but not at polar day (ROADMAP item 68)', () => {
+    const { unmount } = render(<InfoPanel {...defaultProps} />);
+    expect(screen.getByRole('button', { name: 'Share sunset card' })).toBeInTheDocument();
+    unmount();
+    render(<InfoPanel {...defaultProps} sunTimes={{ ...sunTimes, polar: 'day' }} />);
+    expect(screen.queryByRole('button', { name: 'Share sunset card' })).not.toBeInTheDocument();
+  });
+
   it('shows "Sun does not rise" instead of a fake time during polar night (C-5)', () => {
     render(<InfoPanel {...defaultProps} sunTimes={{ ...sunTimes, polar: 'night' }} />);
     expect(screen.getAllByText(/sun does not rise/i).length).toBeGreaterThan(0);

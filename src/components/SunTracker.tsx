@@ -799,6 +799,7 @@ const SunTracker: React.FC = () => {
             onTimeJump={handleTimeJump}
             isSunsetCountdownOn={isCountdownOn}
             onSunsetCountdownToggle={handleCountdownToggle}
+            horizonProfile={horizonProfile}
           />
         </>
       )}
