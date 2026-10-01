@@ -1,4 +1,4 @@
-import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, pickFish, FISH_WEIGHTS, canSpawnFish, getRestStopMotion, pickNightFish, pickMoonlitDayFish, NIGHT_FISH_WEIGHTS, MAX_NIGHT_FISH, getWaterSpeedFactor, getWaterLimit, getStarCloudFactor, getTwilightStars, getSkyOvercastMix, getSunVisibility, getMoonCloudFactor } from '../src/utils/weatherEffectsUtils';
+import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, hasBoatWake, getBoatTone, pickFish, FISH_WEIGHTS, canSpawnFish, getRestStopMotion, pickNightFish, pickMoonlitDayFish, NIGHT_FISH_WEIGHTS, MAX_NIGHT_FISH, getWaterSpeedFactor, getWaterLimit, getStarCloudFactor, getTwilightStars, getSkyOvercastMix, getSunVisibility, getMoonCloudFactor } from '../src/utils/weatherEffectsUtils';
 
 describe('getWeatherEffects (ROADMAP item 10)', () => {
   it('shows fog only for the fog type', () => {
@@ -94,6 +94,42 @@ describe('pickBoat (ROADMAP item 36)', () => {
   it('keeps the rowboat ashore above 40 km/h wind', () => {
     expect(picks('clear', 41).has('rowboat')).toBe(false);
     expect(picks('clear', 40).has('rowboat')).toBe(true);
+  });
+});
+
+describe('pickBoat in a storm (ROADMAP item 73)', () => {
+  it('sends out only the ferry and the freighter, never a sailboat', () => {
+    const picks = new Set(Array.from({ length: 100 }, (_, i) => pickBoat('storm', 60, i / 100)));
+    expect(picks).toEqual(new Set(['ferry', 'freighter']));
+  });
+});
+
+describe('hasBoatWake (ROADMAP item 73, X2)', () => {
+  it('gives the ferry and the freighter a wake in any wind', () => {
+    expect(hasBoatWake('ferry', 0)).toBe(true);
+    expect(hasBoatWake('freighter', null)).toBe(true);
+  });
+
+  it('gives the sailboat a wake only in strong wind (> 40 km/h)', () => {
+    expect(hasBoatWake('sailboat', 40)).toBe(false);
+    expect(hasBoatWake('sailboat', 41)).toBe(true);
+  });
+
+  it('never gives the rowboat or the fishing boat a wake', () => {
+    expect(hasBoatWake('rowboat', 80)).toBe(false);
+    expect(hasBoatWake('fishing', 80)).toBe(false);
+  });
+});
+
+describe('getBoatTone (ROADMAP item 73, B3)', () => {
+  it('maps the time of day to the light on the boats', () => {
+    expect(getBoatTone('midday')).toBe('day');
+    expect(getBoatTone('afternoon')).toBe('day');
+    expect(getBoatTone('dawn')).toBe('sun');
+    expect(getBoatTone('evening')).toBe('sun');
+    expect(getBoatTone('civil-twilight')).toBe('twilight');
+    expect(getBoatTone('nautical-twilight')).toBe('night');
+    expect(getBoatTone('night')).toBe('night');
   });
 });
 

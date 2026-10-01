@@ -67,9 +67,9 @@ export const canFlashLightning = (lastFlashAtMs: number | null, nowMs: number): 
   lastFlashAtMs === null || nowMs - lastFlashAtMs >= LIGHTNING_MIN_GAP_MS;
 
 // Boat mix (ROADMAP item 36): which boat sails out next, weighted. Sailboats are the
-// most common. Wet or foggy weather leaves only the big boats (ferry, freighter), and
-// strong wind keeps the rowboat ashore. Storm and hail (no boats at all) stay in
-// CloudLayer's shouldShowShips.
+// most common. Wet, foggy or stormy weather leaves only the big boats (ferry, freighter),
+// and strong wind keeps the rowboat ashore. Hail (no boats at all) stays in CloudLayer's
+// shouldShowShips.
 export type BoatKind = 'sailboat' | 'ferry' | 'fishing' | 'rowboat' | 'freighter';
 
 const BOAT_WEIGHTS: [BoatKind, number][] = [
@@ -93,6 +93,23 @@ export const pickBoat = (type: WeatherType, windKmh: number | null | undefined, 
   return pickWeighted(BOAT_WEIGHTS.filter(([kind]) =>
     (fair || BIG_BOATS.includes(kind)) && !(strongWind && kind === 'rowboat')), r);
 };
+
+// Wake (ROADMAP item 73, Fleet Styles X2): only a boat that moves fast trails one. The
+// ferry and the freighter always; the sailboat only in strong wind; the rowboat never.
+// The fishing boat has none.
+export const hasBoatWake = (kind: BoatKind, windKmh: number | null | undefined): boolean =>
+  BIG_BOATS.includes(kind) || (kind === 'sailboat' && (windKmh ?? 0) > STRONG_WIND_KMH);
+
+// The light on the boats (ROADMAP item 73, B3): 'sun' when the sky is warm (dawn and
+// evening, the sails catch the peach light), dim in civil twilight, dark from nautical
+// twilight on. Every other time is plain daylight.
+export type BoatTone = 'day' | 'sun' | 'twilight' | 'night';
+
+export const getBoatTone = (timeOfDay: TimeOfDay): BoatTone =>
+  timeOfDay === 'dawn' || timeOfDay === 'evening' ? 'sun' :
+  timeOfDay === 'civil-twilight' ? 'twilight' :
+  timeOfDay === 'nautical-twilight' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'night' ? 'night' :
+  'day';
 
 // Fish mix (ROADMAP item 62, Fish & Currents lookbook): which species swims out next.
 // The weights are each species' share of all spawns (sum 100). The sea visitors are rare.
