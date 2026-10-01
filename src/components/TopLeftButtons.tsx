@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { type CompassStatus } from '@/hooks/useCompassHeading';
 import { GLASS_ICON_BUTTON } from '@/utils/glassChrome';
 import { isFeedbackAvailable, openFeedbackForm } from '@/utils/feedback';
+import { useLanguage } from '@/hooks/useLanguage';
 import FullscreenButton from './FullscreenButton';
 import CompassToggle from './CompassToggle';
 
@@ -33,6 +34,7 @@ const TopLeftButtons: React.FC<TopLeftButtonsProps> = ({
   onCompassDisable
 }) => {
   const isVisible = !isFullscreen || showCursor;
+  const { t } = useLanguage();
 
   return (
     <div
@@ -50,10 +52,10 @@ const TopLeftButtons: React.FC<TopLeftButtonsProps> = ({
         <Button
           variant="ghost"
           size="icon"
-          onClick={openFeedbackForm}
-          aria-label="Send feedback"
+          onClick={() => openFeedbackForm(t)}
+          aria-label={t('feedback.send')}
           className={`${GLASS_ICON_BUTTON} text-white`}
-          title="Send feedback"
+          title={t('feedback.send')}
         >
           <MessageSquare className="h-4 w-4" />
         </Button>

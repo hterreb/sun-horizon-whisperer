@@ -31,6 +31,17 @@ describe('geocodeUtils', () => {
       expect(calledUrl).toContain('format=json');
     });
 
+    it('asks for the names in the UI language (ROADMAP item 67)', async () => {
+      const fetchMock = vi.fn(() =>
+        Promise.resolve({ ok: true, json: () => Promise.resolve({ results: [] }) })
+      );
+      vi.stubGlobal('fetch', fetchMock);
+
+      await searchPlaces('Mailand', undefined, 'it');
+
+      expect(String(fetchMock.mock.calls[0][0])).toContain('language=it');
+    });
+
     it('parses up to 5 results with name, admin1 and country', async () => {
       const fetchMock = vi.fn(() =>
         Promise.resolve({

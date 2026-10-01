@@ -53,6 +53,7 @@ describe('isReminderDue (ROADMAP item 69)', () => {
 
 describe('getReminderText (ROADMAP item 69)', () => {
   it('names the lead time and the sunset time', () => {
-    expect(getReminderText(terrain.sunset)).toMatch(/^Sunset in 15 minutes, at \d{2}:\d{2}$/);
+    expect(getReminderText(terrain.sunset, 'en')).toMatch(/^Sunset in 15 minutes, at \d{2}:\d{2}$/);
+    expect(getReminderText(terrain.sunset, 'de')).toMatch(/^Sonnenuntergang in 15 Minuten, um \d{2}:\d{2}$/);
   });
 });

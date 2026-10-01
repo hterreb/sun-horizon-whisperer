@@ -6,7 +6,9 @@
 
 import { formatTime, getSunPosition } from './sunUtils';
 import { horizonAngleAt, type HorizonProfile } from './horizonUtils';
-import { type SunsetScoreResult } from './weatherUtils';
+import { getScoreReason, type SunsetScoreResult } from './weatherUtils';
+import { translate } from '@/i18n';
+import { type Language } from '@/utils/language';
 
 export const SHARE_CARD_WIDTH = 1080;
 export const SHARE_CARD_HEIGHT = 1350;
@@ -52,22 +54,21 @@ export const getShareCardData = ({
   terrainSunset,
   scoreToday = null,
   scoreTomorrow = null,
-}: ShareCardInput): ShareCardData => {
+}: ShareCardInput, language: Language): ShareCardData => {
   const hasProfile = terrainSunset !== undefined;
-  const flatTime = formatTime(flatSunset);
-  let timeLabel = 'Sunset';
+  const flatTime = formatTime(flatSunset, language);
+  let timeLabel = translate(language, 'sun.sunset');
   let timeText = flatTime;
   let flatText: string | null = null;
   if (hasProfile) {
-    flatText = `Flat horizon ${flatTime}`;
+    flatText = translate(language, 'share.flatHorizon', { time: flatTime });
+    timeLabel = translate(language, 'share.lineOfSight');
     if (terrainSunset) {
       const diff = Math.round((terrainSunset.getTime() - flatSunset.getTime()) / 60000);
-      timeLabel = 'Sunset, line of sight';
-      timeText = formatTime(terrainSunset);
-      flatText += ` (${diff >= 0 ? '+' : '−'}${Math.abs(diff)} min)`;
+      timeText = formatTime(terrainSunset, language);
+      flatText += ` (${diff >= 0 ? '+' : '−'}${translate(language, 'common.minutes', { value: Math.abs(diff) })})`;
     } else {
-      timeLabel = 'Sunset, line of sight';
-      timeText = 'Behind terrain';
+      timeText = translate(language, 'terrain.behind');
     }
   }
 
@@ -76,11 +77,11 @@ export const getShareCardData = ({
 
   return {
     placeName: placeName?.trim() || null,
-    dateText: flatSunset.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
+    dateText: flatSunset.toLocaleDateString(language, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
     timeLabel,
     timeText,
     flatText,
-    scoreText: score ? `Sunset score ${score.score}/10 · ${score.reason}` : null,
+    scoreText: score ? translate(language, 'share.score', { score: score.score, reason: getScoreReason(score, language) }) : null,
     sunTime: terrainSunset ?? flatSunset,
     fileName: `sun-chaser-sunset-${flatSunset.getFullYear()}-${pad(flatSunset.getMonth() + 1)}-${pad(flatSunset.getDate())}.png`,
   };

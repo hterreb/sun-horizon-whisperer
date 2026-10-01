@@ -1,4 +1,4 @@
-import { fetchCurrentWeather, getSunsetScore, WMO_CODE_MAP } from '../src/utils/weatherUtils';
+import { fetchCurrentWeather, getSunsetScore, getScoreReason, WMO_CODE_MAP } from '../src/utils/weatherUtils';
 import { type WeatherType } from '../src/components/CloudLayer';
 describe('weatherUtils', () => {
   it('fetches weather data (mocked)', async () => {
@@ -181,7 +181,7 @@ describe('WMO_CODE_MAP (ROADMAP item 10)', () => {
 
     const data = await fetchCurrentWeather(2, 2);
     expect(data.weatherType).toBe('clear');
-    expect(data.weatherDescription).toBe('Unknown');
+    expect(data.conditionKey).toBe('condition.unknown');
   });
 });
 
@@ -232,11 +232,34 @@ describe('fetchCurrentWeather cloud/wind fields (ROADMAP item 10)', () => {
     expect(data.windDirectionDeg).toBeNull();
   });
 
-  it('normalizes a pre-item-10 cache entry without cloud/wind fields', async () => {
+  it('ignores a pre-item-67 cache entry that has English texts instead of keys', async () => {
     const legacyCached = {
       temperature: 15,
       weatherType: 'clear',
       weatherDescription: 'Clear sky',
+      lastUpdated: new Date().toISOString(),
+      isRealWeather: true,
+      sunsetScoreToday: { score: 5, reason: 'clear sky, clear horizon' },
+      sunsetScoreTomorrow: null,
+    };
+    localStorage.setItem('weather_cache', JSON.stringify({ data: legacyCached, timestamp: Date.now(), latitude: 7, longitude: 7 }));
+    global.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ current_weather: { temperature: 21, weathercode: 3, windspeed: 0, winddirection: 0, time: '' } }),
+      })
+    ) as unknown as typeof fetch;
+
+    const data = await fetchCurrentWeather(7, 7);
+    expect(global.fetch).toHaveBeenCalled();
+    expect(data.conditionKey).toBe('condition.overcast');
+  });
+
+  it('normalizes a pre-item-10 cache entry without cloud/wind fields', async () => {
+    const legacyCached = {
+      temperature: 15,
+      weatherType: 'clear',
+      conditionKey: 'condition.clearSky',
       lastUpdated: new Date().toISOString(),
       isRealWeather: true,
       sunsetScoreToday: null,
@@ -266,17 +289,19 @@ describe('getSunsetScore (ROADMAP item 11)', () => {
   });
 
   it('scores ideal broken high/mid clouds with a clear horizon near the top', () => {
-    const { score, reason } = getSunsetScore({ low: 0, mid: 50, high: 50, visibility: 24140 });
-    expect(score).toBeGreaterThanOrEqual(8);
-    expect(score).toBeLessThanOrEqual(10);
-    expect(reason).toContain('clouds');
-    expect(reason).toContain('clear horizon');
+    const result = getSunsetScore({ low: 0, mid: 50, high: 50, visibility: 24140 });
+    expect(result.score).toBeGreaterThanOrEqual(8);
+    expect(result.score).toBeLessThanOrEqual(10);
+    expect(result.clouds).toBe('score.cloudsHighMid');
+    expect(result.horizon).toBe('score.horizonClear');
+    expect(getScoreReason(result, 'en')).toBe('high clouds and mid clouds, clear horizon');
+    expect(getScoreReason(result, 'de')).toBe('hohe und mittelhohe Wolken, klarer Horizont');
   });
 
   it('scores fog low regardless of cloud cover', () => {
-    const { score, reason } = getSunsetScore({ low: 0, mid: 0, high: 0, visibility: 200 });
+    const { score, horizon } = getSunsetScore({ low: 0, mid: 0, high: 0, visibility: 200 });
     expect(score).toBeLessThanOrEqual(2);
-    expect(reason).toContain('fog');
+    expect(horizon).toBe('score.horizonFog');
   });
 
   it('clamps the score to [0, 10]', () => {
