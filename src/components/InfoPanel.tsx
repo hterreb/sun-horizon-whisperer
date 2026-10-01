@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward, Bell, BellRing } from 'lucide-react';
+import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward, Bell, BellRing, AlarmClock, AlarmClockCheck } from 'lucide-react';
 import { isFeedbackAvailable, openFeedbackForm } from '@/utils/feedback';
 import { ScrollArea } from './ui/scroll-area';
 import { Button } from './ui/button';
@@ -118,6 +118,10 @@ interface InfoPanelProps {
   // Sunset countdown (ROADMAP item 43): the bell toggle in the Sunset row.
   isSunsetCountdownOn?: boolean;
   onSunsetCountdownToggle?: () => void;
+  // Sunset reminder (ROADMAP item 69): the alarm-clock toggle next to the bell. Not
+  // passed when the browser has no Notification API.
+  isSunsetReminderOn?: boolean;
+  onSunsetReminderToggle?: () => void;
 }
 
 const InfoPanel: React.FC<InfoPanelProps> = ({
@@ -156,6 +160,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   onTimeJump = () => {},
   isSunsetCountdownOn = false,
   onSunsetCountdownToggle,
+  isSunsetReminderOn = false,
+  onSunsetReminderToggle,
 }) => {
   const [locationName, setLocationName] = useState<string>('');
   const [loadingLocation, setLoadingLocation] = useState(false);
@@ -768,6 +774,18 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                     aria-pressed={isSunsetCountdownOn}
                   >
                     {isSunsetCountdownOn ? <BellRing size={14} /> : <Bell size={14} />}
+                  </button>
+                )}
+                {onSunsetReminderToggle && (
+                  <button
+                    type="button"
+                    onClick={onSunsetReminderToggle}
+                    className={`${INLINE_ICON_TOGGLE} ml-1 ${isSunsetReminderOn ? 'bg-white/20' : ''}`}
+                    aria-label="Remind me 15 minutes before sunset (while the app is open)"
+                    title="Remind me 15 minutes before sunset (while the app is open)"
+                    aria-pressed={isSunsetReminderOn}
+                  >
+                    {isSunsetReminderOn ? <AlarmClockCheck size={14} /> : <AlarmClock size={14} />}
                   </button>
                 )}
               </div>
