@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Fish, Leaf, Turtle, type LucideIcon } from 'lucide-react';
 import SceneBoat from './SceneBoat';
+import SceneBird from './SceneBird';
 import {
   Bat,
   Carp, Catfish, Jellyfish, Minnow, Perch, Pike, Pufferfish, Ray, Seahorse, Trout, Whale,
@@ -19,6 +20,7 @@ import {
   getWeatherEffects, pickBoat, hasBoatWake, getBoatTone, type BoatKind,
   pickFish, canSpawnFish, getRestStopMotion, type FishKind,
   pickNightFish, pickMoonlitDayFish, MAX_FISH, MAX_NIGHT_FISH, getWaterSpeedFactor, getWaterLimit,
+  pickBird, isBirdInSeason, MAX_BIRDS, type BirdKind,
 } from '../utils/weatherEffectsUtils';
 
 // ROADMAP item 10: more than the original 6 types - fog, drizzle and hail join the
@@ -54,14 +56,16 @@ interface CloudLayerProps {
   // The pool of moonlight for the night fish (ROADMAP item 65): the moon's x as a fraction
   // of the width, and the pool's strength (0 = no pool, 1 = a full moon in a clear sky).
   moonlight?: { x: number; strength: number } | null;
+  // The moon disc while it shows (ROADMAP item 74, W14), in % of the width and height, so the
+  // night geese can cross it.
+  moon?: { x: number; y: number } | null;
 }
 
 // Birds/fish/ships/leaves travel horizontally at a constant rate (in % of the layer's
 // width per second; resting fish pause on the way, see getRestStopMotion). A CSS
 // animation moves each entity across the screen once at spawn time, so no per-frame `setState` is needed for movement; state only changes on spawn
 // (adding an entry) and despawn (removing one, via `onAnimationEnd`).
-const BIRD_RATE_PERCENT_PER_SEC = 5; // was 0.08%/16ms in the old rAF loop
-// Fish and boats: `speed` in FISH and BOATS.
+// Birds, fish and boats: `speed` in BIRDS, FISH and BOATS.
 const LEAF_RATE_PERCENT_PER_SEC = 6;
 // A new boat at least every 55 s. The random part is re-rolled on every 500 ms check, so
 // most gaps end within ~10 s of the minimum. A crossing takes 64-234 s (ROADMAP item 40),
@@ -70,6 +74,11 @@ const LEAF_RATE_PERCENT_PER_SEC = 6;
 const BOAT_GAP_MIN_MS = 55000;
 const BOAT_GAP_RANGE_MS = 60000;
 const MAX_BOATS = 3;
+// A bird check every 8-12 s (ROADMAP item 74, C3; it was 3-5 s at twice the speed). At night
+// the geese across the moon (W14) get a check every 30 s.
+const BIRD_GAP_MIN_MS = 8000;
+const BIRD_GAP_RANGE_MS = 4000;
+const MOON_GEESE_GAP_MS = 30000;
 
 // A fixed fallback seed date for callers that don't pass one (e.g. existing tests) -
 // a stable constant, not `new Date()`, so it never changes identity across renders.
@@ -228,6 +237,95 @@ export const createFish = (
   };
 };
 
+// ROADMAP item 74 (Birds & Skies lookbook). `size` is a near bird's width in px (the
+// silhouettes are twice as wide as tall, a bat is square); `speed` is % of the width per
+// second (M2): at most 2.5x the sailboat, where all birds flew 5 %/s before. `group` is a
+// fixed shape (M4-M7). The kestrel hangs in the wind (M8); the starlings always fly far out.
+type BirdGroup = 'one' | 'pair' | 'v' | 'line' | 'flock';
+type FlyerKind = BirdKind | 'bat';
+const BIRDS: Record<FlyerKind, { size: number; speed: number; group: BirdGroup; hover?: boolean; far?: boolean }> = {
+  gull: { size: 34, speed: 2.5, group: 'one' },
+  heron: { size: 46, speed: 1.6, group: 'one' },
+  stork: { size: 50, speed: 1.8, group: 'pair' },
+  swan: { size: 46, speed: 2.2, group: 'pair' },
+  geese: { size: 22, speed: 2.2, group: 'v' },
+  cormorant: { size: 30, speed: 2.4, group: 'line' },
+  kestrel: { size: 24, speed: 2, group: 'one', hover: true },
+  starlings: { size: 7, speed: 2, group: 'flock', far: true },
+  bat: { size: 38, speed: 2.5, group: 'one' },
+};
+
+// The group shapes, in bird widths, the leader in front. They never change in flight.
+const birdGroup = (group: BirdGroup, random: () => number): [number, number][] => {
+  const count = (min: number, extra: number) => min + Math.floor(random() * (extra + 1));
+  switch (group) {
+    case 'pair': return [[0, 0], [-1.15, -0.32]]; // M4: the second bird a little behind and higher
+    case 'v': { // M5: two arms of 2-4 geese
+      const upper = count(2, 2);
+      const lower = count(2, 2);
+      return [[0, 0],
+        ...Array.from({ length: upper }, (_, i): [number, number] => [-0.8 * (i + 1), -0.38 * (i + 1)]),
+        ...Array.from({ length: lower }, (_, i): [number, number] => [-0.8 * (i + 1), 0.38 * (i + 1)])];
+    }
+    case 'line': return Array.from({ length: count(3, 2) }, (_, i): [number, number] => [-1.05 * i, 0.3 * i]); // M6
+    case 'flock': return Array.from({ length: count(18, 12) }, (): [number, number] => { // M7: a cloud of 18-30
+      const angle = random() * 2 * Math.PI;
+      const r = Math.sqrt(random());
+      return [8 * r * Math.cos(angle), 3.2 * r * Math.sin(angle)];
+    });
+    default: return [[0, 0]];
+  }
+};
+
+interface BirdEntity extends MovingEntity {
+  kind: FlyerKind;
+  depth: number; // 0 = near, 1 = far (M3)
+  size: number; // px, one bird's width after the distance shrink
+  width: number; // px, of the bird or the whole group
+  height: number;
+  opacity: number;
+  group?: { left: number; top: number }[]; // each bird's offset in px
+  easing?: string; // M8: a CSS linear() easing that hangs still mid-crossing
+}
+
+// Builds one bird, group or bat (ROADMAP item 74). `y` is the centre line. `windFactor` slows
+// birds in strong wind (item 10). `moonY` (W14): a V of geese at the moon's height, dark, so
+// it shows only against the moon.
+// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
+export const createBird = (
+  kind: FlyerKind, viewportWidth: number, windFactor = 1, random = Math.random, moonY?: number,
+): BirdEntity => {
+  const spec = BIRDS[kind];
+  // M3: a random distance. Bats keep today's look; the night geese pass at a fixed distance.
+  const depth = kind === 'bat' ? 0 : moonY !== undefined ? 0.2 : spec.far ? 0.8 + random() * 0.2 : random();
+  const nearness = 1 - FAR_SHRINK * depth;
+  const size = Math.round(spec.size * nearness);
+  const spots = birdGroup(spec.group, random);
+  const minX = Math.min(...spots.map(([x]) => x));
+  const minY = Math.min(...spots.map(([, y]) => y));
+  const width = (Math.max(...spots.map(([x]) => x)) - minX) * size + size;
+  const height = (Math.max(...spots.map(([, y]) => y)) - minY) * size + (kind === 'bat' ? size : size / 2);
+  const startX = -(width / viewportWidth) * 100 - 1;
+  const dx = 101 - startX;
+  const speed = spec.speed * nearness * windFactor * getWaterSpeedFactor(viewportWidth); // M2, C4
+  // M8: the kestrel stops with its left edge at 35-65 % of the width, for 3-5 s.
+  const hover = spec.hover ? getRestStopMotion(dx, speed, 35 + random() * 30 - startX, 3 + random() * 2) : null;
+  return {
+    id: Date.now() + Math.random(),
+    kind, depth, size, width, height,
+    group: spots.length > 1 ? spots.map(([x, y]) => ({ left: (x - minX) * size, top: (y - minY) * size })) : undefined,
+    x: startX,
+    // Near birds fly high (20 % of the height), far ones lower (50 %), well above the horizon
+    // (65 %). Bats keep today's 20-50 %.
+    y: moonY ?? (kind === 'bat' ? 20 + random() * 30 : 20 + depth * 30 + (random() - 0.5) * 4),
+    dx,
+    duration: hover ? hover.duration : dx / speed,
+    easing: hover?.easing,
+    // Bats carry their own 90 % in the icon colour (item 64); the night geese are dark at 90 %.
+    opacity: kind === 'bat' ? 1 : moonY !== undefined ? 0.9 : 0.6 * (1 - 0.3 * depth),
+  };
+};
+
 // Deterministic pseudo-random value in [0, 1), seeded by an integer. Lets raindrop/
 // snowflake/hail layouts be derived during render (pure, no `Math.random()`) while
 // still looking randomly scattered; the classic fract(sin(x)) trick.
@@ -254,8 +352,9 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   windDirectionDeg = null,
   isFullscreen = false,
   moonlight = null,
+  moon = null,
 }) => {
-  const [birds, setBirds] = useState<MovingEntity[]>([]);
+  const [birds, setBirds] = useState<BirdEntity[]>([]);
   const [fish, setFish] = useState<FishEntity[]>([]);
   const [ships, setShips] = useState<Boat[]>([]);
   const [leaves, setLeaves] = useState<MovingEntity[]>([]);
@@ -347,6 +446,11 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   // The pool of moonlight (ROADMAP item 65, NF1/NR3): moonlit fish show only within ±9 %
   // of the width from the moon, fading out to ±20 %, as bright as the pool is strong.
   const moonUp = (moonlight?.strength ?? 0) > 0;
+  // Seasons (item 74, C1) and the moon's height for the night geese, as plain numbers so the
+  // spawn loop restarts only when they change (date ticks every second; the moon's height is
+  // rounded to whole percent).
+  const month = date.getMonth() + 1;
+  const moonY = moon ? Math.round(moon.y) : null;
   const poolX = (moonlight?.x ?? 0.5) * 100;
   const poolMask = `linear-gradient(to right, transparent ${poolX - 20}%, #000 ${poolX - 9}%, #000 ${poolX + 9}%, transparent ${poolX + 20}%)`;
 
@@ -362,9 +466,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
 
     // Fair-weather flyers: birds tuck away once it's wet, foggy or stormy. Bats fly from
     // sunset through twilight (ROADMAP item 40); full night stays quiet (item 36).
-    const shouldShowBirds = (weatherType === 'clear' || weatherType === 'partly' ||
-                          weatherType === 'cloudy' || weatherType === 'overcast') &&
-                          timeOfDay !== 'night';
+    const birdWeather = weatherType === 'clear' || weatherType === 'partly' ||
+                        weatherType === 'cloudy' || weatherType === 'overcast';
+    const shouldShowBirds = birdWeather && timeOfDay !== 'night';
+    // Geese also migrate at night (item 74, W14): in their months, a V crosses at the moon's height.
+    const shouldShowMoonGeese = birdWeather && timeOfDay === 'night' && moonY !== null &&
+                                isBirdInSeason('geese', month, latitude);
     const fishWeather = weatherType === 'clear' || weatherType === 'partly' || weatherType === 'cloudy' ||
                         weatherType === 'overcast' || weatherType === 'rain' || weatherType === 'drizzle';
     // Night fish (ROADMAP item 65, NR2) take over in nautical twilight, where the day fish stop.
@@ -379,23 +486,23 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       const currentTime = Date.now();
 
       if (shouldShowBirds) {
-        if (currentTime - lastSpawnTimeRef.current.birds > 3000 + Math.random() * 2000) {
-          if (Math.random() < 0.8) { // 80% chance to spawn
-            // Dynamically calculate the off-screen start position for the bird
-            const birdSvgWidth = 300; // px
-            const birdScale = isSunDown ? 0.5 : 0.3;
-            const scaledBirdWidth = birdSvgWidth * birdScale;
-            const viewportWidth = window.innerWidth;
-            const startX = -(scaledBirdWidth / viewportWidth) * 100;
-            const endX = 110;
-            const newBird: MovingEntity = {
-              id: Date.now() + Math.random(),
-              x: startX,
-              y: 20 + Math.random() * 30,
-              dx: endX - startX,
-              duration: (endX - startX) / (BIRD_RATE_PERCENT_PER_SEC * effects.birdSpeedFactor),
-            };
-            setBirds(prev => [...prev, newBird]);
+        if (currentTime - lastSpawnTimeRef.current.birds > BIRD_GAP_MIN_MS + Math.random() * BIRD_GAP_RANGE_MS) {
+          // 70 %, a third more in the hour before sunset, when the gulls fly to their roost (C2).
+          if (Math.random() < (timeOfDay === 'evening' ? 0.93 : 0.7)) {
+            const kind = isSunDown ? 'bat' : pickBird(Math.random(), month, latitude, timeOfDay === 'evening');
+            const next = createBird(kind, window.innerWidth, effects.birdSpeedFactor);
+            // At most four birds or groups (C3), per phone width (item 70). Far birds first.
+            const limit = getWaterLimit(MAX_BIRDS, window.innerWidth);
+            setBirds(prev => (prev.length >= limit ? prev : [...prev, next].sort((a, b) => b.depth - a.depth)));
+          }
+          lastSpawnTimeRef.current.birds = currentTime;
+        }
+      } else if (shouldShowMoonGeese) {
+        // The twilight bats fly on. One V at a time, about every four minutes.
+        if (currentTime - lastSpawnTimeRef.current.birds > MOON_GEESE_GAP_MS) {
+          if (Math.random() < 0.12) {
+            const next = createBird('geese', window.innerWidth, effects.birdSpeedFactor, Math.random, moonY);
+            setBirds(prev => (prev.some(b => b.kind === 'geese') ? prev : [...prev, next]));
           }
           lastSpawnTimeRef.current.birds = currentTime;
         }
@@ -493,7 +600,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     return () => {
       clearInterval(intervalId);
     };
-  }, [weatherType, windSpeedKmh, timeOfDay, prefersReducedMotion, isSunDown, isFullscreen, effects.showLeaves, effects.birdSpeedFactor, moonUp]);
+  }, [weatherType, windSpeedKmh, timeOfDay, prefersReducedMotion, isSunDown, isFullscreen, effects.showLeaves, effects.birdSpeedFactor, moonUp, month, latitude, moonY]);
 
   // The grey/wet-weather cloud tints below (storm/hail/rain/drizzle/fog/snow/
   // overcast) are ROADMAP item 10's weather-conditioned matrix, unchanged by the
@@ -657,8 +764,10 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
           filter: halo,
           ['--dx' as string]: `${fishItem.dx}vw`,
           animation: `moveAcrossX ${fishItem.duration}s linear ${lag}s forwards`,
-          // Rest stop (P8). A browser without CSS linear() ignores it and glides straight.
-          animationTimingFunction: fishItem.easing,
+          // Rest stop (P8). A browser without CSS linear() ignores it and glides straight. Set
+          // only with a stop: React writes undefined as '', which wipes the shorthand's `linear`
+          // and leaves CSS's default `ease` (item 74 found this).
+          ...(fishItem.easing && { animationTimingFunction: fishItem.easing }),
         }}
         onAnimationEnd={onEnd}
       >
@@ -793,8 +902,9 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         </div>
       ))}
 
-      {/* Birds (or bats at night) — each spawns once and travels via the
-          `moveAcrossX` CSS animation; onAnimationEnd removes it (off-screen). */}
+      {/* Birds (bats after sunset, item 74's species by day) — each spawns once and travels via
+          the `moveAcrossX` CSS animation; onAnimationEnd removes it (off-screen). The silhouette
+          colour and the opacity sit on the whole group, so overlapping wings don't darken. */}
       {birds.map((bird) => (
         <div
           key={bird.id}
@@ -803,39 +913,22 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             left: `${bird.x}%`,
             top: `${bird.y}%`,
             zIndex: 10,
+            opacity: bird.opacity,
+            color: 'hsl(var(--scene-critter-silhouette))',
             ['--dx' as string]: `${bird.dx}vw`,
             animation: `moveAcrossX ${bird.duration}s linear forwards`,
+            // Hang in the wind (M8), set only with a stop, as for the fish.
+            ...(bird.easing && { animationTimingFunction: bird.easing }),
           }}
           onAnimationEnd={() => setBirds(prev => prev.filter(b => b.id !== bird.id))}
         >
-          <div style={{ transform: `${isSunDown ? 'scale(0.5)' : 'scale(0.3)'} translateX(-100%)` }}>
-            {isSunDown ? (
-              <Bat size={76} strokeWidth={0.6} fill="currentColor" style={{ color: 'hsl(var(--scene-critter-silhouette) / 0.9)' }} data-testid="scene-bat" />
-            ) : (
-              <svg
-                version="1.1"
-                id="Capa_1"
-                xmlns="http://www.w3.org/2000/svg"
-                xmlnsXlink="http://www.w3.org/1999/xlink"
-                x="0px"
-                y="0px"
-                viewBox="0 0 300 60"
-                xmlSpace="preserve"
-                width="300"
-                height="60"
-                className="transition-colors duration-1000"
-              >
-                <g>
-                  <path
-                    d="M94.51,37.677c0.606,0.254,1.313,0.05,1.702-0.492c7.256-10.366,20.402-13.103,34.655-10.466
-                    c8.789,1.622,16.164,6.439,21.22,13.003c7.066-4.324,15.686-6.186,24.484-4.559c14.253,2.633,25.539,9.888,28.625,22.165
-                    c0.159,0.643,0.747,1.086,1.403,1.06c0.657-0.019,1.215-0.497,1.334-1.149c3.503-18.931-9.008-37.12-27.939-40.618
-                    c-8.798-1.623-17.407,0.233-24.475,4.558c-5.056-6.564-12.441-11.381-21.229-13.003c-18.941-3.499-37.125,9.012-40.629,27.948
-                    C93.544,36.776,93.892,37.424,94.51,37.677z"
-                    fill="hsl(var(--scene-critter-silhouette) / 0.6)"
-                  />
-                </g>
-              </svg>
+          <div className="relative" style={{ width: bird.width, height: bird.height, transform: 'translateY(-50%)' }}>
+            {bird.kind === 'bat' ? (
+              <Bat size={bird.size} strokeWidth={0.6} fill="currentColor" style={{ color: 'hsl(var(--scene-critter-silhouette) / 0.9)' }} data-testid="scene-bat" />
+            ) : bird.group ? bird.group.map((spot, i) => (
+              <SceneBird key={i} kind={bird.kind as BirdKind} width={bird.size} className="absolute" style={{ left: spot.left, top: spot.top }} />
+            )) : (
+              <SceneBird kind={bird.kind} width={bird.size} />
             )}
           </div>
         </div>

@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44, 47–73, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
+Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44, 47–74, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
 
 ## Verification (2026-09-28)
 
@@ -953,6 +953,50 @@ These items come from the re-shoot of all states after items 46–56.
   - The motion does not change: the same straight glide at the same speeds.
 - **Built:** `SceneBoat.tsx` (drawings, gradients, reflection, wake, lights); `hasBoatWake` and `getBoatTone` (`weatherEffectsUtils.ts`); `CloudLayer` renders `SceneBoat` and lets boats out in a storm; the "Strong wind" switch in `InfoPanel`, with `MANUAL_STRONG_WIND_KMH` in `SunTracker`. The line icons `LakeFerry`, `FishingBoat`, `Rowboat` and `Freighter` are removed from `sceneIcons.ts`.
 - **Checked:** 9 new tests (775 in all after merging item 67), lint and typecheck pass. In Chromium at Ravensburg with faked weather: at 1280×800, 2026-10-01 18:30 (evening, clear, wind 50 km/h), 7 sailboats and a ferry sailed with peach sails, reflections and a wake, and a fishing boat without one. At 390×844, 21:40 (night, wind 10 km/h), a sailboat and a rowboat sailed dark, with their gold lights and no wake. In manual mode at 1280×800, midday: Clear with "Strong wind" on brought leaves, and the sailboats and the ferry had a wake (the fishing boat none); with the switch off the sailboats' wakes went away; Storm sent out only ferries and freighters, each with a wake.
+
+
+### 74. Birds: species, calm flight patterns and seasons — M — **✅ Done**
+
+- **Feedback (2026-10-01):** "I also want some different bird options please create a lookbook". After the picks: "implement, check, then commit & merge".
+- **Lookbook:** [Birds & Skies](https://claude.ai/artifact/EwCnAdSnNQajofsY4s6VDm) (private). Picks: W1, W3, W4, W5, W6, W7, W9, W10, W14, M1–M8, C1–C4.
+- **Now:** one gull shape (black at 60 %, 34 px) flies straight across at 5 % of the width per second: 4× the sailboat, and 72 px/s on a 1440 px Mac. A check every 3–5 s (80 %), so about five birds are in the sky. The bats fly at the same pace.
+- **Birds** (a near bird on a phone; crossing = time to cross a phone; share = part of the day spawns):
+
+  | ID | Bird | Size | Speed (%/s) | Crossing | Share | Group | Months (C1) |
+  |---|---|---|---|---|---|---|---|
+  | W1 | Black-headed gull | 34 px, today's shape | 2.5 | 44 s | 38 | alone | all year |
+  | W3 | Grey heron | 46 px | 1.6 | 69 s | 10 | alone | all year |
+  | W4 | White stork | 50 px | 1.8 | 61 s | 8 | pair (M4) | Mar–Aug |
+  | W5 | Mute swan | 46 px | 2.2 | 50 s | 8 | pair (M4) | all year |
+  | W6 | Greylag geese | 22 px each | 2.2 | 50 s | 10 | V of 5–9 (M5) | Mar–Apr, Sep–Nov |
+  | W7 | Cormorant | 30 px each | 2.4 | 46 s | 10 | line of 3–5 (M6) | all year |
+  | W9 | Kestrel | 24 px | 2 | 55 s + stop | 8 | alone, hangs in the wind (M8) | all year |
+  | W10 | Starling flock | 7 px each, always far | 2 | about 90 s | 8 | cloud of 18–30 (M7) | Sep–Nov, the hour before sunset only (C2) |
+  | W14 | Geese across the moon | 20 px each | 2 | 55 s | night only | V of 5–9 (M5) | Mar–Apr, Sep–Nov |
+
+- **Spec:**
+  - **Silhouettes:** `SceneBird.tsx`, side view, facing right, wings raised in a glide, on a 48 × 24 grid, filled with `--scene-critter-silhouette`. The gull keeps today's shape. The colour and the opacity sit on the whole bird or group, so overlapping wings show no darker seams.
+  - **Mix:** `BIRD_WEIGHTS` and `pickBird` (`weatherEffectsUtils.ts`), with `pickWeighted` like the fish and boats. The shares are the lookbook shares of the picked birds, scaled to 100.
+  - **M2 Calmer pace:** the speed column replaces 5 %/s for all. The bats fly 2.5 %/s. Strong wind still slows every flyer to 60 % (item 10).
+  - **M3 Distance:** a random depth, like the fish and boats: size and speed × (1 − 0.45 × depth), opacity 0.6 × (1 − 0.3 × depth). Near birds fly high (centre at 20 % of the height), far ones lower (50 %), ±2 %, well above the horizon (65 %). Far birds are drawn first. The bats keep today's look: near, at 20–50 %.
+  - **M4–M7 Groups:** fixed shapes in bird widths, the leader in front. Pair: (0, 0) and (−1.15, −0.32). V: two arms of 2–4 at (−0.8 i, ∓0.38 i). Line: 3–5 at (−1.05 i, 0.3 i). Flock: 18–30 at random in an 8 × 3.2 ellipse. A group is one spawn.
+  - **M8 Hang in the wind:** the kestrel slows down over 3 s, stops with its left edge at 35–65 % of the width for 3–5 s, and glides on (`getRestStopMotion`, as the fish rest stop P8).
+  - **C1 Seasons:** `isBirdInSeason`, by the month of the shown date. South of the equator the months shift by six.
+  - **C2 Evening flight:** in the hour before sunset (`'evening'`), the spawn chance is 93 % instead of 70 %. The starling flocks come only then.
+  - **C3 At most four:** a check every 8–12 s (was 3–5 s), 70 %. At most `getWaterLimit(4, width)` birds or groups: 4 on a phone, 13 at 1440 px. The bats count too.
+  - **C4 Wide screens:** speeds × `getWaterSpeedFactor`, like the fish and boats (item 66).
+  - **W14 Geese across the moon:** in full night, in fair weather, in the geese months, while the moon disc shows (the new `moon` prop from `SunVisualization`, in % of the scene). A check every 30 s, 12 % (about every four minutes), one V at a time. The V flies at the moon's height, dark at 90 %, so it shows against the moon. Full night has no other flyers.
+  - **Not picked:** W2 swallow, W8 red kite, W11 osprey, W12 bearded vulture, W13 barn owl, M9 thermal circle, C5 white birds.
+  - **Motion rule** (item 15): the birds never flap, dive, swirl, chase each other or fly right to left.
+- **Bug found:** since item 62 the fish style set `animationTimingFunction: fishItem.easing`. For a fish without a rest stop that is `undefined`, and React writes it as an empty value. That wiped the `linear` of the `animation` shorthand, so these fish moved with CSS's default `ease`: quick at first, slow near the right edge. Now the longhand is set only with a stop, for fish and birds. jsdom does not expand the shorthand, so only the browser check shows this.
+- **Built:** `SceneBird.tsx`; `BirdKind`, `BIRD_WEIGHTS`, `isBirdInSeason`, `pickBird` and `MAX_BIRDS` (`weatherEffectsUtils.ts`); `BIRDS`, `createBird` and the bird spawn and render in `CloudLayer.tsx` (`BIRD_RATE_PERCENT_PER_SEC` is gone); the `moon` prop in `SunVisualization.tsx`.
+- **Checked:** 10 new tests, and 3 bat tests moved to the new timing (785 in all); lint and typecheck pass. In Chromium, Ravensburg, clear, 2026-10-01:
+  - 390×844, 11:00, about 7 simulated minutes: gulls, geese, a heron, swans, cormorants and kestrels flew; no storks (out of season) and no starlings (midday); never more than 4 groups.
+  - 18:25, the hour before sunset: starling flocks of 18 and 28, a V of 7 geese and a swan pair, at 36–46 % of the height.
+  - 00:30, night: a V of 8 geese crossed the moon at its height (35 %).
+  - 19:15, civil twilight: 4 bats, 38 px, 2.5 %/s.
+  - 1440×900, 11:00: birds at 5–11 px/s (was 72 px/s). After the fix, every bird, fish and boat moved linearly at its planned speed.
+  - No console errors.
 
 ---
 
