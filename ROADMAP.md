@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44 and 47–66, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), the device and dashboard checks listed under Verification (status 2026-10-01), backlog (i18n, share card, sunset reminder). [AUDIT.md](AUDIT.md) has no open findings.
+Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44 and 47–66, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), items 67–69 (five languages, share card, sunset reminder), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
 
 ## Verification (2026-09-28)
 
@@ -845,6 +845,46 @@ These items come from the re-shoot of all states after items 46–56.
 - **Built:** the speeds in `FISH` (`CloudLayer.tsx`); `PHONE_WIDTH_PX` and `getWaterSpeedFactor` (`weatherEffectsUtils.ts`), applied in `createFish` and to the boat crossing time.
 - **Checked:** 4 new tests (704 in all), lint, typecheck and build pass. In Chromium at 1440×900 (Ravensburg, 11:00): a near minnow school moved 4.6 px/s and a far trout 3.3 px/s, as planned. On this width a near fish now takes about 4–5 min to cross, and a near sailboat about 5 min.
 
+### Backlog promoted (2026-10-01)
+
+- **Decision (2026-10-01):** "put german, spanish, italian and french on the roadmap and the share card feature as premium and the sunset reminder notification".
+
+### 67. UI in five languages: English, German, Spanish, Italian, French — L
+
+- **Now:** all UI text is English and hard-coded in the components.
+- **Spec:**
+  1. Languages: `en` (fallback), `de`, `es`, `it`, `fr`. One flat dictionary per language in `src/i18n/<lang>.ts`, with the same keys. A small `t(key, vars)` function and a `useLanguage` context. No new dependency.
+  2. The default comes from `navigator.language` (the first two letters). Languages that are not in the list use `en`.
+  3. A language picker in the InfoPanel. Save the choice in `localStorage` (`language`), with try/catch.
+  4. Translate all visible text, the `aria-label`s, the tooltips, the toasts, the loading screen and the feedback form.
+  5. Dates, times and numbers use `Intl` with the chosen language. The place names use the language parameter of BigDataCloud (`localityLanguage`) and the Open-Meteo geocoding API (`language`).
+  6. Set `<html lang>` to the chosen language. The manifest stays English.
+  7. Item 16: the Play Store listing and the privacy policy in the same five languages.
+- **Done when:** a test fails when a key is missing in a dictionary or is not used. In the browser, `de-DE`, `es-ES`, `it-IT` and `fr-FR` show the full UI in that language, with no English left, and the panel layout does not break with the longest strings (390×844 and 360×640).
+- **Note:** this touches almost every component. Build it alone, not in parallel with other UI items. A native speaker should review the four translations.
+
+### 68. Share card: today's sunset as an image — M — Premium
+
+- **Spec:**
+  1. A "Share" button in the Sunset row of the InfoPanel, with the gold plus (item 35). Free while `PREMIUM_ENFORCED` is false. Item 14 adds it to the gated list.
+  2. Draw a 1080×1350 PNG in a `<canvas>` (no DOM screenshot, no new dependency): the sky gradient of the sunset, the sun disc on the horizon, the terrain silhouette when line of sight has a profile, the place name, the date, the sunset time (the line-of-sight time when there is one, plus the flat time), the sunset score, and the app mark.
+  3. Share the file with the Web Share API (`navigator.canShare({ files })`). When it is not available, download the PNG.
+  4. No coordinates on the card, only the place name.
+  5. Colours come from the scene tokens, so the card looks like the app.
+- **Done when:** unit tests for the card layout data (texts, which times show). In the browser, the button gives a PNG with the expected content for Ravensburg (flat) and Sion (terrain). On an Android phone the share sheet opens.
+
+### 69. Sunset reminder notification — M — Depends on 16
+
+- **Spec:**
+  1. A bell option in the Sunset row: "Remind me N minutes before sunset" (N = 10, 20 or 30, default 20). It asks for the notification permission only when the user turns it on.
+  2. A browser cannot schedule a local notification for a later time (the Notification Triggers API was stopped). So the reminder uses Web Push: the app saves a push subscription, the rounded location (2 decimals, about 1 km), the time zone and N. A scheduled Supabase Edge Function runs every 5 minutes, calculates the sunset for each subscription and sends the push N minutes before it.
+  3. The notification text: "Sunset in N minutes, at HH:MM", plus the sunset score when it is 60 or more. A tap opens the app.
+  4. Turning the option off, or a push endpoint that returns 404/410, deletes the subscription row.
+  5. Privacy: the privacy policy (item 16) names the stored data and its use. No other data is stored.
+  6. Works in the Play app (TWA) and the installed PWA, also on iOS 16.4+ (installed only). In a browser tab without push support, hide the option.
+- **Done when:** unit tests for the send-time calculation (time zones, the polar day and night with no sunset). A test push arrives on an Android phone and an installed iPhone PWA N minutes before sunset, within 5 minutes.
+- **Note:** this needs a server part (VAPID keys, a subscriptions table, a scheduled function). It is the first backend the frontend uses.
+
 ---
 
 ## P1 — Core sky features
@@ -979,7 +1019,7 @@ These items come from the re-shoot of all states after items 46–56.
   1. A `usePremium` check: when the Digital Goods API exists (`getDigitalGoodsService('https://play.google.com/billing')`), call `listPurchases()` at start and cache the result. When the API does not exist (the web), Premium is always unlocked.
   2. Buy: a tap on a feature with the gold plus opens the Payment Request API for the product `premium`, with the local price from `getDetails()`. After the purchase, the plus goes away.
   3. Acknowledge the purchase. Play refunds a purchase that is not acknowledged within 3 days (see item 45).
-  4. Gate the gold-plus features only where the Digital Goods API exists and `PREMIUM_ENFORCED` is true.
+  4. Gate the gold-plus features only where the Digital Goods API exists and `PREMIUM_ENFORCED` is true. This includes the share card (item 68).
   5. Tests with a mocked Digital Goods service: no API → unlocked; API without a purchase → locked; API with a purchase → unlocked.
 - **Later, only for a web sale (not planned):**
   1. Supabase Auth in the frontend (sign-in, session handling, `@supabase/supabase-js` client).
@@ -1089,9 +1129,9 @@ Items:
 
 ## Backlog (not prioritized)
 
-- German and English UI (i18n).
-- Share card: an image of today's sunset with the time and score.
-- Sunset reminder notification (after item 16, when notifications are practical).
+- German and English UI (i18n): now item 67, with Spanish, Italian and French.
+- Share card: an image of today's sunset with the time and score: now item 68 (Premium).
+- Sunset reminder notification: now item 69.
 - Date/time scrubber to preview any day or time of the year: now item 44.
 
 ### Unit toggle °C/°F — S — **✅ Done**
