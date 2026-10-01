@@ -8,24 +8,24 @@ const at = (h: number, m: number, dayOffset = 0) => {
   d.setHours(h, m, 0, 0);
   return d;
 };
-const today = { score: 7, reason: 'high clouds, clear horizon' };
-const tomorrow = { score: 3, reason: 'low clouds' };
+const today = { score: 7, clouds: 'score.cloudsHigh', horizon: 'score.horizonClear' } as const;
+const tomorrow = { score: 3, clouds: 'score.cloudsThin', horizon: 'score.horizonClouded' } as const;
 
 describe('getShareCardData (ROADMAP item 68)', () => {
   it('shows only the flat sunset when there is no terrain profile', () => {
-    const data = getShareCardData({ placeName: 'Ravensburg', now: at(12, 0), flatSunset: at(18, 58), scoreToday: today, scoreTomorrow: tomorrow });
+    const data = getShareCardData({ placeName: 'Ravensburg', now: at(12, 0), flatSunset: at(18, 58), scoreToday: today, scoreTomorrow: tomorrow }, 'en');
     expect(data.placeName).toBe('Ravensburg');
     expect(data.timeLabel).toBe('Sunset');
     expect(data.timeText).toBe(formatTime(at(18, 58)));
     expect(data.flatText).toBeNull();
     expect(data.sunTime).toEqual(at(18, 58));
-    expect(data.dateText).toBe('Thursday, 1 October 2026');
+    expect(data.dateText).toBe('Thursday, October 1, 2026');
     expect(data.scoreText).toBe('Sunset score 7/10 · high clouds, clear horizon');
     expect(data.fileName).toBe('sun-chaser-sunset-2026-10-01.png');
   });
 
   it('shows the line-of-sight sunset plus the flat time when there is one', () => {
-    const data = getShareCardData({ placeName: 'Sion', now: at(12, 0), flatSunset: at(19, 10), terrainSunset: at(18, 41) });
+    const data = getShareCardData({ placeName: 'Sion', now: at(12, 0), flatSunset: at(19, 10), terrainSunset: at(18, 41) }, 'en');
     expect(data.timeLabel).toBe('Sunset, line of sight');
     expect(data.timeText).toBe(formatTime(at(18, 41)));
     expect(data.flatText).toBe(`Flat horizon ${formatTime(at(19, 10))} (−29 min)`);
@@ -34,21 +34,29 @@ describe('getShareCardData (ROADMAP item 68)', () => {
   });
 
   it('says the sun stays behind terrain when the profile blocks it all day', () => {
-    const data = getShareCardData({ placeName: 'Viganella', now: at(12, 0), flatSunset: at(17, 0), terrainSunset: null });
+    const data = getShareCardData({ placeName: 'Viganella', now: at(12, 0), flatSunset: at(17, 0), terrainSunset: null }, 'en');
     expect(data.timeText).toBe('Behind terrain');
     expect(data.flatText).toBe(`Flat horizon ${formatTime(at(17, 0))}`);
     expect(data.sunTime).toEqual(at(17, 0));
   });
 
   it("uses tomorrow's score once the panel shows tomorrow's sunset", () => {
-    const data = getShareCardData({ placeName: 'Ravensburg', now: at(20, 0), flatSunset: at(18, 56, 1), scoreToday: today, scoreTomorrow: tomorrow });
-    expect(data.scoreText).toBe('Sunset score 3/10 · low clouds');
+    const data = getShareCardData({ placeName: 'Ravensburg', now: at(20, 0), flatSunset: at(18, 56, 1), scoreToday: today, scoreTomorrow: tomorrow }, 'en');
+    expect(data.scoreText).toBe('Sunset score 3/10 · thin clouds, clouded horizon');
     expect(data.fileName).toBe('sun-chaser-sunset-2026-10-02.png');
   });
 
+  it('writes the texts in the UI language (ROADMAP item 67)', () => {
+    const data = getShareCardData({ placeName: 'Sion', now: at(12, 0), flatSunset: at(19, 10), terrainSunset: at(18, 41), scoreToday: today }, 'de');
+    expect(data.timeLabel).toBe('Sonnenuntergang, Sichtlinie');
+    expect(data.flatText).toBe(`Flacher Horizont ${formatTime(at(19, 10))} (−29 Min.)`);
+    expect(data.dateText).toBe('Donnerstag, 1. Oktober 2026');
+    expect(data.scoreText).toBe('Abendrot 7/10 · hohe Wolken, klarer Horizont');
+  });
+
   it('leaves out the place line when there is no place name (no coordinates)', () => {
-    expect(getShareCardData({ placeName: '  ', now: at(12, 0), flatSunset: at(18, 58) }).placeName).toBeNull();
-    expect(getShareCardData({ placeName: null, now: at(12, 0), flatSunset: at(18, 58) }).placeName).toBeNull();
+    expect(getShareCardData({ placeName: '  ', now: at(12, 0), flatSunset: at(18, 58) }, 'en').placeName).toBeNull();
+    expect(getShareCardData({ placeName: null, now: at(12, 0), flatSunset: at(18, 58) }, 'en').placeName).toBeNull();
   });
 });
 

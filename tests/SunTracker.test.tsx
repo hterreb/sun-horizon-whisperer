@@ -650,4 +650,27 @@ describe('SunTracker', () => {
       });
     });
   });
+
+  describe('UI language (ROADMAP item 67)', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      document.documentElement.lang = '';
+    });
+
+    it('starts in the browser language, sets <html lang>, and saves a picked language', async () => {
+      vi.stubGlobal('navigator', {
+        language: 'de-DE',
+        geolocation: { getCurrentPosition: (_s: unknown, e: (err: { code: number }) => void) => e({ code: 1 }) },
+      });
+      render(<SunTracker />);
+      await waitFor(() => expect(screen.getByText('Sonnenuntergang')).toBeInTheDocument());
+      expect(document.documentElement.lang).toBe('de');
+      expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Standort nicht verfügbar' }));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Français' }));
+      expect(screen.getByText('Coucher du soleil')).toBeInTheDocument();
+      expect(document.documentElement.lang).toBe('fr');
+      expect(localStorage.getItem('language')).toBe('fr');
+    });
+  });
 });

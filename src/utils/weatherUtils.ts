@@ -1,10 +1,13 @@
 
 import { type WeatherType } from '../components/CloudLayer';
+import { translate, type MessageKey } from '@/i18n';
+import { type Language } from '@/utils/language';
 
 export interface WeatherData {
   temperature: number;
   weatherType: WeatherType;
-  weatherDescription: string;
+  // The dictionary key of the condition text (ROADMAP item 67), e.g. 'condition.clearSky'.
+  conditionKey: MessageKey;
   lastUpdated: Date;
   isRealWeather: boolean;
   // Sunset score (ROADMAP item 11) for today's and tomorrow's sunset. Null when
@@ -59,39 +62,39 @@ const CACHE_KEY = 'weather_cache';
 // WMO has no plain "hail" code (96/99 are thunderstorm *with* hail) - the lightning is
 // the more safety-relevant fact, so those stay 'storm'; 'hail' is reachable via manual
 // weather mode only. See tests/utils.weatherUtils.test.ts for full code coverage.
-export const WMO_CODE_MAP: Record<number, { type: WeatherType; description: string }> = {
-  0: { type: 'clear', description: 'Clear sky' },
-  1: { type: 'partly', description: 'Mainly clear' },
-  2: { type: 'cloudy', description: 'Partly cloudy' },
-  3: { type: 'overcast', description: 'Overcast' },
-  45: { type: 'fog', description: 'Fog' },
-  48: { type: 'fog', description: 'Depositing rime fog' },
-  51: { type: 'drizzle', description: 'Light drizzle' },
-  53: { type: 'drizzle', description: 'Moderate drizzle' },
-  55: { type: 'drizzle', description: 'Dense drizzle' },
-  56: { type: 'drizzle', description: 'Light freezing drizzle' },
-  57: { type: 'drizzle', description: 'Dense freezing drizzle' },
-  61: { type: 'rain', description: 'Slight rain' },
-  63: { type: 'rain', description: 'Moderate rain' },
-  65: { type: 'rain', description: 'Heavy rain' },
-  66: { type: 'rain', description: 'Light freezing rain' },
-  67: { type: 'rain', description: 'Heavy freezing rain' },
-  71: { type: 'snow', description: 'Slight snow' },
-  73: { type: 'snow', description: 'Moderate snow' },
-  75: { type: 'snow', description: 'Heavy snow' },
-  77: { type: 'snow', description: 'Snow grains' },
-  80: { type: 'rain', description: 'Slight rain showers' },
-  81: { type: 'rain', description: 'Moderate rain showers' },
-  82: { type: 'rain', description: 'Violent rain showers' },
-  85: { type: 'snow', description: 'Slight snow showers' },
-  86: { type: 'snow', description: 'Heavy snow showers' },
-  95: { type: 'storm', description: 'Thunderstorm' },
-  96: { type: 'storm', description: 'Thunderstorm with slight hail' },
-  99: { type: 'storm', description: 'Thunderstorm with heavy hail' },
+export const WMO_CODE_MAP: Record<number, { type: WeatherType; conditionKey: MessageKey }> = {
+  0: { type: 'clear', conditionKey: 'condition.clearSky' },
+  1: { type: 'partly', conditionKey: 'condition.mainlyClear' },
+  2: { type: 'cloudy', conditionKey: 'condition.partlyCloudy' },
+  3: { type: 'overcast', conditionKey: 'condition.overcast' },
+  45: { type: 'fog', conditionKey: 'condition.fog' },
+  48: { type: 'fog', conditionKey: 'condition.rimeFog' },
+  51: { type: 'drizzle', conditionKey: 'condition.lightDrizzle' },
+  53: { type: 'drizzle', conditionKey: 'condition.moderateDrizzle' },
+  55: { type: 'drizzle', conditionKey: 'condition.denseDrizzle' },
+  56: { type: 'drizzle', conditionKey: 'condition.lightFreezingDrizzle' },
+  57: { type: 'drizzle', conditionKey: 'condition.denseFreezingDrizzle' },
+  61: { type: 'rain', conditionKey: 'condition.slightRain' },
+  63: { type: 'rain', conditionKey: 'condition.moderateRain' },
+  65: { type: 'rain', conditionKey: 'condition.heavyRain' },
+  66: { type: 'rain', conditionKey: 'condition.lightFreezingRain' },
+  67: { type: 'rain', conditionKey: 'condition.heavyFreezingRain' },
+  71: { type: 'snow', conditionKey: 'condition.slightSnow' },
+  73: { type: 'snow', conditionKey: 'condition.moderateSnow' },
+  75: { type: 'snow', conditionKey: 'condition.heavySnow' },
+  77: { type: 'snow', conditionKey: 'condition.snowGrains' },
+  80: { type: 'rain', conditionKey: 'condition.slightRainShowers' },
+  81: { type: 'rain', conditionKey: 'condition.moderateRainShowers' },
+  82: { type: 'rain', conditionKey: 'condition.violentRainShowers' },
+  85: { type: 'snow', conditionKey: 'condition.slightSnowShowers' },
+  86: { type: 'snow', conditionKey: 'condition.heavySnowShowers' },
+  95: { type: 'storm', conditionKey: 'condition.thunderstorm' },
+  96: { type: 'storm', conditionKey: 'condition.thunderstormSlightHail' },
+  99: { type: 'storm', conditionKey: 'condition.thunderstormHeavyHail' },
 };
 
-const mapWeatherCode = (code: number): { type: WeatherType; description: string } =>
-  WMO_CODE_MAP[code] ?? { type: 'clear', description: 'Unknown' };
+const mapWeatherCode = (code: number): { type: WeatherType; conditionKey: MessageKey } =>
+  WMO_CODE_MAP[code] ?? { type: 'clear', conditionKey: 'condition.unknown' };
 
 export interface SunsetScoreInput {
   low: number; // cloud cover %, 0-100
@@ -102,7 +105,9 @@ export interface SunsetScoreInput {
 
 export interface SunsetScoreResult {
   score: number; // 0-10, integer
-  reason: string;
+  // Dictionary keys of the reason (ROADMAP item 67), see getScoreReason.
+  clouds: MessageKey;
+  horizon: MessageKey;
 }
 
 // Tuning constants for getSunsetScore, below.
@@ -141,20 +146,28 @@ const visibilityPenalty = (visibilityMeters: number): number => {
   return VISIBILITY_WEIGHT * t;
 };
 
-const describeClouds = (mid: number, high: number): string => {
-  const layers: string[] = [];
-  if (cloudContribution(high) > 0.3) layers.push('high clouds');
-  if (cloudContribution(mid) > 0.3) layers.push('mid clouds');
-  if (layers.length === 0) return high < 10 && mid < 10 ? 'clear sky' : 'thin clouds';
-  return layers.join(' and ');
+const describeClouds = (mid: number, high: number): MessageKey => {
+  const isHigh = cloudContribution(high) > 0.3;
+  const isMid = cloudContribution(mid) > 0.3;
+  if (isHigh && isMid) return 'score.cloudsHighMid';
+  if (isHigh) return 'score.cloudsHigh';
+  if (isMid) return 'score.cloudsMid';
+  return high < 10 && mid < 10 ? 'score.cloudsNone' : 'score.cloudsThin';
 };
 
-const describeHorizon = (low: number, visibility: number): string => {
-  if (visibility <= VISIBILITY_FULL_PENALTY_M) return 'fog on the horizon';
-  if (low >= 60) return 'clouded horizon';
-  if (low >= 25 || visibility < VISIBILITY_NO_PENALTY_M) return 'hazy horizon';
-  return 'clear horizon';
+const describeHorizon = (low: number, visibility: number): MessageKey => {
+  if (visibility <= VISIBILITY_FULL_PENALTY_M) return 'score.horizonFog';
+  if (low >= 60) return 'score.horizonClouded';
+  if (low >= 25 || visibility < VISIBILITY_NO_PENALTY_M) return 'score.horizonHazy';
+  return 'score.horizonClear';
 };
+
+// "high clouds, clear horizon" in the UI language.
+export const getScoreReason = (score: SunsetScoreResult, language: Language): string =>
+  translate(language, 'score.reason', {
+    clouds: translate(language, score.clouds),
+    horizon: translate(language, score.horizon),
+  });
 
 /**
  * Scores how photogenic a sunset is likely to be (0-10) from cloud cover at
@@ -182,7 +195,8 @@ export const getSunsetScore = ({ low, mid, high, visibility }: SunsetScoreInput)
 
   return {
     score: Math.round(Math.min(10, Math.max(0, raw))),
-    reason: `${describeClouds(mid, high)}, ${describeHorizon(low, visibility)}`
+    clouds: describeClouds(mid, high),
+    horizon: describeHorizon(low, visibility),
   };
 };
 
@@ -247,6 +261,9 @@ const getCachedWeather = (latitude: number, longitude: number): WeatherData | nu
     const latDiff = Math.abs(cacheData.latitude - latitude);
     const lonDiff = Math.abs(cacheData.longitude - longitude);
     if (latDiff > 0.01 || lonDiff > 0.01) return null;
+
+    // An entry from before ROADMAP item 67 has English texts instead of keys.
+    if (!cacheData.data.conditionKey) return null;
     
     // Convert lastUpdated back to Date object. Also normalize the sunset score and
     // cloud/wind fields: a cache entry written before ROADMAP item 11/10 won't have
@@ -321,7 +338,7 @@ export const fetchCurrentWeather = async (
     const weatherData: WeatherData = {
       temperature: Math.round(data.current_weather.temperature),
       weatherType: weatherMapping.type,
-      weatherDescription: weatherMapping.description,
+      conditionKey: weatherMapping.conditionKey,
       lastUpdated: new Date(),
       isRealWeather: true,
       sunsetScoreToday: scoreSunsetAt(data.hourly, sunsetToday),
@@ -342,7 +359,7 @@ export const fetchCurrentWeather = async (
     return {
       temperature: 20,
       weatherType: 'clear',
-      weatherDescription: 'Weather unavailable',
+      conditionKey: 'condition.unavailable',
       lastUpdated: new Date(),
       isRealWeather: false,
       sunsetScoreToday: null,

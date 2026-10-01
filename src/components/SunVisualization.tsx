@@ -18,6 +18,9 @@ import MoonTint from '@/components/MoonTint';
 import { type AstroEvent } from '@/utils/astroEvents';
 import { getSunVisibility, getMoonCloudFactor } from '@/utils/weatherEffectsUtils';
 import { isLineOfSightEnabled } from '@/utils/premium';
+import { useLanguage } from '@/hooks/useLanguage';
+import { formatNumber, type MessageKey } from '@/i18n';
+import { type Language } from '@/utils/language';
 
 // A fixed fallback seed date for callers that don't pass one (e.g. existing tests) -
 // a stable constant, not `new Date()`, so it never changes identity across renders.
@@ -143,6 +146,12 @@ export const CARDINAL_DIRECTIONS = [
   { label: 'W', azimuth: 270 },
   { label: 'NW', azimuth: 315 },
 ] as const;
+
+// The shown label in the UI language (ROADMAP item 67), e.g. "NO" for NE in German.
+const DIRECTION_LABELS: Record<string, MessageKey> = {
+  N: 'direction.n', NE: 'direction.ne', E: 'direction.e', SE: 'direction.se',
+  S: 'direction.s', SW: 'direction.sw', W: 'direction.w', NW: 'direction.nw',
+};
 
 // Screen fraction for each cardinal label, using the same azimuth->x mapping as the
 // sun/moon, so labels stay correct in both hemispheres and pan together with the
@@ -466,11 +475,13 @@ export const avoidCollapsedPanel = <T extends { x: number; y: number }>(label: T
 };
 
 // Sun altitude pill text (ROADMAP item 48): a value that rounds to 0 reads "0.0°", never "-0.0°".
+// The number is in the format of the UI language (ROADMAP item 67), e.g. "+12,3°".
 // eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
-export const formatSunAltitude = (altitude: number): string => {
-  const text = altitude.toFixed(1);
-  if (Number(text) === 0) return '0.0°';
-  return altitude > 0 ? `+${text}°` : `${text}°`;
+export const formatSunAltitude = (altitude: number, language: Language = 'en'): string => {
+  const rounded = Math.round(altitude * 10) / 10;
+  const text = formatNumber(language, Math.abs(rounded), 1);
+  if (rounded === 0) return `${text}°`;
+  return rounded > 0 ? `+${text}°` : `-${text}°`;
 };
 
 const ARC_LABEL_ICONS: Record<ArcLabelKind, typeof Sunrise> = {
@@ -507,6 +518,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   onSunTap,
   calendarEvent = null
 }) => {
+  const { t, language } = useLanguage();
   // Compass mode (ROADMAP item 19): a real field of view centered on the heading,
   // replacing the static full-circle mapping - also turns off the CSS transitions
   // below (the heading's own low-pass filter already smooths the motion).
@@ -896,7 +908,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         // A button, so the sun is a tap target for the sunglasses egg (ROADMAP "Ongoing — Easter eggs").
         <button
           type="button"
-          aria-label="Sun"
+          aria-label={t('scene.sun')}
           onClick={onSunTap}
           data-testid="sun-dot"
           className={`absolute rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${compassActive ? '' : 'transition-transform duration-1000'} ${getSunColor()} ${getGlowIntensity()} animate-glow`}
@@ -1085,7 +1097,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             >
               <span className="block h-3 w-px bg-white/50" aria-hidden="true" />
               <span className="text-caption text-white/90 bg-panel-background border border-panel-border px-2 py-0.5 rounded-full">
-                {label}
+                {t(DIRECTION_LABELS[label])}
               </span>
             </div>
           ))}
@@ -1114,7 +1126,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
                 style={{ left: `${label.x}px`, top: `${label.y}px`, transform: 'translate(-50%, -50%)', color: 'hsl(var(--brand-sunset))' }}
               >
                 <Icon size={10} />
-                {formatTime(label.time)}
+                {formatTime(label.time, language)}
               </div>
             );
           })}
@@ -1128,7 +1140,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
               style={{ left: `${label.x}px`, top: `${label.y}px`, transform: 'translate(-50%, -50%)', color: 'hsl(var(--brand-sunset))' }}
             >
               <Mountain size={10} />
-              {formatTime(label.time)}
+              {formatTime(label.time, language)}
               <PremiumBadge className="absolute -right-1 -top-1 h-2.5 w-2.5" />
             </div>
           ))}
@@ -1142,7 +1154,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
                 style={{ left: `${label.x}px`, top: `${label.y}px`, transform: 'translate(-50%, -50%)', color: 'hsl(var(--scene-moon))' }}
               >
                 <Icon size={10} />
-                {formatTime(label.time)}
+                {formatTime(label.time, language)}
               </div>
             );
           })}
@@ -1155,7 +1167,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
               style={{ left: `${label.x}px`, top: `${label.y}px`, transform: 'translate(-50%, -50%)', color: 'hsl(var(--scene-moon))' }}
             >
               <Mountain size={10} />
-              {formatTime(label.time)}
+              {formatTime(label.time, language)}
               <PremiumBadge className="absolute -right-1 -top-1 h-2.5 w-2.5" />
             </div>
           ))}
@@ -1171,11 +1183,11 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           {sunsetCountdown ? (
             <span className="flex items-center gap-1 tabular-nums">
               {sunsetCountdown.lineOfSight && <Mountain size={12} />}
-              Sunset in {sunsetCountdown.seconds} s
+              {t('scene.countdown', { seconds: sunsetCountdown.seconds })}
               {sunsetCountdown.lineOfSight && <PremiumBadge className="absolute -right-1 -top-1 h-2.5 w-2.5" />}
             </span>
           ) : (
-            formatSunAltitude(sunPosition.altitude)
+            formatSunAltitude(sunPosition.altitude, language)
           )}
         </div>
       )}
@@ -1187,7 +1199,10 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           className="absolute left-1/2 transform -translate-x-1/2 top-[calc(65%+30px)]
                      bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-xs"
         >
-          Moon: {moonPosition.altitude.toFixed(1)}° | {(moonPosition.illumination * 100).toFixed(0)}%
+          {t('scene.moonInfo', {
+            altitude: formatNumber(language, moonPosition.altitude, 1),
+            illumination: new Intl.NumberFormat(language, { style: 'percent' }).format(moonPosition.illumination),
+          })}
         </div>
       )}
     </div>

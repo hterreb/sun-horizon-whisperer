@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { searchPlaces, formatGeocodeResultLabel, type GeocodeResult } from '../utils/geocodeUtils';
 import { FOCUS_RING } from './InfoPanel';
+import { useLanguage } from '@/hooks/useLanguage';
 
 interface PlaceSearchProps {
   onSelect: (latitude: number, longitude: number, name: string) => void;
@@ -15,6 +16,7 @@ const PlaceSearch: React.FC<PlaceSearchProps> = ({ onSelect, autoFocus }) => {
   const [placeResults, setPlaceResults] = useState<GeocodeResult[]>([]);
   const [placeSearchStatus, setPlaceSearchStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const placeAbortRef = useRef<AbortController | null>(null);
+  const { t, language } = useLanguage();
 
   // Debounced search: waits 300ms after typing stops, ignores queries under 2
   // characters, and aborts a request superseded by a newer one so a slow response
@@ -36,7 +38,7 @@ const PlaceSearch: React.FC<PlaceSearchProps> = ({ onSelect, autoFocus }) => {
       placeAbortRef.current = controller;
       setPlaceSearchStatus('loading');
 
-      searchPlaces(trimmed, controller.signal)
+      searchPlaces(trimmed, controller.signal, language)
         .then((results) => {
           if (controller.signal.aborted) return;
           setPlaceResults(results);
@@ -51,7 +53,7 @@ const PlaceSearch: React.FC<PlaceSearchProps> = ({ onSelect, autoFocus }) => {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [placeQuery]);
+  }, [placeQuery, language]);
 
   // Abort any in-flight search on unmount.
   useEffect(() => {
@@ -62,13 +64,13 @@ const PlaceSearch: React.FC<PlaceSearchProps> = ({ onSelect, autoFocus }) => {
 
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor="manual-location-search" className="opacity-80">Search for a place</label>
+      <label htmlFor="manual-location-search" className="opacity-80">{t('search.label')}</label>
       <input
         id="manual-location-search"
         type="text"
         value={placeQuery}
         onChange={(e) => setPlaceQuery(e.target.value)}
-        placeholder="e.g. Friedrichshafen"
+        placeholder={t('search.placeholder')}
         className={`bg-black bg-opacity-30 rounded px-2 py-1 text-white ${FOCUS_RING}`}
         role="combobox"
         aria-expanded={placeResults.length > 0}
@@ -77,19 +79,19 @@ const PlaceSearch: React.FC<PlaceSearchProps> = ({ onSelect, autoFocus }) => {
         autoFocus={autoFocus}
       />
       {placeSearchStatus === 'loading' && (
-        <p className="opacity-70">Searching…</p>
+        <p className="opacity-70">{t('search.searching')}</p>
       )}
       {placeSearchStatus === 'error' && (
-        <p role="alert" className="text-brand-coral">Could not search for places.</p>
+        <p role="alert" className="text-brand-coral">{t('search.error')}</p>
       )}
       {placeSearchStatus === 'done' && placeResults.length === 0 && (
-        <p className="opacity-70">No results</p>
+        <p className="opacity-70">{t('search.noResults')}</p>
       )}
       {placeResults.length > 0 && (
         <ul
           id="manual-location-search-results"
           role="listbox"
-          aria-label="Search results"
+          aria-label={t('search.results')}
           className="space-y-1"
         >
           {placeResults.map((result, index) => (

@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/hooks/useLanguage';
 
 // Gold "plus" mark on premium features (ROADMAP item 35): change location, manual
 // weather, the sunset score, line of sight, compass and the share card (item 68).
@@ -7,10 +8,12 @@ import { cn } from '@/lib/utils';
 // utils/premium.ts). The plus is its own `size-full` svg so the caller's size class
 // scales the whole badge; `!` beats the shadcn Button's `[&_svg]:size-4`, so the
 // badge also works inside a Button.
-const PremiumBadge: React.FC<{ className?: string }> = ({ className }) => (
+const PremiumBadge: React.FC<{ className?: string }> = ({ className }) => {
+  const { t } = useLanguage();
+  return (
   <span
     aria-hidden="true"
-    title="Premium feature, free for now"
+    title={t('common.premium')}
     data-testid="premium-badge"
     className={cn(
       'inline-flex h-3 w-3 flex-shrink-0 rounded-full bg-gradient-to-br from-brand-gold-light to-brand-gold text-brand-night ring-1 ring-white/50 shadow-[0_0_6px_hsl(var(--brand-gold)/0.7)]',
@@ -21,6 +24,7 @@ const PremiumBadge: React.FC<{ className?: string }> = ({ className }) => (
       <path d="M6 3v6M3 6h6" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
     </svg>
   </span>
-);
+  );
+};
 
 export default PremiumBadge;

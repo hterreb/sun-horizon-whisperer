@@ -81,9 +81,15 @@ describe('sunUtils', () => {
     expect(formatTime(new Date(2026, 0, 1, 7, 5, 0))).toMatch(/^07\D05$/);
   });
 
-  it('formatTime still reports "Unknown" for an invalid date', () => {
-    expect(formatTime(new Date('invalid'))).toBe('Unknown');
-    expect(formatTime(null)).toBe('Unknown');
+  it('formatTime shows a dash for an invalid date', () => {
+    expect(formatTime(new Date('invalid'))).toBe('—');
+    expect(formatTime(null)).toBe('—');
+  });
+
+  it('formatTime keeps 24-hour time in every UI language (ROADMAP item 67)', () => {
+    for (const locale of ['en', 'de', 'es', 'it', 'fr']) {
+      expect(formatTime(new Date(2026, 0, 1, 18, 5, 0), locale)).toBe('18:05');
+    }
   });
 
   describe('golden hour (ROADMAP item 11)', () => {
