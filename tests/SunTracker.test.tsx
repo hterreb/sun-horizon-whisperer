@@ -568,5 +568,86 @@ describe('SunTracker', () => {
         expect(starts).toHaveLength(0);
       });
     });
+
+    describe('sunset reminder (ROADMAP item 69)', () => {
+      // Records the body of each notification; jsdom has no service worker, so the hook
+      // uses a page notification.
+      const shown: string[] = [];
+      class FakeNotification {
+        static permission: NotificationPermission = 'default';
+        static answer: NotificationPermission = 'granted';
+        static requestPermission = async () => (FakeNotification.permission = FakeNotification.answer);
+        onclick: (() => void) | null = null;
+        constructor(_title: string, options: NotificationOptions) {
+          shown.push(options.body ?? '');
+        }
+        close() {}
+      }
+      const sunset = getSunTimes(NOON, RAVENSBURG.latitude, RAVENSBURG.longitude).sunset!;
+      const name = 'Remind me 15 minutes before sunset (while the app is open)';
+      const toggle = async () => {
+        fireEvent.click(screen.getByRole('button', { name }));
+        await act(async () => {});
+      };
+      // The page notification comes after an awaited service worker lookup.
+      const advanceAsync = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
+
+      beforeEach(() => {
+        shown.length = 0;
+        FakeNotification.permission = 'default';
+        FakeNotification.answer = 'granted';
+        vi.stubGlobal('Notification', FakeNotification);
+      });
+      afterEach(() => {
+        vi.unstubAllGlobals();
+      });
+
+      it('is off by default; the tap that turns it on asks for the permission and saves the choice', async () => {
+        start(new Date(sunset.getTime() - 20 * 60_000));
+        expect(screen.getByRole('button', { name })).toHaveAttribute('aria-pressed', 'false');
+        await toggle();
+        expect(screen.getByRole('button', { name })).toHaveAttribute('aria-pressed', 'true');
+        expect(localStorage.getItem('sunset-reminder')).toBe('on');
+        expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Sunset reminder on' }));
+      });
+
+      it('shows one notification 15 minutes before sunset', async () => {
+        start(new Date(sunset.getTime() - 20 * 60_000));
+        await toggle();
+        await advanceAsync(4 * 60_000);
+        expect(shown).toHaveLength(0);
+        await advanceAsync(2 * 60_000);
+        expect(shown).toHaveLength(1);
+        expect(shown[0]).toMatch(/^Sunset in 15 minutes, at \d{2}:\d{2}$/);
+        await advanceAsync(20 * 60_000);
+        expect(shown).toHaveLength(1);
+      });
+
+      it('stays off with a hint when the permission is denied', async () => {
+        FakeNotification.answer = 'denied';
+        start(new Date(sunset.getTime() - 20 * 60_000));
+        await toggle();
+        expect(screen.getByRole('button', { name })).toHaveAttribute('aria-pressed', 'false');
+        expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Notifications are blocked' }));
+        await advanceAsync(10 * 60_000);
+        expect(shown).toHaveLength(0);
+      });
+
+      it('during a preview, shows no notification', async () => {
+        start(NOON);
+        await toggle();
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const before = new Date(sunset.getTime() - 20 * 60_000);
+        jumpTo(`2026-09-30T${pad(before.getHours())}:${pad(before.getMinutes())}`);
+        await advanceAsync(10 * 60_000);
+        expect(shown).toHaveLength(0);
+      });
+
+      it('is hidden without the Notification API', () => {
+        vi.unstubAllGlobals();
+        start(NOON);
+        expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
+      });
+    });
   });
 });
