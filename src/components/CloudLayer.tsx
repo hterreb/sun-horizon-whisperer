@@ -211,8 +211,9 @@ export const createFish = (
     id: Date.now() + Math.random(),
     kind, depth, size, width, height, school, light,
     x: startX,
-    // Far fish swim at 70 % of the height, near ones at 85 % (the old fish band), ±1 %.
-    y: 70 + (1 - depth) * 15 + (random() - 0.5) * 2,
+    // The whole water (item 71): far fish just below the horizon (67 % of the height), near
+    // ones in the front (93 %), ±1 %. Before, all fish shared a 70-85 % band in the middle.
+    y: 67 + (1 - depth) * 26 + (random() - 0.5) * 2,
     dx,
     duration: rest ? rest.duration : dx / speed,
     easing: rest?.easing,
@@ -437,7 +438,9 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
           if (Math.random() < 0.9) { // 90% chance to spawn
             const startX = -8;
             const endX = 108;
-            const depth = Math.random();
+            // More boats far out (item 71): the square root makes 44 % of them sail in the
+            // farthest quarter, small and pale near the horizon, and fewer big ones mid-water.
+            const depth = Math.sqrt(Math.random());
             const kind = pickBoat(weatherType, windSpeedKmh, Math.random());
             const newShip: Boat = {
               id: Date.now() + Math.random(),

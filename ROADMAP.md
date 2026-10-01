@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44, 47–66 and 70, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), items 67–69 (five languages, share card, sunset reminder), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
+Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44, 47–66, 70 and 71, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), items 67–69 (five languages, share card, sunset reminder), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
 
 ## Verification (2026-09-28)
 
@@ -895,6 +895,17 @@ These items come from the re-shoot of all states after items 46–56.
 - **Review:** Lutz checks on his Mac whether it gets too crowded. If it does, the fallback is half the rule (8 fish, 5 night fish, 5 boats at 1440 px).
 - **Built:** `getWaterLimit` (`weatherEffectsUtils.ts`), used for the fish limit (day and night) and the boat limit in `CloudLayer`.
 - **Checked:** 4 new tests (707 in all), lint, typecheck and build pass. The limit tests now pin a phone width (390 px) or a wide one (1290 px), because jsdom's window is 1024 px. In Chromium at 1440×900, after two simulated minutes: 12 fish groups (25 fish) on screen.
+
+
+### 71. Fish and boats over the whole water — S — **✅ Done**
+
+- **Feedback (2026-10-01, on the item 70 preview):** "i like it but it feels a bit crowded vertically in the middle, so no fish or boats near the horizon and no fish in the front".
+- **Now:** the water runs from the horizon (65 % of the height) to the bottom of the screen. The fish used only a band from 70 % to 85 %, and the boats' waterlines were spread evenly over 67–87 % (94 % in fullscreen). Everything met in the middle, and the front (85–100 %) stayed empty.
+- **Spec:**
+  - Fish use the whole water: far fish just below the horizon (67 %), near ones in the front (93 %), ±1 %. Day and night.
+  - More boats far out: the distance is √random, so 44 % of the boats sail in the farthest quarter, small and pale near the horizon, and big near boats mid-water are rarer. The waterline range stays (67–87 %, 94 % in fullscreen), so boats still go below the music player only in fullscreen.
+- **Built:** `createFish` (`y` = 67 + (1 − depth) × 26 ± 1) and the boat spawn (`depth = Math.sqrt(Math.random())`) in `CloudLayer.tsx`.
+- **Checked:** 1 new test, the fish height test updated (708 in all); lint and typecheck pass. In Chromium at 1440×900, after six simulated minutes: 22 fish groups at 68–94 % of the height, 5 boats at 70–79 %.
 
 ---
 
