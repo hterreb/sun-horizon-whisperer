@@ -2,10 +2,11 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 
 // Gold "plus" mark on premium features (ROADMAP item 35): change location, manual
-// weather, the sunset score, line of sight and compass. Decorative only: all of them
-// stay free while PREMIUM_ENFORCED is false (see utils/premium.ts). The plus is its
-// own `size-full` svg so the caller's size class scales the whole badge; `!` beats
-// the shadcn Button's `[&_svg]:size-4`, so the badge also works inside a Button.
+// weather, the sunset score, line of sight, compass and the share card (item 68).
+// Decorative only: all of them stay free while PREMIUM_ENFORCED is false (see
+// utils/premium.ts). The plus is its own `size-full` svg so the caller's size class
+// scales the whole badge; `!` beats the shadcn Button's `[&_svg]:size-4`, so the
+// badge also works inside a Button.
 const PremiumBadge: React.FC<{ className?: string }> = ({ className }) => (
   <span
     aria-hidden="true"
