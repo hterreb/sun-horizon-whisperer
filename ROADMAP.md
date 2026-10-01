@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44 and 47–65, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), the device and dashboard checks listed under Verification (status 2026-10-01), backlog (i18n, share card, sunset reminder). [AUDIT.md](AUDIT.md) has no open findings.
+Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44 and 47–66, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), the device and dashboard checks listed under Verification (status 2026-10-01), backlog (i18n, share card, sunset reminder). [AUDIT.md](AUDIT.md) has no open findings.
 
 ## Verification (2026-09-28)
 
@@ -829,6 +829,21 @@ These items come from the re-shoot of all states after items 46–56.
   - `SunVisualization.tsx`: the pool strength (`moonPool` = illumination × `getMoonCloudFactor` × `getReflectionFade`) and the light cone (a radial gradient on a rect twice the water's height, so it has no hard edge). It passes `moonlight` (x and strength) to `CloudLayer`.
   - `CloudLayer.tsx`: the night mix from nautical twilight on, with a check every 15–25 s. `createFish` takes a `night` flag: `light` is `'moon'` or `'own'`, with no depth haze and no E1 spot. The moonlit fish swim in a layer masked around the moon, at the pool's opacity. The layer is always rendered, so a fish can always finish its crossing and be removed. The glowing fish carry `lights` (gold circles, like the boat lights) or a `drop-shadow` halo (jellyfish, squid).
 - **Checked:** 9 new unit tests (699 in all), lint, typecheck and build pass. In Chromium at 390×844, Ravensburg, clear, 2026-09-27 00:30 (full moon at 47°): all seven night kinds spawned. The moonlit day fish (classic, trout), the burbot and the eel were in the pool layer, whose mask was centred on the moon (46 % of the width) at full strength. A lanternfish pair showed its 10 gold lights. The first cone had hard side edges; it now fades out softly.
+
+
+### 66. Calm fish: slower, and phone speed on wide screens — S — **✅ Done**
+
+- **Feedback (2026-10-01):** "some fish are very fast, that it doesnt really feel very calm anymore, please analyze and challenge". Seen on a desktop Mac.
+- **Analysis:**
+  - Item 40 slowed the boats to 0.9–1.8 % of the width per second, but the fish kept the old 2.5 %/s, and item 62 added faster ones (trout 2.8, minnow school 3.0). 89 % of the day spawns were faster than the sailboat (1.2 %/s). The night fish repeated this (lanternfish 2.2, squid 2.0).
+  - Speeds are a share of the width, so a wide screen moves 3–5× more pixels per second than a phone. At 1440 px, a near trout moved 40 px/s.
+  - The fastest fish was 7.5× the slowest, all in one 15 %-high band, so fish kept overtaking each other. Minnows and squid covered more than one body length per second, which looks like darting.
+  - Density is not the cause: the five-fish limit (E4) was already full all the time (without it, about 10 fish would be on screen), and it stays full at the new speeds. Only the turnover halves.
+- **Spec:**
+  - No fish faster than the sailboat: every speed × 0.45, at most 1.2 %/s, at least 0.4 %/s (fish already slower keep their speed). Day: classic 1.15, minnow 1.2, perch 1, pike 0.9, carp 0.7, catfish 0.5, trout 1.2, ray 0.7, turtle 0.55, jellyfish 0.4, seahorse 0.4, whale 0.4, pufferfish 0.45. Night: burbot 0.55, eel 0.65, lanternfish 1, anglerfish 0.4, squid 0.9. These replace the speed columns of items 62 and 65.
+  - Wide screens: fish and boats move at most at a 430 px phone's pixels per second (`getWaterSpeedFactor` = min(1, 430 / window width)). Phones are not affected. Birds and leaves are not changed.
+- **Built:** the speeds in `FISH` (`CloudLayer.tsx`); `PHONE_WIDTH_PX` and `getWaterSpeedFactor` (`weatherEffectsUtils.ts`), applied in `createFish` and to the boat crossing time.
+- **Checked:** 4 new tests (704 in all), lint, typecheck and build pass. In Chromium at 1440×900 (Ravensburg, 11:00): a near minnow school moved 4.6 px/s and a far trout 3.3 px/s, as planned. On this width a near fish now takes about 4–5 min to cross, and a near sailboat about 5 min.
 
 ---
 

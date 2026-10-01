@@ -1,6 +1,7 @@
 import React, { Profiler } from 'react';
 import { render, act } from '@testing-library/react';
 import CloudLayer, { WeatherType, createFish } from '../src/components/CloudLayer';
+import { FISH_WEIGHTS, NIGHT_FISH_WEIGHTS, getWaterSpeedFactor } from '../src/utils/weatherEffectsUtils';
 import type { TimeOfDay } from '../src/utils/sunUtils';
 
 const mockReducedMotion = (matches: boolean) =>
@@ -179,13 +180,15 @@ describe('CloudLayer', () => {
     });
 
     it('sails each boat type at its own speed (ROADMAP item 40)', () => {
-      // Near boats (depth 0) cross 116 % of the width: a sailboat at 1.2 %/s, a ferry at 1.8 %/s.
+      // Near boats (depth 0) cross 116 % of the width: a sailboat at 1.2 %/s, a ferry at 1.8 %/s,
+      // slowed to phone speed on jsdom's 1024 px wide window (item 66).
       const crossingSec = (props: Partial<React.ComponentProps<typeof CloudLayer>>) => {
         const wrapper = spawn(props, 6000).querySelector('[data-testid="scene-boat"]')?.parentElement?.parentElement as HTMLElement;
         return parseFloat(wrapper.style.animation.split(' ')[1]);
       };
-      expect(crossingSec({})).toBeCloseTo(116 / 1.2, 1);
-      expect(crossingSec({ weatherType: 'rain' })).toBeCloseTo(116 / 1.8, 1);
+      const wide = getWaterSpeedFactor(window.innerWidth);
+      expect(crossingSec({})).toBeCloseTo(116 / (1.2 * wide), 1);
+      expect(crossingSec({ weatherType: 'rain' })).toBeCloseTo(116 / (1.8 * wide), 1);
     });
 
     it('draws fish smaller than the boats (ROADMAP item 40)', () => {
@@ -294,6 +297,26 @@ describe('CloudLayer', () => {
       expect(moonlitClassic.glow).toBe(false); // no E1 spot on a night fish
       expect(createFish('lanternfish', false, false, 390, always(0), true).opacity).toBeCloseTo(0.95, 5);
       expect(createFish('classic', false, false, 390, always(0)).light).toBeUndefined();
+    });
+
+    it('swims no fish faster than the sailboat, none slower than 0.4 %/s (ROADMAP item 66)', () => {
+      const kinds = [...FISH_WEIGHTS.map(([kind]) => kind), ...NIGHT_FISH_WEIGHTS.map(([kind]) => kind).filter(k => k !== 'moonlit')];
+      for (const kind of kinds) {
+        const near = createFish(kind as Parameters<typeof createFish>[0], false, false, 390, always(0), true);
+        // The species' own speed in % of the width per second, without the distance slow-down
+        // (the whale is always far out). A rest stop only lowers it.
+        const speed = near.dx / near.duration / (1 - 0.45 * near.depth);
+        expect(speed).toBeLessThanOrEqual(1.2 + 1e-9);
+        if (!near.easing) expect(speed).toBeGreaterThanOrEqual(0.4 - 1e-9);
+      }
+    });
+
+    it('slows fish to phone speed in pixels on a wide screen (ROADMAP item 66)', () => {
+      const phone = createFish('classic', false, false, 390, always(0));
+      const desktop = createFish('classic', false, false, 1290, always(0));
+      // The same pixels per second: 1.15 % of 430 px each second on both.
+      expect(phone.dx / phone.duration).toBeCloseTo(1.15, 5);
+      expect((desktop.dx / desktop.duration) * 1290).toBeCloseTo(1.15 * 430, 5);
     });
 
     it('keeps at most five fish on screen (E4)', () => {
