@@ -139,7 +139,7 @@ export const PHONE_WIDTH_PX = 430;
 export const getWaterSpeedFactor = (viewportWidth: number): number =>
   Math.min(1, PHONE_WIDTH_PX / viewportWidth);
 
-// Room on wide screens (ROADMAP item 67): a crossing there takes 1 / getWaterSpeedFactor
+// Room on wide screens (ROADMAP item 70): a crossing there takes 1 / getWaterSpeedFactor
 // times longer, so the fish and boat limits grow by the same factor. A wide screen then
 // looks like phones side by side. Phones keep the base limit.
 export const getWaterLimit = (base: number, viewportWidth: number): number =>
