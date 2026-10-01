@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44, 47–66 and 70–73, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), items 67–69 (five languages, share card, sunset reminder), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
+Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44, 47–73, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
 
 ## Verification (2026-09-28)
 
@@ -849,7 +849,7 @@ These items come from the re-shoot of all states after items 46–56.
 
 - **Decision (2026-10-01):** "put german, spanish, italian and french on the roadmap and the share card feature as premium and the sunset reminder notification".
 
-### 67. UI in five languages: English, German, Spanish, Italian, French — L
+### 67. UI in five languages: English, German, Spanish, Italian, French — L — **✅ Done**
 
 - **Now:** all UI text is English and hard-coded in the components.
 - **Spec:**
@@ -862,6 +862,18 @@ These items come from the re-shoot of all states after items 46–56.
   7. Item 16: the Play Store listing and the privacy policy in the same five languages.
 - **Done when:** a test fails when a key is missing in a dictionary or is not used. In the browser, `de-DE`, `es-ES`, `it-IT` and `fr-FR` show the full UI in that language, with no English left, and the panel layout does not break with the longest strings (390×844 and 360×640).
 - **Note:** this touches almost every component. Build it alone, not in parallel with other UI items. A native speaker should review the four translations.
+- **Built:**
+  - `src/i18n/en.ts` is the source of the keys (229 flat keys, for example `reminder.toggle`). `de.ts`, `es.ts`, `it.ts` and `fr.ts` are typed `Record<keyof typeof en, string>`, so a missing or extra key is a type error. `translate(language, key, vars)` (`src/i18n/index.ts`) fills `{name}` placeholders and leaves a placeholder without a value visible. `formatNumber` gives the decimal separator of the language. No new dependency.
+  - `src/utils/language.ts`: `getDefaultLanguage` (the first two letters of `navigator.language`, else `en`), `loadLanguage` / `saveLanguage` (`localStorage` `language`, with try/catch), the same pattern as `temperatureUnit.ts`.
+  - `SunTracker` holds the language in state, sets `<html lang>`, and gives `{ language, setLanguage, t }` to the components below it through `LanguageContext` (`useLanguage`). Without a provider (tests) the texts are English. The 404 page and the error page are outside SunTracker and read the saved language directly.
+  - The picker is a row "Language" at the bottom of the InfoPanel, above "Send feedback": `EN DE ES IT FR` in the style of the °C/°F toggle, each button with the language's own name as `aria-label` and tooltip.
+  - Translated: all panel text, `aria-label`s and tooltips, the toasts, the loading screen, the install prompt, the radio, the scene (sun button, compass chips such as `NO`/`SO` in German, the sun altitude pill, the countdown pill, the moon pill), the reminder notification, the share card, the Sentry feedback form (through `createForm` options) and the error and 404 pages. "Sun Chaser" stays as it is.
+  - Pure utils return keys instead of English text: `getTimeOfDayLabel`, `getMoonPhaseLabel`, the WMO weather map (`WeatherData.conditionKey`) and the sunset score (`clouds` and `horizon` keys, shown with `getScoreReason`). A weather cache entry from before this item has English text, so it counts as a miss.
+  - Dates, times and numbers use `Intl` with the language: `formatTime(date, language)` (24-hour in all five languages, as before), the moon dates, the time-travel clock, the share-card date, the coordinates, the altitudes and azimuths and the moon illumination (`70 %` in German and French).
+  - Place names: BigDataCloud gets `localityLanguage` and runs again when the language changes. The Open-Meteo search gets `language`. A place picked from the search before keeps the name in the language it was saved in.
+  - Fix on the way: the open Moon section with the line-of-sight block was taller than its `max-h-64` and ran into the next section (also in English); it is now `max-h-[40rem]`.
+  - Not built here: spec step 7 (the Play Store listing and the privacy policy in five languages) belongs to item 16, which has no listing or policy text yet.
+- **Checked:** 26 new tests (766 in all): every dictionary has exactly the keys of `en` and the same placeholders, every `en` key is used in `src/`, `translate` and `formatNumber`, the language default and storage, the share card and the reminder text in German, the Open-Meteo `language` parameter, the old weather cache, and in `SunTracker` a `de-DE` browser starts in German, sets `<html lang="de">` and a tap on "Français" switches and saves `fr`. Lint, typecheck and build pass. In headless Chromium with the context locale `en-US`, `de-DE`, `es-ES`, `it-IT` and `fr-FR` (Ravensburg, 2026-10-01 18:20 and 23:30, all sections open, manual weather, both line-of-sight blocks): the full panel at 390×844 and 360×640, and the loading screen, show no English text in the four languages, and no row breaks out of the panel. The longest rows ("Sonnenuntergang", "Coucher du soleil" with three buttons) stay on one line at 360 px. The translations still need a review by native speakers.
 
 ### 68. Share card: today's sunset as an image — M — Premium — **✅ Done**
 
@@ -937,10 +949,10 @@ These items come from the re-shoot of all states after items 46–56.
   - **X1 Reflection:** every boat has a faint, still mirror image under the waterline (28 %, slightly blurred, fading out downward).
   - **X2 Wake:** two thin pale lines from under the stern (`hasBoatWake`). The ferry and the freighter always; the sailboat only in strong wind (> 40 km/h); the rowboat never. The fishing boat was not named and has none.
   - **Storm:** then: "only ferries and freighters in a storm but no sail boats". A storm now sends out the ferry and the freighter, each with its wake (`pickBoat`). Hail still has no boats.
-  - **Strong wind in manual weather:** "is there a weather option for fair weather with strong wind?" Manual Weather gets a "Strong wind" switch under the ten types. On, the wind is 50 km/h: leaves, slower birds, no rowboat and the sailboat's wake. Off, manual mode is calm (0 km/h). Before, manual mode used the last real wind reading.
+  - **Strong wind in manual weather:** "is there a weather option for fair weather with strong wind?" Manual Weather gets a "Strong wind" switch under the ten types (`weather.strongWind`, in all five languages). On, the wind is 50 km/h: leaves, slower birds, no rowboat and the sailboat's wake. Off, manual mode is calm (0 km/h). Before, manual mode used the last real wind reading.
   - The motion does not change: the same straight glide at the same speeds.
 - **Built:** `SceneBoat.tsx` (drawings, gradients, reflection, wake, lights); `hasBoatWake` and `getBoatTone` (`weatherEffectsUtils.ts`); `CloudLayer` renders `SceneBoat` and lets boats out in a storm; the "Strong wind" switch in `InfoPanel`, with `MANUAL_STRONG_WIND_KMH` in `SunTracker`. The line icons `LakeFerry`, `FishingBoat`, `Rowboat` and `Freighter` are removed from `sceneIcons.ts`.
-- **Checked:** 9 new tests (749 in all), lint and typecheck pass. In Chromium at Ravensburg with faked weather: at 1280×800, 2026-10-01 18:30 (evening, clear, wind 50 km/h), 7 sailboats and a ferry sailed with peach sails, reflections and a wake, and a fishing boat without one. At 390×844, 21:40 (night, wind 10 km/h), a sailboat and a rowboat sailed dark, with their gold lights and no wake. In manual mode at 1280×800, midday: Clear with "Strong wind" on brought leaves, and the sailboats and the ferry had a wake (the fishing boat none); with the switch off the sailboats' wakes went away; Storm sent out only ferries and freighters, each with a wake.
+- **Checked:** 9 new tests (775 in all after merging item 67), lint and typecheck pass. In Chromium at Ravensburg with faked weather: at 1280×800, 2026-10-01 18:30 (evening, clear, wind 50 km/h), 7 sailboats and a ferry sailed with peach sails, reflections and a wake, and a fishing boat without one. At 390×844, 21:40 (night, wind 10 km/h), a sailboat and a rowboat sailed dark, with their gold lights and no wake. In manual mode at 1280×800, midday: Clear with "Strong wind" on brought leaves, and the sailboats and the ferry had a wake (the fishing boat none); with the switch off the sailboats' wakes went away; Storm sent out only ferries and freighters, each with a wake.
 
 ---
 

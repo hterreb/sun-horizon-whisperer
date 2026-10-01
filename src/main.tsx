@@ -4,6 +4,8 @@ import App from './App.tsx'
 import './index.css'
 import { registerSW } from 'virtual:pwa-register'
 import { scrubLocation } from './utils/sentryScrub'
+import { translate } from './i18n'
+import { loadLanguage } from './utils/language'
 
 // Error reports + anonymous feedback (ROADMAP item 21). Off when no DSN is set
 // (local dev, tests). No tracing, no replay, no user identity, no coordinates.
@@ -37,10 +39,12 @@ if (sentryDsn) {
   })
 }
 
+// The error page is outside SunTracker's language context (ROADMAP item 67).
+const fallbackLanguage = loadLanguage(navigator.language)
 const errorFallback = (
   <div className="h-dvh flex flex-col items-center justify-center gap-4 bg-background text-foreground">
-    <p>Something went wrong.</p>
-    <button className="underline" onClick={() => window.location.reload()}>Reload</button>
+    <p>{translate(fallbackLanguage, 'error.text')}</p>
+    <button className="underline" onClick={() => window.location.reload()}>{translate(fallbackLanguage, 'error.reload')}</button>
   </div>
 )
 

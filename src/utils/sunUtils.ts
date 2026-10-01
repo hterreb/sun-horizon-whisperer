@@ -1,4 +1,5 @@
 import SunCalc from 'suncalc';
+import { type MessageKey } from '@/i18n';
 
 export interface SunPosition {
   azimuth: number;
@@ -233,14 +234,15 @@ export const getSunTimes = (date: Date, latitude: number, longitude: number): Su
   };
 };
 
-export const formatTime = (date: Date | null): string => {
-  if (!isValidDate(date)) return "Unknown";
+// 24-hour "18:42" in the UI language (ROADMAP item 67); "—" for a missing time.
+export const formatTime = (date: Date | null, locale?: string): string => {
+  if (!isValidDate(date)) return '—';
   
   try {
-    return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+    return date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
   } catch (error) {
     console.error('Error formatting time:', error);
-    return "Unknown";
+    return '—';
   }
 };
 
@@ -268,20 +270,20 @@ export const getTimeOfDay = (date: Date, sunTimes: SunTimes): TimeOfDay => {
   return 'night';
 };
 
-export const getTimeOfDayLabel = (timeOfDay: TimeOfDay): string => {
-  switch(timeOfDay) {
-    case 'night': return 'Night';
-    case 'astronomical-twilight': return 'Astronomical Twilight';
-    case 'nautical-twilight': return 'Nautical Twilight';
-    case 'civil-twilight': return 'Civil Twilight';
-    case 'dawn': return 'Dawn';
-    case 'morning': return 'Morning';
-    case 'midday': return 'Midday';
-    case 'afternoon': return 'Afternoon';
-    case 'evening': return 'Evening';
-    default: return 'Unknown';
-  }
+// The dictionary key of the panel heading (ROADMAP item 67).
+const TIME_OF_DAY_LABELS: Record<TimeOfDay, MessageKey> = {
+  'night': 'timeOfDay.night',
+  'astronomical-twilight': 'timeOfDay.astronomicalTwilight',
+  'nautical-twilight': 'timeOfDay.nauticalTwilight',
+  'civil-twilight': 'timeOfDay.civilTwilight',
+  'dawn': 'timeOfDay.dawn',
+  'morning': 'timeOfDay.morning',
+  'midday': 'timeOfDay.midday',
+  'afternoon': 'timeOfDay.afternoon',
+  'evening': 'timeOfDay.evening',
 };
+
+export const getTimeOfDayLabel = (timeOfDay: TimeOfDay): MessageKey => TIME_OF_DAY_LABELS[timeOfDay];
 
 // Brand hex values (ROADMAP item 15, direction D "Polished Classic"). These mirror
 // the HSL custom properties in index.css (--brand-*, --scene-sky-*-*) - kept here as

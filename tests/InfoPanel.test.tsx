@@ -76,7 +76,7 @@ describe('InfoPanel', () => {
     const weatherAt = (temperature: number): WeatherData => ({
       temperature,
       weatherType: 'snow',
-      weatherDescription: 'Snow',
+      conditionKey: 'condition.slightSnow',
       lastUpdated: new Date(),
       isRealWeather: true,
       sunsetScoreToday: null,
@@ -100,7 +100,7 @@ describe('InfoPanel', () => {
     const weather: WeatherData = {
       temperature: -3,
       weatherType: 'snow',
-      weatherDescription: 'Snow',
+      conditionKey: 'condition.slightSnow',
       lastUpdated: new Date(),
       isRealWeather: true,
       sunsetScoreToday: null,
@@ -322,7 +322,7 @@ describe('InfoPanel', () => {
       const weatherData: WeatherData = {
         temperature: 10,
         weatherType: 'clear',
-        weatherDescription: 'Clear',
+        conditionKey: 'condition.clearSky',
         lastUpdated: new Date(),
         isRealWeather: false,
         sunsetScoreToday: null,
@@ -780,10 +780,10 @@ describe('InfoPanel: line of sight as an icon at the sun and moon rows (ROADMAP 
     const weatherData: WeatherData = {
       temperature: 10,
       weatherType: 'clear',
-      weatherDescription: 'Clear',
+      conditionKey: 'condition.clearSky',
       lastUpdated: new Date(),
       isRealWeather: true,
-      sunsetScoreToday: { score: 7, reason: 'High cloud' },
+      sunsetScoreToday: { score: 7, clouds: 'score.cloudsHigh', horizon: 'score.horizonClear' },
       sunsetScoreTomorrow: null,
       cloudCoverPercent: null,
       windSpeedKmh: null,

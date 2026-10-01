@@ -63,6 +63,9 @@ import { DISCO_MS, KONAMI_SEQUENCE, SUNGLASSES_MS, advanceKonami, getEggOverride
 import DiscoSky from './DiscoSky';
 import Ufo from './Ufo';
 import { loadTemperatureUnit, saveTemperatureUnit, type TemperatureUnit } from '@/utils/temperatureUnit';
+import { loadLanguage, saveLanguage, type Language } from '@/utils/language';
+import { translate, type Translate } from '@/i18n';
+import { LanguageContext } from '@/hooks/useLanguage';
 
 // Eye height above ground for line of sight with terrain (ROADMAP item 13): e.g. a
 // building floor or a tower, clamped to a sane 0-1000 m range and persisted like
@@ -144,6 +147,18 @@ const SunTracker: React.FC = () => {
     setTemperatureUnit(unit);
     saveTemperatureUnit(unit);
   }, []);
+  // UI language (ROADMAP item 67): default from navigator.language, saved choice first.
+  // Given to the components below through LanguageContext.
+  const [language, setLanguageState] = useState<Language>(() => loadLanguage(navigator.language));
+  const setLanguage = useCallback((next: Language) => {
+    setLanguageState(next);
+    saveLanguage(next);
+  }, []);
+  const t = useCallback<Translate>((key, vars) => translate(language, key, vars), [language]);
+  const languageContext = useMemo(() => ({ language, setLanguage, t }), [language, setLanguage, t]);
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showCursor, setShowCursor] = useState(true);
   const isMobile = useIsMobile();
@@ -205,12 +220,12 @@ const SunTracker: React.FC = () => {
     if (!hasSeenCompassCalibrationHint()) {
       markCompassCalibrationHintSeen();
       toast({
-        title: "Calibrating compass",
-        description: "Move your phone in a figure 8 for a more accurate heading."
+        title: t('compass.calibratingTitle'),
+        description: t('compass.calibratingDescription')
       });
     }
     enableCompass();
-  }, [enableCompass]);
+  }, [enableCompass, t]);
 
   // Whenever fullscreen mode toggles (either direction), the cursor should be shown
   // immediately; the effect below then re-arms the auto-hide timer for fullscreen.
@@ -327,22 +342,22 @@ const SunTracker: React.FC = () => {
       // refresh (every 30 min, or a cache hit) should stay silent.
       if (!weather.isRealWeather) {
         toast({
-          title: "Weather unavailable",
-          description: "Using default weather. Check your connection.",
+          title: t('toast.weatherUnavailableTitle'),
+          description: t('toast.weatherUnavailableDescription'),
           variant: "destructive"
         });
       }
     } catch (error) {
       console.error('[SunTracker Debug] Error fetching weather:', error);
       toast({
-        title: "Weather fetch failed",
-        description: "Could not get current weather data.",
+        title: t('toast.weatherFailedTitle'),
+        description: t('toast.weatherFailedDescription'),
         variant: "destructive"
       });
     } finally {
       setIsLoadingWeather(false);
     }
-  }, [location.loaded, location.latitude, location.longitude, useRealWeather]);
+  }, [location.loaded, location.latitude, location.longitude, useRealWeather, t]);
 
   // Fetch weather data when location is available. Kicking off the fetch from a
   // timer callback (rather than calling it synchronously in the effect body) avoids
@@ -377,8 +392,8 @@ const SunTracker: React.FC = () => {
 
     if (!navigator.geolocation) {
       toast({
-        title: "Geolocation not supported",
-        description: "Your browser doesn't support geolocation. Using default location.",
+        title: t('toast.geolocationUnsupportedTitle'),
+        description: t('toast.geolocationUnsupportedDefault'),
         variant: "destructive"
       });
       return;
@@ -402,8 +417,8 @@ const SunTracker: React.FC = () => {
           loaded: true
         });
         toast({
-          title: "Location unavailable",
-          description: "Using default location. Please enable location services for accurate data.",
+          title: t('toast.locationUnavailableTitle'),
+          description: t('toast.locationUnavailableDefault'),
           variant: "destructive"
         });
       },
@@ -412,6 +427,7 @@ const SunTracker: React.FC = () => {
       // loading screen's "Choose a place".
       { timeout: 10000 }
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- asks for the location once at start; `t` is the start language
   }, []);
 
   // Manual location form (InfoPanel): validated lat/lon submitted by the user, or a
@@ -428,8 +444,8 @@ const SunTracker: React.FC = () => {
   const handleUseMyLocation = useCallback(() => {
     if (!navigator.geolocation) {
       toast({
-        title: "Geolocation not supported",
-        description: "Your browser doesn't support geolocation.",
+        title: t('toast.geolocationUnsupportedTitle'),
+        description: t('toast.geolocationUnsupported'),
         variant: "destructive"
       });
       return;
@@ -445,20 +461,20 @@ const SunTracker: React.FC = () => {
           loaded: true
         });
         toast({
-          title: "Location detected",
-          description: "Using your current location for sun calculations.",
+          title: t('toast.locationDetectedTitle'),
+          description: t('toast.locationDetectedDescription'),
         });
       },
       (error) => {
         console.error("Error getting location:", error);
         toast({
-          title: "Location unavailable",
-          description: "Could not get your current location.",
+          title: t('toast.locationUnavailableTitle'),
+          description: t('toast.locationUnavailable'),
           variant: "destructive"
         });
       }
     );
-  }, []);
+  }, [t]);
 
   // Sun/moon position, sun times, golden/blue hour and time of day, derived from `date`
   // (ROADMAP item 44). Keyed on the 30 s step, so live mode keeps its 30 s rhythm and a
@@ -686,14 +702,14 @@ const SunTracker: React.FC = () => {
       setNotificationPermission(getNotificationPermission());
       if (!granted) {
         toast({
-          title: 'Notifications are blocked',
-          description: 'Allow notifications for this site in the browser settings to get the sunset reminder.',
+          title: t('reminder.blockedTitle'),
+          description: t('reminder.blockedDescription'),
         });
         return;
       }
       toast({
-        title: 'Sunset reminder on',
-        description: `A notification comes ${SUNSET_REMINDER_MIN} minutes before sunset, while the app is open.`,
+        title: t('reminder.onTitle'),
+        description: t('reminder.onDescription', { minutes: SUNSET_REMINDER_MIN }),
       });
     }
     setIsReminderSaved(next);
@@ -702,8 +718,8 @@ const SunTracker: React.FC = () => {
     } catch (error) {
       console.error('Error saving sunset reminder:', error);
     }
-  }, [isReminderOn]);
-  useSunsetReminder(countdownTarget?.time ?? null, isReminderOn && !isTimePreview);
+  }, [isReminderOn, t]);
+  useSunsetReminder(countdownTarget?.time ?? null, isReminderOn && !isTimePreview, language);
 
   // A manually picked weather ignores the real cloud cover: the sky, the stars and
   // the moon then follow the weather type alone (ROADMAP items 50, 52, 57).
@@ -734,7 +750,7 @@ const SunTracker: React.FC = () => {
   };
 
   return (
-    <>
+    <LanguageContext.Provider value={languageContext}>
     {reveal !== 'done' && (
       <LoadingScreen
         still={prefersReducedMotion || reveal !== 'loading'}
@@ -862,11 +878,11 @@ const SunTracker: React.FC = () => {
           className={`fixed left-1/2 z-20 -translate-x-1/2 ${GLASS_SURFACE} rounded-full px-4 py-2 text-caption font-semibold text-white hover:bg-[hsl(var(--panel-background)/0.65)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70`}
           style={{ bottom: `calc(${isMobile ? '7.5rem' : '4.5rem'} + env(safe-area-inset-bottom))` }}
         >
-          Back to now
+          {t('time.backToNow')}
         </button>
       )}
     </div>
-    </>
+    </LanguageContext.Provider>
   );
 };
 
