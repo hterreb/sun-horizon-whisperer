@@ -4,6 +4,7 @@ import { Music, SkipForward, Volume2, VolumeX } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useLanguage } from '@/hooks/useLanguage';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
 
 interface MusicPlayerProps {
@@ -40,6 +41,7 @@ const loadStoredStationIndex = (): number => {
 
 const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
   const [isPlaying, setIsPlaying] = useState(false);
+  const { t } = useLanguage();
   const [volume, setVolume] = useState([0.5]);
   const [isVisible, setIsVisible] = useState(true);
   const [stationIndex, setStationIndex] = useState(loadStoredStationIndex);
@@ -177,8 +179,8 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
             console.error('Audio playback failed:', error);
             setIsPlaying(false);
             toast({
-              title: "Playback failed",
-              description: "Click anywhere on the page first, then try again. Browser autoplay policies may be blocking audio.",
+              title: t('music.failedTitle'),
+              description: t('music.failedDescription'),
               variant: "destructive"
             });
           });
@@ -187,7 +189,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
         audioRef.current.pause();
       }
     }
-  }, [isPlaying]);
+  }, [isPlaying, t]);
 
   const handleVolumeChange = (newVolume: number[]) => {
     setVolume(newVolume);
@@ -219,7 +221,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
         checked={isPlaying}
         onCheckedChange={handlePlayToggle}
         className="data-[state=checked]:bg-primary"
-        aria-label="Play lo-fi music"
+        aria-label={t('music.play')}
       />
       <Music className="h-4 w-4 text-white" />
       <span className="hidden sm:inline max-w-[100px] truncate text-caption text-white/80">
@@ -228,7 +230,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
       <button
         type="button"
         onClick={handleNext}
-        aria-label="Next station"
+        aria-label={t('music.next')}
         className="text-white/80 hover:text-white transition-colors rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
       >
         <SkipForward className="h-4 w-4" />
@@ -245,7 +247,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
         max={1}
         step={0.01}
         min={0}
-        aria-label="Volume"
+        aria-label={t('music.volume')}
       />
     </div>
   );

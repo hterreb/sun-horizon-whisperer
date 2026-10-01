@@ -9,7 +9,8 @@ import {
   type HorizonProfile,
 } from './horizonUtils';
 
-export const TERRAIN_ATTRIBUTION = 'Terrain: Mapzen / AWS Terrain Tiles';
+// Shown as "Terrain: <source>" in the UI language (ROADMAP item 67).
+export const TERRAIN_SOURCE = 'Mapzen / AWS Terrain Tiles';
 
 // Terrarium PNG encoding: elevation in metres from the R/G/B channels (0-255 each).
 export const decodeTerrarium = (r: number, g: number, b: number): number =>
