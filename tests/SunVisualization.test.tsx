@@ -1056,6 +1056,18 @@ describe('sun and altitude pill (ROADMAP items 46, 48)', () => {
     expect(screen.getByTestId('sun-dot').querySelector('svg')?.getAttribute('style') ?? '').not.toContain('color-mix');
   });
 
+  it('shows a faint pale sun in a white light patch when overcast (ROADMAP item 72)', () => {
+    render(<SunVisualization {...baseProps} weatherType="overcast" />);
+    const sunDot = screen.getByTestId('sun-dot');
+    const sun = sunDot.querySelector('svg') as SVGElement;
+    // The opacity must not sit on the button: its animate-glow animation would override it.
+    expect(sunDot.className).toContain('animate-glow');
+    expect(sunDot.style.opacity).toBe('');
+    expect(sun.style.opacity).toBe('0.3');
+    expect(sun.getAttribute('style')).toContain('color-mix');
+    expect((sunDot.previousElementSibling as HTMLElement).style.background).toContain('--scene-glow-white');
+  });
+
   it('never shows "-0.0°"', () => {
     expect(formatSunAltitude(-0.04)).toBe('0.0°');
     expect(formatSunAltitude(0.04)).toBe('0.0°');

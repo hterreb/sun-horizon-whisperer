@@ -212,12 +212,14 @@ export const getSkyOvercastMix = (type: WeatherType, cloudCoverPercent: number |
 // Clouds dim the sun (ROADMAP item 50): opacity of the sun disc and its halo (0-1),
 // and the halo's size factor. Overcast, fog and rain leave only a soft light patch.
 // `pale` (ROADMAP item 59): how far the disc colour mixes toward the overcast grey
-// (0-1); a pale disc also gets a slightly blurred edge.
+// (0-1); a pale disc also gets a slightly blurred edge. Overcast (ROADMAP item 72) keeps a
+// faint, pale disc in its light patch, so the sun still shows where it is.
 export interface SunVisibility { disc: number; halo: number; haloScale: number; pale: number }
 
 export const getSunVisibility = (type: WeatherType): SunVisibility =>
   type === 'clear' || type === 'partly' ? { disc: 1, halo: 1, haloScale: 1, pale: 0 } :
   type === 'cloudy' ? { disc: 0.8, halo: 0.6, haloScale: 1, pale: 0 } :
   type === 'drizzle' || type === 'snow' ? { disc: 0.7, halo: 0.5, haloScale: 0.6, pale: 0.5 } :
-  type === 'overcast' || type === 'fog' || type === 'rain' ? { disc: 0, halo: 0.6, haloScale: 1.2, pale: 0 } :
+  type === 'overcast' ? { disc: 0.3, halo: 0.6, haloScale: 1.2, pale: 0.6 } :
+  type === 'fog' || type === 'rain' ? { disc: 0, halo: 0.6, haloScale: 1.2, pale: 0 } :
   { disc: 0, halo: 0, haloScale: 0, pale: 0 }; // storm, hail
