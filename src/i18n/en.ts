@@ -57,6 +57,7 @@ export const en = {
   'weather.real': 'Real',
   'weather.manual': 'Manual',
   'weather.manualTitle': 'Manual Weather',
+  'weather.strongWind': 'Strong wind',
   'weatherType.clear': 'Clear',
   'weatherType.partly': 'Partly',
   'weatherType.cloudy': 'Cloudy',

@@ -166,6 +166,21 @@ describe('CloudLayer', () => {
       expect(container.querySelector('[data-testid="boat-light"]')).toBeNull();
     });
 
+    it('draws the boats in soft light, with a reflection (ROADMAP item 73, B3 + X1)', () => {
+      const boat = spawn({}, 6000).querySelector('[data-testid="scene-boat"]') as HTMLElement;
+      expect(boat.querySelectorAll('linearGradient').length).toBeGreaterThan(0);
+      expect(boat.querySelector('path[fill^="url(#"]')).not.toBeNull();
+      expect(boat.querySelector('[data-testid="boat-reflection"]')).not.toBeNull();
+    });
+
+    it('trails a wake only behind fast boats (ROADMAP item 73, X2)', () => {
+      const wake = (props: Partial<React.ComponentProps<typeof CloudLayer>>) =>
+        spawn(props, 6000).querySelector('[data-testid="boat-wake"]') !== null;
+      expect(wake({})).toBe(false); // a sailboat in calm weather
+      expect(wake({ windSpeedKmh: 50 })).toBe(true); // a sailboat in strong wind
+      expect(wake({ weatherType: 'rain' })).toBe(true); // rain sends only the ferry and the freighter
+    });
+
     it('lights the boats once the sun is down', () => {
       const container = spawn({ timeOfDay: 'civil-twilight' }, 121000);
       expect(container.querySelectorAll('[data-testid="boat-light"]').length).toBeGreaterThan(0);
@@ -229,6 +244,13 @@ describe('CloudLayer', () => {
         (spawn(props, 6000).querySelector('[data-testid="scene-boat"]')?.parentElement?.parentElement as HTMLElement | null)?.style.top;
       expect(waterline({})).toBe('87%');
       expect(waterline({ isFullscreen: true })).toBe('94%');
+    });
+
+    it('sends out only the big boats, with a wake, in a storm; none in hail (ROADMAP item 73)', () => {
+      const storm = spawn({ weatherType: 'storm' }, 6000);
+      expect(storm.querySelector('[data-testid="scene-boat"]')?.getAttribute('data-kind')).toBe('ferry');
+      expect(storm.querySelector('[data-testid="boat-wake"]')).not.toBeNull();
+      expect(spawn({ weatherType: 'hail' }, 121000).querySelector('[data-testid="scene-boat"]')).toBeNull();
     });
 
     it('sends out only the big boats in rain', () => {

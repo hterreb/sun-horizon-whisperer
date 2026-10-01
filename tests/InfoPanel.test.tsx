@@ -158,6 +158,15 @@ describe('InfoPanel', () => {
     }
   });
 
+  it('switches strong wind on in the manual picker (ROADMAP item 73)', () => {
+    const onManualWindyChange = vi.fn();
+    render(<InfoPanel {...defaultProps} useRealWeather={false} onManualWindyChange={onManualWindyChange} />);
+    const windy = screen.getByRole('button', { name: 'Strong wind' });
+    expect(windy).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(windy);
+    expect(onManualWindyChange).toHaveBeenCalledWith(true);
+  });
+
   // More tests for collapse/expand, weather options, etc.
 
   it('collapses and expands sections', () => {

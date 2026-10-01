@@ -175,6 +175,23 @@
     /* Night fish (ROADMAP item 65): the glowing jellyfish's line and the firefly squid's light. */
     --scene-fish-jellyfish-glow: 190 90% 80%;
     --scene-fish-squid: 200 100% 68%;
+    /* Boats (ROADMAP item 73, Fleet Styles B3 "Soft light"): flat colours with soft
+       gradients, lit from the upper left. A `-deep` colour is a gradient's shaded end. */
+    --scene-boat-hull: 218 42% 38%;
+    --scene-boat-hull-deep: 222 48% 18%;
+    --scene-boat-white: 40 60% 99%;
+    --scene-boat-shade: 212 22% 82%;
+    --scene-boat-sun: 35 100% 92%;
+    --scene-boat-sun-deep: 17 80% 63%;
+    --scene-boat-red: 4 72% 60%;
+    --scene-boat-red-deep: 2 65% 48%;
+    --scene-boat-navy: 215 32% 26%;
+    --scene-boat-window: 205 45% 35%;
+    --scene-boat-rower: 28 80% 58%;
+    --scene-boat-cargo-1: 6 70% 62%;
+    --scene-boat-cargo-2: 192 50% 48%;
+    --scene-boat-cargo-3: 43 90% 62%;
+    --scene-boat-cargo-4: 150 35% 46%;
   }
 
   .dark {

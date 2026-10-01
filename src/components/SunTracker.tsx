@@ -76,6 +76,8 @@ const SUNSET_COUNTDOWN_STORAGE_KEY = 'sunset-countdown';
 // Sunset reminder toggle (ROADMAP item 69), off by default.
 const SUNSET_REMINDER_STORAGE_KEY = 'sunset-reminder';
 const DEFAULT_EYE_HEIGHT_M = 1.7;
+// Manual weather's strong-wind switch (ROADMAP item 73): above the 40 km/h strong-wind line.
+const MANUAL_STRONG_WIND_KMH = 50;
 const MAX_EYE_HEIGHT_M = 1000;
 
 const clampEyeHeight = (value: number): number =>
@@ -138,6 +140,7 @@ const SunTracker: React.FC = () => {
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [isLoadingWeather, setIsLoadingWeather] = useState(false);
   const [useRealWeather, setUseRealWeather] = useState(true);
+  const [manualWindy, setManualWindy] = useState(false);
   // Display unit only (ROADMAP backlog "Unit toggle °C/°F"); effects stay in °C.
   const [temperatureUnit, setTemperatureUnit] = useState<TemperatureUnit>(() => loadTemperatureUnit(navigator.language));
   const handleTemperatureUnitChange = useCallback((unit: TemperatureUnit) => {
@@ -806,7 +809,8 @@ const SunTracker: React.FC = () => {
             date={date}
             temperatureC={weatherData?.temperature ?? null}
             cloudCoverPercent={cloudCover}
-            windSpeedKmh={weatherData?.windSpeedKmh ?? null}
+            // Manual mode sets the wind itself (ROADMAP item 73): calm, or strong with the switch.
+            windSpeedKmh={useRealWeather ? weatherData?.windSpeedKmh ?? null : manualWindy ? MANUAL_STRONG_WIND_KMH : 0}
             windDirectionDeg={weatherData?.windDirectionDeg ?? null}
             compassHeading={activeCompassHeading}
             horizonProfile={horizonProfile}
@@ -842,6 +846,8 @@ const SunTracker: React.FC = () => {
             onTemperatureUnitChange={handleTemperatureUnitChange}
             isFullscreen={isFullscreen}
             onWeatherChange={handleWeatherChange}
+            manualWindy={manualWindy}
+            onManualWindyChange={setManualWindy}
             onWeatherModeToggle={handleWeatherModeToggle}
             onWeatherRefresh={handleWeatherRefresh}
             onLocationChange={handleLocationChange}

@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44, 47–72, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
+Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44, 47–73, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
 
 ## Verification (2026-09-28)
 
@@ -937,6 +937,22 @@ These items come from the re-shoot of all states after items 46–56.
   - The cloud opacity sits on the `Sun` icon, not on the animated button.
 - **Built:** `getSunVisibility` (`weatherEffectsUtils.ts`); `sunShines` and the opacity on the `Sun` icon (`SunVisualization.tsx`).
 - **Checked:** 1 new test (726 in all), lint and typecheck pass. In Chromium at 390×844 (Friedrichshafen, 2026-10-01 11:27, overcast): versions at 5, 10, 20 and 30 % compared; 30 % shows the rays faintly in the light patch.
+
+### 73. Fleet in soft light — S — **✅ Done**
+
+- **Feedback (2026-10-01):** "I dont like the ships design, can you do a lookbook with different style options".
+- **Lookbook:** [Fleet Styles](https://claude.ai/artifact/LUB956QVNV8UDZy6g4ii5S) (private), styles B1–B6 and add-ons X1–X2. Picks: **B3, X1, X2**, with a rule for X2: "wake only if a ship goes really fast, like a sailboat with a lot of wind in the storm, never for the canoe, ferries and freighters can always have it".
+- **Now:** the five boats (item 36) are lucide line icons in one grey ink. Next to the soft sun, the blurred clouds and the solid birds and bats they look like UI icons, and at sunset the grey line almost disappears into the water.
+- **Spec:**
+  - **B3 Soft light:** new drawings of the same five boats on one 64 × 37 grid (waterline y 36, bow to the right), in flat colours with soft gradients lit from the upper left. New tokens `--scene-boat-*`. Each hull keeps the length of its old icon (`BOATS` scale: sailboat, fishing boat and rowboat 1, ferry 1.1, freighter 1.4).
+  - The light: one palette all day, dimmed by a CSS filter (`getBoatTone`): day as drawn; dawn and evening ('sun') slightly dimmer, with peach sails; civil twilight 72 %; nautical twilight to night 36 %. The gold lights (item 36, V3) stay bright: mast lights, and the windows of the ferry, the fishing boat and the freighter.
+  - **X1 Reflection:** every boat has a faint, still mirror image under the waterline (28 %, slightly blurred, fading out downward).
+  - **X2 Wake:** two thin pale lines from under the stern (`hasBoatWake`). The ferry and the freighter always; the sailboat only in strong wind (> 40 km/h); the rowboat never. The fishing boat was not named and has none.
+  - **Storm:** then: "only ferries and freighters in a storm but no sail boats". A storm now sends out the ferry and the freighter, each with its wake (`pickBoat`). Hail still has no boats.
+  - **Strong wind in manual weather:** "is there a weather option for fair weather with strong wind?" Manual Weather gets a "Strong wind" switch under the ten types (`weather.strongWind`, in all five languages). On, the wind is 50 km/h: leaves, slower birds, no rowboat and the sailboat's wake. Off, manual mode is calm (0 km/h). Before, manual mode used the last real wind reading.
+  - The motion does not change: the same straight glide at the same speeds.
+- **Built:** `SceneBoat.tsx` (drawings, gradients, reflection, wake, lights); `hasBoatWake` and `getBoatTone` (`weatherEffectsUtils.ts`); `CloudLayer` renders `SceneBoat` and lets boats out in a storm; the "Strong wind" switch in `InfoPanel`, with `MANUAL_STRONG_WIND_KMH` in `SunTracker`. The line icons `LakeFerry`, `FishingBoat`, `Rowboat` and `Freighter` are removed from `sceneIcons.ts`.
+- **Checked:** 9 new tests (775 in all after merging item 67), lint and typecheck pass. In Chromium at Ravensburg with faked weather: at 1280×800, 2026-10-01 18:30 (evening, clear, wind 50 km/h), 7 sailboats and a ferry sailed with peach sails, reflections and a wake, and a fishing boat without one. At 390×844, 21:40 (night, wind 10 km/h), a sailboat and a rowboat sailed dark, with their gold lights and no wake. In manual mode at 1280×800, midday: Clear with "Strong wind" on brought leaves, and the sailboats and the ferry had a wake (the fishing boat none); with the switch off the sailboats' wakes went away; Storm sent out only ferries and freighters, each with a wake.
 
 ---
 

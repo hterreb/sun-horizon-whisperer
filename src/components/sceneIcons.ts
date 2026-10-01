@@ -1,7 +1,8 @@
 import { createLucideIcon } from 'lucide-react';
 
 // Scene icons from the Bats & Boats lookbook (ROADMAP item 36), drawn on lucide's
-// 24 px grid (2 px round strokes, no fill) so they match lucide's Sailboat and Fish.
+// 24 px grid (2 px round strokes, no fill) so they match lucide's Fish. The boats are
+// drawn by SceneBoat since item 73.
 // createLucideIcon gives them the same props (size, strokeWidth, className, children).
 
 export const Bat = createLucideIcon('Bat', [
@@ -12,42 +13,6 @@ export const Bat = createLucideIcon('Bat', [
       key: 'wings',
     },
   ],
-]);
-
-export const LakeFerry = createLucideIcon('LakeFerry', [
-  ['path', { d: 'M2 15h20l-2.5 4h-15Z', key: 'hull' }],
-  ['path', { d: 'M5 15v-4h14v4', key: 'lower-deck' }],
-  ['path', { d: 'M8 11V8h8v3', key: 'upper-deck' }],
-  ['path', { d: 'M11 8V4.5h2.5V8', key: 'funnel' }],
-  ['path', { d: 'M8 13h.01', key: 'window-1' }],
-  ['path', { d: 'M12 13h.01', key: 'window-2' }],
-  ['path', { d: 'M16 13h.01', key: 'window-3' }],
-]);
-
-export const FishingBoat = createLucideIcon('FishingBoat', [
-  ['path', { d: 'M2 14h20l-3 6H5Z', key: 'hull' }],
-  ['path', { d: 'M5 14V9h5v5', key: 'wheelhouse' }],
-  ['path', { d: 'M7.5 11h.01', key: 'window' }],
-  ['path', { d: 'M15 14V3', key: 'mast' }],
-  ['path', { d: 'm15 4 6 10', key: 'stay' }],
-]);
-
-export const Rowboat = createLucideIcon('Rowboat', [
-  ['path', { d: 'M3 16h18l-3 4H6Z', key: 'hull' }],
-  ['circle', { cx: '12', cy: '10.5', r: '1.5', key: 'head' }],
-  ['path', { d: 'M12 12v4', key: 'body' }],
-  ['path', { d: 'm7 12 10 7', key: 'oar' }],
-]);
-
-export const Freighter = createLucideIcon('Freighter', [
-  ['path', { d: 'M1.5 15h21l-2 4h-17Z', key: 'hull' }],
-  ['path', { d: 'M3.5 15V9H7v6', key: 'bridge' }],
-  ['path', { d: 'M5 9V6.5', key: 'mast' }],
-  ['path', { d: 'M9 15v-3h12v3', key: 'containers-low' }],
-  ['path', { d: 'M13 12v3', key: 'divider-1' }],
-  ['path', { d: 'M17 12v3', key: 'divider-2' }],
-  ['path', { d: 'M9 12V9h8v3', key: 'containers-high' }],
-  ['path', { d: 'M13 9v3', key: 'divider-3' }],
 ]);
 
 // Fish from the Fish & Currents lookbook (ROADMAP item 62), on the same grid, facing
