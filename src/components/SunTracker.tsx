@@ -45,6 +45,8 @@ import { useCompassHeading } from '@/hooks/useCompassHeading';
 import { useHorizonProfile } from '@/hooks/useHorizonProfile';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { useSunsetCountdown, primeCountdownAudio } from '@/hooks/useSunsetCountdown';
+import { useSunsetReminder, requestReminderPermission, getNotificationPermission } from '@/hooks/useSunsetReminder';
+import { SUNSET_REMINDER_MIN } from '@/utils/sunsetReminder';
 import { loadManualLocation, saveManualLocation, clearManualLocation } from '../utils/manualLocation';
 import {
   hasSeenCompassCalibrationHint,
@@ -68,6 +70,8 @@ import { loadTemperatureUnit, saveTemperatureUnit, type TemperatureUnit } from '
 const EYE_HEIGHT_STORAGE_KEY = 'eye-height-m';
 // Sunset countdown toggle (ROADMAP item 43), off by default.
 const SUNSET_COUNTDOWN_STORAGE_KEY = 'sunset-countdown';
+// Sunset reminder toggle (ROADMAP item 69), off by default.
+const SUNSET_REMINDER_STORAGE_KEY = 'sunset-reminder';
 const DEFAULT_EYE_HEIGHT_M = 1.7;
 const MAX_EYE_HEIGHT_M = 1000;
 
@@ -660,6 +664,44 @@ const SunTracker: React.FC = () => {
   const countdownTarget = getCountdownTarget(date, sunTimes, terrainExtras.terrainSunTimes, isLineOfSightEnabled());
   const countdownSeconds = useSunsetCountdown(countdownTarget?.time ?? null, date, isCountdownOn && !isTimePreview);
 
+  // Sunset reminder (ROADMAP item 69): a notification SUNSET_REMINDER_MIN before the same
+  // target, while the app is open. Live time only. The tap that turns it on asks for the
+  // notification permission; without the permission the toggle shows as off.
+  const [isReminderSaved, setIsReminderSaved] = useState(() => {
+    try {
+      return localStorage.getItem(SUNSET_REMINDER_STORAGE_KEY) === 'on';
+    } catch {
+      return false;
+    }
+  });
+  const [notificationPermission, setNotificationPermission] = useState(getNotificationPermission);
+  const isReminderOn = isReminderSaved && notificationPermission === 'granted';
+  const handleReminderToggle = useCallback(async () => {
+    const next = !isReminderOn;
+    if (next) {
+      const granted = await requestReminderPermission();
+      setNotificationPermission(getNotificationPermission());
+      if (!granted) {
+        toast({
+          title: 'Notifications are blocked',
+          description: 'Allow notifications for this site in the browser settings to get the sunset reminder.',
+        });
+        return;
+      }
+      toast({
+        title: 'Sunset reminder on',
+        description: `A notification comes ${SUNSET_REMINDER_MIN} minutes before sunset, while the app is open.`,
+      });
+    }
+    setIsReminderSaved(next);
+    try {
+      localStorage.setItem(SUNSET_REMINDER_STORAGE_KEY, next ? 'on' : 'off');
+    } catch (error) {
+      console.error('Error saving sunset reminder:', error);
+    }
+  }, [isReminderOn]);
+  useSunsetReminder(countdownTarget?.time ?? null, isReminderOn && !isTimePreview);
+
   // A manually picked weather ignores the real cloud cover: the sky, the stars and
   // the moon then follow the weather type alone (ROADMAP items 50, 52, 57).
   const cloudCover = useRealWeather ? weatherData?.cloudCoverPercent ?? null : null;
@@ -800,6 +842,8 @@ const SunTracker: React.FC = () => {
             isSunsetCountdownOn={isCountdownOn}
             onSunsetCountdownToggle={handleCountdownToggle}
             horizonProfile={horizonProfile}
+            isSunsetReminderOn={isReminderOn}
+            onSunsetReminderToggle={notificationPermission === 'unsupported' ? undefined : handleReminderToggle}
           />
         </>
       )}
