@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44, 47–66 and 70, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), items 67–69 (five languages, share card, sunset reminder), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
+Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44, 47–66, 70 and 72, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), items 67–69 (five languages, share card, sunset reminder), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
 
 ## Verification (2026-09-28)
 
@@ -902,6 +902,17 @@ These items come from the re-shoot of all states after items 46–56.
 - **Review:** Lutz checks on his Mac whether it gets too crowded. If it does, the fallback is half the rule (8 fish, 5 night fish, 5 boats at 1440 px).
 - **Built:** `getWaterLimit` (`weatherEffectsUtils.ts`), used for the fish limit (day and night) and the boat limit in `CloudLayer`.
 - **Checked:** 4 new tests (707 in all), lint, typecheck and build pass. The limit tests now pin a phone width (390 px) or a wide one (1290 px), because jsdom's window is 1024 px. In Chromium at 1440×900, after two simulated minutes: 12 fish groups (25 fish) on screen.
+
+### 72. Overcast: a faint sun in the light patch — S — **✅ Done**
+
+- **Feedback (2026-10-01):** "somehow the sund and moon are not visible anymore seems like there is a layer over it". Friedrichshafen, 11:27, weather code 3 (overcast) at 100 % cloud cover. Item 50 hides the disc when overcast, so only the white light patch showed. Then: "it still is too visible, make different versions with 5%, 10% and 20% visibility", and after the comparison: "do the 30%".
+- **Bug found:** the sun button's `animate-glow` animates its opacity (1 ↔ 0.8), and that overrode the inline cloud opacity on the same element. So the disc never dimmed: cloudy (item 50, 80 %), drizzle and snow (item 59, 70 %) all showed at 80–100 %.
+- **Spec:**
+  - Overcast: the disc at 30 % opacity, mixed 60 % toward the overcast grey (`getSunVisibility('overcast')` = disc 0.3, halo 0.6, haloScale 1.2, pale 0.6). Fog and rain still hide the disc.
+  - A faint disc (below 50 %) keeps the white light patch and gets no water glints, as with no disc.
+  - The cloud opacity sits on the `Sun` icon, not on the animated button.
+- **Built:** `getSunVisibility` (`weatherEffectsUtils.ts`); `sunShines` and the opacity on the `Sun` icon (`SunVisualization.tsx`).
+- **Checked:** 1 new test (726 in all), lint and typecheck pass. In Chromium at 390×844 (Friedrichshafen, 2026-10-01 11:27, overcast): versions at 5, 10, 20 and 30 % compared; 30 % shows the rays faintly in the light patch.
 
 ---
 
