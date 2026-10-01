@@ -1,7 +1,8 @@
 import React from 'react';
-import { TERRAIN_ATTRIBUTION } from '../utils/terrainTiles';
+import { TERRAIN_SOURCE } from '../utils/terrainTiles';
 import { type HorizonProfileStatus } from '../hooks/useHorizonProfile';
 import { ROW, FOCUS_RING } from './InfoPanel';
+import { useLanguage } from '@/hooks/useLanguage';
 
 // Line of sight details (ROADMAP item 30): the block that opens below the sun rows
 // or the moon rows when their Mountain icon button is clicked. One instance per body
@@ -31,22 +32,24 @@ const LineOfSightDetails: React.FC<LineOfSightDetailsProps> = ({
   eyeHeightMeters,
   onEyeHeightChange,
   idPrefix,
-}) => (
+}) => {
+  const { t } = useLanguage();
+  return (
   <div className="mt-1 mb-1 space-y-1">
     {terrainStatus === 'loading' && (
-      <p className="text-caption opacity-70">Loading terrain…</p>
+      <p className="text-caption opacity-70">{t('terrain.loading')}</p>
     )}
     {terrainStatus === 'error' && (
-      <p role="alert" className="text-caption text-brand-coral">Terrain unavailable</p>
+      <p role="alert" className="text-caption text-brand-coral">{t('terrain.error')}</p>
     )}
     {terrainStatus === 'ready' && (
       <>
         {/* "behind terrain" once as a note, so each row below can stay a short value
             (ROADMAP item 30), e.g. "07:44 (+27 min)". */}
-        <p className="text-caption opacity-60">Behind terrain</p>
+        <p className="text-caption opacity-60">{t('terrain.behind')}</p>
         {rows.map((row) => (
           <div key={row.label} className={ROW}>
-            <span className="opacity-80 text-caption">{row.label}:</span>
+            <span className="opacity-80 text-caption">{t('common.labelColon', { label: row.label })}</span>
             <span className="text-caption tabular-nums text-brand-peach">{row.value}</span>
           </div>
         ))}
@@ -54,7 +57,7 @@ const LineOfSightDetails: React.FC<LineOfSightDetailsProps> = ({
     )}
 
     <div className="flex flex-col gap-1 mt-2 text-caption">
-      <label htmlFor={`${idPrefix}-eye-height`} className="opacity-80">Eye height (m) — e.g. floor, tower</label>
+      <label htmlFor={`${idPrefix}-eye-height`} className="opacity-80">{t('terrain.eyeHeight')}</label>
       <input
         id={`${idPrefix}-eye-height`}
         type="number"
@@ -67,8 +70,9 @@ const LineOfSightDetails: React.FC<LineOfSightDetailsProps> = ({
       />
     </div>
 
-    <p className="text-caption opacity-50 mt-1">{TERRAIN_ATTRIBUTION}</p>
+    <p className="text-caption opacity-50 mt-1">{t('terrain.attribution', { source: TERRAIN_SOURCE })}</p>
   </div>
-);
+  );
+};
 
 export default LineOfSightDetails;

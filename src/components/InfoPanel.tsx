@@ -19,7 +19,7 @@ import {
   getRelevantTwilightTimes
 } from '../utils/sunUtils';
 import { type MoonPosition, type MoonTimes, getMoonPhaseLabel } from '../utils/moonUtils';
-import { type WeatherData } from '../utils/weatherUtils';
+import { type WeatherData, getScoreReason } from '../utils/weatherUtils';
 import { getWeatherEffects } from '../utils/weatherEffectsUtils';
 import { isValidLatitude, isValidLongitude } from '../utils/manualLocation';
 import { type HorizonProfileStatus } from '../hooks/useHorizonProfile';
@@ -27,6 +27,10 @@ import { type HorizonProfile } from '@/utils/horizonUtils';
 import { type WeatherType } from './CloudLayer';
 import { getTimeTravelRange, toDateTimeLocalValue } from '@/utils/timeTravel';
 import { formatTemperature, type TemperatureUnit } from '@/utils/temperatureUnit';
+import { SUNSET_REMINDER_MIN } from '@/utils/sunsetReminder';
+import { LANGUAGES, LANGUAGE_NAMES, type Language } from '@/utils/language';
+import { formatNumber, translate, type MessageKey } from '@/i18n';
+import { useLanguage } from '@/hooks/useLanguage';
 
 // Direction D "Polished Classic" (ROADMAP items 7 & 15): shared classes so every
 // row/section/focus ring in the panel reads as one system. ROW, ICON_TOGGLE and
@@ -51,27 +55,25 @@ const INLINE_ICON_TOGGLE = 'p-0.5 rounded-full hover:bg-white/10 transition-colo
 export const formatTerrainDelta = (
   body: 'sun' | 'moon',
   terrainDate: Date | null,
-  astronomicalDate: Date | null
+  astronomicalDate: Date | null,
+  language: Language = 'en'
 ): string => {
   if (!astronomicalDate) return '—';
-  if (!terrainDate) return `${body} stays behind terrain`;
+  if (!terrainDate) return translate(language, body === 'sun' ? 'terrain.sunHidden' : 'terrain.moonHidden');
   const diffMinutes = Math.round((terrainDate.getTime() - astronomicalDate.getTime()) / 60000);
   const sign = diffMinutes >= 0 ? '+' : '';
-  return `${formatTime(terrainDate)} (${sign}${diffMinutes} min)`;
+  return `${formatTime(terrainDate, language)} (${sign}${translate(language, 'common.minutes', { value: diffMinutes })})`;
 };
 
-// "Oct 7, 14:05", as date-fns 'MMM d, HH:mm' did, with Intl instead (AUDIT P-7).
-const formatMoonDate = (date: Date): string =>
-  `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${formatTime(date)}`;
+// "Oct 7, 14:05" in the UI language, as date-fns 'MMM d, HH:mm' did, with Intl instead
+// (AUDIT P-7, ROADMAP item 67).
+const formatMoonDate = (date: Date, language: Language): string =>
+  `${date.toLocaleDateString(language, { month: 'short', day: 'numeric' })}, ${formatTime(date, language)}`;
 
 // Highlights "now, until 19:42" in peach, the same D `--panel-hi` treatment as the
-// terrain delta above, without changing formatWindow's own text.
-const renderWindow = (text: string): React.ReactNode => {
-  if (text.startsWith('now, until')) {
-    return <span className="text-brand-peach">{text}</span>;
-  }
-  return text;
-};
+// terrain delta above.
+const renderWindow = ({ text, isNow }: { text: string; isNow: boolean }): React.ReactNode =>
+  isNow ? <span className="text-brand-peach">{text}</span> : text;
 
 interface InfoPanelProps {
   sunPosition: SunPosition;
@@ -173,7 +175,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   isSunsetReminderOn = false,
   onSunsetReminderToggle,
 }) => {
-  const [locationName, setLocationName] = useState<string>('');
+  const { t, language, setLanguage } = useLanguage();
+  const formatLocalTime = (date: Date | null) => formatTime(date, language);
+  // '' until the first lookup ends; null when the lookup found no place name.
+  const [locationName, setLocationName] = useState<string | null>('');
   const [loadingLocation, setLoadingLocation] = useState(false);
   // Phones (< 640 px, Tailwind `sm`) start collapsed so the first view shows the scene
   // (ROADMAP item 55). Read once at mount; later resizes do not change it.
@@ -296,7 +301,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
         const roundedLat = Math.round(location.latitude * 100) / 100;
         const roundedLon = Math.round(location.longitude * 100) / 100;
         const response = await fetch(
-          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${roundedLat}&longitude=${roundedLon}&localityLanguage=en`
+          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${roundedLat}&longitude=${roundedLon}&localityLanguage=${language}`
         );
         const data = await response.json();
         if (cancelled) return;
@@ -308,12 +313,12 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
         } else if (data.countryName) {
           setLocationName(data.countryName);
         } else {
-          setLocationName('Unknown Location');
+          setLocationName(null);
         }
       } catch (error) {
         if (cancelled) return;
         console.error('Error fetching location name:', error);
-        setLocationName('Unknown Location');
+        setLocationName(null);
       } finally {
         if (!cancelled) setLoadingLocation(false);
       }
@@ -323,7 +328,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [location.latitude, location.longitude, location.loaded, manualPlaceName]);
+  }, [location.latitude, location.longitude, location.loaded, manualPlaceName, language]);
 
   // Focus the latitude field when the manual-location form opens.
   useEffect(() => {
@@ -351,11 +356,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     const lon = parseFloat(lonInput);
 
     if (Number.isNaN(lat) || !isValidLatitude(lat)) {
-      setLocationError('Latitude must be a number between -90 and 90.');
+      setLocationError(t('location.latitudeError'));
       return;
     }
     if (Number.isNaN(lon) || !isValidLongitude(lon)) {
-      setLocationError('Longitude must be a number between -180 and 180.');
+      setLocationError(t('location.longitudeError'));
       return;
     }
 
@@ -379,17 +384,17 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
   // Coordinates in the header (ROADMAP item 25): shown only when there is no place
   // name to show instead - while the reverse-geocode lookup is still loading, or
-  // after it failed ('Unknown Location'). Kept in the "Change location" form either way.
-  const hasPlaceName = locationName !== '' && locationName !== 'Unknown Location';
+  // after it failed (null). Kept in the "Change location" form either way.
+  const hasPlaceName = locationName !== '' && locationName !== null;
   const showCoordinates = loadingLocation || !hasPlaceName;
 
   // At polar day/night, SunCalc has no real sunrise/sunset, so `sunTimes.sunrise`/`.sunset`
   // hold invented 06:00/18:00 fallback times (kept only for internal time-of-day math).
   // Show a plain-language label instead of those fake times.
   const polarSunLabel = sunTimes.polar === 'day'
-    ? 'Sun does not set'
+    ? t('sun.noSet')
     : sunTimes.polar === 'night'
-      ? 'Sun does not rise'
+      ? t('sun.noRise')
       : null;
   const shownSunrise = passSunTimes?.sunrise ?? sunTimes.sunrise;
   const shownSunset = passSunTimes?.sunset ?? sunTimes.sunset;
@@ -405,61 +410,54 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   // Golden/blue hour window (ROADMAP item 20): null at polar day/night, or before
   // SunTracker has computed it yet. A window running right now is marked as such
   // instead of showing its already-passed start time.
-  const formatWindow = (window: TimeWindow | null | undefined): string => {
-    if (!window) return '—';
+  const formatWindow = (window: TimeWindow | null | undefined): { text: string; isNow: boolean } => {
+    if (!window) return { text: '—', isNow: false };
     const now = currentTime.getTime();
     if (now >= window.start.getTime() && now < window.end.getTime()) {
-      return `now, until ${formatTime(window.end)}`;
+      return { text: t('golden.nowUntil', { time: formatLocalTime(window.end) }), isNow: true };
     }
-    return `${formatTime(window.start)} – ${formatTime(window.end)}`;
+    return { text: `${formatLocalTime(window.start)} – ${formatLocalTime(window.end)}`, isNow: false };
   };
 
   // "This morning" / "This evening" / "Tomorrow morning" (ROADMAP item 20). First line
   // of the collapsible body, not part of the heading, so the heading never wraps
   // (ROADMAP item 33).
+  const GOLDEN_BLUE_DAY_PARTS: Record<string, MessageKey> = {
+    'today morning': 'golden.thisMorning',
+    'today evening': 'golden.thisEvening',
+    'tomorrow morning': 'golden.tomorrowMorning',
+    'tomorrow evening': 'golden.tomorrowEvening',
+  };
   const goldenBlueDayPart = nextGoldenBlueHours
-    ? nextGoldenBlueHours.day === 'today'
-      ? `This ${nextGoldenBlueHours.part}`
-      : `Tomorrow ${nextGoldenBlueHours.part}`
+    ? t(GOLDEN_BLUE_DAY_PARTS[`${nextGoldenBlueHours.day} ${nextGoldenBlueHours.part}`])
     : null;
 
   const weatherOptions: { type: WeatherType; label: string; icon: React.ReactNode }[] = [
-    { type: 'clear', label: 'Clear', icon: <Sun size={16} /> },
-    { type: 'partly', label: 'Partly', icon: <CloudSun size={16} /> },
-    { type: 'cloudy', label: 'Cloudy', icon: <Cloudy size={16} /> },
-    { type: 'overcast', label: 'Overcast', icon: <Cloud size={16} /> },
-    { type: 'fog', label: 'Fog', icon: <CloudFog size={16} /> },
-    { type: 'drizzle', label: 'Drizzle', icon: <CloudDrizzle size={16} /> },
-    { type: 'rain', label: 'Rain', icon: <CloudRain size={16} /> },
-    { type: 'storm', label: 'Storm', icon: <CloudLightning size={16} /> },
-    { type: 'snow', label: 'Snow', icon: <CloudSnow size={16} /> },
-    { type: 'hail', label: 'Hail', icon: <CloudHail size={16} /> },
+    { type: 'clear', label: t('weatherType.clear'), icon: <Sun size={16} /> },
+    { type: 'partly', label: t('weatherType.partly'), icon: <CloudSun size={16} /> },
+    { type: 'cloudy', label: t('weatherType.cloudy'), icon: <Cloudy size={16} /> },
+    { type: 'overcast', label: t('weatherType.overcast'), icon: <Cloud size={16} /> },
+    { type: 'fog', label: t('weatherType.fog'), icon: <CloudFog size={16} /> },
+    { type: 'drizzle', label: t('weatherType.drizzle'), icon: <CloudDrizzle size={16} /> },
+    { type: 'rain', label: t('weatherType.rain'), icon: <CloudRain size={16} /> },
+    { type: 'storm', label: t('weatherType.storm'), icon: <CloudLightning size={16} /> },
+    { type: 'snow', label: t('weatherType.snow'), icon: <CloudSnow size={16} /> },
+    { type: 'hail', label: t('weatherType.hail'), icon: <CloudHail size={16} /> },
   ];
 
+  // "Sunset (0°) → Civil (-6°)", in the order the twilight runs (dusk or dawn).
   const getDegreeInfo = (twilightType: string) => {
-    if (relevantTwilightTimes.type === 'dusk') {
-      switch (twilightType) {
-        case 'civil':
-          return 'Sunset (0°) → Civil (-6°)';
-        case 'nautical':
-          return 'Civil (-6°) → Nautical (-12°)';
-        case 'astronomical':
-          return 'Nautical (-12°) → Astronomical (-18°)';
-        default:
-          return '';
-      }
-    } else {
-      switch (twilightType) {
-        case 'astronomical':
-          return 'Astronomical (-18°) → Nautical (-12°)';
-        case 'nautical':
-          return 'Nautical (-12°) → Civil (-6°)';
-        case 'civil':
-          return 'Civil (-6°) → Sunrise (0°)';
-        default:
-          return '';
-      }
-    }
+    const steps = [
+      `${t('sun.sunset')} (0°)`,
+      `${t('twilight.civil')} (-6°)`,
+      `${t('twilight.nautical')} (-12°)`,
+      `${t('twilight.astronomical')} (-18°)`,
+    ];
+    const index = ['civil', 'nautical', 'astronomical'].indexOf(twilightType);
+    if (index === -1) return '';
+    if (relevantTwilightTimes.type === 'dusk') return `${steps[index]} → ${steps[index + 1]}`;
+    const dawnTo = index === 0 ? `${t('sun.sunrise')} (0°)` : steps[index];
+    return `${steps[index + 1]} → ${dawnTo}`;
   };
 
   // The top-left button column (3.5rem wide, down to 9.5rem: fullscreen, compass,
@@ -497,18 +495,18 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
       {/* Header with toggle button */}
       <div className="p-4 pb-2 flex items-start justify-between flex-shrink-0">
         <div className="flex-1 min-w-0">
-          <h1 className="text-display leading-none font-bold tracking-tight">{getTimeOfDayLabel(timeOfDay)}</h1>
+          <h1 className="text-display leading-none font-bold tracking-tight">{t(getTimeOfDayLabel(timeOfDay))}</h1>
           <div className="flex items-start text-body opacity-80 mt-1">
             <MapPin size={14} className="mr-1 mt-0.5 flex-shrink-0" />
             <div className="flex flex-col min-w-0">
               {loadingLocation ? (
-                <span>Loading location...</span>
+                <span>{t('location.loading')}</span>
               ) : (
-                locationName && <span className="mb-1 truncate">{locationName}</span>
+                locationName !== '' && <span className="mb-1 truncate">{locationName ?? t('location.unknown')}</span>
               )}
               {showCoordinates && (
                 <span className="text-caption opacity-70 tabular-nums">
-                  {location.latitude.toFixed(4)}°, {location.longitude.toFixed(4)}°
+                  {formatNumber(language, location.latitude, 4)}°, {formatNumber(language, location.longitude, 4)}°
                 </span>
               )}
               {/* Expanded panel only (ROADMAP item 47): keeps the collapsed panel within
@@ -523,7 +521,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   onClick={() => (isLocationFormOpen ? closeLocationForm() : openLocationForm())}
                   aria-expanded={isLocationFormOpen}
                 >
-                  {isLocationFormOpen ? 'Cancel' : <>Change location<PremiumBadge /></>}
+                  {isLocationFormOpen ? t('common.cancel') : <>{t('location.change')}<PremiumBadge /></>}
                 </Button>
               )}
             </div>
@@ -533,7 +531,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
           className={`ml-2 ${ICON_TOGGLE} flex-shrink-0`}
-          aria-label={isCollapsed ? "Expand info panel" : "Collapse info panel"}
+          aria-label={isCollapsed ? t('panel.expand') : t('panel.collapse')}
         >
           {isCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
         </button>
@@ -543,7 +541,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
         <form onSubmit={handleSubmitLocation} noValidate className="mx-4 mb-3 p-2 space-y-2 text-caption bg-white bg-opacity-10 rounded">
           <PlaceSearch onSelect={handleSelectPlace} />
           <div className="flex flex-col gap-1">
-            <label htmlFor="manual-location-lat" className="opacity-80">Latitude</label>
+            <label htmlFor="manual-location-lat" className="opacity-80">{t('location.latitude')}</label>
             <input
               id="manual-location-lat"
               ref={latInputRef}
@@ -557,7 +555,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="manual-location-lon" className="opacity-80">Longitude</label>
+            <label htmlFor="manual-location-lon" className="opacity-80">{t('location.longitude')}</label>
             <input
               id="manual-location-lon"
               type="number"
@@ -573,9 +571,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             <p role="alert" className="text-brand-coral">{locationError}</p>
           )}
           <div className="flex flex-wrap gap-2 pt-1">
-            <Button type="submit" size="sm" variant="secondary" className="rounded-full">Set location</Button>
+            <Button type="submit" size="sm" variant="secondary" className="rounded-full">{t('location.set')}</Button>
             <Button type="button" size="sm" variant="outline" className="rounded-full" onClick={handleUseMyLocationClick}>
-              Use my location
+              {t('location.useMine')}
             </Button>
           </div>
         </form>
@@ -595,13 +593,13 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               <div className="flex items-center justify-between mb-2">
                 <h3 className={SECTION_HEADING}>
                   <Thermometer size={16} className="mr-2" />
-                  Current Weather
+                  {t('weather.current')}
                 </h3>
                 <button
                   onClick={onWeatherRefresh}
                   disabled={isLoadingWeather}
                   className={`${ICON_TOGGLE} disabled:opacity-50`}
-                  aria-label="Refresh weather"
+                  aria-label={t('weather.refresh')}
                 >
                   <RefreshCw size={14} className={isLoadingWeather ? 'animate-spin' : ''} />
                 </button>
@@ -609,10 +607,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
               <div className="space-y-1">
                 <div className={ROW}>
-                  <span className="opacity-80 text-body">Temperature:</span>
+                  <span className="opacity-80 text-body">{t('weather.temperature')}</span>
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-body tabular-nums">{formatTemperature(weatherData.temperature, temperatureUnit)}</span>
-                    <div className="flex bg-white bg-opacity-10 rounded-full p-1" role="group" aria-label="Temperature unit">
+                    <div className="flex bg-white bg-opacity-10 rounded-full p-1" role="group" aria-label={t('weather.temperatureUnit')}>
                       {(['C', 'F'] as const).map((unit) => (
                         <button
                           key={unit}
@@ -631,12 +629,12 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   </div>
                 </div>
                 <div className={ROW}>
-                  <span className="opacity-80 text-body">Condition:</span>
-                  <span className="font-semibold text-body">{weatherData.weatherDescription}</span>
+                  <span className="opacity-80 text-body">{t('weather.condition')}</span>
+                  <span className="font-semibold text-body text-right">{t(weatherData.conditionKey)}</span>
                 </div>
                 {!weatherData.isRealWeather && (
                   <div className="text-caption opacity-60 text-brand-peach mt-1">
-                    Real weather unavailable
+                    {t('weather.realUnavailable')}
                   </div>
                 )}
               </div>
@@ -646,7 +644,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           {/* Weather Mode Toggle */}
           <div className="mb-4 pt-2 border-t border-white border-opacity-20">
             <div className="flex items-center justify-between mb-2">
-              <h3 className={SECTION_HEADING}>Weather Mode</h3>
+              <h3 className={SECTION_HEADING}>{t('weather.mode')}</h3>
               <div className="flex bg-white bg-opacity-10 rounded-full p-1">
                 <button
                   onClick={() => onWeatherModeToggle(true)}
@@ -656,7 +654,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                       : 'text-white opacity-60'
                   }`}
                 >
-                  Real
+                  {t('weather.real')}
                 </button>
                 <button
                   onClick={() => onWeatherModeToggle(false)}
@@ -666,7 +664,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                       : 'text-white opacity-60'
                   }`}
                 >
-                  <span className="inline-flex items-center gap-1">Manual<PremiumBadge /></span>
+                  <span className="inline-flex items-center gap-1">{t('weather.manual')}<PremiumBadge /></span>
                 </button>
               </div>
             </div>
@@ -675,7 +673,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           {/* Manual Weather Selector - only show when not using real weather */}
           {!useRealWeather && (
             <div className="mb-4 pt-2 border-t border-white border-opacity-20">
-              <h3 className={`${SECTION_HEADING} mb-2`}>Manual Weather</h3>
+              <h3 className={`${SECTION_HEADING} mb-2`}>{t('weather.manualTitle')}</h3>
               <div className="grid grid-cols-3 gap-1">
                 {weatherOptions.map((option) => (
                   <button
@@ -703,7 +701,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 }`}
               >
                 <Wind size={16} className="mr-1" />
-                Strong wind
+                {t('weather.strongWind')}
               </button>
             </div>
           )}
@@ -713,14 +711,14 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             <div className={ROW}>
               <div className="flex items-center">
                 <Clock size={18} className="mr-2" />
-                <span className="text-body inline-flex items-center gap-1 whitespace-nowrap">{isTimePreview ? 'Time' : 'Current Time'}<PremiumBadge /></span>
+                <span className="text-body inline-flex items-center gap-1 whitespace-nowrap">{isTimePreview ? t('time.preview') : t('time.current')}<PremiumBadge /></span>
               </div>
               <div className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={() => onTimePlay(-1)}
                   className={`${INLINE_ICON_TOGGLE} ${timePlayDirection === -1 ? 'bg-white/20' : ''}`}
-                  aria-label="Play time backward"
+                  aria-label={t('time.playBackward')}
                   aria-pressed={timePlayDirection === -1}
                 >
                   <Rewind size={14} />
@@ -728,7 +726,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 {timePickerRange ? (
                   <input
                     type="datetime-local"
-                    aria-label="Set date and time"
+                    aria-label={t('time.set')}
                     autoFocus
                     value={toDateTimeLocalValue(currentTime)}
                     min={toDateTimeLocalValue(timePickerRange.min)}
@@ -745,18 +743,18 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                     type="button"
                     onClick={() => setTimePickerRange(getTimeTravelRange(new Date()))}
                     className={`font-semibold text-body tabular-nums whitespace-nowrap rounded ${FOCUS_RING}`}
-                    title="Set date and time"
+                    title={t('time.set')}
                   >
                     {isTimePreview
-                      ? formatMoonDate(currentTime)
-                      : currentTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })}
+                      ? formatMoonDate(currentTime, language)
+                      : currentTime.toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })}
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={() => onTimePlay(1)}
                   className={`${INLINE_ICON_TOGGLE} ${timePlayDirection === 1 ? 'bg-white/20' : ''}`}
-                  aria-label="Play time forward"
+                  aria-label={t('time.playForward')}
                   aria-pressed={timePlayDirection === 1}
                 >
                   <FastForward size={14} />
@@ -767,13 +765,13 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             <div className={ROW}>
               <div className="flex items-center min-w-0">
                 <Sunrise size={18} className="mr-2 flex-shrink-0" />
-                <span className="text-body truncate">Sunrise</span>
+                <span className="text-body truncate">{t('sun.sunrise')}</span>
                 {terrainStatus !== 'idle' && (
                   <button
                     type="button"
                     onClick={() => setIsSunTerrainOpen(!isSunTerrainOpen)}
                     className={`${INLINE_ICON_TOGGLE} relative ml-1`}
-                    aria-label="Show line of sight"
+                    aria-label={t('terrain.show')}
                     aria-expanded={isSunTerrainOpen}
                   >
                     <Mountain size={14} />
@@ -781,19 +779,19 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   </button>
                 )}
               </div>
-              <span className="font-semibold text-body tabular-nums">{polarSunLabel ?? formatTime(shownSunrise)}</span>
+              <span className="font-semibold text-body tabular-nums">{polarSunLabel ?? formatLocalTime(shownSunrise)}</span>
             </div>
 
             <div className={ROW}>
               <div className="flex items-center">
                 <Sunset size={18} className="mr-2" />
-                <span className="text-body">Sunset</span>
+                <span className="text-body">{t('sun.sunset')}</span>
                 {onSunsetCountdownToggle && (
                   <button
                     type="button"
                     onClick={onSunsetCountdownToggle}
                     className={`${INLINE_ICON_TOGGLE} ml-1 ${isSunsetCountdownOn ? 'bg-white/20' : ''}`}
-                    aria-label="Sunset countdown"
+                    aria-label={t('sun.countdown')}
                     aria-pressed={isSunsetCountdownOn}
                   >
                     {isSunsetCountdownOn ? <BellRing size={14} /> : <Bell size={14} />}
@@ -804,8 +802,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                     type="button"
                     onClick={onSunsetReminderToggle}
                     className={`${INLINE_ICON_TOGGLE} ml-1 ${isSunsetReminderOn ? 'bg-white/20' : ''}`}
-                    aria-label="Remind me 15 minutes before sunset (while the app is open)"
-                    title="Remind me 15 minutes before sunset (while the app is open)"
+                    aria-label={t('reminder.toggle', { minutes: SUNSET_REMINDER_MIN })}
+                    title={t('reminder.toggle', { minutes: SUNSET_REMINDER_MIN })}
                     aria-pressed={isSunsetReminderOn}
                   >
                     {isSunsetReminderOn ? <AlarmClockCheck size={14} /> : <AlarmClock size={14} />}
@@ -828,7 +826,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   />
                 )}
               </div>
-              <span className="font-semibold text-body tabular-nums">{polarSunLabel ?? formatTime(shownSunset)}</span>
+              <span className="font-semibold text-body tabular-nums">{polarSunLabel ?? formatLocalTime(shownSunset)}</span>
             </div>
 
             {terrainStatus !== 'idle' && isSunTerrainOpen && (
@@ -838,8 +836,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 eyeHeightMeters={eyeHeightMeters}
                 onEyeHeightChange={onEyeHeightChange}
                 rows={[
-                  { label: 'Sunrise', value: formatTerrainDelta('sun', terrainSunTimes?.sunrise ?? null, shownSunrise) },
-                  { label: 'Sunset', value: formatTerrainDelta('sun', terrainSunTimes?.sunset ?? null, shownSunset) },
+                  { label: t('sun.sunrise'), value: formatTerrainDelta('sun', terrainSunTimes?.sunrise ?? null, shownSunrise, language) },
+                  { label: t('sun.sunset'), value: formatTerrainDelta('sun', terrainSunTimes?.sunset ?? null, shownSunset, language) },
                 ]}
               />
             )}
@@ -848,19 +846,19 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             {weatherData?.sunsetScoreToday && (
               <div className="text-caption opacity-80 mt-1 space-y-0.5">
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex flex-shrink-0 items-center gap-1">Sunset score<PremiumBadge /></span>
+                  <span className="inline-flex flex-shrink-0 items-center gap-1">{t('score.label')}<PremiumBadge /></span>
                   <span className="inline-flex items-center rounded-full bg-brand-peach text-brand-night px-2 py-0.5 font-semibold tabular-nums">
                     {weatherData.sunsetScoreToday.score}/10
                   </span>
-                  <span className="opacity-80">· {weatherData.sunsetScoreToday.reason}</span>
+                  <span className="opacity-80">· {getScoreReason(weatherData.sunsetScoreToday, language)}</span>
                 </div>
                 {weatherData.sunsetScoreTomorrow && (
                   <div className="opacity-70 flex items-center gap-2">
-                    <span>Tomorrow:</span>
+                    <span>{t('score.tomorrow')}</span>
                     <span className="inline-flex items-center rounded-full bg-brand-peach text-brand-night px-2 py-0.5 font-semibold tabular-nums">
                       {weatherData.sunsetScoreTomorrow.score}/10
                     </span>
-                    <span className="opacity-80">· {weatherData.sunsetScoreTomorrow.reason}</span>
+                    <span className="opacity-80">· {getScoreReason(weatherData.sunsetScoreTomorrow, language)}</span>
                   </div>
                 )}
               </div>
@@ -873,7 +871,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               <div className="flex items-center justify-between mb-2">
                 <h3 className={SECTION_HEADING}>
                   <Moon size={16} className="mr-2" />
-                  Moon Information
+                  {t('moon.title')}
                 </h3>
                 <button
                   onClick={() => {
@@ -881,41 +879,41 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                     setIsMoonCollapsed(!isMoonCollapsed);
                   }}
                   className={ICON_TOGGLE}
-                  aria-label={isMoonCollapsed ? "Expand moon info" : "Collapse moon info"}
+                  aria-label={isMoonCollapsed ? t('moon.expand') : t('moon.collapse')}
                 >
                   {isMoonCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
                 </button>
               </div>
 
               <div className={`transition-all duration-300 ease-in-out ${
-                isMoonCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-64 opacity-100'
+                isMoonCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[40rem] opacity-100'
               }`}>
                 <div className="space-y-1">
                   <div className={ROW}>
-                    <span className="text-caption">Phase:</span>
-                    <span className="text-caption tabular-nums">{getMoonPhaseLabel(moonPosition.phase)}</span>
+                    <span className="text-caption">{t('moon.phase')}</span>
+                    <span className="text-caption tabular-nums">{t(getMoonPhaseLabel(moonPosition.phase))}</span>
                   </div>
                   <div className={ROW}>
-                    <span className="text-caption">Illumination:</span>
-                    <span className="text-caption tabular-nums">{(moonPosition.illumination * 100).toFixed(0)}%</span>
+                    <span className="text-caption">{t('moon.illumination')}</span>
+                    <span className="text-caption tabular-nums">{new Intl.NumberFormat(language, { style: 'percent' }).format(moonPosition.illumination)}</span>
                   </div>
                   <div className={ROW}>
-                    <span className="text-caption">Altitude:</span>
-                    <span className="text-caption tabular-nums">{moonPosition.altitude.toFixed(1)}°</span>
+                    <span className="text-caption">{t('common.altitude')}</span>
+                    <span className="text-caption tabular-nums">{formatNumber(language, moonPosition.altitude, 1)}°</span>
                   </div>
                   <div className={ROW}>
-                    <span className="text-caption">Azimuth:</span>
-                    <span className="text-caption tabular-nums">{moonPosition.azimuth.toFixed(1)}°</span>
+                    <span className="text-caption">{t('common.azimuth')}</span>
+                    <span className="text-caption tabular-nums">{formatNumber(language, moonPosition.azimuth, 1)}°</span>
                   </div>
                   <div className={ROW}>
                     <span className="text-caption flex items-center min-w-0">
-                      <span className="truncate">Moonrise:</span>
+                      <span className="truncate">{t('common.labelColon', { label: t('moon.rise') })}</span>
                       {terrainStatus !== 'idle' && (
                         <button
                           type="button"
                           onClick={() => setIsMoonTerrainOpen(!isMoonTerrainOpen)}
                           className={`${INLINE_ICON_TOGGLE} relative ml-1`}
-                          aria-label="Show line of sight"
+                          aria-label={t('terrain.show')}
                           aria-expanded={isMoonTerrainOpen}
                         >
                           <Mountain size={14} />
@@ -925,23 +923,23 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                     </span>
                     <span className="text-caption tabular-nums">
                       {moonTimes.alwaysUp
-                        ? 'Up all day'
+                        ? t('moon.upAllDay')
                         : moonTimes.alwaysDown
-                          ? 'Down all day'
+                          ? t('moon.downAllDay')
                           : moonTimes.rise
-                            ? formatTime(moonTimes.rise)
+                            ? formatLocalTime(moonTimes.rise)
                             : '—'}
                     </span>
                   </div>
                   <div className={ROW}>
-                    <span className="text-caption">Moonset:</span>
+                    <span className="text-caption">{t('common.labelColon', { label: t('moon.set') })}</span>
                     <span className="text-caption tabular-nums">
                       {moonTimes.alwaysUp
-                        ? 'Up all day'
+                        ? t('moon.upAllDay')
                         : moonTimes.alwaysDown
-                          ? 'Down all day'
+                          ? t('moon.downAllDay')
                           : moonTimes.set
-                            ? formatTime(moonTimes.set)
+                            ? formatLocalTime(moonTimes.set)
                             : '—'}
                     </span>
                   </div>
@@ -953,19 +951,19 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                       eyeHeightMeters={eyeHeightMeters}
                       onEyeHeightChange={onEyeHeightChange}
                       rows={[
-                        { label: 'Moonrise', value: formatTerrainDelta('moon', terrainMoonTimes?.rise ?? null, moonTimes.rise) },
-                        { label: 'Moonset', value: formatTerrainDelta('moon', terrainMoonTimes?.set ?? null, moonTimes.set) },
+                        { label: t('moon.rise'), value: formatTerrainDelta('moon', terrainMoonTimes?.rise ?? null, moonTimes.rise, language) },
+                        { label: t('moon.set'), value: formatTerrainDelta('moon', terrainMoonTimes?.set ?? null, moonTimes.set, language) },
                       ]}
                     />
                   )}
 
                   <div className={ROW}>
-                    <span className="text-caption">Next full moon:</span>
-                    <span className="text-caption tabular-nums">{formatMoonDate(nextFullMoon)}</span>
+                    <span className="text-caption">{t('moon.nextFull')}</span>
+                    <span className="text-caption tabular-nums">{formatMoonDate(nextFullMoon, language)}</span>
                   </div>
                   <div className={ROW}>
-                    <span className="text-caption">Next new moon:</span>
-                    <span className="text-caption tabular-nums">{formatMoonDate(nextNewMoon)}</span>
+                    <span className="text-caption">{t('moon.nextNew')}</span>
+                    <span className="text-caption tabular-nums">{formatMoonDate(nextNewMoon, language)}</span>
                   </div>
                 </div>
               </div>
@@ -979,12 +977,12 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           <div className="mt-6 pt-4 border-t border-white border-opacity-20">
             <div className="flex items-center justify-between mb-2">
               <h3 className={SECTION_HEADING}>
-                Golden &amp; Blue Hour
+                {t('golden.title')}
               </h3>
               <button
                 onClick={() => setIsGoldenBlueCollapsed(!isGoldenBlueCollapsed)}
                 className={ICON_TOGGLE}
-                aria-label={isGoldenBlueCollapsed ? "Expand golden & blue hour" : "Collapse golden & blue hour"}
+                aria-label={isGoldenBlueCollapsed ? t('golden.expand') : t('golden.collapse')}
                 aria-expanded={!isGoldenBlueCollapsed}
               >
                 {isGoldenBlueCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
@@ -1001,22 +999,22 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 {nextGoldenBlueHours?.part === 'morning' ? (
                   <>
                     <div className={ROW}>
-                      <span className="opacity-80 text-caption">Blue hour:</span>
+                      <span className="opacity-80 text-caption">{t('golden.blue')}</span>
                       <span className="text-caption tabular-nums">{renderWindow(formatWindow(nextGoldenBlueHours?.blue))}</span>
                     </div>
                     <div className={ROW}>
-                      <span className="opacity-80 text-caption">Golden hour:</span>
+                      <span className="opacity-80 text-caption">{t('golden.golden')}</span>
                       <span className="text-caption tabular-nums">{renderWindow(formatWindow(nextGoldenBlueHours?.golden))}</span>
                     </div>
                   </>
                 ) : (
                   <>
                     <div className={ROW}>
-                      <span className="opacity-80 text-caption">Golden hour:</span>
+                      <span className="opacity-80 text-caption">{t('golden.golden')}</span>
                       <span className="text-caption tabular-nums">{renderWindow(formatWindow(nextGoldenBlueHours?.golden))}</span>
                     </div>
                     <div className={ROW}>
-                      <span className="opacity-80 text-caption">Blue hour:</span>
+                      <span className="opacity-80 text-caption">{t('golden.blue')}</span>
                       <span className="text-caption tabular-nums">{renderWindow(formatWindow(nextGoldenBlueHours?.blue))}</span>
                     </div>
                   </>
@@ -1029,7 +1027,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           <div className="mt-6 pt-4 border-t border-white border-opacity-20">
             <div className="flex items-center justify-between mb-2">
               <h3 className={SECTION_HEADING}>
-                Upcoming {relevantTwilightTimes.type === 'dawn' ? 'Dawn' : 'Dusk'} Times
+                {relevantTwilightTimes.type === 'dawn' ? t('twilight.dawnTitle') : t('twilight.duskTitle')}
               </h3>
               <button
                 onClick={() => {
@@ -1037,7 +1035,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   setIsTwilightCollapsed(!isTwilightCollapsed);
                 }}
                 className={ICON_TOGGLE}
-                aria-label={isTwilightCollapsed ? "Expand twilight times" : "Collapse twilight times"}
+                aria-label={isTwilightCollapsed ? t('twilight.expand') : t('twilight.collapse')}
               >
                 {isTwilightCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
               </button>
@@ -1060,11 +1058,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                         onClick={() => setHoveredTwilight(hoveredTwilight === 'civil' ? null : 'civil')}
                         aria-expanded={hoveredTwilight === 'civil'}
                         aria-describedby="twilight-degree-civil"
-                        title="Click or hover for degree information"
+                        title={t('twilight.degreeHint')}
                       >
-                        Civil:
+                        {t('common.labelColon', { label: t('twilight.civil') })}
                       </button>
-                      <span className="text-caption tabular-nums">{formatTime(sunTimes.sunset)} - {formatTime(relevantTwilightTimes.civil)}</span>
+                      <span className="text-caption tabular-nums">{formatLocalTime(sunTimes.sunset)} - {formatLocalTime(relevantTwilightTimes.civil)}</span>
                     </div>
                     {hoveredTwilight === 'civil' && (
                       <div id="twilight-degree-civil" className="text-caption opacity-60 ml-2">
@@ -1082,11 +1080,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                         onClick={() => setHoveredTwilight(hoveredTwilight === 'nautical' ? null : 'nautical')}
                         aria-expanded={hoveredTwilight === 'nautical'}
                         aria-describedby="twilight-degree-nautical"
-                        title="Click or hover for degree information"
+                        title={t('twilight.degreeHint')}
                       >
-                        Nautical:
+                        {t('common.labelColon', { label: t('twilight.nautical') })}
                       </button>
-                      <span className="text-caption tabular-nums">{formatTime(relevantTwilightTimes.civil)} - {formatTime(relevantTwilightTimes.nautical)}</span>
+                      <span className="text-caption tabular-nums">{formatLocalTime(relevantTwilightTimes.civil)} - {formatLocalTime(relevantTwilightTimes.nautical)}</span>
                     </div>
                     {hoveredTwilight === 'nautical' && (
                       <div id="twilight-degree-nautical" className="text-caption opacity-60 ml-2">
@@ -1104,11 +1102,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                         onClick={() => setHoveredTwilight(hoveredTwilight === 'astronomical' ? null : 'astronomical')}
                         aria-expanded={hoveredTwilight === 'astronomical'}
                         aria-describedby="twilight-degree-astronomical"
-                        title="Click or hover for degree information"
+                        title={t('twilight.degreeHint')}
                       >
-                        Astronomical:
+                        {t('common.labelColon', { label: t('twilight.astronomical') })}
                       </button>
-                      <span className="text-caption tabular-nums">{formatTime(relevantTwilightTimes.nautical)} - {formatTime(relevantTwilightTimes.astronomical)}</span>
+                      <span className="text-caption tabular-nums">{formatLocalTime(relevantTwilightTimes.nautical)} - {formatLocalTime(relevantTwilightTimes.astronomical)}</span>
                     </div>
                     {hoveredTwilight === 'astronomical' && (
                       <div id="twilight-degree-astronomical" className="text-caption opacity-60 ml-2">
@@ -1129,11 +1127,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                         onClick={() => setHoveredTwilight(hoveredTwilight === 'astronomical' ? null : 'astronomical')}
                         aria-expanded={hoveredTwilight === 'astronomical'}
                         aria-describedby="twilight-degree-astronomical"
-                        title="Click or hover for degree information"
+                        title={t('twilight.degreeHint')}
                       >
-                        Astronomical:
+                        {t('common.labelColon', { label: t('twilight.astronomical') })}
                       </button>
-                      <span className="text-caption tabular-nums">{formatTime(relevantTwilightTimes.astronomical)} - {formatTime(relevantTwilightTimes.nautical)}</span>
+                      <span className="text-caption tabular-nums">{formatLocalTime(relevantTwilightTimes.astronomical)} - {formatLocalTime(relevantTwilightTimes.nautical)}</span>
                     </div>
                     {hoveredTwilight === 'astronomical' && (
                       <div id="twilight-degree-astronomical" className="text-caption opacity-60 ml-2">
@@ -1151,11 +1149,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                         onClick={() => setHoveredTwilight(hoveredTwilight === 'nautical' ? null : 'nautical')}
                         aria-expanded={hoveredTwilight === 'nautical'}
                         aria-describedby="twilight-degree-nautical"
-                        title="Click or hover for degree information"
+                        title={t('twilight.degreeHint')}
                       >
-                        Nautical:
+                        {t('common.labelColon', { label: t('twilight.nautical') })}
                       </button>
-                      <span className="text-caption tabular-nums">{formatTime(relevantTwilightTimes.nautical)} - {formatTime(relevantTwilightTimes.civil)}</span>
+                      <span className="text-caption tabular-nums">{formatLocalTime(relevantTwilightTimes.nautical)} - {formatLocalTime(relevantTwilightTimes.civil)}</span>
                     </div>
                     {hoveredTwilight === 'nautical' && (
                       <div id="twilight-degree-nautical" className="text-caption opacity-60 ml-2">
@@ -1173,11 +1171,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                         onClick={() => setHoveredTwilight(hoveredTwilight === 'civil' ? null : 'civil')}
                         aria-expanded={hoveredTwilight === 'civil'}
                         aria-describedby="twilight-degree-civil"
-                        title="Click or hover for degree information"
+                        title={t('twilight.degreeHint')}
                       >
-                        Civil:
+                        {t('common.labelColon', { label: t('twilight.civil') })}
                       </button>
-                      <span className="text-caption tabular-nums">{formatTime(relevantTwilightTimes.civil)} - {formatTime(sunTimes.sunrise)}</span>
+                      <span className="text-caption tabular-nums">{formatLocalTime(relevantTwilightTimes.civil)} - {formatLocalTime(sunTimes.sunrise)}</span>
                     </div>
                     {hoveredTwilight === 'civil' && (
                       <div id="twilight-degree-civil" className="text-caption opacity-60 ml-2">
@@ -1193,14 +1191,14 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           {/* Sun position - collapsible */}
           <div className="mt-6 pt-4 border-t border-white border-opacity-20">
             <div className="flex items-center justify-between mb-2">
-              <h3 className={SECTION_HEADING}>Sun Position</h3>
+              <h3 className={SECTION_HEADING}>{t('sunPosition.title')}</h3>
               <button
                 onClick={() => {
                   userToggledSunPositionRef.current = true;
                   setIsSunPositionCollapsed(!isSunPositionCollapsed);
                 }}
                 className={ICON_TOGGLE}
-                aria-label={isSunPositionCollapsed ? "Expand sun position" : "Collapse sun position"}
+                aria-label={isSunPositionCollapsed ? t('sunPosition.expand') : t('sunPosition.collapse')}
               >
                 {isSunPositionCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
               </button>
@@ -1211,14 +1209,38 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             }`}>
               <div className="grid grid-cols-2 gap-1 text-caption">
                 <div>
-                  <span>Altitude: </span>
-                  <span className="tabular-nums">{sunPosition.altitude.toFixed(2)}°</span>
+                  <span>{t('common.altitude')} </span>
+                  <span className="tabular-nums">{formatNumber(language, sunPosition.altitude, 2)}°</span>
                 </div>
                 <div>
-                  <span>Azimuth: </span>
-                  <span className="tabular-nums">{sunPosition.azimuth.toFixed(2)}°</span>
+                  <span>{t('common.azimuth')} </span>
+                  <span className="tabular-nums">{formatNumber(language, sunPosition.azimuth, 2)}°</span>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Language (ROADMAP item 67): the same segmented style as the °C/°F toggle. */}
+          <div className="mt-6 pt-4 border-t border-white border-opacity-20 flex items-center justify-between gap-2">
+            <span className="text-caption opacity-80">{t('language.label')}</span>
+            <div className="flex bg-white bg-opacity-10 rounded-full p-1" role="group" aria-label={t('language.label')}>
+              {LANGUAGES.map((code) => (
+                <button
+                  key={code}
+                  lang={code}
+                  onClick={() => setLanguage(code)}
+                  aria-pressed={language === code}
+                  aria-label={LANGUAGE_NAMES[code]}
+                  title={LANGUAGE_NAMES[code]}
+                  className={`text-caption px-2 py-1 rounded-full uppercase transition-colors ${FOCUS_RING} ${
+                    language === code
+                      ? 'bg-white bg-opacity-20 text-white'
+                      : 'text-white opacity-60'
+                  }`}
+                >
+                  {code}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -1226,11 +1248,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           {isFeedbackAvailable() && (
             <div className="mt-6 pt-4 border-t border-white border-opacity-20">
               <button
-                onClick={openFeedbackForm}
+                onClick={() => openFeedbackForm(t)}
                 className={`flex items-center gap-2 text-caption opacity-80 hover:opacity-100 transition-opacity rounded ${FOCUS_RING}`}
               >
                 <MessageSquare size={14} />
-                Send feedback
+                {t('feedback.send')}
               </button>
             </div>
           )}

@@ -1,4 +1,6 @@
 import { formatTime } from '@/utils/sunUtils';
+import { translate } from '@/i18n';
+import { type Language } from '@/utils/language';
 
 // Sunset reminder (ROADMAP item 69): a system notification a fixed time before the next
 // sunset, while the app is open. No server and no Web Push.
@@ -25,5 +27,5 @@ export const isReminderDue = (now: Date, sunset: Date | null, shownKey: string |
   return lateMs >= 0 && lateMs < REMINDER_LATE_MS;
 };
 
-export const getReminderText = (sunset: Date): string =>
-  `Sunset in ${SUNSET_REMINDER_MIN} minutes, at ${formatTime(sunset)}`;
+export const getReminderText = (sunset: Date, language: Language): string =>
+  translate(language, 'reminder.notification', { minutes: SUNSET_REMINDER_MIN, time: formatTime(sunset, language) });
