@@ -1,6 +1,7 @@
 
 import SunCalc from 'suncalc';
 import { scanMoonEvents } from './lunarEphemeris';
+import { type MessageKey } from '@/i18n';
 
 export interface MoonPosition {
   azimuth: number;
@@ -375,18 +376,19 @@ export const getMoonPhaseIndex = (phase: number): number => {
   return 0; // New Moon
 };
 
-const MOON_PHASE_LABELS = [
-  'New Moon',
-  'Waxing Crescent',
-  'First Quarter',
-  'Waxing Gibbous',
-  'Full Moon',
-  'Waning Gibbous',
-  'Third Quarter',
-  'Waning Crescent',
+// Dictionary keys (ROADMAP item 67), in the order of getMoonPhaseIndex.
+const MOON_PHASE_LABELS: MessageKey[] = [
+  'moonPhase.new',
+  'moonPhase.waxingCrescent',
+  'moonPhase.firstQuarter',
+  'moonPhase.waxingGibbous',
+  'moonPhase.full',
+  'moonPhase.waningGibbous',
+  'moonPhase.thirdQuarter',
+  'moonPhase.waningCrescent',
 ];
 
-export const getMoonPhaseLabel = (phase: number): string => MOON_PHASE_LABELS[getMoonPhaseIndex(phase)];
+export const getMoonPhaseLabel = (phase: number): MessageKey => MOON_PHASE_LABELS[getMoonPhaseIndex(phase)];
 
 // Number of sample points per side of the lit-region outline; enough for a smooth
 // crescent/gibbous curve at the sizes the moon is drawn on screen.

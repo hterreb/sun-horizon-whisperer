@@ -6,7 +6,7 @@ import type { HorizonProfile } from '../src/utils/horizonUtils';
 
 vi.mock('../src/utils/terrainTiles', () => ({
   loadHorizonProfile: vi.fn(),
-  TERRAIN_ATTRIBUTION: 'Terrain: Mapzen / AWS Terrain Tiles',
+  TERRAIN_SOURCE: 'Mapzen / AWS Terrain Tiles',
 }));
 
 const fakeProfile: HorizonProfile = {

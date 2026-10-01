@@ -1,5 +1,5 @@
 import {
-  TERRAIN_ATTRIBUTION,
+  TERRAIN_SOURCE,
   decodeTerrarium,
   createElevationSampler,
   loadHorizonProfile,
@@ -25,8 +25,8 @@ describe('terrainTiles', () => {
     localStorage.clear();
   });
 
-  it('exposes the required attribution string', () => {
-    expect(TERRAIN_ATTRIBUTION).toBe('Terrain: Mapzen / AWS Terrain Tiles');
+  it('exposes the required attribution source', () => {
+    expect(TERRAIN_SOURCE).toBe('Mapzen / AWS Terrain Tiles');
   });
 
   describe('decodeTerrarium', () => {

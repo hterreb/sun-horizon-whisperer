@@ -2,6 +2,8 @@
 // free, keyless Open-Meteo geocoding API. Pure fetch + parsing only; debouncing,
 // aborting stale requests, and rendering results are the caller's job (InfoPanel).
 
+import { type Language } from '@/utils/language';
+
 const GEOCODE_URL = 'https://geocoding-api.open-meteo.com/v1/search';
 
 export interface GeocodeResult {
@@ -27,15 +29,17 @@ export const formatGeocodeResultLabel = (result: GeocodeResult): string =>
   [result.name, result.admin1, result.country].filter(Boolean).join(', ');
 
 // Ignores queries under 2 characters (returns no results, no request). Pass an
-// AbortController's signal so a fast-typing caller can cancel a stale request.
+// AbortController's signal so a fast-typing caller can cancel a stale request. The
+// place and country names come in `language` (ROADMAP item 67).
 export const searchPlaces = async (
   query: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  language: Language = 'en'
 ): Promise<GeocodeResult[]> => {
   const trimmed = query.trim();
   if (trimmed.length < 2) return [];
 
-  const url = `${GEOCODE_URL}?name=${encodeURIComponent(trimmed)}&count=5&language=en&format=json`;
+  const url = `${GEOCODE_URL}?name=${encodeURIComponent(trimmed)}&count=5&language=${language}&format=json`;
   const response = await fetch(url, { signal });
   if (!response.ok) {
     throw new Error(`Geocoding request failed: ${response.status}`);

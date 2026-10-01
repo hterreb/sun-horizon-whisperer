@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { type CompassStatus } from '@/hooks/useCompassHeading';
 import { GLASS_ICON_BUTTON } from '@/utils/glassChrome';
 import PremiumBadge from './PremiumBadge';
+import { useLanguage } from '@/hooks/useLanguage';
 
 interface CompassToggleProps {
   status: CompassStatus;
@@ -22,6 +23,7 @@ const CompassToggle: React.FC<CompassToggleProps> = ({
   onEnable,
   onDisable
 }) => {
+  const { t } = useLanguage();
   if (status === 'unsupported' || status === 'unavailable') {
     return null;
   }
@@ -43,10 +45,10 @@ const CompassToggle: React.FC<CompassToggleProps> = ({
       variant="ghost"
       size="icon"
       onClick={handleClick}
-      aria-label={isActive ? 'Disable compass' : 'Enable compass'}
+      aria-label={isActive ? t('compass.disable') : t('compass.enable')}
       aria-pressed={isActive}
       className={`${GLASS_ICON_BUTTON} relative transition-colors ${isActive ? 'text-brand-sky' : 'text-white'}`}
-      title={isActive ? 'Disable compass' : 'Enable compass'}
+      title={isActive ? t('compass.disable') : t('compass.enable')}
     >
       <Compass className="h-4 w-4" />
       <PremiumBadge className="absolute -right-0.5 -top-0.5 h-3.5 w-3.5" />
