@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44 and 47–66, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), items 67–69 (five languages, share card, sunset reminder), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
+Status: last updated 2026-10-01. Done: items 1–13, 15, 17–44, 47–66 and 70, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 14 and 16 (item 45 decided: Premium in the Play app only, web free), items 67–69 (five languages, share card, sunset reminder), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
 
 ## Verification (2026-09-28)
 
@@ -884,6 +884,17 @@ These items come from the re-shoot of all states after items 46–56.
   6. Works in the Play app (TWA) and the installed PWA, also on iOS 16.4+ (installed only). In a browser tab without push support, hide the option.
 - **Done when:** unit tests for the send-time calculation (time zones, the polar day and night with no sunset). A test push arrives on an Android phone and an installed iPhone PWA N minutes before sunset, within 5 minutes.
 - **Note:** this needs a server part (VAPID keys, a subscriptions table, a scheduled function). It is the first backend the frontend uses.
+
+### Fish follow-up (2026-10-01)
+
+### 70. More room on wide screens — S — **✅ Done**
+
+- **Feedback (2026-10-01):** "as they are so slow we can raise the limit for fish and boats, what do you propose?" Then: "build the full rule and lets review it if it gets too crowded".
+- **Now:** since item 66, a crossing on a wide screen takes as long as the width needs at phone speed (3.35× longer at 1440 px). The limits (5 fish, 3 at night, 3 boats) stayed, so at 1440 px there was one fish per 290 px of water (a phone has one per 80 px), and a new fish came only about every 100 s.
+- **Spec:** the limits count per 430 px of width (`getWaterLimit` = round(limit / `getWaterSpeedFactor`)). A phone keeps 5 fish, 3 night fish and 3 boats. At 1280 px: 15, 9, 9. At 1440 px: 17, 10, 10. At 1920 px: 22, 13, 13. The spawn timing does not change: at 1440 px a new fish comes about every 30 s. The boats come about once a minute, so they stay at about 6 on average, below their limit.
+- **Review:** Lutz checks on his Mac whether it gets too crowded. If it does, the fallback is half the rule (8 fish, 5 night fish, 5 boats at 1440 px).
+- **Built:** `getWaterLimit` (`weatherEffectsUtils.ts`), used for the fish limit (day and night) and the boat limit in `CloudLayer`.
+- **Checked:** 4 new tests (707 in all), lint, typecheck and build pass. The limit tests now pin a phone width (390 px) or a wide one (1290 px), because jsdom's window is 1024 px. In Chromium at 1440×900, after two simulated minutes: 12 fish groups (25 fish) on screen.
 
 ---
 
