@@ -131,6 +131,14 @@ const NOT_FISH: FishKind[] = ['turtle', 'jellyfish'];
 export const canSpawnFish = (onScreen: FishKind[], next: FishKind, max = MAX_FISH): boolean =>
   NOT_FISH.includes(next) || onScreen.filter(kind => !NOT_FISH.includes(kind)).length < max;
 
+// Calm water on wide screens (ROADMAP item 66). Fish and boat speeds are a share of the
+// width per second, so on a desktop they move 3-5x more pixels per second than on a phone.
+// Above a large phone's width, this factor slows them to the phone's pixels per second.
+export const PHONE_WIDTH_PX = 430;
+
+export const getWaterSpeedFactor = (viewportWidth: number): number =>
+  Math.min(1, PHONE_WIDTH_PX / viewportWidth);
+
 // Rest stop (P8): cruise at `speed`, slow to a stop over 3 s so that it stands still
 // `stopAt` along the path, hold for `holdSec`, speed up over 3 s and cruise on. Distances
 // are in % of the width, speed in % per second. Returns the crossing time and a CSS
