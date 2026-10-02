@@ -2,6 +2,7 @@ import {
   getCloudCount,
   getCloudOpacity,
   getCloudLayout,
+  getCloudMoonlight,
   getCloudDriftDurationSec,
   getCloudDriftDirection,
   getPrecipitationSlantPx,
@@ -87,6 +88,28 @@ describe('getCloudLayout (ROADMAP item 10)', () => {
       expect(Number.isFinite(cloud.y)).toBe(true);
       expect(Number.isFinite(cloud.scale)).toBe(true);
     }
+  });
+});
+
+describe('getCloudMoonlight (ROADMAP item 76, X2)', () => {
+  const moon = { x: 50, y: 30, r: 20 }; // at (400, 180) px in an 800 × 600 scene
+
+  it("centres the light on the moon in the cloud's own svg units", () => {
+    // An unscaled cloud whose box starts at (360, 150): the moon sits at (40, 30) in it.
+    const light = getCloudMoonlight({ id: 0, x: 45, y: 25, scale: 1 }, moon, 800, 600);
+    expect(light?.cx).toBeCloseTo(40);
+    expect(light?.cy).toBeCloseTo(30);
+    expect(light?.r).toBeCloseTo(90); // 4.5 × the radius
+  });
+
+  it("accounts for the cloud's scale around its centre", () => {
+    const light = getCloudMoonlight({ id: 0, x: 45, y: 25, scale: 0.5 }, moon, 800, 600);
+    expect(light?.cx).toBeCloseTo(20);
+    expect(light?.r).toBeCloseTo(180);
+  });
+
+  it('is null for a cloud the light does not reach', () => {
+    expect(getCloudMoonlight({ id: 0, x: 5, y: 5, scale: 1 }, moon, 800, 600)).toBeNull();
   });
 });
 

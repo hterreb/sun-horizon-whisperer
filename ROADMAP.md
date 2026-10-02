@@ -1010,7 +1010,7 @@ These items come from the re-shoot of all states after items 46–56.
 
 Four Sentry reports from the evening and night of 2026-10-01, all from Ravensburg on release `6e12461`. Request: "please spec all 4 of them, lets make a comparison of moon visibility, completely redo the rain animations, create a lookbook and spec a screenshot like behaviour for the share feature, and create a lookbook as well for different wave options depending on wind strength". Items 76, 77 and 79 have a lookbook, with Lutz's picks (2026-10-02) in each item. Item 78 has a full spec.
 
-### 76. The moon stays findable behind clouds — S — [SUN-CHASER-M](https://ainabler.sentry.io/issues/SUN-CHASER-M) — **Spec ready**
+### 76. The moon stays findable behind clouds — S — [SUN-CHASER-M](https://ainabler.sentry.io/issues/SUN-CHASER-M) — **✅ Done**
 
 - **Feedback (2026-10-01 23:42):** "Can't see the moon anymore". Then: "lets make a comparison of moon visibility".
 - **Now:** not a regression. Item 57 works as built: `getMoonCloudFactor` uses the stars' cloud factor (1 − cover), with a floor of 0.15 under partial cover, cloudy and overcast; storm and fog hide the moon. At the reported time Ravensburg had light rain (code 61) at 97 % cover. The moon was 21° high and 69 % lit, and showed at 11 % opacity (76 % on a clear night). Manual weather has no cover value, so manual rain, drizzle, snow and hail give 0: the moon is not drawn at all. The moon div paints above the clouds (DOM order, no z-index), so the clouds never cover it; the factor fades it. The moon arc and the altitude chip show in every weather.
@@ -1033,6 +1033,12 @@ Four Sentry reports from the evening and night of 2026-10-01, all from Ravensbur
   - **X2 Silver lining:** clouds within 4.5 × the disc radius of the moon get a pale rim in `--scene-moon`. `CloudLayer` already has the moon's place (the `moon` prop, item 74).
   - The cloud motion, the moon arc and the chip do not change. The moon reflection and the moonlight pool keep the item-57 factor.
 - **Done when:** a test for the disc floor and the corona per weather type (live and manual). In the browser at 23:42 on 2026-10-01 (rain, 97 %), the moon is findable at a glance; in fog only the glow shows; in a storm nothing shows.
+- **Built:**
+  - `getMoonLook` (`weatherEffectsUtils.ts`) gives the disc factor (the item-57 factor, at least 0.25 except in storm and fog) and the corona (strength 1 at 3.5 radii while the factor is below 0.5; fog 0.5 at 5 radii; storm none).
+  - `SunVisualization` draws the corona (`data-testid="moon-corona"`, a radial gradient in `--scene-moon`: 0.32 × strength × brightness at the centre, 0.13 at 40 %, 0 at the edge) under the disc (`data-testid="moon-disc"`). The reflection bars and the moonlight pool keep `getMoonCloudFactor`. The Halloween pumpkin moon follows the disc. `CloudLayer` gets `moon` while the disc or the corona shows, now with the radius (px) and the brightness; the night geese still fly only in fair weather.
+  - `getCloudMoonlight` (`cloudLayoutUtils.ts`) maps the moon into each cloud's 120 × 60 svg units. A cloud within reach gets a second copy of its path, filled with a radial gradient in `--scene-moon` (0.85 × brightness at the centre, 0.32 at half the radius, 0 at 4.5 radii), as in the lookbook.
+- **Deviations:** the silver lining brightens the parts of a cloud near the moon (as in the lookbook), not only its edge ("rim" in the spec). It is placed from the cloud's resting place, so the light rides along the cloud's ±6 vw sway (a `ponytail:` note in `getCloudMoonlight`).
+- **Checked:** 10 new tests (825 in all), lint, typecheck and build pass. In Chrome at 1280×800, Ravensburg, 2026-10-01 23:42 (moon 21° high, 69 % lit, disc radius 22 px): clear 0 %: disc 0.756, no corona. Live rain at 97 % cover: disc 0.189 (was 0.11), a 155 px corona, 2 lit clouds; the moon is findable at a glance. Manual Rain: disc 0.189 and the corona (was no moon at all). Manual Overcast: 0.189 and the corona. Manual Cloudy: disc 0.302 and the corona, 1 lit cloud. Manual Fog: no disc, a 222 px corona (faint under the fog band). Manual Storm: nothing. No console errors.
 
 ### 77. Rain, redone — M — [SUN-CHASER-J](https://ainabler.sentry.io/issues/SUN-CHASER-J) — **✅ Done**
 
@@ -1077,7 +1083,7 @@ Four Sentry reports from the evening and night of 2026-10-01, all from Ravensbur
   - Snow: 60 flakes with 60 different delays, none 0 s. Manual hail: 45 pellets, 45 different delays.
   - Frame cost with 4× CPU throttling in a downpour: 390×844 median 0.8 ms (p95 1.2 ms), 1440×900 median 1.2 ms (p95 1.8 ms). No console errors.
 
-### 78. Share the current view — M — Premium — [SUN-CHASER-N](https://ainabler.sentry.io/issues/SUN-CHASER-N) — **Spec ready**
+### 78. Share the current view — M — Premium — [SUN-CHASER-N](https://ainabler.sentry.io/issues/SUN-CHASER-N) — **✅ Done**
 
 - **Feedback (2026-10-01 23:44):** "Share feature should include a screenshot of the actual view". Then: "spec a screenshot like behaviour for the share feature".
 - **Now:** the Share button (item 68) draws a 1080×1350 sunset card on a `<canvas>`: the dusk sky, the sun on the horizon or the ridge, the place, the date, the sunset times and the score. It does not show what the user sees (the current sky, the moon, the clouds, the boats, the birds).
@@ -1095,8 +1101,22 @@ Four Sentry reports from the evening and night of 2026-10-01, all from Ravensbur
   7. **Text:** the button label "Share sunset card" (`share.button`) becomes "Share this view", in all five languages.
   8. Premium as now: the gold plus and `requirePremium` (item 14) around the tap.
 - **Done when:** tests for the footer data (the view time, no coordinates), the `data-share-hide` filter, and the fallback to the card when the capture throws. In the browser (Chrome 390×844 and 1440×900): the image matches the screen without the controls, with moving boats and birds in place, at midday, at sunset and at night. On an Android phone the share sheet opens with the image. On iOS Safari the capture works or falls back to the card.
+- **Built:**
+  - `modern-screenshot` (^4.7.0) is a new dependency, loaded with `import()` inside `captureShareView` (`shareCard.ts`), so it is a separate 22 kB chunk (8.5 kB gzipped), not in the main bundle. The service worker precaches it, so it also works offline.
+  - `captureShareView` renders the scene root (`data-share-root` on the `SunTracker` root div) with `domToCanvas` at `getShareViewScale` (the pixel ratio, at most 2, with the long side at most 2400 px). It then draws the footer band (`getShareFooterHeight`, one fifth of the width) under it and returns a PNG. The filter `isSharedNode` leaves out every node with `data-share-hide`.
+  - `data-share-hide` is on the InfoPanel, the top-left buttons, the music player, the install prompt and the time-travel "Back to now" button. The toasts (`App.tsx`), the loading screen and the Premium dialog render outside the scene root, so the capture never sees them.
+  - The footer: the place name and the view time (`viewText`, new in `getShareCardData`) on the left, with the app mark under them. The sunset label and time, the flat time and the score are on the right. Sizes are the card's at 1080 px, scaled to the width. The app mark drawing is shared with the card (`drawAppMark`).
+  - `ShareCardButton` finds the scene root from the button (`closest('[data-share-root]')`), captures it and shares it as `sun-chaser-YYYY-MM-DD-HHMM.png` (`viewFileName`). When there is no root, or the import or the capture throws, it draws the item-68 card under its old file name. `share.button` is "Share this view" in all five languages.
+  - **Deviations:** `domToCanvas` instead of `domToPng`, because the footer is drawn on the same canvas. Point 4: the capture part has the screen's aspect ratio, and the footer makes the image one fifth of the width taller (390×844 → 780×1844).
+- **Checked:** 6 new tests (821 in all); lint, typecheck and build pass. In Chrome (Ravensburg, 2026-10-01, faked weather), a tap on "Share this view" gave the shared PNG in 0.2–0.4 s on a phone and 0.9 s on desktop:
+  - 390×844 at 2×: 780×1844 at 11:04 (three boats on the water), 18:50 (sunset) and 23:42 (night, moon 21°). 1440×900 at 1×: 1440×1188 at 11:05.
+  - Against a screenshot with the controls hidden, the capture differs by 0.1–0.37 of 255 on average. 0.24 % of the pixels differ by more than 40, only at midday, where boats and birds moved in the 0.5 s between the two shots. The boats sit where they are on screen.
+  - No InfoPanel, buttons or music player in the image. The footer shows "Ravensburg", "October 1, 2026, 18:50", the line-of-sight sunset 18:55, the flat time 19:03 (−9 min), the score and the app mark.
+  - With the capture chunk blocked, the button shares the item-68 card (1080×1350).
+  - No console errors.
+  - This Chrome has the Web Share API, and its headless share sheet never answers, so the check caught the shared file instead. The Android share sheet and iOS Safari are not checked yet.
 
-### 79. Waves by wind strength — M — [SUN-CHASER-K](https://ainabler.sentry.io/issues/SUN-CHASER-K) — **Spec ready**
+### 79. Waves by wind strength — M — [SUN-CHASER-K](https://ainabler.sentry.io/issues/SUN-CHASER-K) — **✅ Done**
 
 - **Feedback (2026-10-01 19:52):** "Waves on the water depending on wind strength". Then: "create a lookbook as well for different wave options depending on wind strength".
 - **Now:** the sea (`data-testid="sea"`) is a gradient under a fixed bumpy top edge that never changes. Wind changes only the sailboat's wake (item 73), the leaves and the birds' pace. `SunVisualization` already gets `windSpeedKmh` and `windDirectionDeg`; the sea has no wind input. Storm darkens the water and hides the reflection. Manual weather gives 0 or 50 km/h. Gusts are not fetched.
@@ -1135,6 +1155,48 @@ Four Sentry reports from the evening and night of 2026-10-01, all from Ravensbur
   - **X3 Foam in a storm:** from 55 km/h, long thin white foam streaks along the wind that drift with it (at most 3 px/s), and a foam line along the sea's top edge. None below 55 km/h.
   - **Storm:** a storm uses at least the strong band (50 km/h) when the measured wind is lower.
 - **Done when:** tests for the wind-band mapping and the counts per band. In the browser at 0, 15, 30, 50 and 70 km/h, on 390×844 and 1440×900: the sea reads calm at every band, every drift is at most 5.2 px/s (the sailboat's pace), calm water mirrors the ridge, foam shows only from 55 km/h, and one frame takes under 1 ms on a phone.
+- **Built:**
+  - `src/utils/waveUtils.ts`:
+    - `atWindStops` interpolates between the five stops, exact at each stop.
+    - `getWaveLook` holds every value of the table.
+    - `getReflectionBars` (X1) and `getBoatReflection` (X2) lay out the reflections.
+    - `getSeaWindKmh` sets the storm minimum.
+    - `getWindBand` gives the five bands.
+    - `waveHash` is the lookbook's stable hash.
+  - `src/components/SeaCanvas.tsx` is the one sea canvas. It draws WV6, WV4, WV1, WV2 and X3, clipped to the sea path (`Path2D`), at 30 fps, with the frame ID in a `useRef`. Reduced motion draws one still frame.
+    - The mirror (sky glow plus the flipped ridge) is drawn once into an offscreen canvas and copied in 2 px slices.
+    - When a slice has no offset, its crossfade draws one copy at full strength, so calm water stays still.
+  - `SunVisualization`:
+    - Renders `SeaCanvas` right after the sea path: above the sea fill, and under CloudLayer's fish (z 5) and boats (z 7).
+    - Splits the sea path into its top edge (for the foam line) and the closed fill. The `d` of `data-testid="sea"` does not change.
+    - Lays out the reflection bars from `getReflectionBars`.
+    - Crest colour: `--scene-moon` at night, else `--scene-glow-white`, with a gain of 0.6 at night, 0.9 at dawn, evening and civil twilight, and 1 otherwise. Trough colour: the deep water colour.
+  - `getWaterColors` also returns `sky`, the sky colour at the horizon line, for the mirror.
+  - `SceneBoat` gets `seaWindKmh` for its reflection; `CloudLayer` passes `getSeaWindKmh`.
+- **Deviations from the spec:**
+  1. **Whitecaps:** none below 12 km/h. Linear interpolation between 0 (at 3 km/h) and 2 (at 12 km/h) would give the first cap at 7.5 km/h, but the text says "the first ones come at 12 km/h".
+  2. **Counts scale with width:** the counts are per 430 px of width (`getWaterLimit`, as in item 70), because the lookbook scenes were phone-sized. A 1440 px sea has 3.35 × as many lines, caps, paws and foam streaks. The drifts are px/s, the same on every width.
+  3. **No wind reading yet:** the sea uses 12 km/h, today's look with the 7 bars. Manual weather without "Strong wind" is 0 km/h, so it shows calm water.
+  4. **X2 beyond opacity:** from the lookbook, the blur (0 to 1.6 px) and the height of the image (70 % to 36 %) also follow the wind. The stripes come in three steps, from 28, 50 and 70 km/h.
+  5. **Foam ramp:** the foam fades in from 55 to 66 km/h. The lookbook started at 50.
+  6. **Bar opacity:** the X1 bars use the lookbook's opacity, (base + the wind's offset − 0.04 per row) × item 58's fade × item 57's moon factor. In light air the rows fade by 0.04 each, not by today's 0.05.
+  7. **No extra WV6 ripples:** the lookbook added faint ripples to WV6 from 20 km/h. They are left out, because WV1 draws the ripples.
+- **Checked:** 14 new tests (829 in all); lint, typecheck and build pass. In Chrome, Ravensburg (terrain profile loaded), with the live wind mocked at 0, 15, 30, 50 and 70 km/h, on 2026-10-02 at 13:00, 18:45 and 23:30 local time, at 390×844 and 1440×900:
+  - **Calm:** the water mirrors the ridge and the sky glow; 10 bars.
+  - **15 km/h:** the mirror breaks into slices; 7 bars.
+  - **30 km/h:** the sea is matte, with ripples, troughs and the first caps; the bars split into 18 pieces.
+  - **50 and 70 km/h:** dense ripples and caps; 33 and 36 bar pieces.
+  - **Foam:** a foam line along the sea edge at 70 km/h, none at 50.
+  - **Frame cost** at 4× CPU throttle, daytime (mean per frame):
+    - 390×844: 0.53 ms at 0 km/h, 0.40 ms at 70 km/h.
+    - 1440×900: 0.62 ms and 1.34 ms.
+  - **Drift**, measured from the canvas rectangles of two frames 1 s apart: at most 3.99 px/s at 70 km/h on both widths, and 0.27 px/s in calm water.
+  - **Boat reflections (X2):** at 0 km/h 42 % and sharp, at 15 km/h 26.5 %, at 50 km/h 13 % with stripes.
+  - **Manual mode at 1280×800:**
+    - Clear with "Strong wind" (50 km/h): ripples and caps, 33 bar pieces, no foam.
+    - Clear with the switch off: calm water with the mirror and 10 bars.
+    - Storm: dark water at the strong band and no reflection.
+  - No console errors.
 
 ---
 
@@ -1354,9 +1416,10 @@ Four Sentry reports from the evening and night of 2026-10-01, all from Ravensbur
 - **Done when:** the app is live on Google Play, opens fullscreen without a URL bar, and web deploys update it without a new store release.
 - **Test APK (2026-10-02):** a signed test APK exists, for a phone check before the Play release.
   - The Bubblewrap project is in `~/sun-chaser-android/`, outside git. It has the keystore and its password file. Do not commit them.
-  - Package `app.vercel.sun_chaser.twa`, host `sun-chaser.vercel.app`, `display: fullscreen`, notifications on, `playBilling` on, `minSdkVersion` 23 (the billing library needs 23).
+  - Package `com.ainabler.sunchaser`, host `sun-chaser.vercel.app`, `display: fullscreen`, notifications on, `playBilling` on, `minSdkVersion` 23 (the billing library needs 23).
   - `public/.well-known/assetlinks.json` has the SHA-256 fingerprint of this local key. With Play App Signing, add the Play app signing key's fingerprint from the Play Console to this file.
-  - The package name stays fixed after the first Play upload. Change it before then if needed.
+  - Package name decided (2026-10-02): `com.ainabler.sunchaser`. It has the brand and the app name, no personal name and no country domain, because the app is for all countries. It stays fixed after the first Play upload.
+  - Distribution for phone tests: the Play Console internal testing track (decided 2026-10-02).
 
 ---
 

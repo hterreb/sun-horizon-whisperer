@@ -16,7 +16,10 @@ import SolarEclipse from '@/components/SolarEclipse';
 import GreenFlash from '@/components/GreenFlash';
 import MoonTint from '@/components/MoonTint';
 import { type AstroEvent } from '@/utils/astroEvents';
-import { getSunVisibility, getMoonCloudFactor } from '@/utils/weatherEffectsUtils';
+import { getSunVisibility, getMoonCloudFactor, getMoonLook } from '@/utils/weatherEffectsUtils';
+import { getSeaWindKmh, getReflectionBars } from '@/utils/waveUtils';
+import { getCloudDriftDirection } from '@/utils/cloudLayoutUtils';
+import SeaCanvas from '@/components/SeaCanvas';
 import { getRainMmH, getRainMistOpacity } from '@/utils/rainUtils';
 import { useLanguage } from '@/hooks/useLanguage';
 import { formatNumber, type MessageKey } from '@/i18n';
@@ -548,8 +551,9 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   }, []);
 
   // The horizon path is fully derived from `containerDimensions` (deterministic, no
-  // randomness), so it's computed during render instead of synced into state.
-  const svgPath = useMemo(() => {
+  // randomness), so it's computed during render instead of synced into state. The top
+  // edge alone carries the storm foam line (ROADMAP item 79, X3).
+  const seaEdgePath = useMemo(() => {
     const { width, height } = containerDimensions;
     if (width === 0 || height === 0) return '';
 
@@ -573,9 +577,10 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       path += `L${x1},${y1} Q${x2},${y2} ${x3},${y3} `;
     }
 
-    path += `L${width},${horizonY} L${width},${height} L0,${height} Z`;
+    path += `L${width},${horizonY} `;
     return path;
   }, [containerDimensions]);
+  const svgPath = seaEdgePath && `${seaEdgePath}L${containerDimensions.width},${containerDimensions.height} L0,${containerDimensions.height} Z`;
 
   // Terrain silhouette (ROADMAP item 13): replaces the flat horizon line with the
   // real profile when one is loaded, using the same altitude->y mapping as the sun/
@@ -613,6 +618,10 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   const isSunVisible = sunAltitudeVisible && sunDotVisible;
   const isMoonVisible = moonAltitudeVisible && moonDotVisible;
   const moonCloudFactor = getMoonCloudFactor(weatherType, cloudCoverPercent); // clouds hide the moon (ROADMAP item 57)
+  // ...but the disc and its corona keep it findable (item 76); the reflection and the pool keep the factor above.
+  const moonLook = getMoonLook(weatherType, cloudCoverPercent);
+  const moonBright = moonPosition.illumination * 0.8 + 0.2;
+  const isMoonDiscShown = isMoonVisible && moonLook.disc > 0;
   // The pool of moonlight for the night fish (ROADMAP item 65, NR3): as bright as the moon
   // is full, dimmed by clouds, and fading as the moon sets, like its reflection bars.
   const nightWater = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
@@ -732,6 +741,10 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
   // The water follows the sky (ROADMAP item 53); a storm darkens it (item 51).
   const water = getWaterColors(skyGradient, weatherType === 'storm');
+  // Waves by wind strength (ROADMAP item 79): a storm is at least the strong band.
+  const seaWindKmh = getSeaWindKmh(windSpeedKmh, weatherType);
+  const seaIsDark = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
+  const seaIsGolden = timeOfDay === 'dawn' || timeOfDay === 'evening' || timeOfDay === 'civil-twilight';
   const rainAmount = getRainMmH(weatherType, rainMmH);
 
   // Line-of-sight ridge (terrain-silhouette) color, the style book's "soft ridge"
@@ -853,8 +866,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         rainMmH={rainMmH}
         isFullscreen={isFullscreen}
         moonlight={{ x: containerDimensions.width > 0 ? moonX / containerDimensions.width : 0.5, strength: moonPool }}
-        moon={isMoonVisible && moonCloudFactor > 0 && containerDimensions.height > 0
-          ? { x: (moonX / containerDimensions.width) * 100, y: (moonY / containerDimensions.height) * 100 }
+        moon={isMoonVisible && (moonLook.disc > 0 || moonLook.corona > 0) && containerDimensions.height > 0
+          ? { x: (moonX / containerDimensions.width) * 100, y: (moonY / containerDimensions.height) * 100, r: moonRadius, light: moonBright }
           : null}
       />
       <WeatherEffects
@@ -960,16 +973,33 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         </div>
       )}
 
-      {isMoonVisible && moonCloudFactor > 0 && (
+      {isMoonVisible && moonLook.corona > 0 && (
+        // MV4 (item 76): a soft glow in the moon's colour where it sits behind clouds or fog.
+        <div
+          className={`absolute pointer-events-none rounded-full ${compassActive ? '' : 'transition-all duration-1000'}`}
+          style={{
+            left: `${moonX}px`,
+            top: `${moonY}px`,
+            width: moonRadius * moonLook.coronaRadius * 2,
+            height: moonRadius * moonLook.coronaRadius * 2,
+            transform: 'translate(-50%, -50%)',
+            background: `radial-gradient(circle closest-side, hsl(var(--scene-moon) / ${0.32 * moonLook.corona * moonBright}) 0%, hsl(var(--scene-moon) / ${0.13 * moonLook.corona * moonBright}) 40%, transparent 100%)`,
+          }}
+          data-testid="moon-corona"
+        />
+      )}
+
+      {isMoonDiscShown && (
         <div
           className={`absolute ${compassActive ? '' : 'transition-all duration-1000'}`}
           style={{
             left: `${moonX}px`,
             top: `${moonY}px`,
             transform: 'translate(-50%, -50%)',
-            opacity: (moonPosition.illumination * 0.8 + 0.2) * moonCloudFactor,
+            opacity: moonBright * moonLook.disc,
             filter: `drop-shadow(0 0 ${moonPosition.illumination * 15}px hsl(var(--scene-glow-white) / 0.4))`
           }}
+          data-testid="moon-disc"
         >
           <svg
             width={moonRadius * 2}
@@ -989,7 +1019,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         event={calendarEvent}
         timeOfDay={timeOfDay}
         weatherType={weatherType}
-        moon={isMoonVisible && moonCloudFactor > 0 ? { x: moonX, y: moonY, r: moonRadius } : null}
+        moon={isMoonDiscShown ? { x: moonX, y: moonY, r: moonRadius } : null}
         horizonY={containerDimensions.height * 0.65}
       />
 
@@ -1023,6 +1053,20 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         />
       </svg>
 
+      <SeaCanvas
+        width={containerDimensions.width}
+        height={containerDimensions.height}
+        seaPath={svgPath}
+        seaEdgePath={seaEdgePath}
+        ridgePath={terrainFillPath}
+        ridgeColor={getRidgeColor()}
+        skyColor={water.sky}
+        crestColor={seaIsDark ? 'hsl(var(--scene-moon))' : 'hsl(var(--scene-glow-white))'}
+        troughColor={water.deep}
+        gain={seaIsDark ? 0.6 : seaIsGolden ? 0.9 : 1}
+        windKmh={seaWindKmh}
+        driftDirection={getCloudDriftDirection(windDirectionDeg)}
+      />
       {rainAmount != null && (
         // Horizon mist (ROADMAP item 77, X4): a pale band over the horizon, so heavy rain
         // hides the far shore. Above the ridge and the sea, below the boats and the rain.
@@ -1053,8 +1097,9 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
         const reflectX = nightReflection ? moonX : sunX;
         const reflectColor = nightReflection ? 'hsl(var(--scene-moon))' : 'hsl(var(--scene-sun-glow-low))';
-        const baseOpacity = (nightReflection ? 0.35 : 0.6) * reflectionFade;
-        const bandHeight = (containerDimensions.height - horizonLabelY) * 0.07;
+        // The bars' layout follows the wind (ROADMAP item 79, X1): today's 7 in light air.
+        const { bars, rowSpacing } = getReflectionBars(seaWindKmh, nightReflection ? 0.35 : 0.6);
+        const bandHeight = (containerDimensions.height - horizonLabelY) * rowSpacing;
 
         return (
           <svg className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true" data-testid="water-reflection">
@@ -1081,21 +1126,18 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
                 />
               </>
             )}
-            {Array.from({ length: 7 }, (_, i) => {
-              const barWidth = Math.max(4, 26 - i * 3);
-              return (
-                <rect
-                  key={i}
-                  x={reflectX - barWidth / 2 + (i % 2 ? 3 : -3)}
-                  y={horizonLabelY + 6 + i * bandHeight}
-                  width={barWidth}
-                  height={1.6}
-                  rx={0.8}
-                  fill={reflectColor}
-                  opacity={Math.max(0, baseOpacity - i * 0.05)}
-                />
-              );
-            })}
+            {bars.map((bar, i) => (
+              <rect
+                key={i}
+                x={reflectX - bar.width / 2 + bar.dx}
+                y={horizonLabelY + 6 + bar.row * bandHeight + bar.dy}
+                width={bar.width}
+                height={1.6}
+                rx={0.8}
+                fill={reflectColor}
+                opacity={bar.opacity * reflectionFade}
+              />
+            ))}
           </svg>
         );
       })()}
