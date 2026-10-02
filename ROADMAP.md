@@ -1222,6 +1222,11 @@ These items come from the re-shoot of all states after items 46–56.
   6. Store listing: privacy policy (location use, no tracking), data-safety form, content rating, and the graphics from item 15.
   7. Note: new personal developer accounts must run a closed test with 12+ testers for 14 days before the production release. Plan for this time.
 - **Done when:** the app is live on Google Play, opens fullscreen without a URL bar, and web deploys update it without a new store release.
+- **Test APK (2026-10-02):** a signed test APK exists, for a phone check before the Play release.
+  - The Bubblewrap project is in `~/sun-chaser-android/`, outside git. It has the keystore and its password file. Do not commit them.
+  - Package `app.vercel.sun_chaser.twa`, host `sun-chaser.vercel.app`, `display: fullscreen`, notifications on, `playBilling` on, `minSdkVersion` 23 (the billing library needs 23).
+  - `public/.well-known/assetlinks.json` has the SHA-256 fingerprint of this local key. With Play App Signing, add the Play app signing key's fingerprint from the Play Console to this file.
+  - The package name stays fixed after the first Play upload. Change it before then if needed.
 
 ---
 
