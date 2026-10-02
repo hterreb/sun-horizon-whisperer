@@ -1172,3 +1172,50 @@ describe('SunVisualization (rendered): the moon behind clouds (ROADMAP item 76)'
     expect(screen.queryByTestId('moon-corona')).toBeNull();
   });
 });
+
+describe('SunVisualization (rendered): waves by wind strength (ROADMAP item 79)', () => {
+  const originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+  const originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
+
+  beforeEach(() => {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { value: 800, configurable: true });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { value: 600, configurable: true });
+  });
+
+  afterEach(() => {
+    if (originalClientWidth) Object.defineProperty(HTMLElement.prototype, 'clientWidth', originalClientWidth);
+    if (originalClientHeight) Object.defineProperty(HTMLElement.prototype, 'clientHeight', originalClientHeight);
+  });
+
+  const waveProps = {
+    sunPosition: { azimuth: 180, altitude: 30 },
+    moonPosition: { azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false },
+    sunPath: [],
+    moonPath: [],
+    timeOfDay: 'midday' as const,
+    weatherType: 'clear' as const,
+    latitude: 51,
+  };
+
+  it('draws the sea canvas over the sea fill and under the reflection bars', () => {
+    render(<SunVisualization {...waveProps} windSpeedKmh={20} />);
+    const sea = screen.getByTestId('sea');
+    const canvas = screen.getByTestId('sea-canvas');
+    const reflection = screen.getByTestId('water-reflection');
+    expect(sea.compareDocumentPosition(canvas) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(canvas.compareDocumentPosition(reflection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('lays out the reflection bars by the wind: 10 in calm water, 7 in light air or without a reading, pieces in strong wind', () => {
+    const bars = (windSpeedKmh: number | null) => {
+      const { unmount } = render(<SunVisualization {...waveProps} windSpeedKmh={windSpeedKmh} />);
+      const count = screen.getByTestId('water-reflection').querySelectorAll('rect').length;
+      unmount();
+      return count;
+    };
+    expect(bars(0)).toBe(10);
+    expect(bars(12)).toBe(7);
+    expect(bars(null)).toBe(7);
+    expect(bars(70)).toBe(36);
+  });
+});

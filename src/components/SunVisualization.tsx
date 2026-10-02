@@ -17,6 +17,9 @@ import GreenFlash from '@/components/GreenFlash';
 import MoonTint from '@/components/MoonTint';
 import { type AstroEvent } from '@/utils/astroEvents';
 import { getSunVisibility, getMoonCloudFactor, getMoonLook } from '@/utils/weatherEffectsUtils';
+import { getSeaWindKmh, getReflectionBars } from '@/utils/waveUtils';
+import { getCloudDriftDirection } from '@/utils/cloudLayoutUtils';
+import SeaCanvas from '@/components/SeaCanvas';
 import { useLanguage } from '@/hooks/useLanguage';
 import { formatNumber, type MessageKey } from '@/i18n';
 import { type Language } from '@/utils/language';
@@ -544,8 +547,9 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   }, []);
 
   // The horizon path is fully derived from `containerDimensions` (deterministic, no
-  // randomness), so it's computed during render instead of synced into state.
-  const svgPath = useMemo(() => {
+  // randomness), so it's computed during render instead of synced into state. The top
+  // edge alone carries the storm foam line (ROADMAP item 79, X3).
+  const seaEdgePath = useMemo(() => {
     const { width, height } = containerDimensions;
     if (width === 0 || height === 0) return '';
 
@@ -569,9 +573,10 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       path += `L${x1},${y1} Q${x2},${y2} ${x3},${y3} `;
     }
 
-    path += `L${width},${horizonY} L${width},${height} L0,${height} Z`;
+    path += `L${width},${horizonY} `;
     return path;
   }, [containerDimensions]);
+  const svgPath = seaEdgePath && `${seaEdgePath}L${containerDimensions.width},${containerDimensions.height} L0,${containerDimensions.height} Z`;
 
   // Terrain silhouette (ROADMAP item 13): replaces the flat horizon line with the
   // real profile when one is loaded, using the same altitude->y mapping as the sun/
@@ -732,6 +737,10 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
   // The water follows the sky (ROADMAP item 53); a storm darkens it (item 51).
   const water = getWaterColors(skyGradient, weatherType === 'storm');
+  // Waves by wind strength (ROADMAP item 79): a storm is at least the strong band.
+  const seaWindKmh = getSeaWindKmh(windSpeedKmh, weatherType);
+  const seaIsDark = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
+  const seaIsGolden = timeOfDay === 'dawn' || timeOfDay === 'evening' || timeOfDay === 'civil-twilight';
 
   // Line-of-sight ridge (terrain-silhouette) color, the style book's "soft ridge"
   // per time-of-day bucket (ROADMAP item 15 deliverable 2), drawn semi-transparent
@@ -1038,6 +1047,21 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         />
       </svg>
 
+      <SeaCanvas
+        width={containerDimensions.width}
+        height={containerDimensions.height}
+        seaPath={svgPath}
+        seaEdgePath={seaEdgePath}
+        ridgePath={terrainFillPath}
+        ridgeColor={getRidgeColor()}
+        skyColor={water.sky}
+        crestColor={seaIsDark ? 'hsl(var(--scene-moon))' : 'hsl(var(--scene-glow-white))'}
+        troughColor={water.deep}
+        gain={seaIsDark ? 0.6 : seaIsGolden ? 0.9 : 1}
+        windKmh={seaWindKmh}
+        driftDirection={getCloudDriftDirection(windDirectionDeg)}
+      />
+
       {containerDimensions.height > 0 && weatherType !== 'storm' && (() => {
         // Sun/moon reflection on the water (ROADMAP item 15 deliverable 2): a few
         // short glinting bars under whichever body is currently shown, fading out
@@ -1053,8 +1077,9 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
         const reflectX = nightReflection ? moonX : sunX;
         const reflectColor = nightReflection ? 'hsl(var(--scene-moon))' : 'hsl(var(--scene-sun-glow-low))';
-        const baseOpacity = (nightReflection ? 0.35 : 0.6) * reflectionFade;
-        const bandHeight = (containerDimensions.height - horizonLabelY) * 0.07;
+        // The bars' layout follows the wind (ROADMAP item 79, X1): today's 7 in light air.
+        const { bars, rowSpacing } = getReflectionBars(seaWindKmh, nightReflection ? 0.35 : 0.6);
+        const bandHeight = (containerDimensions.height - horizonLabelY) * rowSpacing;
 
         return (
           <svg className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true" data-testid="water-reflection">
@@ -1081,21 +1106,18 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
                 />
               </>
             )}
-            {Array.from({ length: 7 }, (_, i) => {
-              const barWidth = Math.max(4, 26 - i * 3);
-              return (
-                <rect
-                  key={i}
-                  x={reflectX - barWidth / 2 + (i % 2 ? 3 : -3)}
-                  y={horizonLabelY + 6 + i * bandHeight}
-                  width={barWidth}
-                  height={1.6}
-                  rx={0.8}
-                  fill={reflectColor}
-                  opacity={Math.max(0, baseOpacity - i * 0.05)}
-                />
-              );
-            })}
+            {bars.map((bar, i) => (
+              <rect
+                key={i}
+                x={reflectX - bar.width / 2 + bar.dx}
+                y={horizonLabelY + 6 + bar.row * bandHeight + bar.dy}
+                width={bar.width}
+                height={1.6}
+                rx={0.8}
+                fill={reflectColor}
+                opacity={bar.opacity * reflectionFade}
+              />
+            ))}
           </svg>
         );
       })()}

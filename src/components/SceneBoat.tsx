@@ -1,5 +1,6 @@
 import { useId } from 'react';
 import { type BoatKind, type BoatTone } from '../utils/weatherEffectsUtils';
+import { getBoatReflection, UNKNOWN_SEA_WIND_KMH } from '../utils/waveUtils';
 
 // The fleet in the Fleet Styles lookbook's B3 "Soft light" (ROADMAP item 73): flat colours
 // with soft gradients, drawn on one 64 × 37 grid with the waterline at y 36 and the bow to
@@ -102,9 +103,10 @@ interface SceneBoatProps {
   tone: BoatTone;
   lit: boolean; // the sun is below the horizon: windows and mast lights glow
   wake: boolean;
+  seaWindKmh?: number; // the reflection follows the wind (item 79, X2)
 }
 
-const SceneBoat = ({ kind, tone, lit, wake }: SceneBoatProps) => {
+const SceneBoat = ({ kind, tone, lit, wake, seaWindKmh = UNKNOWN_SEA_WIND_KMH }: SceneBoatProps) => {
   const id = useId().replace(/:/g, '');
   const boat = FLEET[kind];
   const height = (BOAT_WIDTH_PX * H) / W;
@@ -125,6 +127,9 @@ const SceneBoat = ({ kind, tone, lit, wake }: SceneBoatProps) => {
     : <path key={i} d={d} fill={FLAT[role] ?? `url(#${id}${role})`} />);
   const svg = { width: BOAT_WIDTH_PX, height, viewBox: `0 0 ${W} ${H}`, 'aria-hidden': true, overflow: 'visible' } as const;
   const filter = TONE_FILTER[tone] || undefined;
+  const reflection = getBoatReflection(seaWindKmh);
+  // From moderate wind the mirror image breaks into stripes (item 79, X2).
+  const mask = `linear-gradient(#000, transparent)${reflection.stripe ? `, repeating-linear-gradient(${reflection.stripe})` : ''}`;
 
   return (
     <div className="relative" style={{ width: BOAT_WIDTH_PX, height }} data-testid="scene-boat" data-kind={kind}>
@@ -153,10 +158,19 @@ const SceneBoat = ({ kind, tone, lit, wake }: SceneBoatProps) => {
         )}
         {parts}
       </svg>
-      {/* X1: a faint, still mirror image below the waterline, fading out downward. */}
+      {/* X1: a faint, still mirror image below the waterline, fading out downward: sharp in
+          calm water, striped and fainter in wind (item 79, X2). */}
       <div
         className="absolute left-0 top-full w-full overflow-hidden"
-        style={{ height: '55%', opacity: 0.28, filter: 'blur(0.6px)', maskImage: 'linear-gradient(#000, transparent)', WebkitMaskImage: 'linear-gradient(#000, transparent)' }}
+        style={{
+          height: `${reflection.heightPercent}%`,
+          opacity: reflection.opacity,
+          filter: reflection.blurPx > 0 ? `blur(${reflection.blurPx}px)` : undefined,
+          maskImage: mask,
+          WebkitMaskImage: mask,
+          maskComposite: 'intersect',
+          WebkitMaskComposite: 'source-in',
+        }}
         data-testid="boat-reflection"
       >
         <svg {...svg} className="absolute left-0 top-0" style={{ transform: 'scaleY(-1)', filter }}>{parts}</svg>

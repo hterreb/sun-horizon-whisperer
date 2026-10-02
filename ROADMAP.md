@@ -1101,7 +1101,7 @@ Four Sentry reports from the evening and night of 2026-10-01, all from Ravensbur
   - No console errors.
   - This Chrome has the Web Share API, and its headless share sheet never answers, so the check caught the shared file instead. The Android share sheet and iOS Safari are not checked yet.
 
-### 79. Waves by wind strength — M — [SUN-CHASER-K](https://ainabler.sentry.io/issues/SUN-CHASER-K) — **Spec ready**
+### 79. Waves by wind strength — M — [SUN-CHASER-K](https://ainabler.sentry.io/issues/SUN-CHASER-K) — **✅ Done**
 
 - **Feedback (2026-10-01 19:52):** "Waves on the water depending on wind strength". Then: "create a lookbook as well for different wave options depending on wind strength".
 - **Now:** the sea (`data-testid="sea"`) is a gradient under a fixed bumpy top edge that never changes. Wind changes only the sailboat's wake (item 73), the leaves and the birds' pace. `SunVisualization` already gets `windSpeedKmh` and `windDirectionDeg`; the sea has no wind input. Storm darkens the water and hides the reflection. Manual weather gives 0 or 50 km/h. Gusts are not fetched.
@@ -1140,6 +1140,48 @@ Four Sentry reports from the evening and night of 2026-10-01, all from Ravensbur
   - **X3 Foam in a storm:** from 55 km/h, long thin white foam streaks along the wind that drift with it (at most 3 px/s), and a foam line along the sea's top edge. None below 55 km/h.
   - **Storm:** a storm uses at least the strong band (50 km/h) when the measured wind is lower.
 - **Done when:** tests for the wind-band mapping and the counts per band. In the browser at 0, 15, 30, 50 and 70 km/h, on 390×844 and 1440×900: the sea reads calm at every band, every drift is at most 5.2 px/s (the sailboat's pace), calm water mirrors the ridge, foam shows only from 55 km/h, and one frame takes under 1 ms on a phone.
+- **Built:**
+  - `src/utils/waveUtils.ts`:
+    - `atWindStops` interpolates between the five stops, exact at each stop.
+    - `getWaveLook` holds every value of the table.
+    - `getReflectionBars` (X1) and `getBoatReflection` (X2) lay out the reflections.
+    - `getSeaWindKmh` sets the storm minimum.
+    - `getWindBand` gives the five bands.
+    - `waveHash` is the lookbook's stable hash.
+  - `src/components/SeaCanvas.tsx` is the one sea canvas. It draws WV6, WV4, WV1, WV2 and X3, clipped to the sea path (`Path2D`), at 30 fps, with the frame ID in a `useRef`. Reduced motion draws one still frame.
+    - The mirror (sky glow plus the flipped ridge) is drawn once into an offscreen canvas and copied in 2 px slices.
+    - When a slice has no offset, its crossfade draws one copy at full strength, so calm water stays still.
+  - `SunVisualization`:
+    - Renders `SeaCanvas` right after the sea path: above the sea fill, and under CloudLayer's fish (z 5) and boats (z 7).
+    - Splits the sea path into its top edge (for the foam line) and the closed fill. The `d` of `data-testid="sea"` does not change.
+    - Lays out the reflection bars from `getReflectionBars`.
+    - Crest colour: `--scene-moon` at night, else `--scene-glow-white`, with a gain of 0.6 at night, 0.9 at dawn, evening and civil twilight, and 1 otherwise. Trough colour: the deep water colour.
+  - `getWaterColors` also returns `sky`, the sky colour at the horizon line, for the mirror.
+  - `SceneBoat` gets `seaWindKmh` for its reflection; `CloudLayer` passes `getSeaWindKmh`.
+- **Deviations from the spec:**
+  1. **Whitecaps:** none below 12 km/h. Linear interpolation between 0 (at 3 km/h) and 2 (at 12 km/h) would give the first cap at 7.5 km/h, but the text says "the first ones come at 12 km/h".
+  2. **Counts scale with width:** the counts are per 430 px of width (`getWaterLimit`, as in item 70), because the lookbook scenes were phone-sized. A 1440 px sea has 3.35 × as many lines, caps, paws and foam streaks. The drifts are px/s, the same on every width.
+  3. **No wind reading yet:** the sea uses 12 km/h, today's look with the 7 bars. Manual weather without "Strong wind" is 0 km/h, so it shows calm water.
+  4. **X2 beyond opacity:** from the lookbook, the blur (0 to 1.6 px) and the height of the image (70 % to 36 %) also follow the wind. The stripes come in three steps, from 28, 50 and 70 km/h.
+  5. **Foam ramp:** the foam fades in from 55 to 66 km/h. The lookbook started at 50.
+  6. **Bar opacity:** the X1 bars use the lookbook's opacity, (base + the wind's offset − 0.04 per row) × item 58's fade × item 57's moon factor. In light air the rows fade by 0.04 each, not by today's 0.05.
+  7. **No extra WV6 ripples:** the lookbook added faint ripples to WV6 from 20 km/h. They are left out, because WV1 draws the ripples.
+- **Checked:** 14 new tests (829 in all); lint, typecheck and build pass. In Chrome, Ravensburg (terrain profile loaded), with the live wind mocked at 0, 15, 30, 50 and 70 km/h, on 2026-10-02 at 13:00, 18:45 and 23:30 local time, at 390×844 and 1440×900:
+  - **Calm:** the water mirrors the ridge and the sky glow; 10 bars.
+  - **15 km/h:** the mirror breaks into slices; 7 bars.
+  - **30 km/h:** the sea is matte, with ripples, troughs and the first caps; the bars split into 18 pieces.
+  - **50 and 70 km/h:** dense ripples and caps; 33 and 36 bar pieces.
+  - **Foam:** a foam line along the sea edge at 70 km/h, none at 50.
+  - **Frame cost** at 4× CPU throttle, daytime (mean per frame):
+    - 390×844: 0.53 ms at 0 km/h, 0.40 ms at 70 km/h.
+    - 1440×900: 0.62 ms and 1.34 ms.
+  - **Drift**, measured from the canvas rectangles of two frames 1 s apart: at most 3.99 px/s at 70 km/h on both widths, and 0.27 px/s in calm water.
+  - **Boat reflections (X2):** at 0 km/h 42 % and sharp, at 15 km/h 26.5 %, at 50 km/h 13 % with stripes.
+  - **Manual mode at 1280×800:**
+    - Clear with "Strong wind" (50 km/h): ripples and caps, 33 bar pieces, no foam.
+    - Clear with the switch off: calm water with the mirror and 10 bars.
+    - Storm: dark water at the strong band and no reflection.
+  - No console errors.
 
 ---
 
