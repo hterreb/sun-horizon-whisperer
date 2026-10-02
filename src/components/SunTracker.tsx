@@ -54,7 +54,8 @@ import {
 } from '../utils/compassUtils';
 import { getTerrainSunTimes, getTerrainMoonTimes } from '../utils/horizonUtils';
 import { getSunArcLabels, getMoonArcLabels } from '../utils/arcLabels';
-import { isLineOfSightEnabled } from '../utils/premium';
+import { PremiumContext, usePremium } from '@/hooks/usePremium';
+import PremiumDialog from './PremiumDialog';
 import { passesSunEvent, getCountdownTarget } from '../utils/sunEvents';
 import { getCalendarEvent } from '@/utils/calendarEvents';
 import { PLAY_SPEED, PLAY_TICK_MS, clampTimeOffset } from '@/utils/timeTravel';
@@ -156,6 +157,10 @@ const SunTracker: React.FC = () => {
   }, []);
   const t = useCallback<Translate>((key, vars) => translate(language, key, vars), [language]);
   const languageContext = useMemo(() => ({ language, setLanguage, t }), [language, setLanguage, t]);
+  // Premium (ROADMAP item 14): given to the components below through PremiumContext.
+  // Line of sight is off while Premium is locked.
+  const premium = usePremium(language);
+  const isLineOfSightOn = !premium.isLocked;
   useEffect(() => {
     document.documentElement.lang = language;
   }, [language]);
@@ -213,7 +218,7 @@ const SunTracker: React.FC = () => {
     location.latitude,
     location.longitude,
     eyeHeight,
-    isLineOfSightEnabled() && location.loaded
+    isLineOfSightOn && location.loaded
   );
 
   const handleCompassEnable = useCallback(() => {
@@ -680,7 +685,7 @@ const SunTracker: React.FC = () => {
     }
     if (next) primeCountdownAudio();
   }, [isCountdownOn]);
-  const countdownTarget = getCountdownTarget(date, sunTimes, terrainExtras.terrainSunTimes, isLineOfSightEnabled());
+  const countdownTarget = getCountdownTarget(date, sunTimes, terrainExtras.terrainSunTimes, isLineOfSightOn);
   const countdownSeconds = useSunsetCountdown(countdownTarget?.time ?? null, date, isCountdownOn && !isTimePreview);
 
   // Sunset reminder (ROADMAP item 69): a notification SUNSET_REMINDER_MIN before the same
@@ -751,6 +756,7 @@ const SunTracker: React.FC = () => {
 
   return (
     <LanguageContext.Provider value={languageContext}>
+    <PremiumContext.Provider value={premium}>
     {reveal !== 'done' && (
       <LoadingScreen
         still={prefersReducedMotion || reveal !== 'loading'}
@@ -882,6 +888,8 @@ const SunTracker: React.FC = () => {
         </button>
       )}
     </div>
+    <PremiumDialog />
+    </PremiumContext.Provider>
     </LanguageContext.Provider>
   );
 };

@@ -10,6 +10,15 @@ export const it: Record<keyof typeof en, string> = {
   'common.azimuth': "Azimut:",
   'common.minutes': "{value} min",
   'common.premium': "Funzione premium, gratis per ora",
+  'premium.badge': "Funzione premium",
+  'premium.title': "Sun Chaser Premium",
+  'premium.includes': "Un solo acquisto sblocca tutte le funzioni con il più dorato: cambiare luogo, il meteo manuale, il punteggio del tramonto, la linea di vista con il terreno, la bussola, il viaggio nel tempo e la scheda da condividere.",
+  'premium.price': "Acquisto unico: {price}",
+  'premium.buy': "Acquista",
+  'premium.restore': "Ripristina acquisto",
+  'premium.restoreNone': "Nessun acquisto Premium trovato in questo account Google",
+  'premium.failedTitle': "Acquisto non riuscito",
+  'premium.failedDescription': "Riprova più tardi.",
 
   // Language picker
   'language.label': "Lingua",
