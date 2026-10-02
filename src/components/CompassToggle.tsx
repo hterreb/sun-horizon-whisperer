@@ -5,6 +5,7 @@ import { type CompassStatus } from '@/hooks/useCompassHeading';
 import { GLASS_ICON_BUTTON } from '@/utils/glassChrome';
 import PremiumBadge from './PremiumBadge';
 import { useLanguage } from '@/hooks/useLanguage';
+import { usePremiumGate } from '@/hooks/usePremium';
 
 interface CompassToggleProps {
   status: CompassStatus;
@@ -17,13 +18,15 @@ interface CompassToggleProps {
 // the row's fixed position, safe-area padding and fullscreen-idle fade. Hidden
 // entirely when the device has no DeviceOrientationEvent, and hidden again once
 // permission was denied or no sensor reading ever arrived (see useCompassHeading's
-// 'unavailable' status). Marked premium with a gold plus (ROADMAP item 35), still free.
+// 'unavailable' status). Marked premium with a gold plus (ROADMAP item 35); turning it
+// on goes through requirePremium (item 14).
 const CompassToggle: React.FC<CompassToggleProps> = ({
   status,
   onEnable,
   onDisable
 }) => {
   const { t } = useLanguage();
+  const { requirePremium } = usePremiumGate();
   if (status === 'unsupported' || status === 'unavailable') {
     return null;
   }
@@ -36,7 +39,7 @@ const CompassToggle: React.FC<CompassToggleProps> = ({
     } else {
       // Called directly from the click handler (no awaits before it) so iOS's
       // DeviceOrientationEvent.requestPermission() still sees a user gesture.
-      onEnable();
+      requirePremium(onEnable);
     }
   };
 

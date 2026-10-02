@@ -5,6 +5,20 @@ import InfoPanel, { formatTerrainDelta } from '../src/components/InfoPanel';
 import { type TimeOfDay, type SunTimes, type NextGoldenBlueHours } from '../src/utils/sunUtils';
 import { type WeatherType } from '../src/components/CloudLayer';
 import { type WeatherData } from '../src/utils/weatherUtils';
+import { PremiumContext, type PremiumValue } from '../src/hooks/usePremium';
+
+const premiumValue = (overrides: Partial<PremiumValue>): PremiumValue => ({
+  isPremium: false,
+  isBillingAvailable: true,
+  isLocked: true,
+  price: null,
+  buy: async () => {},
+  restore: async () => {},
+  requirePremium: vi.fn(),
+  isDialogOpen: false,
+  setDialogOpen: () => {},
+  ...overrides,
+});
 
 describe('InfoPanel', () => {
   const now = new Date();
@@ -797,6 +811,54 @@ describe('InfoPanel: line of sight as an icon at the sun and moon rows (ROADMAP 
     expect(hasBadge(screen.getByText('Sunset score'))).toBe(true);
     expect(hasBadge(getSunLineOfSightButton())).toBe(true);
     expect(hasBadge(getMoonLineOfSightButton())).toBe(true);
+  });
+
+  describe('Premium gate (ROADMAP item 14)', () => {
+    const weatherData: WeatherData = {
+      temperature: 10,
+      weatherType: 'clear',
+      conditionKey: 'condition.clearSky',
+      lastUpdated: new Date(),
+      isRealWeather: true,
+      sunsetScoreToday: { score: 7, clouds: 'score.cloudsHigh', horizon: 'score.horizonClear' },
+      sunsetScoreTomorrow: null,
+      cloudCoverPercent: null,
+      windSpeedKmh: null,
+      windDirectionDeg: null,
+    };
+
+    it('while locked, every gold-plus control goes through requirePremium and the score is hidden', () => {
+      const value = premiumValue({});
+      const onWeatherModeToggle = vi.fn();
+      const onTimePlay = vi.fn();
+      render(
+        <PremiumContext.Provider value={value}>
+          <InfoPanel {...defaultProps} weatherData={weatherData} terrainStatus="idle" onWeatherModeToggle={onWeatherModeToggle} onTimePlay={onTimePlay} />
+        </PremiumContext.Provider>
+      );
+      expect(screen.queryByText('7/10')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /change location/i }));
+      fireEvent.click(screen.getByRole('button', { name: 'Manual' }));
+      fireEvent.click(screen.getByRole('button', { name: /play time forward/i }));
+      fireEvent.click(screen.getByRole('button', { name: /sunset score/i }));
+      // Line of sight is off while locked (status idle), but the buttons stay to open the purchase.
+      fireEvent.click(getSunLineOfSightButton());
+      fireEvent.click(getMoonLineOfSightButton());
+      expect(value.requirePremium).toHaveBeenCalledTimes(6);
+      expect(onWeatherModeToggle).not.toHaveBeenCalled();
+      expect(onTimePlay).not.toHaveBeenCalled();
+      expect(screen.queryByLabelText('Latitude')).not.toBeInTheDocument();
+    });
+
+    it('after a Play purchase the gold plus is gone and the score shows', () => {
+      render(
+        <PremiumContext.Provider value={premiumValue({ isPremium: true, isLocked: false })}>
+          <InfoPanel {...defaultProps} weatherData={weatherData} terrainStatus="ready" />
+        </PremiumContext.Provider>
+      );
+      expect(screen.queryByTestId('premium-badge')).not.toBeInTheDocument();
+      expect(screen.getByText('7/10')).toBeInTheDocument();
+    });
   });
 });
 
