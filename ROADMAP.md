@@ -1126,9 +1126,9 @@ These items come from the re-shoot of all states after items 46–56.
   - Tiles are not cached by the service worker. Only the computed profile is cached (`localStorage`).
 - **Checked (2026-10-01):** Sion (CH) against a second-hand PeakFinder value: sunrise −2.5 min, sunset +4.3 min, inside the 5-min target. A first-hand PeakFinder check or an observation would make it stronger (see Verification).
 
-### 14. Premium gating (deferred) — M
+### 14. Premium gating (deferred) — M — **✅ Done** (Play-app code; enforcement off until item 16)
 
-- **Status:** not started. The Stripe backend below is ready but only needed for a later web sale. Only start this when `PREMIUM_ENFORCED` should become `true`.
+- **Status:** the Play-app steps 1–5 below are built; `PREMIUM_ENFORCED` stays `false` until item 16. The Stripe backend below is ready but only needed for a later web sale.
 - **Update (2026-09-30), decision in item 45:** Premium is a one-time Google Play purchase in the Play app only. The web stays free. The Stripe steps below are not needed for the first release. They are kept for a possible later web sale.
 - **Depends on:** item 13.
 - **Exists today:**
@@ -1142,6 +1142,16 @@ These items come from the re-shoot of all states after items 46–56.
   3. Acknowledge the purchase. Play refunds a purchase that is not acknowledged within 3 days (see item 45).
   4. Gate the gold-plus features only where the Digital Goods API exists and `PREMIUM_ENFORCED` is true. This includes the share card (item 68).
   5. Tests with a mocked Digital Goods service: no API → unlocked; API without a purchase → locked; API with a purchase → unlocked.
+- **Built:**
+  - `hooks/usePremium.ts`: `usePremium(language)` gets the Play Billing service, calls `listPurchases()` and `getDetails(['premium'])` at start, and returns `isPremium`, `isBillingAvailable`, `isLocked`, `price` (Intl, in the chosen language), `buy`, `restore` and `requirePremium(action)`. `localStorage` `premium-owned` is only a start hint; the purchase list overwrites it. Without the API, or when `getDigitalGoodsService` rejects (Chrome outside the Play app), Premium is unlocked.
+  - The gate is in one place: `SunTracker` provides the hook through `PremiumContext`, and each gold-plus control calls `requirePremium`: change location (panel and loading screen), manual weather, time travel (play and the time picker), the sunset score, both line-of-sight buttons, the compass and the share card. While locked, line of sight is off (no terrain fetch), the score shows only its label, and a tap opens `PremiumDialog` (title, what Premium includes, the local price, Buy, Restore, Cancel).
+  - Buy: `PaymentRequest` for `premium`; a cancel (`AbortError`) is quiet, other errors show a toast. After a purchase `PremiumBadge` is gone everywhere. The web keeps the plus (item 35).
+  - Pure helpers in `utils/premium.ts` (`isPremiumLocked`, `ownsPremium`, `formatPrice`, the hint). Types in `src/digital-goods.d.ts`. New texts `premium.*` in all five dictionaries.
+  - `PREMIUM_ENFORCED` stays `false`. For screenshots and manual checks, the dev server takes `?premium=enforce` (`import.meta.env.DEV` only; the production build drops it).
+  - The dialog is hand-built: `components/ui` has no dialog, and the shadcn dialog would add `@radix-ui/react-dialog`.
+- **Acknowledge (open, blocks item 16):** Digital Goods API v2 has no client `acknowledge()`. The [Chrome docs](https://developer.chrome.com/docs/android/trusted-web-activity/receive-payments-play-billing) and [chromeos.dev](https://chromeos.dev/en/publish/pwa-play-billing) acknowledge on a backend with the Play Developer API (`purchases.products.acknowledge`). `paymentResponse.complete('success')` only closes the payment UI. The code calls the v1 `acknowledge(token, 'onetime')` where the browser still has it. Before the release, test with a licence tester that a purchase is still there after 3 days. If not, add a small backend function (for example a Supabase Edge Function) that acknowledges the token.
+- **Checked:** 30 new tests (815 in all), lint, typecheck and build pass. In Chromium at 390×844 with a fake Digital Goods service and `?premium=enforce`: "Change location" opens the purchase dialog (en and de, €3.99 / 3,99 €) and not the form; after Buy the dialog closes, no gold plus is left (9 → 0) and the form opens. Without the query (enforcement off), web and fake Play app: no dialog, the form opens, the plus stays.
+- **Left for item 16:** create the managed product `premium` in the Play Console, turn on `playBilling` in Bubblewrap, solve the acknowledge point above, set `PREMIUM_ENFORCED = true`, and test buy, restore and refund with a licence tester.
 - **Later, only for a web sale (not planned):**
   1. Supabase Auth in the frontend (sign-in, session handling, `@supabase/supabase-js` client).
   2. Upgrade UI: pricing dialog → call `create-checkout` → redirect to Stripe.

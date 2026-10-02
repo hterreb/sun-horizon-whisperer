@@ -10,6 +10,15 @@ export const en = {
   'common.azimuth': 'Azimuth:',
   'common.minutes': '{value} min',
   'common.premium': 'Premium feature, free for now',
+  'premium.badge': 'Premium feature',
+  'premium.title': 'Sun Chaser Premium',
+  'premium.includes': 'One purchase unlocks all features with the gold plus: change location, manual weather, the sunset score, line of sight with terrain, the compass, time travel and the share card.',
+  'premium.price': 'One-time purchase: {price}',
+  'premium.buy': 'Buy',
+  'premium.restore': 'Restore purchase',
+  'premium.restoreNone': 'No Premium purchase found on this Google account',
+  'premium.failedTitle': 'Purchase failed',
+  'premium.failedDescription': 'Please try again later.',
 
   // Language picker
   'language.label': 'Language',

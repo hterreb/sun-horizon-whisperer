@@ -13,7 +13,7 @@
 ## Architecture
 
 - `src/components/SunTracker.tsx` is the root state owner. It holds location, date, sun/moon position, sun times, time-of-day, and weather in state, and passes them down as props. Child components do not fetch or compute this state themselves. Two children fetch other data: `InfoPanel` (the place name from BigDataCloud) and `PlaceSearch` (search results through `geocodeUtils`).
-- `src/utils/*.ts` (`sunUtils`, `moonUtils`, `weatherUtils`, …) are pure functions. They take inputs, return outputs, and do not touch React state. Only these utils use `localStorage`: `weatherUtils` (weather cache), `terrainTiles` (terrain profile cache), `manualLocation`, `compassUtils`, `temperatureUnit` and `language` (saved choices).
+- `src/utils/*.ts` (`sunUtils`, `moonUtils`, `weatherUtils`, …) are pure functions. They take inputs, return outputs, and do not touch React state. Only these utils use `localStorage`: `weatherUtils` (weather cache), `terrainTiles` (terrain profile cache), `manualLocation`, `compassUtils`, `temperatureUnit` and `language` (saved choices), `premium` (the Premium start hint).
 - `src/components/ui/` is shadcn-generated. Do not hand-edit these files. Regenerate with `npx shadcn add <component>` instead.
 - `supabase/functions/*` are independent Deno Edge Functions for a Stripe subscription. The frontend does not call them. The first Premium release uses Google Play Billing instead (ROADMAP items 14 and 45).
 
