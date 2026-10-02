@@ -729,13 +729,15 @@ const SunTracker: React.FC = () => {
   // A manually picked weather ignores the real cloud cover: the sky, the stars and
   // the moon then follow the weather type alone (ROADMAP items 50, 52, 57).
   const cloudCover = useRealWeather ? weatherData?.cloudCoverPercent ?? null : null;
+  // The forecast rain amount (ROADMAP item 77); manual weather uses the type's middle value.
+  const rainMmH = useRealWeather ? weatherData?.precipitationMmH ?? null : null;
 
   const skyGradient = useMemo(() => {
     // Clouds dim the sky (ROADMAP item 50): mix toward grey per weather type, scaled
     // by the measured cloud cover.
     // The water takes its colours from this same gradient (ROADMAP item 53).
-    return mixGradientTowardOvercast(getBackgroundGradient(timeOfDay), getSkyOvercastMix(weatherType, cloudCover));
-  }, [timeOfDay, weatherType, cloudCover]);
+    return mixGradientTowardOvercast(getBackgroundGradient(timeOfDay), getSkyOvercastMix(weatherType, cloudCover, rainMmH));
+  }, [timeOfDay, weatherType, cloudCover, rainMmH]);
 
   const handleWeatherChange = (newWeather: WeatherType) => {
     setWeatherType(newWeather);
@@ -818,6 +820,7 @@ const SunTracker: React.FC = () => {
             cloudCoverPercent={cloudCover}
             // Manual mode sets the wind itself (ROADMAP item 73): calm, or strong with the switch.
             windSpeedKmh={useRealWeather ? weatherData?.windSpeedKmh ?? null : manualWindy ? MANUAL_STRONG_WIND_KMH : 0}
+            rainMmH={rainMmH}
             windDirectionDeg={weatherData?.windDirectionDeg ?? null}
             compassHeading={activeCompassHeading}
             horizonProfile={horizonProfile}

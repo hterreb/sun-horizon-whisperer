@@ -20,6 +20,7 @@ import { getSunVisibility, getMoonCloudFactor, getMoonLook } from '@/utils/weath
 import { getSeaWindKmh, getReflectionBars } from '@/utils/waveUtils';
 import { getCloudDriftDirection } from '@/utils/cloudLayoutUtils';
 import SeaCanvas from '@/components/SeaCanvas';
+import { getRainMmH, getRainMistOpacity } from '@/utils/rainUtils';
 import { useLanguage } from '@/hooks/useLanguage';
 import { formatNumber, type MessageKey } from '@/i18n';
 import { type Language } from '@/utils/language';
@@ -52,6 +53,8 @@ interface SunVisualizationProps {
   cloudCoverPercent?: number | null;
   windSpeedKmh?: number | null;
   windDirectionDeg?: number | null;
+  // The forecast rain amount in mm/h (ROADMAP item 77); null: the type's middle value.
+  rainMmH?: number | null;
   // Live compass mode (ROADMAP item 19): the current (smoothed) device heading, or
   // null/undefined for the static 360°-across-the-screen mode. When set, azimuths are
   // mapped through a real field of view centered on this heading (getCompassScreenFraction)
@@ -507,6 +510,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   cloudCoverPercent = null,
   windSpeedKmh = null,
   windDirectionDeg = null,
+  rainMmH = null,
   compassHeading = null,
   horizonProfile = null,
   terrainSunTimes = null,
@@ -741,6 +745,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   const seaWindKmh = getSeaWindKmh(windSpeedKmh, weatherType);
   const seaIsDark = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
   const seaIsGolden = timeOfDay === 'dawn' || timeOfDay === 'evening' || timeOfDay === 'civil-twilight';
+  const rainAmount = getRainMmH(weatherType, rainMmH);
 
   // Line-of-sight ridge (terrain-silhouette) color, the style book's "soft ridge"
   // per time-of-day bucket (ROADMAP item 15 deliverable 2), drawn semi-transparent
@@ -858,6 +863,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         cloudCoverPercent={cloudCoverPercent}
         windSpeedKmh={windSpeedKmh}
         windDirectionDeg={windDirectionDeg}
+        rainMmH={rainMmH}
         isFullscreen={isFullscreen}
         moonlight={{ x: containerDimensions.width > 0 ? moonX / containerDimensions.width : 0.5, strength: moonPool }}
         moon={isMoonVisible && (moonLook.disc > 0 || moonLook.corona > 0) && containerDimensions.height > 0
@@ -1061,6 +1067,20 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         windKmh={seaWindKmh}
         driftDirection={getCloudDriftDirection(windDirectionDeg)}
       />
+      {rainAmount != null && (
+        // Horizon mist (ROADMAP item 77, X4): a pale band over the horizon, so heavy rain
+        // hides the far shore. Above the ridge and the sea, below the boats and the rain.
+        <div
+          className="absolute inset-x-0 pointer-events-none"
+          style={{
+            top: '50%',
+            height: '30%',
+            background: `linear-gradient(transparent, ${water.mist} 50%, transparent)`,
+            opacity: getRainMistOpacity(rainAmount),
+          }}
+          data-testid="rain-mist"
+        />
+      )}
 
       {containerDimensions.height > 0 && weatherType !== 'storm' && (() => {
         // Sun/moon reflection on the water (ROADMAP item 15 deliverable 2): a few

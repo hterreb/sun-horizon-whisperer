@@ -518,3 +518,31 @@ describe('CloudLayer', () => {
     });
   });
 });
+
+describe('CloudLayer rain (ROADMAP item 77)', () => {
+  const layer = (weatherType: WeatherType, rainMmH: number | null = null) =>
+    render(<CloudLayer weatherType={weatherType} timeOfDay="midday" rainMmH={rainMmH} />).container;
+
+  it('draws drizzle, rain and storm on the rain canvas, with the forecast amount or the middle value', () => {
+    expect(layer('rain', 7).querySelector('[data-testid="rain-canvas"]')?.getAttribute('data-mm-h')).toBe('7');
+    expect(layer('drizzle').querySelector('[data-testid="rain-canvas"]')?.getAttribute('data-mm-h')).toBe('0.4');
+    expect(layer('storm').querySelector('[data-testid="rain-canvas"]')?.getAttribute('data-mm-h')).toBe('10');
+    for (const type of ['clear', 'overcast', 'snow', 'hail'] as const) {
+      expect(layer(type, 5).querySelector('[data-testid="rain-canvas"]')).toBeNull();
+    }
+  });
+
+  it('keeps each flake and pellet delay in the animation shorthand, so they do not fall in step', () => {
+    const delays = (container: HTMLElement, name: string) =>
+      [...container.querySelectorAll<HTMLElement>('div')]
+        .map(el => el.style.animation)
+        .filter(animation => animation.startsWith(name))
+        .map(animation => animation.split(' ')[3]);
+    const snow = delays(layer('snow'), 'snowfall');
+    const hail = delays(layer('hail'), 'hailFall');
+    expect(snow).toHaveLength(60);
+    expect(hail).toHaveLength(45);
+    expect(new Set(snow).size).toBeGreaterThan(50);
+    expect(new Set(hail).size).toBeGreaterThan(40);
+  });
+});

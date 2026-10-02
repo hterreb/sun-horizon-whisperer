@@ -309,3 +309,37 @@ describe('getSunsetScore (ROADMAP item 11)', () => {
     expect(getSunsetScore({ low: 0, mid: 100, high: 100, visibility: 50000 }).score).toBeLessThanOrEqual(10);
   });
 });
+
+describe('fetchCurrentWeather rain amount (ROADMAP item 77, X1)', () => {
+  const respond = (body: object) => {
+    const fetchMock = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve(body) }));
+    global.fetch = fetchMock as unknown as typeof fetch;
+    return fetchMock;
+  };
+  const weather = (weathercode: number) => ({ temperature: 12, weathercode, windspeed: 0, winddirection: 0, time: '' });
+  const current = (precipitation: number) => ({ cloud_cover: 100, wind_speed_10m: 5, wind_direction_10m: 270, precipitation, interval: 900 });
+
+  it('requests precipitation and turns the 15-minute amount into mm/h', async () => {
+    const fetchMock = respond({ current_weather: weather(63), current: current(0.5) });
+    const data = await fetchCurrentWeather(17, 17);
+    expect(String((fetchMock.mock.calls[0] as unknown[])[0])).toContain(',precipitation');
+    expect(data.precipitationMmH).toBe(2);
+  });
+
+  it('takes the amount from the weather code when the measured amount is 0 or missing', async () => {
+    respond({ current_weather: weather(65), current: current(0) });
+    expect((await fetchCurrentWeather(18, 18)).precipitationMmH).toBe(10);
+    respond({ current_weather: weather(0) });
+    expect((await fetchCurrentWeather(19, 19)).precipitationMmH).toBeNull();
+  });
+
+  it('normalizes a pre-item-77 cache entry without the amount', async () => {
+    const cached = {
+      temperature: 15, weatherType: 'rain', conditionKey: 'condition.slightRain', lastUpdated: new Date().toISOString(),
+      isRealWeather: true, sunsetScoreToday: null, sunsetScoreTomorrow: null,
+      cloudCoverPercent: 90, windSpeedKmh: 10, windDirectionDeg: 200,
+    };
+    localStorage.setItem('weather_cache', JSON.stringify({ data: cached, timestamp: Date.now(), latitude: 20, longitude: 20 }));
+    expect((await fetchCurrentWeather(20, 20)).precipitationMmH).toBeNull();
+  });
+});

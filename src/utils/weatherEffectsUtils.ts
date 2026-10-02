@@ -4,6 +4,7 @@
 // without mounting anything.
 import { type WeatherType } from '../components/CloudLayer';
 import { type TimeOfDay } from './sunUtils';
+import { getRainMmH, getRainSkyMix } from './rainUtils';
 
 export interface WeatherEffectsInput {
   type: WeatherType;
@@ -265,7 +266,8 @@ export const getTwilightStars = (timeOfDay: TimeOfDay): { share: number; opacity
   { share: 0, opacity: 0 };
 
 // Clouds dim the sky (ROADMAP item 50): how far the sky gradient mixes toward the
-// overcast grey (0-1). A measured cloud cover scales the weather type's mix.
+// overcast grey (0-1). A measured cloud cover scales the weather type's mix. Rain and
+// drizzle get greyer with more rain (item 77, X5); without an amount, the type's middle value.
 const SKY_OVERCAST_MIX: Record<WeatherType, number> = {
   clear: 0, partly: 0.1, cloudy: 0.25,
   drizzle: 0.45, snow: 0.45,
@@ -273,8 +275,13 @@ const SKY_OVERCAST_MIX: Record<WeatherType, number> = {
   storm: 0.75, hail: 0.75,
 };
 
-export const getSkyOvercastMix = (type: WeatherType, cloudCoverPercent: number | null | undefined): number =>
-  SKY_OVERCAST_MIX[type] * (cloudCoverPercent == null ? 1 : Math.min(1, Math.max(0, cloudCoverPercent / 100)));
+export const getSkyOvercastMix = (
+  type: WeatherType,
+  cloudCoverPercent: number | null | undefined,
+  rainMmH: number | null = null
+): number =>
+  (type === 'rain' || type === 'drizzle' ? getRainSkyMix(getRainMmH(type, rainMmH) as number) : SKY_OVERCAST_MIX[type]) *
+  (cloudCoverPercent == null ? 1 : Math.min(1, Math.max(0, cloudCoverPercent / 100)));
 
 // Clouds dim the sun (ROADMAP item 50): opacity of the sun disc and its halo (0-1),
 // and the halo's size factor. Overcast, fog and rain leave only a soft light patch.

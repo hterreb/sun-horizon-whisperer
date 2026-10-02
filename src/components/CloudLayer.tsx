@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Fish, Leaf, Turtle, type LucideIcon } from 'lucide-react';
 import SceneBoat from './SceneBoat';
 import SceneBird from './SceneBird';
+import RainCanvas from './RainCanvas';
 import {
   Bat,
   Carp, Catfish, Jellyfish, Minnow, Perch, Pike, Pufferfish, Ray, Seahorse, Trout, Whale,
@@ -24,6 +25,7 @@ import {
   pickBird, isBirdInSeason, MAX_BIRDS, type BirdKind,
 } from '../utils/weatherEffectsUtils';
 import { getSeaWindKmh } from '../utils/waveUtils';
+import { getRainMmH } from '../utils/rainUtils';
 
 // ROADMAP item 10: more than the original 6 types - fog, drizzle and hail join the
 // weather-dependent clouds/illustrations, and "partly" splits out the old single
@@ -53,6 +55,8 @@ interface CloudLayerProps {
   cloudCoverPercent?: number | null;
   windSpeedKmh?: number | null;
   windDirectionDeg?: number | null;
+  // The forecast rain amount in mm/h (ROADMAP item 77, X1); null: the type's middle value.
+  rainMmH?: number | null;
   // Fullscreen fades the chrome away, so near boats can sail lower.
   isFullscreen?: boolean;
   // The pool of moonlight for the night fish (ROADMAP item 65): the moon's x as a fraction
@@ -338,9 +342,6 @@ const seededRandom = (seed: number): number => {
 };
 
 const PRECIP_COUNT: Partial<Record<WeatherType, number>> = {
-  drizzle: 35,
-  rain: 80,
-  storm: 100,
   hail: 45,
 };
 
@@ -353,6 +354,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   cloudCoverPercent = null,
   windSpeedKmh = null,
   windDirectionDeg = null,
+  rainMmH = null,
   isFullscreen = false,
   moonlight = null,
   moon = null,
@@ -399,20 +401,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     [effectiveCloudCover, cloudSeedDayKey, latitude, longitude]
   );
 
-  // Raindrops/drizzle/hail look randomly scattered but only need to change when the
+  // Drizzle, rain and storm fall on the rain canvas (ROADMAP item 77); null: no rain.
+  const rainAmount = getRainMmH(weatherType, rainMmH);
+
+  // Hail pellets and snowflakes look randomly scattered but only need to change when the
   // weather changes, so they're derived with a stable seed rather than `Math.random()`
   // (impure) inside an effect + setState.
-  const precipDrops = useMemo(() => {
-    if (weatherType !== 'rain' && weatherType !== 'storm' && weatherType !== 'drizzle') return [];
-    const count = PRECIP_COUNT[weatherType] ?? 60;
-    return Array.from({ length: count }, (_, i) => ({
-      id: i,
-      x: seededRandom(i * 3 + 1) * 100,
-      y: -10 - seededRandom(i * 3 + 2) * 100,
-      delay: seededRandom(i * 3 + 3) * 5
-    }));
-  }, [weatherType]);
-
   const hailPellets = useMemo(() => {
     if (weatherType !== 'hail') return [];
     const count = PRECIP_COUNT.hail ?? 45;
@@ -870,21 +864,15 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         );
       })}
 
-      {/* Rain/drizzle drops - drizzle is thinner, shorter and fainter than rain/storm,
-          all slanted sideways by `--slant` (from wind, see getPrecipitationSlantPx). */}
-      {precipDrops.map((drop) => (
-        <div
-          key={drop.id}
-          className={`absolute bg-blue-300 ${weatherType === 'drizzle' ? 'w-px opacity-40' : 'w-0.5 opacity-60'}`}
-          style={{
-            left: `${drop.x}%`,
-            top: `${drop.y}%`,
-            height: weatherType === 'drizzle' ? '8px' : weatherType === 'storm' ? '20px' : '15px',
-            animationDelay: `${drop.delay}s`,
-            animation: `fall ${weatherType === 'drizzle' ? '3s' : weatherType === 'storm' ? '2s' : '2.5s'} linear infinite`
-          }}
+      {rainAmount != null && (
+        <RainCanvas
+          weatherType={weatherType as 'drizzle' | 'rain' | 'storm'}
+          mmH={rainAmount}
+          windSpeedKmh={windSpeedKmh}
+          windDirectionDeg={windDirectionDeg}
+          timeOfDay={timeOfDay}
         />
-      ))}
+      )}
 
       {/* Hail: small pellets falling straight/slanted with a tiny settle (shrink +
           fade) at the ground - the calm-motion rule (ROADMAP item 15) rules out an
@@ -898,8 +886,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             top: `${pellet.y}%`,
             width: `${pellet.size}px`,
             height: `${pellet.size}px`,
-            animationDelay: `${pellet.delay}s`,
-            animation: 'hailFall 1.8s linear infinite'
+            // The delay sits in the shorthand: a separate animationDelay before it was reset to 0 (item 77).
+            animation: `hailFall 1.8s linear ${pellet.delay}s infinite`
           }}
         />
       ))}
@@ -915,8 +903,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             fontSize: `${flake.size}rem`,
             // A thin blue-grey outline so the flakes read on the grey sky (ROADMAP item 50).
             textShadow: '0 0 1px hsl(var(--scene-snow-outline)), 0 0 1px hsl(var(--scene-snow-outline))',
-            animationDelay: `${flake.delay}s`,
-            animation: 'snowfall 6s linear infinite'
+            animation: `snowfall 6s linear ${flake.delay}s infinite`
           }}
         >
           ❄
@@ -1013,12 +1000,6 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
 
       {/* CSS animations for weather effects and entity movement */}
       <style>{`
-        @keyframes fall {
-          to {
-            transform: translate(var(--slant, 0px), 100vh);
-          }
-        }
-
         @keyframes hailFall {
           0% {
             transform: translate(0, 0) scale(1);

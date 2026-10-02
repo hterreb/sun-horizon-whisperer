@@ -120,8 +120,8 @@ export const getCloudDriftDirection = (windDirectionDeg: number | null | undefin
   return eastward >= 0 ? 1 : -1;
 };
 
-// How far (px) rain/drizzle/hail should slant sideways as they fall, from wind speed
-// and direction. Capped low - this is a slant, not a gale.
+// How far (px) hail should slant sideways as it falls, from wind speed and direction.
+// Capped low - this is a slant, not a gale. The rain tilts on its canvas (ROADMAP item 77).
 const PRECIP_SLANT_MAX_PX = 60;
 const PRECIP_SLANT_WIND_CAP_KMH = 40;
 
