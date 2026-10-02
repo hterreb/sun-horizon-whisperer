@@ -1,4 +1,4 @@
-import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, hasBoatWake, getBoatTone, pickFish, FISH_WEIGHTS, canSpawnFish, getRestStopMotion, pickNightFish, pickMoonlitDayFish, NIGHT_FISH_WEIGHTS, MAX_NIGHT_FISH, getWaterSpeedFactor, getWaterLimit, getStarCloudFactor, getTwilightStars, getSkyOvercastMix, getSunVisibility, getMoonCloudFactor, BIRD_WEIGHTS, pickBird, isBirdInSeason } from '../src/utils/weatherEffectsUtils';
+import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, hasBoatWake, getBoatTone, pickFish, FISH_WEIGHTS, canSpawnFish, getRestStopMotion, pickNightFish, pickMoonlitDayFish, NIGHT_FISH_WEIGHTS, MAX_NIGHT_FISH, getWaterSpeedFactor, getWaterLimit, getStarCloudFactor, getTwilightStars, getSkyOvercastMix, getSunVisibility, getMoonCloudFactor, getMoonLook, BIRD_WEIGHTS, pickBird, isBirdInSeason } from '../src/utils/weatherEffectsUtils';
 
 describe('getWeatherEffects (ROADMAP item 10)', () => {
   it('shows fog only for the fog type', () => {
@@ -388,5 +388,29 @@ describe('getMoonCloudFactor (ROADMAP item 57)', () => {
     expect(getMoonCloudFactor('overcast', null)).toBe(0.15);
     expect(getMoonCloudFactor('cloudy', null)).toBe(0.4);
     expect(getMoonCloudFactor('cloudy', 100)).toBe(0.15);
+  });
+});
+
+describe('getMoonLook (ROADMAP item 76, MV4)', () => {
+  it('keeps at least a quarter of the disc in every weather but storm and fog, live and manual', () => {
+    for (const type of ['overcast', 'drizzle', 'rain', 'snow', 'hail'] as const) {
+      expect(getMoonLook(type, null).disc).toBe(0.25); // manual: no cover value
+      expect(getMoonLook(type, 97).disc).toBe(0.25); // the reported night: rain at 97 %
+    }
+    expect(getMoonLook('cloudy', null).disc).toBe(0.4);
+    expect(getMoonLook('partly', 25).disc).toBe(0.75);
+    expect(getMoonLook('clear', 0).disc).toBe(1);
+  });
+
+  it('adds a corona of 3.5 radii while the item-57 factor is below 0.5', () => {
+    expect(getMoonLook('rain', 97)).toEqual({ disc: 0.25, corona: 1, coronaRadius: 3.5 });
+    expect(getMoonLook('cloudy', null).corona).toBe(1);
+    expect(getMoonLook('partly', 25).corona).toBe(0);
+    expect(getMoonLook('clear', null).corona).toBe(0);
+  });
+
+  it('shows only a larger, fainter corona in fog, and nothing in a storm', () => {
+    expect(getMoonLook('fog', null)).toEqual({ disc: 0, corona: 0.5, coronaRadius: 5 });
+    expect(getMoonLook('storm', 50)).toEqual({ disc: 0, corona: 0, coronaRadius: 0 });
   });
 });

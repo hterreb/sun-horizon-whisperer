@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Share2 } from 'lucide-react';
 import PremiumBadge from '@/components/PremiumBadge';
 import { toast } from '@/hooks/use-toast';
 import { useLanguage } from '@/hooks/useLanguage';
 import { usePremiumGate } from '@/hooks/usePremium';
-import { drawShareCard, getShareCardData, shareOrDownload, type ShareCardInput } from '@/utils/shareCard';
+import { captureShareView, drawShareCard, getShareCardData, shareOrDownload, type ShareCardInput } from '@/utils/shareCard';
 import { type HorizonProfile } from '@/utils/horizonUtils';
 
 // Share card (ROADMAP item 68): the "Share" button in the Sunset row, with the gold
-// plus (item 35). Gated through requirePremium (item 14).
+// plus (item 35). Gated through requirePremium (item 14). Since item 78 it shares the
+// current view (the scene root marked `data-share-root`); the drawn card is the fallback.
 interface ShareCardButtonProps {
   card: ShareCardInput;
   latitude: number;
@@ -19,6 +20,7 @@ interface ShareCardButtonProps {
 
 const ShareCardButton: React.FC<ShareCardButtonProps> = ({ card, latitude, longitude, horizonProfile, className = '' }) => {
   const [isBusy, setIsBusy] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const { t, language } = useLanguage();
   const { requirePremium } = usePremiumGate();
 
@@ -26,8 +28,18 @@ const ShareCardButton: React.FC<ShareCardButtonProps> = ({ card, latitude, longi
     setIsBusy(true);
     try {
       const data = getShareCardData(card, language);
-      const blob = await drawShareCard(data, latitude, longitude, horizonProfile);
-      await shareOrDownload(blob, data.fileName);
+      const root = buttonRef.current?.closest<HTMLElement>('[data-share-root]');
+      let blob: Blob;
+      let fileName = data.viewFileName;
+      try {
+        if (!root) throw new Error('No scene to capture');
+        blob = await captureShareView(root, data);
+      } catch {
+        // An old browser, or the capture chunk could not load: the item-68 card.
+        blob = await drawShareCard(data, latitude, longitude, horizonProfile);
+        fileName = data.fileName;
+      }
+      await shareOrDownload(blob, fileName);
     } catch {
       toast({ title: t('share.failedTitle'), description: t('share.failedDescription') });
     } finally {
@@ -37,6 +49,7 @@ const ShareCardButton: React.FC<ShareCardButtonProps> = ({ card, latitude, longi
 
   return (
     <button
+      ref={buttonRef}
       type="button"
       onClick={() => requirePremium(handleClick)}
       disabled={isBusy}

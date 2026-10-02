@@ -78,6 +78,25 @@ export const getCloudLayout = (
   }));
 };
 
+// Silver lining (ROADMAP item 76, X2): the parts of a cloud within 4.5 × the moon's radius
+// catch its light. Returns the light's centre and radius in the cloud's own 120 × 60 svg
+// units (the cloud is scaled around its centre), or null when the light does not reach it.
+// `moon` is in % of the scene (x, y) and px (r), like CloudLayer's `moon` prop.
+// ponytail: from the cloud's resting place, so the light rides along its ±6 vw sway.
+const MOON_LINING_RADII = 4.5;
+
+export const getCloudMoonlight = (
+  cloud: CloudShape,
+  moon: { x: number; y: number; r: number },
+  sceneWidth: number,
+  sceneHeight: number
+): { cx: number; cy: number; r: number } | null => {
+  const cx = 60 + (((moon.x - cloud.x) / 100) * sceneWidth - 60) / cloud.scale;
+  const cy = 30 + (((moon.y - cloud.y) / 100) * sceneHeight - 30) / cloud.scale;
+  const r = (MOON_LINING_RADII * moon.r) / cloud.scale;
+  return cx + r > 0 && cx - r < 120 && cy + r > 0 && cy - r < 60 ? { cx, cy, r } : null;
+};
+
 // Wind -> cloud drift. Speed is clamped well below real wind speeds so the scene stays
 // calm even in a storm (ROADMAP item 15: all motion stays slow); direction is a simple
 // left/right sign from the wind's eastward component.

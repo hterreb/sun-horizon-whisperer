@@ -3,6 +3,7 @@ import { render, act } from '@testing-library/react';
 import CloudLayer, { WeatherType, createFish, createBird } from '../src/components/CloudLayer';
 import { FISH_WEIGHTS, NIGHT_FISH_WEIGHTS, getWaterSpeedFactor } from '../src/utils/weatherEffectsUtils';
 import type { TimeOfDay } from '../src/utils/sunUtils';
+import { getCloudLayout } from '../src/utils/cloudLayoutUtils';
 
 const mockReducedMotion = (matches: boolean) =>
   vi.spyOn(window, 'matchMedia').mockReturnValue({
@@ -500,6 +501,20 @@ describe('CloudLayer', () => {
       expect(spawnBirds(night, 31000).querySelector('[data-testid="scene-bird"]')).toBeNull();
       const july = { ...night, date: new Date('2026-07-01T23:00:00'), moon: { x: 70, y: 22 } };
       expect(spawnBirds(july, 31000).querySelector('[data-testid="scene-bird"]')).toBeNull();
+    });
+  });
+
+  describe('silver lining (ROADMAP item 76, X2)', () => {
+    it('lights the cloud the moon sits on, and no cloud without the moon', () => {
+      const props = { weatherType: 'cloudy' as const, timeOfDay: 'night' as const, cloudCoverPercent: 55, date: new Date('2026-10-01T23:42:00'), latitude: 47.78, longitude: 9.61 };
+      // The moon at the centre of the first cloud (120 × 60 px, jsdom's window is 1024 × 768).
+      const [cloud] = getCloudLayout(55, props.date, props.latitude, props.longitude);
+      const moon = { x: cloud.x + (60 / window.innerWidth) * 100, y: cloud.y + (30 / window.innerHeight) * 100, r: 22, light: 0.75 };
+      const lit = render(<CloudLayer {...props} moon={moon} />);
+      expect(lit.container.querySelectorAll('[data-testid="cloud-moonlight"]').length).toBeGreaterThan(0);
+      lit.unmount();
+      const dark = render(<CloudLayer {...props} />);
+      expect(dark.container.querySelector('[data-testid="cloud-moonlight"]')).toBeNull();
     });
   });
 });

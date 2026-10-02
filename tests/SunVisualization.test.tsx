@@ -1135,3 +1135,98 @@ describe('SunVisualization sunglasses egg', () => {
     expect(screen.getByTestId('sun-sunglasses')).toBeInTheDocument();
   });
 });
+
+describe('SunVisualization (rendered): the moon behind clouds (ROADMAP item 76)', () => {
+  const originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+  const originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
+
+  beforeEach(() => {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { value: 800, configurable: true });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { value: 600, configurable: true });
+  });
+
+  afterEach(() => {
+    if (originalClientWidth) Object.defineProperty(HTMLElement.prototype, 'clientWidth', originalClientWidth);
+    if (originalClientHeight) Object.defineProperty(HTMLElement.prototype, 'clientHeight', originalClientHeight);
+  });
+
+  const nightProps = {
+    sunPosition: { azimuth: 0, altitude: -40 },
+    moonPosition: { azimuth: 180, altitude: 30, phase: 0.6, illumination: 0.5, visible: true },
+    sunPath: [],
+    moonPath: [],
+    timeOfDay: 'night' as const,
+    latitude: 48,
+    longitude: 11,
+    date: new Date('2026-06-15T23:00:00Z'),
+  };
+  const bright = 0.5 * 0.8 + 0.2;
+
+  it('keeps a quarter of the disc and adds a corona in manual rain (no cover value)', () => {
+    render(<SunVisualization {...nightProps} weatherType="rain" cloudCoverPercent={null} />);
+    expect(Number(screen.getByTestId('moon-disc').style.opacity)).toBeCloseTo(bright * 0.25);
+    expect(screen.getByTestId('moon-corona')).toBeInTheDocument();
+  });
+
+  it('shows the full disc and no corona on a clear night', () => {
+    render(<SunVisualization {...nightProps} weatherType="clear" cloudCoverPercent={0} />);
+    expect(Number(screen.getByTestId('moon-disc').style.opacity)).toBeCloseTo(bright);
+    expect(screen.queryByTestId('moon-corona')).toBeNull();
+  });
+
+  it('shows only the corona in fog and nothing in a storm', () => {
+    const { rerender } = render(<SunVisualization {...nightProps} weatherType="fog" cloudCoverPercent={null} />);
+    expect(screen.queryByTestId('moon-disc')).toBeNull();
+    expect(screen.getByTestId('moon-corona')).toBeInTheDocument();
+    rerender(<SunVisualization {...nightProps} weatherType="storm" cloudCoverPercent={null} />);
+    expect(screen.queryByTestId('moon-disc')).toBeNull();
+    expect(screen.queryByTestId('moon-corona')).toBeNull();
+  });
+});
+
+describe('SunVisualization (rendered): waves by wind strength (ROADMAP item 79)', () => {
+  const originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+  const originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
+
+  beforeEach(() => {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { value: 800, configurable: true });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { value: 600, configurable: true });
+  });
+
+  afterEach(() => {
+    if (originalClientWidth) Object.defineProperty(HTMLElement.prototype, 'clientWidth', originalClientWidth);
+    if (originalClientHeight) Object.defineProperty(HTMLElement.prototype, 'clientHeight', originalClientHeight);
+  });
+
+  const waveProps = {
+    sunPosition: { azimuth: 180, altitude: 30 },
+    moonPosition: { azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false },
+    sunPath: [],
+    moonPath: [],
+    timeOfDay: 'midday' as const,
+    weatherType: 'clear' as const,
+    latitude: 51,
+  };
+
+  it('draws the sea canvas over the sea fill and under the reflection bars', () => {
+    render(<SunVisualization {...waveProps} windSpeedKmh={20} />);
+    const sea = screen.getByTestId('sea');
+    const canvas = screen.getByTestId('sea-canvas');
+    const reflection = screen.getByTestId('water-reflection');
+    expect(sea.compareDocumentPosition(canvas) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(canvas.compareDocumentPosition(reflection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('lays out the reflection bars by the wind: 10 in calm water, 7 in light air or without a reading, pieces in strong wind', () => {
+    const bars = (windSpeedKmh: number | null) => {
+      const { unmount } = render(<SunVisualization {...waveProps} windSpeedKmh={windSpeedKmh} />);
+      const count = screen.getByTestId('water-reflection').querySelectorAll('rect').length;
+      unmount();
+      return count;
+    };
+    expect(bars(0)).toBe(10);
+    expect(bars(12)).toBe(7);
+    expect(bars(null)).toBe(7);
+    expect(bars(70)).toBe(36);
+  });
+});
