@@ -5,6 +5,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { Button } from './ui/button';
 import LineOfSightDetails from './LineOfSightDetails';
 import PremiumBadge from './PremiumBadge';
+import { usePremiumGate } from '@/hooks/usePremium';
 import ShareCardButton from '@/components/ShareCardButton';
 import PlaceSearch from './PlaceSearch';
 import {
@@ -176,6 +177,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   onSunsetReminderToggle,
 }) => {
   const { t, language, setLanguage } = useLanguage();
+  // Premium gate (ROADMAP item 14): every gold-plus control goes through requirePremium.
+  const { isLocked, requirePremium } = usePremiumGate();
   const formatLocalTime = (date: Date | null) => formatTime(date, language);
   // '' until the first lookup ends; null when the lookup found no place name.
   const [locationName, setLocationName] = useState<string | null>('');
@@ -518,7 +521,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   variant="link"
                   size="sm"
                   className={`h-auto p-0 mt-1 gap-1 text-caption opacity-80 hover:opacity-100 text-white justify-start ${FOCUS_RING}`}
-                  onClick={() => (isLocationFormOpen ? closeLocationForm() : openLocationForm())}
+                  onClick={() => (isLocationFormOpen ? closeLocationForm() : requirePremium(openLocationForm))}
                   aria-expanded={isLocationFormOpen}
                 >
                   {isLocationFormOpen ? t('common.cancel') : <>{t('location.change')}<PremiumBadge /></>}
@@ -657,7 +660,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   {t('weather.real')}
                 </button>
                 <button
-                  onClick={() => onWeatherModeToggle(false)}
+                  onClick={() => requirePremium(() => onWeatherModeToggle(false))}
                   className={`text-caption px-2 py-1 rounded-full transition-colors ${FOCUS_RING} ${
                     !useRealWeather
                       ? 'bg-white bg-opacity-20 text-white'
@@ -716,7 +719,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               <div className="flex items-center gap-1">
                 <button
                   type="button"
-                  onClick={() => onTimePlay(-1)}
+                  onClick={() => requirePremium(() => onTimePlay(-1))}
                   className={`${INLINE_ICON_TOGGLE} ${timePlayDirection === -1 ? 'bg-white/20' : ''}`}
                   aria-label={t('time.playBackward')}
                   aria-pressed={timePlayDirection === -1}
@@ -741,7 +744,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 ) : (
                   <button
                     type="button"
-                    onClick={() => setTimePickerRange(getTimeTravelRange(new Date()))}
+                    onClick={() => requirePremium(() => setTimePickerRange(getTimeTravelRange(new Date())))}
                     className={`font-semibold text-body tabular-nums whitespace-nowrap rounded ${FOCUS_RING}`}
                     title={t('time.set')}
                   >
@@ -752,7 +755,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 )}
                 <button
                   type="button"
-                  onClick={() => onTimePlay(1)}
+                  onClick={() => requirePremium(() => onTimePlay(1))}
                   className={`${INLINE_ICON_TOGGLE} ${timePlayDirection === 1 ? 'bg-white/20' : ''}`}
                   aria-label={t('time.playForward')}
                   aria-pressed={timePlayDirection === 1}
@@ -766,10 +769,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               <div className="flex items-center min-w-0">
                 <Sunrise size={18} className="mr-2 flex-shrink-0" />
                 <span className="text-body truncate">{t('sun.sunrise')}</span>
-                {terrainStatus !== 'idle' && (
+                {(terrainStatus !== 'idle' || isLocked) && (
                   <button
                     type="button"
-                    onClick={() => setIsSunTerrainOpen(!isSunTerrainOpen)}
+                    onClick={() => requirePremium(() => setIsSunTerrainOpen(!isSunTerrainOpen))}
                     className={`${INLINE_ICON_TOGGLE} relative ml-1`}
                     aria-label={t('terrain.show')}
                     aria-expanded={isSunTerrainOpen}
@@ -843,7 +846,13 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             )}
 
             {/* Sunset score (ROADMAP item 11) */}
-            {weatherData?.sunsetScoreToday && (
+            {/* Locked (item 14): only the label with the plus, which opens the purchase. */}
+            {weatherData?.sunsetScoreToday && isLocked && (
+              <button type="button" onClick={() => requirePremium()} className={`text-caption opacity-80 mt-1 inline-flex items-center gap-1 rounded ${FOCUS_RING}`}>
+                {t('score.label')}<PremiumBadge />
+              </button>
+            )}
+            {weatherData?.sunsetScoreToday && !isLocked && (
               <div className="text-caption opacity-80 mt-1 space-y-0.5">
                 <div className="flex items-center gap-2">
                   <span className="inline-flex flex-shrink-0 items-center gap-1">{t('score.label')}<PremiumBadge /></span>
@@ -908,10 +917,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   <div className={ROW}>
                     <span className="text-caption flex items-center min-w-0">
                       <span className="truncate">{t('common.labelColon', { label: t('moon.rise') })}</span>
-                      {terrainStatus !== 'idle' && (
+                      {(terrainStatus !== 'idle' || isLocked) && (
                         <button
                           type="button"
-                          onClick={() => setIsMoonTerrainOpen(!isMoonTerrainOpen)}
+                          onClick={() => requirePremium(() => setIsMoonTerrainOpen(!isMoonTerrainOpen))}
                           className={`${INLINE_ICON_TOGGLE} relative ml-1`}
                           aria-label={t('terrain.show')}
                           aria-expanded={isMoonTerrainOpen}

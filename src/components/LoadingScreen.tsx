@@ -5,6 +5,7 @@ import { FOCUS_RING } from './InfoPanel';
 import PlaceSearch from './PlaceSearch';
 import PremiumBadge from './PremiumBadge';
 import { useLanguage } from '@/hooks/useLanguage';
+import { usePremiumGate } from '@/hooks/usePremium';
 
 // A location that arrives sooner than this skips the rise: SunTracker fades the scene
 // in instead, and the rise animation waits this long before it starts
@@ -44,6 +45,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ still, onSelectPlace }) =
   const [isWaiting, setIsWaiting] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const { t } = useLanguage();
+  const { requirePremium } = usePremiumGate();
 
   useEffect(() => {
     const timeoutId = setTimeout(() => setIsWaiting(true), WAITING_MS);
@@ -113,7 +115,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ still, onSelectPlace }) =
         ) : (
           <button
             type="button"
-            onClick={() => setIsSearchOpen(true)}
+            onClick={() => requirePremium(() => setIsSearchOpen(true))}
             className={`${GLASS_SURFACE} rounded-full inline-flex items-center gap-2 px-4 py-2 text-body font-semibold ${FOCUS_RING}`}
           >
             <Search className="h-4 w-4" aria-hidden="true" />

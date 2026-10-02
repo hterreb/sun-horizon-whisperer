@@ -3,11 +3,12 @@ import { Share2 } from 'lucide-react';
 import PremiumBadge from '@/components/PremiumBadge';
 import { toast } from '@/hooks/use-toast';
 import { useLanguage } from '@/hooks/useLanguage';
+import { usePremiumGate } from '@/hooks/usePremium';
 import { drawShareCard, getShareCardData, shareOrDownload, type ShareCardInput } from '@/utils/shareCard';
 import { type HorizonProfile } from '@/utils/horizonUtils';
 
 // Share card (ROADMAP item 68): the "Share" button in the Sunset row, with the gold
-// plus (item 35). Free while PREMIUM_ENFORCED is false; item 14 gates it later.
+// plus (item 35). Gated through requirePremium (item 14).
 interface ShareCardButtonProps {
   card: ShareCardInput;
   latitude: number;
@@ -19,6 +20,7 @@ interface ShareCardButtonProps {
 const ShareCardButton: React.FC<ShareCardButtonProps> = ({ card, latitude, longitude, horizonProfile, className = '' }) => {
   const [isBusy, setIsBusy] = useState(false);
   const { t, language } = useLanguage();
+  const { requirePremium } = usePremiumGate();
 
   const handleClick = async () => {
     setIsBusy(true);
@@ -36,7 +38,7 @@ const ShareCardButton: React.FC<ShareCardButtonProps> = ({ card, latitude, longi
   return (
     <button
       type="button"
-      onClick={handleClick}
+      onClick={() => requirePremium(handleClick)}
       disabled={isBusy}
       className={`${className} relative ml-1`}
       aria-label={t('share.button')}
