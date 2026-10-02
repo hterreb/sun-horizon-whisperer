@@ -22,6 +22,7 @@ import {
   pickNightFish, pickMoonlitDayFish, MAX_FISH, MAX_NIGHT_FISH, getWaterSpeedFactor, getWaterLimit,
   pickBird, isBirdInSeason, MAX_BIRDS, type BirdKind,
 } from '../utils/weatherEffectsUtils';
+import { getSeaWindKmh } from '../utils/waveUtils';
 
 // ROADMAP item 10: more than the original 6 types - fog, drizzle and hail join the
 // weather-dependent clouds/illustrations, and "partly" splits out the old single
@@ -440,6 +441,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
                     timeOfDay === 'nautical-twilight' ||
                     timeOfDay === 'civil-twilight';
   const boatTone = getBoatTone(timeOfDay);
+  const seaWindKmh = getSeaWindKmh(windSpeedKmh, weatherType); // the boats' reflection (item 79, X2)
   // The line leaves keep the old ship tone.
   const lineInk = timeOfDay === 'night' ? 'text-gray-300 text-opacity-60' : 'text-gray-600 text-opacity-80';
 
@@ -966,7 +968,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
           >
             {/* Scale from the bottom-left corner, then lift by the boat's height, so `top` is the waterline. */}
             <div style={{ transform: `translateY(-100%) scale(${1.4 * scale * nearness})`, transformOrigin: 'bottom left' }}>
-              <SceneBoat kind={ship.kind} tone={boatTone} lit={isSunDown} wake={hasBoatWake(ship.kind, windSpeedKmh)} />
+              <SceneBoat kind={ship.kind} tone={boatTone} lit={isSunDown} wake={hasBoatWake(ship.kind, windSpeedKmh)} seaWindKmh={seaWindKmh} />
             </div>
           </div>
         );
