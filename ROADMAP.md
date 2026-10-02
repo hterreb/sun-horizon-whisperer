@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-02. Done: items 1–13, 15, 17–44, 47–75, item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 76–79 (specs ready 2026-10-02), items 14 and 16 (item 45 decided: Premium in the Play app only, web free; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
+Status: last updated 2026-10-02. Done: items 1–15, 17–44, 47–75 (item 14: the Play-app code, with `PREMIUM_ENFORCED` off until item 16), item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 76–79 (specs ready 2026-10-02), item 16 (with it: turn on `PREMIUM_ENFORCED`, and check with a licence tester that a purchase is still there after 3 days, see item 14 "Acknowledge"; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
 
 ## Verification (2026-09-28)
 
@@ -1241,9 +1241,9 @@ Four Sentry reports from the evening and night of 2026-10-01, all from Ravensbur
   - Tiles are not cached by the service worker. Only the computed profile is cached (`localStorage`).
 - **Checked (2026-10-01):** Sion (CH) against a second-hand PeakFinder value: sunrise −2.5 min, sunset +4.3 min, inside the 5-min target. A first-hand PeakFinder check or an observation would make it stronger (see Verification).
 
-### 14. Premium gating (deferred) — M
+### 14. Premium gating (deferred) — M — **✅ Done** (Play-app code; enforcement off until item 16)
 
-- **Status:** not started. The Stripe backend below is ready but only needed for a later web sale. Only start this when `PREMIUM_ENFORCED` should become `true`.
+- **Status:** the Play-app steps 1–5 below are built; `PREMIUM_ENFORCED` stays `false` until item 16. The Stripe backend below is ready but only needed for a later web sale.
 - **Update (2026-09-30), decision in item 45:** Premium is a one-time Google Play purchase in the Play app only. The web stays free. The Stripe steps below are not needed for the first release. They are kept for a possible later web sale.
 - **Depends on:** item 13.
 - **Exists today:**
@@ -1257,6 +1257,16 @@ Four Sentry reports from the evening and night of 2026-10-01, all from Ravensbur
   3. Acknowledge the purchase. Play refunds a purchase that is not acknowledged within 3 days (see item 45).
   4. Gate the gold-plus features only where the Digital Goods API exists and `PREMIUM_ENFORCED` is true. This includes the share card (item 68).
   5. Tests with a mocked Digital Goods service: no API → unlocked; API without a purchase → locked; API with a purchase → unlocked.
+- **Built:**
+  - `hooks/usePremium.ts`: `usePremium(language)` gets the Play Billing service, calls `listPurchases()` and `getDetails(['premium'])` at start, and returns `isPremium`, `isBillingAvailable`, `isLocked`, `price` (Intl, in the chosen language), `buy`, `restore` and `requirePremium(action)`. `localStorage` `premium-owned` is only a start hint; the purchase list overwrites it. Without the API, or when `getDigitalGoodsService` rejects (Chrome outside the Play app), Premium is unlocked.
+  - The gate is in one place: `SunTracker` provides the hook through `PremiumContext`, and each gold-plus control calls `requirePremium`: change location (panel and loading screen), manual weather, time travel (play and the time picker), the sunset score, both line-of-sight buttons, the compass and the share card. While locked, line of sight is off (no terrain fetch), the score shows only its label, and a tap opens `PremiumDialog` (title, what Premium includes, the local price, Buy, Restore, Cancel).
+  - Buy: `PaymentRequest` for `premium`; a cancel (`AbortError`) is quiet, other errors show a toast. After a purchase `PremiumBadge` is gone everywhere. The web keeps the plus (item 35).
+  - Pure helpers in `utils/premium.ts` (`isPremiumLocked`, `ownsPremium`, `formatPrice`, the hint). Types in `src/digital-goods.d.ts`. New texts `premium.*` in all five dictionaries.
+  - `PREMIUM_ENFORCED` stays `false`. For screenshots and manual checks, the dev server takes `?premium=enforce` (`import.meta.env.DEV` only; the production build drops it).
+  - The dialog is hand-built: `components/ui` has no dialog, and the shadcn dialog would add `@radix-ui/react-dialog`.
+- **Acknowledge (open, blocks item 16):** Digital Goods API v2 has no client `acknowledge()`. The [Chrome docs](https://developer.chrome.com/docs/android/trusted-web-activity/receive-payments-play-billing) and [chromeos.dev](https://chromeos.dev/en/publish/pwa-play-billing) acknowledge on a backend with the Play Developer API (`purchases.products.acknowledge`). `paymentResponse.complete('success')` only closes the payment UI. The code calls the v1 `acknowledge(token, 'onetime')` where the browser still has it. Before the release, test with a licence tester that a purchase is still there after 3 days. If not, add a small backend function (for example a Supabase Edge Function) that acknowledges the token.
+- **Checked:** 30 new tests (815 in all), lint, typecheck and build pass. In Chromium at 390×844 with a fake Digital Goods service and `?premium=enforce`: "Change location" opens the purchase dialog (en and de, €3.99 / 3,99 €) and not the form; after Buy the dialog closes, no gold plus is left (9 → 0) and the form opens. Without the query (enforcement off), web and fake Play app: no dialog, the form opens, the plus stays.
+- **Left for item 16:** create the managed product `premium` in the Play Console, turn on `playBilling` in Bubblewrap, solve the acknowledge point above, set `PREMIUM_ENFORCED = true`, and test buy, restore and refund with a licence tester.
 - **Later, only for a web sale (not planned):**
   1. Supabase Auth in the frontend (sign-in, session handling, `@supabase/supabase-js` client).
   2. Upgrade UI: pricing dialog → call `create-checkout` → redirect to Stripe.
@@ -1327,6 +1337,11 @@ Four Sentry reports from the evening and night of 2026-10-01, all from Ravensbur
   6. Store listing: privacy policy (location use, no tracking), data-safety form, content rating, and the graphics from item 15.
   7. Note: new personal developer accounts must run a closed test with 12+ testers for 14 days before the production release. Plan for this time.
 - **Done when:** the app is live on Google Play, opens fullscreen without a URL bar, and web deploys update it without a new store release.
+- **Test APK (2026-10-02):** a signed test APK exists, for a phone check before the Play release.
+  - The Bubblewrap project is in `~/sun-chaser-android/`, outside git. It has the keystore and its password file. Do not commit them.
+  - Package `app.vercel.sun_chaser.twa`, host `sun-chaser.vercel.app`, `display: fullscreen`, notifications on, `playBilling` on, `minSdkVersion` 23 (the billing library needs 23).
+  - `public/.well-known/assetlinks.json` has the SHA-256 fingerprint of this local key. With Play App Signing, add the Play app signing key's fingerprint from the Play Console to this file.
+  - The package name stays fixed after the first Play upload. Change it before then if needed.
 
 ---
 
