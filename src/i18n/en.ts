@@ -148,7 +148,7 @@ export const en = {
   'score.horizonClear': 'clear horizon',
 
   // Share card (item 68)
-  'share.button': 'Share sunset card',
+  'share.button': 'Share this view',
   'share.lineOfSight': 'Sunset, line of sight',
   'share.flatHorizon': 'Flat horizon {time}',
   'share.score': 'Sunset score {score}/10 · {reason}',

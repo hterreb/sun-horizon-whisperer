@@ -1010,7 +1010,7 @@ These items come from the re-shoot of all states after items 46–56.
 
 Four Sentry reports from the evening and night of 2026-10-01, all from Ravensburg on release `6e12461`. Request: "please spec all 4 of them, lets make a comparison of moon visibility, completely redo the rain animations, create a lookbook and spec a screenshot like behaviour for the share feature, and create a lookbook as well for different wave options depending on wind strength". Items 76, 77 and 79 have a lookbook, with Lutz's picks (2026-10-02) in each item. Item 78 has a full spec.
 
-### 76. The moon stays findable behind clouds — S — [SUN-CHASER-M](https://ainabler.sentry.io/issues/SUN-CHASER-M) — **Spec ready**
+### 76. The moon stays findable behind clouds — S — [SUN-CHASER-M](https://ainabler.sentry.io/issues/SUN-CHASER-M) — **✅ Done**
 
 - **Feedback (2026-10-01 23:42):** "Can't see the moon anymore". Then: "lets make a comparison of moon visibility".
 - **Now:** not a regression. Item 57 works as built: `getMoonCloudFactor` uses the stars' cloud factor (1 − cover), with a floor of 0.15 under partial cover, cloudy and overcast; storm and fog hide the moon. At the reported time Ravensburg had light rain (code 61) at 97 % cover. The moon was 21° high and 69 % lit, and showed at 11 % opacity (76 % on a clear night). Manual weather has no cover value, so manual rain, drizzle, snow and hail give 0: the moon is not drawn at all. The moon div paints above the clouds (DOM order, no z-index), so the clouds never cover it; the factor fades it. The moon arc and the altitude chip show in every weather.
@@ -1033,6 +1033,12 @@ Four Sentry reports from the evening and night of 2026-10-01, all from Ravensbur
   - **X2 Silver lining:** clouds within 4.5 × the disc radius of the moon get a pale rim in `--scene-moon`. `CloudLayer` already has the moon's place (the `moon` prop, item 74).
   - The cloud motion, the moon arc and the chip do not change. The moon reflection and the moonlight pool keep the item-57 factor.
 - **Done when:** a test for the disc floor and the corona per weather type (live and manual). In the browser at 23:42 on 2026-10-01 (rain, 97 %), the moon is findable at a glance; in fog only the glow shows; in a storm nothing shows.
+- **Built:**
+  - `getMoonLook` (`weatherEffectsUtils.ts`) gives the disc factor (the item-57 factor, at least 0.25 except in storm and fog) and the corona (strength 1 at 3.5 radii while the factor is below 0.5; fog 0.5 at 5 radii; storm none).
+  - `SunVisualization` draws the corona (`data-testid="moon-corona"`, a radial gradient in `--scene-moon`: 0.32 × strength × brightness at the centre, 0.13 at 40 %, 0 at the edge) under the disc (`data-testid="moon-disc"`). The reflection bars and the moonlight pool keep `getMoonCloudFactor`. The Halloween pumpkin moon follows the disc. `CloudLayer` gets `moon` while the disc or the corona shows, now with the radius (px) and the brightness; the night geese still fly only in fair weather.
+  - `getCloudMoonlight` (`cloudLayoutUtils.ts`) maps the moon into each cloud's 120 × 60 svg units. A cloud within reach gets a second copy of its path, filled with a radial gradient in `--scene-moon` (0.85 × brightness at the centre, 0.32 at half the radius, 0 at 4.5 radii), as in the lookbook.
+- **Deviations:** the silver lining brightens the parts of a cloud near the moon (as in the lookbook), not only its edge ("rim" in the spec). It is placed from the cloud's resting place, so the light rides along the cloud's ±6 vw sway (a `ponytail:` note in `getCloudMoonlight`).
+- **Checked:** 10 new tests (825 in all), lint, typecheck and build pass. In Chrome at 1280×800, Ravensburg, 2026-10-01 23:42 (moon 21° high, 69 % lit, disc radius 22 px): clear 0 %: disc 0.756, no corona. Live rain at 97 % cover: disc 0.189 (was 0.11), a 155 px corona, 2 lit clouds; the moon is findable at a glance. Manual Rain: disc 0.189 and the corona (was no moon at all). Manual Overcast: 0.189 and the corona. Manual Cloudy: disc 0.302 and the corona, 1 lit cloud. Manual Fog: no disc, a 222 px corona (faint under the fog band). Manual Storm: nothing. No console errors.
 
 ### 77. Rain, redone — M — [SUN-CHASER-J](https://ainabler.sentry.io/issues/SUN-CHASER-J) — **Spec ready**
 
@@ -1062,7 +1068,7 @@ Four Sentry reports from the evening and night of 2026-10-01, all from Ravensbur
   - **Snow and hail:** fix the same delay bug (set the delay after the shorthand, or only longhands). Their look does not change.
 - **Done when:** tests for the mm/h mapping, the code fallback, the angle and the drop reset (the count stays constant). In the browser at 390×844 and 1440×900: rain never pauses (sampled for 30 s), drizzle at 0.2 mm/h and a downpour at 20 mm/h look clearly different, 0 km/h falls straight and 50 km/h falls from the side, the rings sit where the streaks end, and in a downpour the mist hides the far shore. One frame takes under 1 ms on a phone.
 
-### 78. Share the current view — M — Premium — [SUN-CHASER-N](https://ainabler.sentry.io/issues/SUN-CHASER-N) — **Spec ready**
+### 78. Share the current view — M — Premium — [SUN-CHASER-N](https://ainabler.sentry.io/issues/SUN-CHASER-N) — **✅ Done**
 
 - **Feedback (2026-10-01 23:44):** "Share feature should include a screenshot of the actual view". Then: "spec a screenshot like behaviour for the share feature".
 - **Now:** the Share button (item 68) draws a 1080×1350 sunset card on a `<canvas>`: the dusk sky, the sun on the horizon or the ridge, the place, the date, the sunset times and the score. It does not show what the user sees (the current sky, the moon, the clouds, the boats, the birds).
@@ -1080,6 +1086,20 @@ Four Sentry reports from the evening and night of 2026-10-01, all from Ravensbur
   7. **Text:** the button label "Share sunset card" (`share.button`) becomes "Share this view", in all five languages.
   8. Premium as now: the gold plus and `requirePremium` (item 14) around the tap.
 - **Done when:** tests for the footer data (the view time, no coordinates), the `data-share-hide` filter, and the fallback to the card when the capture throws. In the browser (Chrome 390×844 and 1440×900): the image matches the screen without the controls, with moving boats and birds in place, at midday, at sunset and at night. On an Android phone the share sheet opens with the image. On iOS Safari the capture works or falls back to the card.
+- **Built:**
+  - `modern-screenshot` (^4.7.0) is a new dependency, loaded with `import()` inside `captureShareView` (`shareCard.ts`), so it is a separate 22 kB chunk (8.5 kB gzipped), not in the main bundle. The service worker precaches it, so it also works offline.
+  - `captureShareView` renders the scene root (`data-share-root` on the `SunTracker` root div) with `domToCanvas` at `getShareViewScale` (the pixel ratio, at most 2, with the long side at most 2400 px). It then draws the footer band (`getShareFooterHeight`, one fifth of the width) under it and returns a PNG. The filter `isSharedNode` leaves out every node with `data-share-hide`.
+  - `data-share-hide` is on the InfoPanel, the top-left buttons, the music player, the install prompt and the time-travel "Back to now" button. The toasts (`App.tsx`), the loading screen and the Premium dialog render outside the scene root, so the capture never sees them.
+  - The footer: the place name and the view time (`viewText`, new in `getShareCardData`) on the left, with the app mark under them. The sunset label and time, the flat time and the score are on the right. Sizes are the card's at 1080 px, scaled to the width. The app mark drawing is shared with the card (`drawAppMark`).
+  - `ShareCardButton` finds the scene root from the button (`closest('[data-share-root]')`), captures it and shares it as `sun-chaser-YYYY-MM-DD-HHMM.png` (`viewFileName`). When there is no root, or the import or the capture throws, it draws the item-68 card under its old file name. `share.button` is "Share this view" in all five languages.
+  - **Deviations:** `domToCanvas` instead of `domToPng`, because the footer is drawn on the same canvas. Point 4: the capture part has the screen's aspect ratio, and the footer makes the image one fifth of the width taller (390×844 → 780×1844).
+- **Checked:** 6 new tests (821 in all); lint, typecheck and build pass. In Chrome (Ravensburg, 2026-10-01, faked weather), a tap on "Share this view" gave the shared PNG in 0.2–0.4 s on a phone and 0.9 s on desktop:
+  - 390×844 at 2×: 780×1844 at 11:04 (three boats on the water), 18:50 (sunset) and 23:42 (night, moon 21°). 1440×900 at 1×: 1440×1188 at 11:05.
+  - Against a screenshot with the controls hidden, the capture differs by 0.1–0.37 of 255 on average. 0.24 % of the pixels differ by more than 40, only at midday, where boats and birds moved in the 0.5 s between the two shots. The boats sit where they are on screen.
+  - No InfoPanel, buttons or music player in the image. The footer shows "Ravensburg", "October 1, 2026, 18:50", the line-of-sight sunset 18:55, the flat time 19:03 (−9 min), the score and the app mark.
+  - With the capture chunk blocked, the button shares the item-68 card (1080×1350).
+  - No console errors.
+  - This Chrome has the Web Share API, and its headless share sheet never answers, so the check caught the shared file instead. The Android share sheet and iOS Safari are not checked yet.
 
 ### 79. Waves by wind strength — M — [SUN-CHASER-K](https://ainabler.sentry.io/issues/SUN-CHASER-K) — **✅ Done**
 
@@ -1381,9 +1401,10 @@ Four Sentry reports from the evening and night of 2026-10-01, all from Ravensbur
 - **Done when:** the app is live on Google Play, opens fullscreen without a URL bar, and web deploys update it without a new store release.
 - **Test APK (2026-10-02):** a signed test APK exists, for a phone check before the Play release.
   - The Bubblewrap project is in `~/sun-chaser-android/`, outside git. It has the keystore and its password file. Do not commit them.
-  - Package `app.vercel.sun_chaser.twa`, host `sun-chaser.vercel.app`, `display: fullscreen`, notifications on, `playBilling` on, `minSdkVersion` 23 (the billing library needs 23).
+  - Package `com.ainabler.sunchaser`, host `sun-chaser.vercel.app`, `display: fullscreen`, notifications on, `playBilling` on, `minSdkVersion` 23 (the billing library needs 23).
   - `public/.well-known/assetlinks.json` has the SHA-256 fingerprint of this local key. With Play App Signing, add the Play app signing key's fingerprint from the Play Console to this file.
-  - The package name stays fixed after the first Play upload. Change it before then if needed.
+  - Package name decided (2026-10-02): `com.ainabler.sunchaser`. It has the brand and the app name, no personal name and no country domain, because the app is for all countries. It stays fixed after the first Play upload.
+  - Distribution for phone tests: the Play Console internal testing track (decided 2026-10-02).
 
 ---
 

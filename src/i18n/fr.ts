@@ -148,7 +148,7 @@ export const fr: Record<keyof typeof en, string> = {
   'score.horizonClear': "horizon dégagé",
 
   // Share card (item 68)
-  'share.button': "Partager le coucher du soleil",
+  'share.button': "Partager cette vue",
   'share.lineOfSight': "Coucher du soleil, ligne de vue",
   'share.flatHorizon': "Horizon plat {time}",
   'share.score': "Note du coucher {score}/10 · {reason}",

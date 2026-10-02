@@ -16,7 +16,7 @@ import SolarEclipse from '@/components/SolarEclipse';
 import GreenFlash from '@/components/GreenFlash';
 import MoonTint from '@/components/MoonTint';
 import { type AstroEvent } from '@/utils/astroEvents';
-import { getSunVisibility, getMoonCloudFactor } from '@/utils/weatherEffectsUtils';
+import { getSunVisibility, getMoonCloudFactor, getMoonLook } from '@/utils/weatherEffectsUtils';
 import { getSeaWindKmh, getReflectionBars } from '@/utils/waveUtils';
 import { getCloudDriftDirection } from '@/utils/cloudLayoutUtils';
 import SeaCanvas from '@/components/SeaCanvas';
@@ -614,6 +614,10 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   const isSunVisible = sunAltitudeVisible && sunDotVisible;
   const isMoonVisible = moonAltitudeVisible && moonDotVisible;
   const moonCloudFactor = getMoonCloudFactor(weatherType, cloudCoverPercent); // clouds hide the moon (ROADMAP item 57)
+  // ...but the disc and its corona keep it findable (item 76); the reflection and the pool keep the factor above.
+  const moonLook = getMoonLook(weatherType, cloudCoverPercent);
+  const moonBright = moonPosition.illumination * 0.8 + 0.2;
+  const isMoonDiscShown = isMoonVisible && moonLook.disc > 0;
   // The pool of moonlight for the night fish (ROADMAP item 65, NR3): as bright as the moon
   // is full, dimmed by clouds, and fading as the moon sets, like its reflection bars.
   const nightWater = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
@@ -856,8 +860,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         windDirectionDeg={windDirectionDeg}
         isFullscreen={isFullscreen}
         moonlight={{ x: containerDimensions.width > 0 ? moonX / containerDimensions.width : 0.5, strength: moonPool }}
-        moon={isMoonVisible && moonCloudFactor > 0 && containerDimensions.height > 0
-          ? { x: (moonX / containerDimensions.width) * 100, y: (moonY / containerDimensions.height) * 100 }
+        moon={isMoonVisible && (moonLook.disc > 0 || moonLook.corona > 0) && containerDimensions.height > 0
+          ? { x: (moonX / containerDimensions.width) * 100, y: (moonY / containerDimensions.height) * 100, r: moonRadius, light: moonBright }
           : null}
       />
       <WeatherEffects
@@ -963,16 +967,33 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         </div>
       )}
 
-      {isMoonVisible && moonCloudFactor > 0 && (
+      {isMoonVisible && moonLook.corona > 0 && (
+        // MV4 (item 76): a soft glow in the moon's colour where it sits behind clouds or fog.
+        <div
+          className={`absolute pointer-events-none rounded-full ${compassActive ? '' : 'transition-all duration-1000'}`}
+          style={{
+            left: `${moonX}px`,
+            top: `${moonY}px`,
+            width: moonRadius * moonLook.coronaRadius * 2,
+            height: moonRadius * moonLook.coronaRadius * 2,
+            transform: 'translate(-50%, -50%)',
+            background: `radial-gradient(circle closest-side, hsl(var(--scene-moon) / ${0.32 * moonLook.corona * moonBright}) 0%, hsl(var(--scene-moon) / ${0.13 * moonLook.corona * moonBright}) 40%, transparent 100%)`,
+          }}
+          data-testid="moon-corona"
+        />
+      )}
+
+      {isMoonDiscShown && (
         <div
           className={`absolute ${compassActive ? '' : 'transition-all duration-1000'}`}
           style={{
             left: `${moonX}px`,
             top: `${moonY}px`,
             transform: 'translate(-50%, -50%)',
-            opacity: (moonPosition.illumination * 0.8 + 0.2) * moonCloudFactor,
+            opacity: moonBright * moonLook.disc,
             filter: `drop-shadow(0 0 ${moonPosition.illumination * 15}px hsl(var(--scene-glow-white) / 0.4))`
           }}
+          data-testid="moon-disc"
         >
           <svg
             width={moonRadius * 2}
@@ -992,7 +1013,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         event={calendarEvent}
         timeOfDay={timeOfDay}
         weatherType={weatherType}
-        moon={isMoonVisible && moonCloudFactor > 0 ? { x: moonX, y: moonY, r: moonRadius } : null}
+        moon={isMoonDiscShown ? { x: moonX, y: moonY, r: moonRadius } : null}
         horizonY={containerDimensions.height * 0.65}
       />
 
