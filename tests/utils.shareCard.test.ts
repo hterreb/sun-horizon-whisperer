@@ -1,5 +1,15 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { getShareCardData, getRidgePoints, shareOrDownload, SHARE_CARD_WIDTH } from '@/utils/shareCard';
+import { domToCanvas } from 'modern-screenshot';
+import {
+  captureShareView,
+  getShareCardData,
+  getRidgePoints,
+  getShareFooterHeight,
+  getShareViewScale,
+  isSharedNode,
+  shareOrDownload,
+  SHARE_CARD_WIDTH,
+} from '@/utils/shareCard';
 import { formatTime } from '@/utils/sunUtils';
 import { type HorizonProfile } from '@/utils/horizonUtils';
 
@@ -8,6 +18,8 @@ const at = (h: number, m: number, dayOffset = 0) => {
   d.setHours(h, m, 0, 0);
   return d;
 };
+vi.mock('modern-screenshot', () => ({ domToCanvas: vi.fn() }));
+
 const today = { score: 7, clouds: 'score.cloudsHigh', horizon: 'score.horizonClear' } as const;
 const tomorrow = { score: 3, clouds: 'score.cloudsThin', horizon: 'score.horizonClouded' } as const;
 
@@ -101,5 +113,37 @@ describe('shareOrDownload', () => {
     await expect(shareOrDownload(blob, 'card.png')).resolves.toBe('downloaded');
     expect(click).toHaveBeenCalledOnce();
     expect(downloaded).toBe('card.png blob:card');
+  });
+});
+
+describe('Share the current view (ROADMAP item 78)', () => {
+  it('gives the footer the date and time on screen, also during time travel', () => {
+    const data = getShareCardData({ placeName: 'Ravensburg', now: at(21, 42, 5), flatSunset: at(18, 50, 6) }, 'en');
+    expect(data.viewText).toBe(`October 6, 2026, ${formatTime(at(21, 42, 5))}`);
+    expect(data.viewFileName).toBe('sun-chaser-2026-10-06-2142.png');
+  });
+
+  it('leaves out the nodes marked data-share-hide (the controls), keeps the scene', () => {
+    const panel = document.createElement('div');
+    panel.setAttribute('data-share-hide', '');
+    expect(isSharedNode(panel)).toBe(false);
+    expect(isSharedNode(document.createElement('svg'))).toBe(true);
+    expect(isSharedNode(document.createTextNode('18:55'))).toBe(true);
+  });
+
+  it('keeps the screen pixels (at most 2×) and the image at most 2400 px long', () => {
+    expect(getShareViewScale(390, 844, 3)).toBe(2); // phone: 780 × 1688 + a 156 px footer
+    expect(getShareViewScale(1440, 900, 2)).toBeCloseTo(2400 / 1440); // desktop: 2400 wide
+    expect(getShareViewScale(1440, 900, 1)).toBe(1);
+    expect(getShareFooterHeight(780)).toBe(156);
+  });
+
+  it('captures the scene root with the hide filter, and fails so the button can fall back', async () => {
+    const root = document.createElement('div');
+    vi.spyOn(root, 'getBoundingClientRect').mockReturnValue({ width: 390, height: 844 } as DOMRect);
+    vi.mocked(domToCanvas).mockRejectedValue(new Error('foreignObject not supported'));
+    const data = getShareCardData({ placeName: 'Ravensburg', now: at(12, 0), flatSunset: at(18, 58) }, 'en');
+    await expect(captureShareView(root, data)).rejects.toThrow('foreignObject');
+    expect(domToCanvas).toHaveBeenCalledWith(root, expect.objectContaining({ filter: isSharedNode }));
   });
 });
