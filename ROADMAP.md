@@ -1034,7 +1034,7 @@ Four Sentry reports from the evening and night of 2026-10-01, all from Ravensbur
   - The cloud motion, the moon arc and the chip do not change. The moon reflection and the moonlight pool keep the item-57 factor.
 - **Done when:** a test for the disc floor and the corona per weather type (live and manual). In the browser at 23:42 on 2026-10-01 (rain, 97 %), the moon is findable at a glance; in fog only the glow shows; in a storm nothing shows.
 
-### 77. Rain, redone — M — [SUN-CHASER-J](https://ainabler.sentry.io/issues/SUN-CHASER-J) — **Spec ready**
+### 77. Rain, redone — M — [SUN-CHASER-J](https://ainabler.sentry.io/issues/SUN-CHASER-J) — **✅ Done**
 
 - **Feedback (2026-10-01 19:51):** "Rain should be a constant drizzle not stopping every few seconds and depending on how much rain falls more or less and depending on the wind straight or from the side". Then: "completely redo the rain animations, create a lookbook".
 - **Now:**
@@ -1050,7 +1050,7 @@ Four Sentry reports from the evening and night of 2026-10-01, all from Ravensbur
     | Class | mm/h | t | Drops | Near streak | Opacity | Fall | Sky grey (X5) | Mist (X4) |
     |---|---|---|---|---|---|---|---|---|
     | Drizzle | 0.2 | 0.13 | 102 | 8 px | 33 % | 2.8 s | 0.45 | 0.32 |
-    | Light | 1 | 0.44 | 199 | 14 px | 44 % | 2.4 s | 0.55 | 0.47 |
+    | Light | 1 | 0.43 | 199 | 14 px | 44 % | 2.4 s | 0.55 | 0.47 |
     | Moderate | 4 | 0.70 | 283 | 19 px | 54 % | 2.0 s | 0.64 | 0.60 |
     | Heavy | 10 | 0.87 | 338 | 22 px | 60 % | 1.8 s | 0.70 | 0.68 |
     | Downpour | 20 | 1 | 380 | 24 px | 65 % | 1.6 s | 0.75 | 0.75 |
@@ -1061,6 +1061,21 @@ Four Sentry reports from the evening and night of 2026-10-01, all from Ravensbur
   - **X5 Darker with more rain:** the sky's grey mix for rain and drizzle (`SKY_OVERCAST_MIX`, item 50) becomes 0.4 + 0.35t (today drizzle 0.45, rain 0.6), times the cloud cover as now.
   - **Snow and hail:** fix the same delay bug (set the delay after the shorthand, or only longhands). Their look does not change.
 - **Done when:** tests for the mm/h mapping, the code fallback, the angle and the drop reset (the count stays constant). In the browser at 390×844 and 1440×900: rain never pauses (sampled for 30 s), drizzle at 0.2 mm/h and a downpour at 20 mm/h look clearly different, 0 km/h falls straight and 50 km/h falls from the side, the rings sit where the streaks end, and in a downpour the mist hides the far shore. One frame takes under 1 ms on a phone.
+- **Built:**
+  - `src/utils/rainUtils.ts`: `getPrecipitationMmH` (the amount per interval to mm/h, else the code value), `getRainMmH` (null without rain; manual weather and old cache entries get drizzle 0.4, rain 4, storm 10), `getRainIntensity` (t), `getRainLook` (X1, per 430 px, at most 1200 drops), `getRainMistOpacity` (X4), `getRainSkyMix` (X5), `getRainAngleDeg` (X2), and the drops: `getRainWaterY`, `placeRainDrop`, `stepRainDrops`.
+  - `src/components/RainCanvas.tsx`: one canvas (`zIndex` 8: over the sea and the boats, under the chips) with one rAF loop (frame ID in a `useRef`). Far: 0.5 × the drops as short faint dashes in the band from 26 % of the height above the horizon down to it, in 8 slices that get stronger toward the horizon. Middle: 0.72 × the drops, ending on the water at their depth, with rings (at most 120, in 5 opacity batches). Near: 0.05 × the drops (at least 4), long and soft. The rain's grey haze over the horizon is the canvas's CSS background. Reduced motion: one still frame. Colours: the new tokens `--scene-rain-day`, `--scene-rain-dusk`, `--scene-rain-night`, with the lookbook's light factor (day 1, dusk 0.95, night 0.75).
+  - `weatherUtils`: `current=…,precipitation`, `precipitationMmH` in `WeatherData` and the cache (null in an older entry). `SunTracker` passes `rainMmH` (null in manual mode) to `getSkyOvercastMix` and `SunVisualization` → `CloudLayer`. `getWaterColors` also returns `mist`; the mist band sits in `SunVisualization` after the sea (over the ridge and the sea, under the boats).
+  - `CloudLayer`: the `precipDrops` divs, their `PRECIP_COUNT` entries and `@keyframes fall` are gone; hail keeps `getPrecipitationSlantPx` and `--slant`. Snow and hail now put their delay in the `animation` shorthand.
+  - Before, the drops had no z-index and the sea path covered them: the rain showed only in the sky. Now it falls onto the water.
+  - **Deviations:** the far veil is short dashes on the same canvas, not the lookbook's moving pattern tile (no pattern or `DOMMatrix`). The haze is CSS, not a canvas gradient. The ring opacity is rounded to 5 levels (one stroke per level). The freezing codes get the lookbook values (56/57 → 0.2/0.8, 66/67 → 1.5/10). Drizzle's 1.4 × tilt follows the weather type, not mm/h < 0.5. In the table above, t at 1 mm/h is 0.43 (it said 0.44).
+- **Checked:** 25 new tests (840 in all); lint, typecheck and build pass. In Chrome, Ravensburg, mocked Open-Meteo with `precipitation` and `interval` 900:
+  - 390×844, 12:00, 4 mm/h: over 30 s (60 samples) the lit sky pixels of the canvas stayed between 4157 and 7423 (mean 5699); the rain never paused.
+  - Drizzle (code 51, 0.2 mm/h): 710 lit sky pixels, mist 0.32. Downpour (code 82, 20 mm/h): 8979, mist 0.75; long streaks, rings on the water, the far shore faint, the sky greyer.
+  - Wind 0 km/h: 0°, straight down. 50 km/h from the west: 30°, falling to the right. From the east: −30°, to the left.
+  - Night (2026-10-01 23:42, 1.6 mm/h): faint, calm streaks and rings on the dark water. 1440×900 downpour at 30 km/h: 18°, the mist hides the ridge.
+  - Reduced motion: the same frame after 3 s (a still frame, no loop).
+  - Snow: 60 flakes with 60 different delays, none 0 s. Manual hail: 45 pellets, 45 different delays.
+  - Frame cost with 4× CPU throttling in a downpour: 390×844 median 0.8 ms (p95 1.2 ms), 1440×900 median 1.2 ms (p95 1.8 ms). No console errors.
 
 ### 78. Share the current view — M — Premium — [SUN-CHASER-N](https://ainabler.sentry.io/issues/SUN-CHASER-N) — **Spec ready**
 

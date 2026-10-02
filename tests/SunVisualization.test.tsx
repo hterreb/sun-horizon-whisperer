@@ -969,6 +969,17 @@ describe('SunVisualization (rendered): sea visible at the horizon (ROADMAP item 
     expect(stops).toEqual([water.surface, water.deep]);
   });
 
+  it('lays a horizon mist in rain, thicker with more rain (ROADMAP item 77, X4)', () => {
+    const skyGradient = 'linear-gradient(to bottom, #403E43 0%, #E5DEFF 62%, #F97316 100%)';
+    const mist = (props: object) =>
+      render(<SunVisualization {...baseProps} skyGradient={skyGradient} {...props} />).container.querySelector<HTMLElement>('[data-testid="rain-mist"]');
+    expect(Number(mist({ weatherType: 'rain', rainMmH: 0.2 })?.style.opacity)).toBeCloseTo(0.32, 2);
+    expect(Number(mist({ weatherType: 'rain', rainMmH: 20 })?.style.opacity)).toBe(0.75);
+    expect(Number(mist({ weatherType: 'storm' })?.style.opacity)).toBeCloseTo(0.68, 2); // 10 mm/h without an amount
+    expect(mist({ weatherType: 'clear' })).toBeNull();
+    expect(mist({ weatherType: 'snow' })).toBeNull();
+  });
+
   it('draws the reflection bars under a visible sun, and none when clouds hide the sun (ROADMAP items 50, 53 rollback)', () => {
     setMockedContainerSize(800, 600);
     const { unmount } = render(<SunVisualization {...baseProps} />);

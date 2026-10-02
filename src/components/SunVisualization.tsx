@@ -17,6 +17,7 @@ import GreenFlash from '@/components/GreenFlash';
 import MoonTint from '@/components/MoonTint';
 import { type AstroEvent } from '@/utils/astroEvents';
 import { getSunVisibility, getMoonCloudFactor } from '@/utils/weatherEffectsUtils';
+import { getRainMmH, getRainMistOpacity } from '@/utils/rainUtils';
 import { useLanguage } from '@/hooks/useLanguage';
 import { formatNumber, type MessageKey } from '@/i18n';
 import { type Language } from '@/utils/language';
@@ -49,6 +50,8 @@ interface SunVisualizationProps {
   cloudCoverPercent?: number | null;
   windSpeedKmh?: number | null;
   windDirectionDeg?: number | null;
+  // The forecast rain amount in mm/h (ROADMAP item 77); null: the type's middle value.
+  rainMmH?: number | null;
   // Live compass mode (ROADMAP item 19): the current (smoothed) device heading, or
   // null/undefined for the static 360°-across-the-screen mode. When set, azimuths are
   // mapped through a real field of view centered on this heading (getCompassScreenFraction)
@@ -504,6 +507,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   cloudCoverPercent = null,
   windSpeedKmh = null,
   windDirectionDeg = null,
+  rainMmH = null,
   compassHeading = null,
   horizonProfile = null,
   terrainSunTimes = null,
@@ -728,6 +732,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
   // The water follows the sky (ROADMAP item 53); a storm darkens it (item 51).
   const water = getWaterColors(skyGradient, weatherType === 'storm');
+  const rainAmount = getRainMmH(weatherType, rainMmH);
 
   // Line-of-sight ridge (terrain-silhouette) color, the style book's "soft ridge"
   // per time-of-day bucket (ROADMAP item 15 deliverable 2), drawn semi-transparent
@@ -845,6 +850,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         cloudCoverPercent={cloudCoverPercent}
         windSpeedKmh={windSpeedKmh}
         windDirectionDeg={windDirectionDeg}
+        rainMmH={rainMmH}
         isFullscreen={isFullscreen}
         moonlight={{ x: containerDimensions.width > 0 ? moonX / containerDimensions.width : 0.5, strength: moonPool }}
         moon={isMoonVisible && moonCloudFactor > 0 && containerDimensions.height > 0
@@ -1016,6 +1022,21 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           data-testid="sea"
         />
       </svg>
+
+      {rainAmount != null && (
+        // Horizon mist (ROADMAP item 77, X4): a pale band over the horizon, so heavy rain
+        // hides the far shore. Above the ridge and the sea, below the boats and the rain.
+        <div
+          className="absolute inset-x-0 pointer-events-none"
+          style={{
+            top: '50%',
+            height: '30%',
+            background: `linear-gradient(transparent, ${water.mist} 50%, transparent)`,
+            opacity: getRainMistOpacity(rainAmount),
+          }}
+          data-testid="rain-mist"
+        />
+      )}
 
       {containerDimensions.height > 0 && weatherType !== 'storm' && (() => {
         // Sun/moon reflection on the water (ROADMAP item 15 deliverable 2): a few

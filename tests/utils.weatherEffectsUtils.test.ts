@@ -276,9 +276,10 @@ describe('getTwilightStars (ROADMAP item 52)', () => {
 
 describe('getSkyOvercastMix (ROADMAP item 50)', () => {
   it('mixes the sky toward grey per weather type without a cloud cover', () => {
+    // Rain and drizzle follow the amount since item 77 (X5), see below.
     const expected = {
-      clear: 0, partly: 0.1, cloudy: 0.25, drizzle: 0.45, snow: 0.45,
-      overcast: 0.6, fog: 0.6, rain: 0.6, storm: 0.75, hail: 0.75,
+      clear: 0, partly: 0.1, cloudy: 0.25, snow: 0.45,
+      overcast: 0.6, fog: 0.6, storm: 0.75, hail: 0.75,
     } as const;
     for (const [type, mix] of Object.entries(expected)) {
       expect(getSkyOvercastMix(type as keyof typeof expected, null)).toBe(mix);
@@ -287,11 +288,30 @@ describe('getSkyOvercastMix (ROADMAP item 50)', () => {
   });
 
   it('scales the mix by a measured cloud cover, clamped to 0-100 %', () => {
-    expect(getSkyOvercastMix('rain', 100)).toBe(0.6);
-    expect(getSkyOvercastMix('rain', 50)).toBeCloseTo(0.3);
+    expect(getSkyOvercastMix('overcast', 100)).toBe(0.6);
+    expect(getSkyOvercastMix('overcast', 50)).toBeCloseTo(0.3);
     expect(getSkyOvercastMix('cloudy', 0)).toBe(0);
     expect(getSkyOvercastMix('storm', 150)).toBe(0.75);
     expect(getSkyOvercastMix('clear', 100)).toBe(0);
+  });
+});
+
+describe('getSkyOvercastMix: darker with more rain (ROADMAP item 77, X5)', () => {
+  it('greys rain and drizzle from 0.4 + 0.35t, times the cover', () => {
+    expect(getSkyOvercastMix('drizzle', null, 0.2)).toBeCloseTo(0.446, 3);
+    expect(getSkyOvercastMix('rain', null, 4)).toBeCloseTo(0.644, 3);
+    expect(getSkyOvercastMix('rain', null, 20)).toBeCloseTo(0.75, 3);
+    expect(getSkyOvercastMix('rain', 50, 20)).toBeCloseTo(0.375, 3);
+  });
+
+  it("uses the type's middle value without an amount (manual weather)", () => {
+    expect(getSkyOvercastMix('rain', null)).toBeCloseTo(getSkyOvercastMix('rain', null, 4), 6);
+    expect(getSkyOvercastMix('drizzle', null, 0)).toBeCloseTo(getSkyOvercastMix('drizzle', null, 0.4), 6);
+  });
+
+  it('leaves the storm and the other types as they were', () => {
+    expect(getSkyOvercastMix('storm', null, 20)).toBe(0.75);
+    expect(getSkyOvercastMix('snow', null, 20)).toBe(0.45);
   });
 });
 

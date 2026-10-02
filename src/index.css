@@ -103,6 +103,10 @@
     --scene-sky-overcast: 208.4 8.8% 57.8%;
     /* The thin outline that keeps snowflakes readable on the grey sky (item 50) */
     --scene-snow-outline: 210 25% 40%;
+    /* The rain streaks, rings and haze (item 77), by light: day, dusk, night */
+    --scene-rain-day: 210 52% 89%;
+    --scene-rain-dusk: 26 52% 89%;
+    --scene-rain-night: 213 26% 73%;
 
     /* Scene palette — sun glow, matching the 3 altitude bands in
        SunVisualization's getGlowIntensity (yellow / orange / tomato) */
