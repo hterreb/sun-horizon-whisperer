@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-02. Done: items 1–15, 17–44, 47–75 (item 14: the Play-app code, with `PREMIUM_ENFORCED` off until item 16), item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: item 16 (with it: turn on `PREMIUM_ENFORCED`, and check with a licence tester that a purchase is still there after 3 days, see item 14 "Acknowledge"; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
+Status: last updated 2026-10-02. Done: items 1–15, 17–44, 47–75 (item 14: the Play-app code, with `PREMIUM_ENFORCED` off until item 16), item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: items 76–79 (specs ready 2026-10-02), item 16 (with it: turn on `PREMIUM_ENFORCED`, and check with a licence tester that a purchase is still there after 3 days, see item 14 "Acknowledge"; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
 
 ## Verification (2026-09-28)
 
@@ -1005,6 +1005,121 @@ These items come from the re-shoot of all states after items 46–56.
 - **Spec:** `:root { color-scheme: only light; }` (`src/index.css`). `only light` tells Chrome that the page must not be darkened. The scene already paints its own day and night.
 - **Built:** the one line in `src/index.css`.
 - **Checked:** in Chrome with `--enable-features=WebContentsForceDark` and a dark system theme, Ravensburg, 2026-10-01 13:00, clear: before the fix the halo was a dark ring; after it, the halo is pale yellow-white as in light mode. On a near fishing boat at 3× scale, the fix restores the white cabin, the navy roof and the navy mast. Lint, typecheck and tests pass.
+
+### Feedback round (2026-10-02)
+
+Four Sentry reports from the evening and night of 2026-10-01, all from Ravensburg on release `6e12461`. Request: "please spec all 4 of them, lets make a comparison of moon visibility, completely redo the rain animations, create a lookbook and spec a screenshot like behaviour for the share feature, and create a lookbook as well for different wave options depending on wind strength". Items 76, 77 and 79 have a lookbook, with Lutz's picks (2026-10-02) in each item. Item 78 has a full spec.
+
+### 76. The moon stays findable behind clouds — S — [SUN-CHASER-M](https://ainabler.sentry.io/issues/SUN-CHASER-M) — **Spec ready**
+
+- **Feedback (2026-10-01 23:42):** "Can't see the moon anymore". Then: "lets make a comparison of moon visibility".
+- **Now:** not a regression. Item 57 works as built: `getMoonCloudFactor` uses the stars' cloud factor (1 − cover), with a floor of 0.15 under partial cover, cloudy and overcast; storm and fog hide the moon. At the reported time Ravensburg had light rain (code 61) at 97 % cover. The moon was 21° high and 69 % lit, and showed at 11 % opacity (76 % on a clear night). Manual weather has no cover value, so manual rain, drizzle, snow and hail give 0: the moon is not drawn at all. The moon div paints above the clouds (DOM order, no z-index), so the clouds never cover it; the factor fades it. The moon arc and the altitude chip show in every weather.
+- **Comparison:** [Moon Visibility](https://claude.ai/artifact/Wp4kWonKagqoTXLpw6dX2m) (private): 11 weathers × 6 options, a phase slider, a phone close-up. Options: MV1 today; MV2 a floor of 0.35; MV3 the moon behind passing clouds (clouds above the moon, new slow crossing motion); MV4 glow through clouds; MV5 a halo ring in partly and cloudy weather; MV6 at least 0.5. Add-ons: X1 a "Behind clouds" chip, X2 a silver lining on clouds near the moon, X3 a brighter moon arc while the moon is dim.
+- **Disc opacity at the reported phase** (live mode, CloudLayer's default cover per type):
+
+  | Weather | MV1 | MV2 | MV3 (under a cloud) | MV4 | MV6 |
+  |---|---|---|---|---|---|
+  | clear | 76 | 76 | 76 | 76 | 76 |
+  | partly | 57 | 57 | 76 (61) | 57 | 57 |
+  | cloudy | 34 | 34 | 76 (56) | 34 + glow | 38 |
+  | overcast, rain, hail | 11 | 26 | 53 (15–22) | 19 + glow | 38 |
+  | drizzle, snow | 15 | 26 | 53 (26–28) | 19 + glow | 38 |
+  | fog | 0 | 0 | 0 | glow only | 0 |
+  | storm | 0 | 0 | 0 | 0 | 0 |
+
+- **Picks (2026-10-02):** "Moon picks: MV4, X2".
+- **Spec:**
+  - **MV4 Glow through clouds:** the disc keeps at least 0.25 of its clear opacity in every weather except storm (manual rain included). When the item-57 factor is below 0.5, a soft corona in `--scene-moon` (radius 3.5 × the disc radius) shows around the disc. Fog: the corona only, 5 × the radius, no disc. Storm: no moon, as now.
+  - **X2 Silver lining:** clouds within 4.5 × the disc radius of the moon get a pale rim in `--scene-moon`. `CloudLayer` already has the moon's place (the `moon` prop, item 74).
+  - The cloud motion, the moon arc and the chip do not change. The moon reflection and the moonlight pool keep the item-57 factor.
+- **Done when:** a test for the disc floor and the corona per weather type (live and manual). In the browser at 23:42 on 2026-10-01 (rain, 97 %), the moon is findable at a glance; in fog only the glow shows; in a storm nothing shows.
+
+### 77. Rain, redone — M — [SUN-CHASER-J](https://ainabler.sentry.io/issues/SUN-CHASER-J) — **Spec ready**
+
+- **Feedback (2026-10-01 19:51):** "Rain should be a constant drizzle not stopping every few seconds and depending on how much rain falls more or less and depending on the wind straight or from the side". Then: "completely redo the rain animations, create a lookbook".
+- **Now:**
+  - **The gaps (bug):** each drop's style sets `animationDelay`, then the `animation` shorthand (`CloudLayer.tsx` ~861). The shorthand resets the delay: in Chrome `getComputedStyle(drop).animationDelay` is `0s` on all 80 drops, so they fall in step. The drops also start 10–110 % of the height above the top and fall 100vh per loop. Measured every 100 ms, the drops on screen climb from 2 to 73 of 80 and drop to 0, every 2.5 s (drizzle every 3 s). 7 drops never come into view. Snow and hail set their delay the same way and fall in step too.
+  - **Amount:** only by type (drizzle 35 drops, rain 80, storm 100). The forecast amount is not fetched.
+  - **Wind:** `--slant` moves the drops sideways by at most 60 px over the fall (about 4°). The streaks are never tilted.
+- **Lookbook:** [Rain Styles](https://claude.ai/artifact/9ct7DNppTsMoHdzNQNzjcp) (private), with live intensity, wind and time-of-day controls. Styles: R1 steady CSS streaks in 3 layers; R2 canvas rain with depth; R3 a soft veil for drizzle; R4 rain curtains toward the horizon; R5 canvas rain with rings on the water; R6 depth layers. Add-ons: X1 the amount from the forecast, X2 the wind angle, X3 rings on the water, X4 horizon mist, X5 darker with more rain, X6 gusts.
+- **Picks (2026-10-02):** "Rain picks: R6, X1, X2, X3, X4, X5".
+- **Spec:**
+  - **R6 Depth layers:** one `<canvas>` for drizzle, rain and storm, with one `requestAnimationFrame` loop (the frame ID in a `useRef`, CLAUDE.md gotcha). Three layers: a far veil band that thickens toward the horizon, middle streaks that end on the water at their depth, and a few soft near streaks. A drop that leaves the scene starts again at the top, so the amount on screen never changes. No rain: no canvas, no loop. Reduced motion: one still frame. The `precipDrops` divs, their `PRECIP_COUNT` entries and `@keyframes fall` go.
+  - **X1 Amount from the forecast:** add `precipitation` to `current=` (`weatherUtils.ts`). It is in mm per `current.interval` (900 s), so mm/h = value × 4. Without a value, the weather code sets it: 51/53/55 → 0.2/0.4/0.8, 61/63/65 → 1.5/4/10, 80/81/82 → 2/6/20, thunderstorm 10 mm/h. Manual weather uses the code values (drizzle 0.4, rain 4, storm 10). With t = (log10 mm/h + 1) / (log10 20 + 1), clamped to 0–1, per 430 px of width: drops = 60 + 320t, near streak 6 + 18t px long and 1 + 0.8t px wide, opacity 0.28 + 0.37t, fall time 3 − 1.4t s per scene height (far drops up to 1.8× longer). At most 1200 drops.
+
+    | Class | mm/h | t | Drops | Near streak | Opacity | Fall | Sky grey (X5) | Mist (X4) |
+    |---|---|---|---|---|---|---|---|---|
+    | Drizzle | 0.2 | 0.13 | 102 | 8 px | 33 % | 2.8 s | 0.45 | 0.32 |
+    | Light | 1 | 0.44 | 199 | 14 px | 44 % | 2.4 s | 0.55 | 0.47 |
+    | Moderate | 4 | 0.70 | 283 | 19 px | 54 % | 2.0 s | 0.64 | 0.60 |
+    | Heavy | 10 | 0.87 | 338 | 22 px | 60 % | 1.8 s | 0.70 | 0.68 |
+    | Downpour | 20 | 1 | 380 | 24 px | 65 % | 1.6 s | 0.75 | 0.75 |
+
+  - **X2 Wind angle:** the streaks tilt along their path, angle = min(35°, 0.6° per km/h); drizzle tilts 1.4× as much, up to 45°. The rain falls away from the side the wind comes from (the sign of `getCloudDriftDirection`). This replaces `getPrecipitationSlantPx` for the rain; hail keeps it.
+  - **X3 Rings on the water:** where a middle streak ends on the water, a small flat ring (an ellipse, height 0.3 × width) widens and fades out in 0.8 s. Radius (1 + (2 + 7z) × f) × 1.6 px, opacity 0.55 × (1 − f) × (0.4 + 0.6z), with z the depth (0 at the horizon, 1 at the bottom) and f the ring's age / 0.8 s. So the rings are smaller, flatter and fainter toward the horizon. At most 120 rings. On the same canvas.
+  - **X4 Horizon mist:** a pale band over the horizon (from 50 % to 80 % of the height, strongest at the middle) in the horizon colour, lighter and less saturated (saturation × 0.35, lightness × 1.06 + 8, at most 90). Opacity 0.25 + 0.5t, so heavy rain hides the far shore. A CSS gradient, no animation.
+  - **X5 Darker with more rain:** the sky's grey mix for rain and drizzle (`SKY_OVERCAST_MIX`, item 50) becomes 0.4 + 0.35t (today drizzle 0.45, rain 0.6), times the cloud cover as now.
+  - **Snow and hail:** fix the same delay bug (set the delay after the shorthand, or only longhands). Their look does not change.
+- **Done when:** tests for the mm/h mapping, the code fallback, the angle and the drop reset (the count stays constant). In the browser at 390×844 and 1440×900: rain never pauses (sampled for 30 s), drizzle at 0.2 mm/h and a downpour at 20 mm/h look clearly different, 0 km/h falls straight and 50 km/h falls from the side, the rings sit where the streaks end, and in a downpour the mist hides the far shore. One frame takes under 1 ms on a phone.
+
+### 78. Share the current view — M — Premium — [SUN-CHASER-N](https://ainabler.sentry.io/issues/SUN-CHASER-N) — **Spec ready**
+
+- **Feedback (2026-10-01 23:44):** "Share feature should include a screenshot of the actual view". Then: "spec a screenshot like behaviour for the share feature".
+- **Now:** the Share button (item 68) draws a 1080×1350 sunset card on a `<canvas>`: the dusk sky, the sun on the horizon or the ridge, the place, the date, the sunset times and the score. It does not show what the user sees (the current sky, the moon, the clouds, the boats, the birds).
+- **Feasibility (checked 2026-10-02, Chrome, 390×844 at 2×, Ravensburg):** two DOM-capture libraries rendered the scene root (`div.relative.min-h-dvh`) to a PNG.
+  - Both match a real screenshot for the evening sky (blurred clouds, gradients, ridge, sun glow) and the night sky (the `NightStars` canvas, the moon, the arcs), in 0.2–0.4 s.
+  - **html-to-image** restarts the CSS animations in its copy: the boats show at their start, cut off at the left edge.
+  - **modern-screenshot** (4.7.0, MIT, no dependencies, about 14 kB gzipped) keeps the boats where they are on screen.
+- **Spec:**
+  1. **Capture:** a tap on Share loads `modern-screenshot` with a dynamic `import()` (no cost at app start) and renders the scene root with `domToPng` at `devicePixelRatio` (at most 2). The image is the view as the user sees it, labels and arcs included.
+  2. **Without the controls:** elements with `data-share-hide` stay out of the image (`filter` option): the InfoPanel, the top-left buttons, the music player, the install prompt and the toasts.
+  3. **Footer:** below the capture, a band one fifth of the image width high, drawn on a canvas in the card's colours: the place name, the date and time of the view, the sunset time (line of sight and flat, as in item 68), the score and the app mark. No coordinates. `getShareCardData` gives the texts; the view time is new.
+  4. **Size:** the screen's aspect ratio, with the long side at most 2400 px; PNG.
+  5. **Moment:** the image shows the time on screen, also during time travel (item 44); the footer shows that time.
+  6. **Fallback:** when the import or the capture fails (an old browser, no network for the chunk), the button draws the item-68 card as now. A failed share shows the toast as now.
+  7. **Text:** the button label "Share sunset card" (`share.button`) becomes "Share this view", in all five languages.
+  8. Premium as now: the gold plus and `requirePremium` (item 14) around the tap.
+- **Done when:** tests for the footer data (the view time, no coordinates), the `data-share-hide` filter, and the fallback to the card when the capture throws. In the browser (Chrome 390×844 and 1440×900): the image matches the screen without the controls, with moving boats and birds in place, at midday, at sunset and at night. On an Android phone the share sheet opens with the image. On iOS Safari the capture works or falls back to the card.
+
+### 79. Waves by wind strength — M — [SUN-CHASER-K](https://ainabler.sentry.io/issues/SUN-CHASER-K) — **Spec ready**
+
+- **Feedback (2026-10-01 19:52):** "Waves on the water depending on wind strength". Then: "create a lookbook as well for different wave options depending on wind strength".
+- **Now:** the sea (`data-testid="sea"`) is a gradient under a fixed bumpy top edge that never changes. Wind changes only the sailboat's wake (item 73), the leaves and the birds' pace. `SunVisualization` already gets `windSpeedKmh` and `windDirectionDeg`; the sea has no wind input. Storm darkens the water and hides the reflection. Manual weather gives 0 or 50 km/h. Gusts are not fetched.
+- **Lookbook:** [Waves](https://claude.ai/artifact/1nRuLQgjvmkgpeRkEDzRRA) (private), with a wind slider (0–80 km/h, bands calm < 6, light 6–19, moderate 20–38, strong 39–61, storm 62+), day, sunset and night. Options: WV1 ripple lines; WV2 whitecaps; WV3 slow swell bands; WV4 cat's paws; WV5 a choppy sea edge; WV6 mirror to matte. Add-ons: X1 the reflection follows the wind, X2 boat reflections follow the wind, X3 foam in a storm, X4 sailboats heel. All drifts are at or below the sailboat's pace (5.2 px/s on a phone, the same px/s on a 1440 px screen).
+- **Picks (2026-10-02):** "Wave picks: WV1, WV2, WV4, WV6, X1, X2, X3".
+- **Spec:**
+  - **One sea canvas** over the sea path, under the boats and fish, with one `requestAnimationFrame` loop at about 30 fps (the frame ID in a `useRef`). Reduced motion: one still frame. Drifts go downwind (`getCloudDriftDirection`), in phone px/s on wide screens. Every value below is set at five wind stops and interpolated linearly in between (below 3 km/h the first value, above 70 the last):
+
+    | Wind (km/h) | 3 | 12 | 28 | 50 | 70 |
+    |---|---|---|---|---|---|
+    | WV1 lines | 8 | 30 | 60 | 95 | 130 |
+    | WV1 length (px) | 30–70 | 6–14 | 8–18 | 10–24 | 12–28 |
+    | WV1 opacity | 0.11 | 0.2 | 0.26 | 0.31 | 0.36 |
+    | WV1 drift (px/s) | 0.3 | 1.2 | 2.2 | 3.2 | 4 |
+    | WV2 whitecaps | 0 | 2 | 18 | 45 | 80 |
+    | WV2 size (px) | 6 | 6 | 8 | 10 | 12 |
+    | WV2 opacity | 0 | 0.55 | 0.65 | 0.75 | 0.85 |
+    | WV2 drift (px/s) | 0 | 0.6 | 1.2 | 1.6 | 2 |
+    | WV4 patches | 0 | 6 | 12 | 18 | 24 |
+    | WV4 stretch (× length) | 1 | 1 | 1.7 | 3.2 | 4.2 |
+    | WV4 darkness | 0 | 0.13 | 0.15 | 0.17 | 0.19 |
+    | WV4 drift (px/s) | 0 | 1 | 1.8 | 2.6 | 3.2 |
+    | WV6 mirror strength | 0.5 | 0.3 | 0.11 | 0.03 | 0 |
+    | WV6 break-up | 0 | 0.28 | 0.55 | 0.75 | 1 |
+    | WV6 matte (darker by) | 0 | 3 % | 9 % | 15 % | 20 % |
+    | X1 bar rows | 10 | 7 | 9 | 11 | 12 |
+    | X1 pieces per row | 1 | 1 | 2 | 2.6 | 3 |
+    | X2 boat reflection | 42 % | 28 % | 20 % | 13 % | 8 % |
+
+  - **WV1 Ripple lines:** thin pale lines in perspective, smaller toward the horizon. Calm water shows a few long glassy streaks; with wind they get shorter, more numerous and brighter. From 14 km/h each line has a dark trough under it. Each line fades in, drifts downwind and fades out over 9–15 s.
+  - **WV2 Whitecaps:** small white crests at random places that fade in, hold and fade out (opacity only). The first ones come at 12 km/h.
+  - **WV4 Cat's paws:** soft darker patches that drift downwind and fade. With more wind they stretch into long wind streaks; in a storm light and dark streaks alternate. Calm water has none.
+  - **WV6 Mirror to matte:** calm water mirrors the ridge (the terrain path, flipped at the sea line, `Path2D` from the same SVG path) and the glow of the sky. A breeze breaks the mirror into thin slices that fade in and out. From moderate wind the mirror is gone and the sea turns matte and darker.
+  - **X1 The reflection follows the wind:** the sun and moon bars change their layout, not their place over time: calm a tight column of 10 bars, light today's 7, then more, smaller pieces that spread sideways (up to ±16 px) and get fainter.
+  - **X2 Boat reflections follow the wind:** the boats' mirror image (item 73, X1) is sharp in calm water, as today in light air, then striped and broken (a CSS mask) and fainter. No motion.
+  - **X3 Foam in a storm:** from 55 km/h, long thin white foam streaks along the wind that drift with it (at most 3 px/s), and a foam line along the sea's top edge. None below 55 km/h.
+  - **Storm:** a storm uses at least the strong band (50 km/h) when the measured wind is lower.
+- **Done when:** tests for the wind-band mapping and the counts per band. In the browser at 0, 15, 30, 50 and 70 km/h, on 390×844 and 1440×900: the sea reads calm at every band, every drift is at most 5.2 px/s (the sailboat's pace), calm water mirrors the ridge, foam shows only from 55 km/h, and one frame takes under 1 ms on a phone.
 
 ---
 
