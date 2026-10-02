@@ -2,6 +2,7 @@
 import { type WeatherType } from '../components/CloudLayer';
 import { translate, type MessageKey } from '@/i18n';
 import { type Language } from '@/utils/language';
+import { getPrecipitationMmH } from './rainUtils';
 
 export interface WeatherData {
   temperature: number;
@@ -21,6 +22,9 @@ export interface WeatherData {
   cloudCoverPercent: number | null;
   windSpeedKmh: number | null;
   windDirectionDeg: number | null;
+  // The rain amount in mm/h (ROADMAP item 77, X1); from the weather code when the
+  // measured amount is 0 or missing. Null without rain or in an older cache entry.
+  precipitationMmH: number | null;
 }
 
 interface OpenMeteoResponse {
@@ -37,6 +41,8 @@ interface OpenMeteoResponse {
     cloud_cover: number;
     wind_speed_10m: number;
     wind_direction_10m: number;
+    precipitation?: number; // mm over `interval` seconds
+    interval?: number;
   };
   hourly?: {
     time: string[];
@@ -275,7 +281,8 @@ const getCachedWeather = (latitude: number, longitude: number): WeatherData | nu
       sunsetScoreTomorrow: cacheData.data.sunsetScoreTomorrow ?? null,
       cloudCoverPercent: cacheData.data.cloudCoverPercent ?? null,
       windSpeedKmh: cacheData.data.windSpeedKmh ?? null,
-      windDirectionDeg: cacheData.data.windDirectionDeg ?? null
+      windDirectionDeg: cacheData.data.windDirectionDeg ?? null,
+      precipitationMmH: cacheData.data.precipitationMmH ?? null
     };
   } catch (error) {
     console.error('Error reading weather cache:', error);
@@ -322,7 +329,7 @@ export const fetchCurrentWeather = async (
     const url =
       `https://api.open-meteo.com/v1/forecast?latitude=${roundedLatitude}&longitude=${roundedLongitude}` +
       `&current_weather=true` +
-      `&current=cloud_cover,wind_speed_10m,wind_direction_10m` +
+      `&current=cloud_cover,wind_speed_10m,wind_direction_10m,precipitation` +
       `&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility` +
       `&timezone=UTC&forecast_days=2`;
 
@@ -345,7 +352,8 @@ export const fetchCurrentWeather = async (
       sunsetScoreTomorrow: scoreSunsetAt(data.hourly, sunsetTomorrow),
       cloudCoverPercent: data.current?.cloud_cover ?? null,
       windSpeedKmh: data.current?.wind_speed_10m ?? null,
-      windDirectionDeg: data.current?.wind_direction_10m ?? null
+      windDirectionDeg: data.current?.wind_direction_10m ?? null,
+      precipitationMmH: getPrecipitationMmH(data.current?.precipitation, data.current?.interval, data.current_weather.weathercode)
     };
 
     // Cache the result
@@ -366,7 +374,8 @@ export const fetchCurrentWeather = async (
       sunsetScoreTomorrow: null,
       cloudCoverPercent: null,
       windSpeedKmh: null,
-      windDirectionDeg: null
+      windDirectionDeg: null,
+      precipitationMmH: null
     };
   }
 };

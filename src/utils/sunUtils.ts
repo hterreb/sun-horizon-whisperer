@@ -389,8 +389,9 @@ const toSea = (sky: [number, number, number]): [number, number, number] => {
 // the sky colour at the horizon line, 15 % darker (and at least 5 points of lightness,
 // so a dark night sea still reads against the night sky) and more saturated. Deep:
 // a dark version of the sky's top colour. A storm (item 51) darkens both by 40 % and
-// greys them a little. Both then go through toSea (item 61).
-export const getWaterColors = (skyGradient: string, storm = false): { surface: string; deep: string } => {
+// greys them a little. Both then go through toSea (item 61). `mist`: the rain's horizon
+// mist (item 77, X4), the horizon colour paler and less saturated.
+export const getWaterColors = (skyGradient: string, storm = false): { surface: string; deep: string; mist: string } => {
   const stops = [...skyGradient.matchAll(/#([0-9a-fA-F]{6})\s+([\d.]+)%/g)].map(([, hex, at]) => {
     const num = parseInt(hex, 16);
     return { rgb: [(num >> 16) & 0xff, (num >> 8) & 0xff, num & 0xff], at: Number(at) / 100 };
@@ -409,6 +410,7 @@ export const getWaterColors = (skyGradient: string, storm = false): { surface: s
   return {
     surface: hsl(toSea([horizon[0], horizon[1] * 1.3 * grey, Math.max(0, Math.min(horizon[2] * 0.85, horizon[2] - 5)) * dim])),
     deep: hsl(toSea([top[0], top[1] * grey, top[2] * 0.45 * dim])),
+    mist: hsl([horizon[0], horizon[1] * 0.35, Math.min(90, horizon[2] * 1.06 + 8)]),
   };
 };
 
