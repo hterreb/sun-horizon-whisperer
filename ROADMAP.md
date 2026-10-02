@@ -1078,7 +1078,7 @@ Four Sentry reports from the evening and night of 2026-10-01, all from Ravensbur
   5. **Moment:** the image shows the time on screen, also during time travel (item 44); the footer shows that time.
   6. **Fallback:** when the import or the capture fails (an old browser, no network for the chunk), the button draws the item-68 card as now. A failed share shows the toast as now.
   7. **Text:** the button label "Share sunset card" (`share.button`) becomes "Share this view", in all five languages.
-  8. Premium as item 68: the gold plus, free while `PREMIUM_ENFORCED` is false.
+  8. Premium as now: the gold plus and `requirePremium` (item 14) around the tap.
 - **Done when:** tests for the footer data (the view time, no coordinates), the `data-share-hide` filter, and the fallback to the card when the capture throws. In the browser (Chrome 390×844 and 1440×900): the image matches the screen without the controls, with moving boats and birds in place, at midday, at sunset and at night. On an Android phone the share sheet opens with the image. On iOS Safari the capture works or falls back to the card.
 
 ### 79. Waves by wind strength — M — [SUN-CHASER-K](https://ainabler.sentry.io/issues/SUN-CHASER-K) — **Spec ready**
