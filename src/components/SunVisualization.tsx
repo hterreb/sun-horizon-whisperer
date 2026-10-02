@@ -17,7 +17,6 @@ import GreenFlash from '@/components/GreenFlash';
 import MoonTint from '@/components/MoonTint';
 import { type AstroEvent } from '@/utils/astroEvents';
 import { getSunVisibility, getMoonCloudFactor } from '@/utils/weatherEffectsUtils';
-import { isLineOfSightEnabled } from '@/utils/premium';
 import { useLanguage } from '@/hooks/useLanguage';
 import { formatNumber, type MessageKey } from '@/i18n';
 import { type Language } from '@/utils/language';
@@ -668,7 +667,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   // ready profile; a null terrain time gives no label.
   const terrainArcLabelGeometry = useMemo(
     () =>
-      isLineOfSightEnabled() && horizonProfile && terrainSunTimes
+      horizonProfile && terrainSunTimes
         ? getArcLabelGeometry(getTerrainArcLabels(terrainSunTimes, latitude, longitude), latitude, compassHeading, false)
         : [],
     [horizonProfile, terrainSunTimes, latitude, longitude, compassHeading]
@@ -683,7 +682,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   // while the moon arc is drawn.
   const moonTerrainArcLabelGeometry = useMemo(
     () =>
-      isLineOfSightEnabled() && horizonProfile && terrainMoonTimes && moonArcPath
+      horizonProfile && terrainMoonTimes && moonArcPath
         ? getArcLabelGeometry(getTerrainMoonArcLabels(terrainMoonTimes, latitude, longitude), latitude, compassHeading, false)
         : [],
     [horizonProfile, terrainMoonTimes, moonArcPath, latitude, longitude, compassHeading]
