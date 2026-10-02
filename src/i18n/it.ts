@@ -148,7 +148,7 @@ export const it: Record<keyof typeof en, string> = {
   'score.horizonClear': "orizzonte limpido",
 
   // Share card (item 68)
-  'share.button': "Condividi il tramonto",
+  'share.button': "Condividi questa vista",
   'share.lineOfSight': "Tramonto, linea di vista",
   'share.flatHorizon': "Orizzonte piatto {time}",
   'share.score': "Voto tramonto {score}/10 · {reason}",
