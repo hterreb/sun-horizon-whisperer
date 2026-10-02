@@ -1125,6 +1125,54 @@ describe('SunVisualization sunglasses egg', () => {
   });
 });
 
+describe('SunVisualization (rendered): the moon behind clouds (ROADMAP item 76)', () => {
+  const originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+  const originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
+
+  beforeEach(() => {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { value: 800, configurable: true });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { value: 600, configurable: true });
+  });
+
+  afterEach(() => {
+    if (originalClientWidth) Object.defineProperty(HTMLElement.prototype, 'clientWidth', originalClientWidth);
+    if (originalClientHeight) Object.defineProperty(HTMLElement.prototype, 'clientHeight', originalClientHeight);
+  });
+
+  const nightProps = {
+    sunPosition: { azimuth: 0, altitude: -40 },
+    moonPosition: { azimuth: 180, altitude: 30, phase: 0.6, illumination: 0.5, visible: true },
+    sunPath: [],
+    moonPath: [],
+    timeOfDay: 'night' as const,
+    latitude: 48,
+    longitude: 11,
+    date: new Date('2026-06-15T23:00:00Z'),
+  };
+  const bright = 0.5 * 0.8 + 0.2;
+
+  it('keeps a quarter of the disc and adds a corona in manual rain (no cover value)', () => {
+    render(<SunVisualization {...nightProps} weatherType="rain" cloudCoverPercent={null} />);
+    expect(Number(screen.getByTestId('moon-disc').style.opacity)).toBeCloseTo(bright * 0.25);
+    expect(screen.getByTestId('moon-corona')).toBeInTheDocument();
+  });
+
+  it('shows the full disc and no corona on a clear night', () => {
+    render(<SunVisualization {...nightProps} weatherType="clear" cloudCoverPercent={0} />);
+    expect(Number(screen.getByTestId('moon-disc').style.opacity)).toBeCloseTo(bright);
+    expect(screen.queryByTestId('moon-corona')).toBeNull();
+  });
+
+  it('shows only the corona in fog and nothing in a storm', () => {
+    const { rerender } = render(<SunVisualization {...nightProps} weatherType="fog" cloudCoverPercent={null} />);
+    expect(screen.queryByTestId('moon-disc')).toBeNull();
+    expect(screen.getByTestId('moon-corona')).toBeInTheDocument();
+    rerender(<SunVisualization {...nightProps} weatherType="storm" cloudCoverPercent={null} />);
+    expect(screen.queryByTestId('moon-disc')).toBeNull();
+    expect(screen.queryByTestId('moon-corona')).toBeNull();
+  });
+});
+
 describe('SunVisualization (rendered): waves by wind strength (ROADMAP item 79)', () => {
   const originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
   const originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
