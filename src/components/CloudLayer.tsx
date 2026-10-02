@@ -11,6 +11,7 @@ import { type TimeOfDay } from '../utils/sunUtils';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import {
   getCloudLayout,
+  getCloudMoonlight,
   getCloudOpacity,
   getCloudDriftDurationSec,
   getCloudDriftDirection,
@@ -56,9 +57,10 @@ interface CloudLayerProps {
   // The pool of moonlight for the night fish (ROADMAP item 65): the moon's x as a fraction
   // of the width, and the pool's strength (0 = no pool, 1 = a full moon in a clear sky).
   moonlight?: { x: number; strength: number } | null;
-  // The moon disc while it shows (ROADMAP item 74, W14), in % of the width and height, so the
-  // night geese can cross it.
-  moon?: { x: number; y: number } | null;
+  // The moon while it shows (ROADMAP item 74, W14), in % of the width and height, so the
+  // night geese can cross it; with its radius (px) and brightness (0-1) for the clouds'
+  // silver lining (item 76).
+  moon?: { x: number; y: number; r?: number; light?: number } | null;
 }
 
 // Birds/fish/ships/leaves travel horizontally at a constant rate (in % of the layer's
@@ -699,6 +701,9 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   // one otherwise (partly/cloudy/snow).
   const isFlatCloudWeather = weatherType === 'storm' || weatherType === 'rain' || weatherType === 'overcast' ||
     weatherType === 'hail' || weatherType === 'drizzle' || weatherType === 'fog';
+  const cloudPath = isFlatCloudWeather
+    ? "M0 35 Q30 15 60 30 Q90 10 120 25 Q120 50 90 55 Q60 60 30 55 Q0 50 0 35Z"
+    : "M20 40 Q30 20 45 35 Q60 10 75 30 Q90 20 100 35 Q110 45 95 50 Q85 60 60 55 Q35 60 25 50 Q15 45 20 40Z";
 
   // One fish, or a pair (P6): the companion swims `lag` s behind and leaves last, so its
   // onAnimationEnd removes the pair. Night fish (item 65) are in the moon tone or carry lights.
@@ -813,41 +818,55 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
 
       {/* Clouds: count/opacity from cloud_cover, drift from wind, positions from a
           seeded layout stable for the day/place (see cloudLayoutUtils.getCloudLayout). */}
-      {clouds.map((cloud) => (
-        <div
-          key={cloud.id}
-          className="absolute transition-colors duration-[5000ms]"
-          style={{
-            left: `${cloud.x}%`,
-            // In a storm the drifting clouds sit below the deck (ROADMAP item 51).
-            top: `${weatherType === 'storm' ? 30 + cloud.y * 0.5 : cloud.y}%`,
-            opacity: cloudOpacity,
-            // Soft blurred clouds (ROADMAP item 15 D polish, style book scene()
-            // k==='d'). On the wrapper, not the <svg>, so it doesn't touch the
-            // snapshot in tests/CloudLayer.test.tsx.
-            filter: 'blur(1.5px)',
-            ['--cloud-scale' as string]: cloud.scale,
-            ['--cloud-dx' as string]: `${CLOUD_DRIFT_AMPLITUDE_VW * cloudDriftDirection}vw`,
-            animation: `cloudDrift ${cloudDriftDurationSec}s ease-in-out infinite alternate`,
-          }}
-        >
-          <svg
-            width="120"
-            height="60"
-            viewBox="0 0 120 60"
-            fill="none"
+      {clouds.map((cloud) => {
+        const moonlight = moon?.r ? getCloudMoonlight(cloud, { x: moon.x, y: moon.y, r: moon.r }, window.innerWidth, window.innerHeight) : null;
+        const moonGlow = moon?.light ?? 1;
+        return (
+          <div
+            key={cloud.id}
+            className="absolute transition-colors duration-[5000ms]"
+            style={{
+              left: `${cloud.x}%`,
+              // In a storm the drifting clouds sit below the deck (ROADMAP item 51).
+              top: `${weatherType === 'storm' ? 30 + cloud.y * 0.5 : cloud.y}%`,
+              opacity: cloudOpacity,
+              // Soft blurred clouds (ROADMAP item 15 D polish, style book scene()
+              // k==='d'). On the wrapper, not the <svg>, so it doesn't touch the
+              // snapshot in tests/CloudLayer.test.tsx.
+              filter: 'blur(1.5px)',
+              ['--cloud-scale' as string]: cloud.scale,
+              ['--cloud-dx' as string]: `${CLOUD_DRIFT_AMPLITUDE_VW * cloudDriftDirection}vw`,
+              animation: `cloudDrift ${cloudDriftDurationSec}s ease-in-out infinite alternate`,
+            }}
           >
-            <path
-              d={isFlatCloudWeather
-                ? "M0 35 Q30 15 60 30 Q90 10 120 25 Q120 50 90 55 Q60 60 30 55 Q0 50 0 35Z"
-                : "M20 40 Q30 20 45 35 Q60 10 75 30 Q90 20 100 35 Q110 45 95 50 Q85 60 60 55 Q35 60 25 50 Q15 45 20 40Z"
-              }
-              fill={getCloudColor()}
-              className="transition-colors duration-[5000ms]"
-            />
-          </svg>
-        </div>
-      ))}
+            <svg
+              width="120"
+              height="60"
+              viewBox="0 0 120 60"
+              fill="none"
+            >
+              <path
+                d={cloudPath}
+                fill={getCloudColor()}
+                className="transition-colors duration-[5000ms]"
+              />
+              {/* X2 silver lining (item 76): the cloud's parts near the moon catch its light. */}
+              {moonlight && (
+                <>
+                  <defs>
+                    <radialGradient id={`cloud-moonlight-${cloud.id}`} gradientUnits="userSpaceOnUse" cx={moonlight.cx} cy={moonlight.cy} r={moonlight.r}>
+                      <stop offset="0" stopColor="hsl(var(--scene-moon))" stopOpacity={0.85 * moonGlow} />
+                      <stop offset="0.5" stopColor="hsl(var(--scene-moon))" stopOpacity={0.32 * moonGlow} />
+                      <stop offset="1" stopColor="hsl(var(--scene-moon))" stopOpacity={0} />
+                    </radialGradient>
+                  </defs>
+                  <path d={cloudPath} fill={`url(#cloud-moonlight-${cloud.id})`} data-testid="cloud-moonlight" />
+                </>
+              )}
+            </svg>
+          </div>
+        );
+      })}
 
       {/* Rain/drizzle drops - drizzle is thinner, shorter and fainter than rain/storm,
           all slanted sideways by `--slant` (from wind, see getPrecipitationSlantPx). */}

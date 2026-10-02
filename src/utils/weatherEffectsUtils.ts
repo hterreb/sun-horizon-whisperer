@@ -240,6 +240,22 @@ export const getMoonCloudFactor = (type: WeatherType, cloudCoverPercent: number 
   return patch ? Math.max(MOON_PATCH, factor) : factor;
 };
 
+// The moon stays findable behind clouds (ROADMAP item 76, MV4): the disc keeps at least a
+// quarter of its clear opacity in every weather but storm, manual rain included. While the
+// item-57 factor is below 0.5, a soft corona marks its place: `corona` is its strength,
+// `coronaRadius` a multiple of the disc radius. Fog shows the corona only, larger and fainter.
+// The moon's reflection and the moonlight pool keep the item-57 factor.
+const MOON_DISC_FLOOR = 0.25;
+
+export const getMoonLook = (type: WeatherType, cloudCoverPercent: number | null | undefined) => {
+  if (type === 'storm') return { disc: 0, corona: 0, coronaRadius: 0 };
+  if (type === 'fog') return { disc: 0, corona: 0.5, coronaRadius: 5 };
+  const factor = getMoonCloudFactor(type, cloudCoverPercent);
+  return factor < 0.5
+    ? { disc: Math.max(MOON_DISC_FLOOR, factor), corona: 1, coronaRadius: 3.5 }
+    : { disc: factor, corona: 0, coronaRadius: 0 };
+};
+
 // Stars in twilight (ROADMAP item 52): which share of the stars shows (the brightest
 // first) and at which opacity. Day: none.
 export const getTwilightStars = (timeOfDay: TimeOfDay): { share: number; opacity: number } =>
