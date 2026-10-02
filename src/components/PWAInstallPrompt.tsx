@@ -113,6 +113,7 @@ const PWAInstallPrompt: React.FC = () => {
 
   return (
     <div
+      data-share-hide
       className={`fixed z-50 ${GLASS_SURFACE} rounded-panel text-white p-4 animate-in slide-in-from-bottom-2 duration-500`}
       style={{
         bottom: 'calc(1rem + env(safe-area-inset-bottom))',
