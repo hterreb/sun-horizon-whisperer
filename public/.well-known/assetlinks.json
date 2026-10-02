@@ -3,7 +3,7 @@
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
       "namespace": "android_app",
-      "package_name": "app.vercel.sun_chaser.twa",
+      "package_name": "com.ainabler.sunchaser",
       "sha256_cert_fingerprints": [
         "4B:9C:19:1B:E6:20:5F:8F:6B:AA:9E:CE:72:3D:70:4A:6A:CA:E9:82:10:62:47:3E:A0:AF:D2:9E:DB:45:4F:CB"
       ]
