@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-02. Done: items 1–15, 17–44, 47–79 (item 14: the Play-app code, with `PREMIUM_ENFORCED` off until item 16), item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: item 16 (with it: turn on `PREMIUM_ENFORCED`, and check with a licence tester that a purchase is still there after 3 days, see item 14 "Acknowledge"; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
+Status: last updated 2026-10-03. Specced, in build: items 80–85 (Sentry feedback round 2026-10-03). Done: items 1–15, 17–44, 47–79 (item 14: the Play-app code, with `PREMIUM_ENFORCED` off until item 16), item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: item 16 (with it: turn on `PREMIUM_ENFORCED`, and check with a licence tester that a purchase is still there after 3 days, see item 14 "Acknowledge"; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
 
 ## Verification (2026-09-28)
 
@@ -1197,6 +1197,97 @@ Four Sentry reports from the evening and night of 2026-10-01, all from Ravensbur
     - Clear with the switch off: calm water with the mirror and 10 bars.
     - Storm: dark water at the strong band and no reflection.
   - No console errors.
+
+### Feedback round (2026-10-03)
+
+Six open Sentry feedback reports from 2026-10-02 20:48 to 2026-10-03 18:58, all on release `b7de009`, from Ravensburg and Stuttgart. Sentry has no new errors for sun-chaser in 90 days (only the setup test, SUN-CHASER-1, resolved). Request: "check sentry for all errors and user feedback, analyze, spec it out and pitch me ideas how to solve". Items 80–83 have a recommended spec. Items 84 and 85 are design work, with a lookbook first. Decisions (2026-10-03): "80, no only on sunset, 83 yes thats ok, 84&85 yes please".
+
+### 80. Fireworks you do not miss — S — [SUN-CHASER-V](https://ainabler.sentry.io/issues/SUN-CHASER-V)
+
+- **Feedback (2026-10-03 18:58 CEST, Ravensburg):** "Today the firework didn't work".
+- **Now:** `Fireworks.tsx` and `sunEvents.ts` have not changed since item 41/43 (2026-09-30). A show starts only when one clock tick of at most 5 s (`MAX_CLOCK_STEP_MS`) passes the next sunrise or sunset, in live mode, without reduced motion. The trigger uses the line-of-sight sunset. The feedback came 55 s before the flat sunset (18:59:41), so the line-of-sight sunset behind the western hills had passed without a show. SUN-CHASER-T (13:59) has the same trace ID: one page load, open for 5 h on a phone.
+- **Cause:** not provable from Sentry (no replay, no breadcrumbs, no error). In order of likelihood:
+  1. The app was hidden at the sunset: screen off, or the camera open for the sunset photo. A mobile browser stops the timers of a hidden page. The first tick after the return is a step of more than 5 s, so `passesSunEvent` returns false and there is no show.
+  2. A time preview (item 44) was on: no show, as specified. The same user tests fast forward (SUN-CHASER-R).
+  3. Reduced motion is on in the phone settings: no show, as specified.
+- **Options:**
+  - **FW1 Catch-up (recommended):** one show per sun event, at the first live, visible tick in the 15 min after the event. This includes the first tick after a return from the camera. A ref keeps the last celebrated event, so a show never repeats. The 5 s step rule goes.
+  - **FW2:** FW1, plus a "Replay fireworks" chip for 15 min after the event.
+  - **FW3 Diagnose only:** a Sentry breadcrumb `fireworks` with "fired" or "skipped" and the reason (hidden step, preview, reduced motion). Cheap, but it fixes nothing.
+- **Pick (2026-10-03):** FW1 with the FW3 breadcrumb. "no only on sunset": a cold app start after the sunset gives no show. The catch-up is only for a page that was open at the sunset and comes back within 15 min (a hidden page whose clock stopped).
+- **Done when:** unit tests for the catch-up rule: hidden at the event and back after 3 min gives one show; back after 20 min gives none; the next tick gives no second show; a preview gives none. In the browser, a clock jump over the sunset gives one show.
+
+### 81. Glass icons stay visible when tapped — S — [SUN-CHASER-Q](https://ainabler.sentry.io/issues/SUN-CHASER-Q)
+
+- **Feedback (2026-10-02 20:53):** "Icons disappear when pressing them full screen or feedback".
+- **Now (cause found in the code):** the round glass buttons use the shadcn `variant="ghost"`, which adds `hover:text-accent-foreground`. The app has no `.dark` class, so this is the light token `222 47% 11%`: near-black on the dark glass. On a phone, `:hover` stays after a tap, so the icon stays near-black until the next tap somewhere else. Affected: `FullscreenButton`, `CompassToggle`, the feedback button in `TopLeftButtons`, and the Restore and Close buttons in `PremiumDialog`. `PWAInstallPrompt` already has `hover:text-white` and does not show the bug.
+- **Spec:** add `hover:text-white` to `GLASS_ICON_BUTTON` (`glassChrome.ts`). The active `CompassToggle` adds `hover:text-brand-sky`. The two ghost buttons in `PremiumDialog` add `hover:text-white`. tailwind-merge then drops the ghost class. Do not edit `src/components/ui/`.
+- **Done when:** a test shows that the three top-left buttons have no `hover:text-accent-foreground` class. In the browser at 390×844 with touch: after a tap, each icon stays white (the active compass stays sky blue).
+
+### 82. Jellyfish: a softer night glow — S — [SUN-CHASER-P](https://ainabler.sentry.io/issues/SUN-CHASER-P)
+
+- **Feedback (2026-10-02 20:48):** "Jellyfish is a little too bright at night".
+- **Now:** at night the jellyfish has its own light (item 65): `--scene-fish-jellyfish-glow` (`190 90% 80%`) at opacity 0.95, with a 3 px drop-shadow halo. The other night fish with their own light are outlines at stroke opacity 0.45 with small gold lights. The jellyfish is the brightest thing in the night water.
+- **Options:**
+  - **J1 Dimmer (recommended):** opacity 0.95 → 0.6 for the jellyfish, halo 3 → 2 px. Two numbers in `CloudLayer.tsx`.
+  - **J2:** J1, plus a slow glow that breathes between 0.4 and 0.65 over 5 s. Opacity only, no motion, so it keeps the calm-motion rule.
+  - **J3:** the bell as an outline in the moon tone at 0.45, like the lanternfish; only the bell rim glows cyan.
+- **Done when:** a test for the jellyfish night opacity. A night screenshot with a jellyfish beside a lanternfish.
+
+### 83. The scene follows fast forward and rewind — M — [SUN-CHASER-R](https://ainabler.sentry.io/issues/SUN-CHASER-R)
+
+- **Feedback (2026-10-02 22:31):** "During fast forward all elements boats fish birds should go a lot faster as well and backwards when going back".
+- **Now:** play (item 44) moves only the clock (`PLAY_SPEED` 600, 10 min per second). Boats, fish, birds, leaves and clouds are CSS animations (`moveAcrossX`, `cloudDrift`) in `CloudLayer` with fixed durations. `CloudLayer` does not get `playDirection`. The sea and the rain are canvas loops with their own clocks.
+- **Options:**
+  - **SP1 Playback rate (recommended):** `CloudLayer` gets `playDirection`. An effect sets `playbackRate = direction × 8` on each animation in the scene (`container.getAnimations({ subtree: true })`, the Web Animations API, no new dependency), again on each play tick so new spawns follow. Rewind uses a negative rate: CSS animations then run backwards natively. In rewind, a new spawn starts at its end (`currentTime = duration`), so it comes in from the right. The spawn timers divide their interval by 8, so the scene does not empty. Pause and live: rate 1.
+  - **SP2:** SP1, plus a speed input for the wave and rain clocks in `SeaCanvas` and `RainCanvas`.
+  - **SP3:** all elements 8× faster in both play directions, always moving forward. Smallest, but no "backwards".
+- **Factor:** 8×. A sailboat at 1.2 %/s then crosses in about 10 s; 600× would be a flash. The calm-motion rule is for live mode; play is the exception (confirmed 2026-10-03: "83 yes thats ok").
+- **Done when:** tests for the rate (direction −1 → −8, 0 → 1, 1 → 8) and for the rewind spawn. In the browser: in forward play a near boat crosses in at most 12 s; in rewind all elements move right to left; after pause the scene is at live speed.
+
+### 84. Clouds by type — M — [SUN-CHASER-T](https://ainabler.sentry.io/issues/SUN-CHASER-T) — lookbook first
+
+- **Feedback (2026-10-03 13:59, Stuttgart):** "Redo cloud design with different cloud types and looks".
+- **Now:** two SVG paths: a flat blanket for storm, rain, overcast, hail, drizzle and fog, and one puff for partly, cloudy and snow. One flat colour per weather and time of day (item 10 matrix); fair clouds are brand-peach at dawn, morning and evening. The weather fetch already gets `cloud_cover_low`, `cloud_cover_mid` and `cloud_cover_high` per hour, but only the sunset score uses them.
+- **Pitch:**
+  - **C1 Real cloud layers (the core):** the cloud types come from the cover per layer of the current hour. High: cirrus wisps, high and slow. Mid: altocumulus, a field of small puffs. Low: cumulus in fair weather, stratocumulus or stratus at high cover. Rain: a nimbostratus base with rain shafts. Storm: a cumulonimbus anvil on the horizon. 5–6 shapes, 2–3 variants each.
+  - **C2 Lit by the sun:** a gradient to the sun's side. In the golden hour the cloud bases go peach to pink to purple. After sunset the high clouds keep their colour longest, as in nature. This is the picture people chase sunsets for, and it matches the sunset score.
+  - **C3 Depth:** three bands (high, mid, low) with their own drift speed and size; far clouds smaller and paler near the horizon.
+  - **C4 Soft fills:** blurred gradient fills instead of one flat colour, in the D palette.
+  - **X1:** mammatus or lenticular clouds as rare easter eggs.
+- **Bug found (2026-10-03):** `getCloudColor` has no `civil-twilight` case, so in civil twilight fair clouds fall back to day white and overcast to day grey. C2 replaces this matrix; without C2, add the case.
+- **Lookbook:** [Cloud Types](https://claude.ai/artifact/RbsfFkWCy3TNhDAXNBgbi5) (private). Controls: weather (8 types), time of day (5) and sliders for low, mid and high cover, plus a wide view and a 390 × 844 phone. Options:
+  - **C0** today's two shapes.
+  - **C1** real cloud layers: cirrus, or a cirrostratus veil from high 60 %; an altocumulus field, or an altostratus sheet from mid 70 %; cumulus, then stratocumulus from low 45 % and stratus from 75 %; a nimbostratus deck with rain shafts; a cumulonimbus anvil on the horizon in a storm. 2–4 shapes per type.
+  - **C2** lit by the sun.
+  - **C3** depth: three bands, gliding at 0.35, 0.7 and 1.2–2.4 px/s (phone; the sailboat is 5.2 px/s).
+  - **C4** soft gradient fills with a 2.6 px edge.
+  - **Add-ons:** X1 rare lenticular clouds (still over the ridge) or mammatus after a storm; X2 cloud shadows on the sea; X3 sun rays through the gaps; X4 a 22° halo under a thin high veil; X5 noctilucent clouds in summer twilight; X6 clouds in the calm-water mirror (WV6).
+  - **Recommended:** C1, C2, C3, C4, X1, X3. The new shapes stay in today's 120 × 60 box, so the item-76 silver lining works on them. With C3 the clouds glide across the screen, so the silver lining must follow the cloud's current place (the lookbook updates it once per second).
+- **Picks (2026-10-03):** "Cloud picks: C1, C2, C3, C4, X1, X2".
+
+### 85. Fish redone, with rare sharks and dolphins — M — [SUN-CHASER-S](https://ainabler.sentry.io/issues/SUN-CHASER-S) — lookbook first
+
+- **Feedback (2026-10-03 09:59):** "Redo fish design and add sharks and dolphins as very rare fish".
+- **Now:** 13 day and 5 night species as 24 px line icons (lucide stroke style, no fill; items 62 and 65). `FISH_WEIGHTS` sums to 100; the whale (1) is the rare sea visitor, always far out.
+- **Pitch (style):**
+  - **F1 Silhouettes:** filled bodies in two tones (dark back, pale belly), no outline. At 10–30 px they read better than 2 px strokes.
+  - **F2 Refined line art:** keep the lucide style, which matches the UI icons, and redraw with fins and a gill line. The smallest change.
+  - **F3 Shadows under water:** soft dark shapes below the surface; only near fish show detail. The calmest look.
+- **Pitch (sharks and dolphins):**
+  - **Shark:** a dorsal fin cuts the surface, with a faint body below; a slow, straight glide (0.5 %/s). Weight 0.5.
+  - **Dolphins:** a pod of 2–3 that rolls at the surface in slow arcs (back and fin only). The calm-motion rule forbids jumping, so no leaps. Weight 0.5.
+  - Both use the whale mechanism (`FISH_WEIGHTS`, far out), so "very rare" is about 1 in 200 fish each.
+- **Lookbook:** [Fish Redone](https://claude.ai/artifact/9xfwzHXufL3zvZsRiJA6TJ) (private), with all 18 species at real size and 3× by day, at sunset and at night, live strips and a 390 × 844 phone. The codes FS, SH and DO are new; F1–F13 are item 62's. Styles:
+  - **FS0** today's line icons.
+  - **FS1** two-tone silhouettes (dark back, pale belly).
+  - **FS2** refined line art with fins, a gill line and species marks.
+  - **FS3** soft shadows under water; only near fish keep detail.
+  - **Sharks** (0.5 %/s): SH1 a fin and a faint body below; SH2 two fins (dorsal fin and tail tip); SH3 a deep shadow, no fin.
+  - **Dolphins:** DO1 a rolling pod (a slow 4.5 s arc); DO2 backs that surface and fade, opacity only; DO3 the pod below the surface, only the fin tips break it.
+  - **Add-ons:** X1 a ripple above near fish; X2 blur on far fish; X3 a sunset rim light; X4 a V-wake behind sharks and dolphins; X5 night visitors in the moon pool; X6 closer visitors (depth 0.3–1).
+  - **Rarity:** shark 0.5 and dolphin pod 0.5; the classic fish goes from 25 to 24, so the weights still sum to 100. Both swim far out, like the whale. About 1 in 200 fish each, or one of each about every 1¾ hours (a simulation of today's spawn loop).
+- **Picks (2026-10-03):** "Fish picks: FS1, SH1, DO1, X4, X5, X6".
 
 ---
 
