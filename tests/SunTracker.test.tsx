@@ -20,6 +20,13 @@ vi.mock('../src/components/SunVisualization', async (importOriginal) => {
   };
 });
 
+// The fireworks breadcrumbs (ROADMAP item 80).
+vi.mock('@sentry/react', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@sentry/react')>()),
+  addBreadcrumb: vi.fn(),
+}));
+import { addBreadcrumb } from '@sentry/react';
+
 // Mock the toast function
 vi.mock('@/hooks/use-toast', () => ({
   toast: vi.fn(),
@@ -110,20 +117,23 @@ describe('SunTracker', () => {
     expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ title: 'Weather updated' }));
   });
 
-  it('a manually picked weather ignores the real cloud cover for the stars and the moon (items 52, 57)', async () => {
+  it('a manually picked weather ignores the real cloud cover for the stars, the moon and the cloud types (items 52, 57, 84)', async () => {
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 7, longitude: 8 } }) } });
     global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({
       current_weather: { temperature: 20, weathercode: 3, windspeed: 0, winddirection: 0, time: '' },
       current: { cloud_cover: 100, wind_speed_10m: 0, wind_direction_10m: 0 },
+      hourly: { time: ['2026-06-01T18:00'], cloud_cover_low: [90], cloud_cover_mid: [50], cloud_cover_high: [30], visibility: [24140] },
     }) })) as unknown as typeof fetch;
 
     render(<SunTracker />);
     await waitFor(() => expect(visProps.current?.cloudCoverPercent).toBe(100));
+    expect(visProps.current!.cloudLayers).toEqual({ low: 90, mid: 50, high: 30 });
 
     fireEvent.click(screen.getByRole('button', { name: /manual/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
     expect(visProps.current!.weatherType).toBe('clear');
     expect(visProps.current!.cloudCoverPercent).toBeNull();
+    expect(visProps.current!.cloudLayers).toBeNull();
   });
 
   it('toasts when the weather refresh fails (A-5)', async () => {
@@ -471,19 +481,93 @@ describe('SunTracker', () => {
     it('does not start the fireworks during a preview, paused or playing', () => {
       const sunset = getSunTimes(NOON, RAVENSBURG.latitude, RAVENSBURG.longitude).sunset!;
       start(NOON);
-      // Paused preview a minute before the sunset: the 1 s clock passes it.
+      // Paused preview a minute before the sunset: the clock passes it. A commit every
+      // 10 s, not every 1 s: since item 80 a long step no longer hides a show (a live
+      // step 10 s past the event would start one), and 15 commits instead of 150 keep
+      // the test well inside its timeout on a busy machine.
       const minuteBefore = new Date(sunset.getTime() - 60_000);
       const pad = (n: number) => String(n).padStart(2, '0');
       jumpTo(`2026-09-30T${pad(minuteBefore.getHours())}:${pad(minuteBefore.getMinutes())}`);
-      tickFor(150_000, 1000);
+      tickFor(150_000, 10_000);
       expect(shownDate()).toBeGreaterThan(sunset.getTime());
       expect(visProps.current!.fireworksTrigger).toBe(0);
       // Play forward through the sunset.
       jumpTo(`2026-09-30T${pad(minuteBefore.getHours())}:${pad(minuteBefore.getMinutes())}`);
       fireEvent.click(screen.getByRole('button', { name: 'Play time forward' }));
-      tickFor(3000, 100);
+      tickFor(3000, 500);
       expect(shownDate()).toBeGreaterThan(sunset.getTime());
       expect(visProps.current!.fireworksTrigger).toBe(0);
+    });
+
+    describe('fireworks you do not miss (ROADMAP item 80)', () => {
+      const sunset = () => getSunTimes(NOON, RAVENSBURG.latitude, RAVENSBURG.longitude).sunset!;
+      const trigger = () => visProps.current!.fireworksTrigger;
+      const breadcrumbs = () => vi.mocked(addBreadcrumb).mock.calls.map(([crumb]) => crumb);
+      // The page is hidden: its timers stop, so the clock jumps on the first tick back.
+      const hideUntil = (ms: number) => vi.setSystemTime(ms);
+      const setVisibility = (state: DocumentVisibilityState) =>
+        Object.defineProperty(document, 'visibilityState', { value: state, configurable: true });
+      afterEach(() => setVisibility('visible'));
+
+      it('gives one show to a page that was hidden at the sunset and comes back after 3 min', () => {
+        start(new Date(sunset().getTime() - 60_000));
+        hideUntil(sunset().getTime() + 3 * 60_000);
+        advance(1000);
+        const fired = trigger();
+        expect(fired).not.toBe(0);
+        expect(breadcrumbs()).toEqual([{ category: 'fireworks', message: 'fired', level: 'info' }]);
+        tickFor(5000, 1000);
+        expect(trigger()).toBe(fired);
+        expect(breadcrumbs()).toHaveLength(1);
+      });
+
+      it('gives no show to a page that comes back 20 min after the sunset', () => {
+        start(new Date(sunset().getTime() - 60_000));
+        hideUntil(sunset().getTime() + 20 * 60_000);
+        tickFor(3000, 1000);
+        expect(trigger()).toBe(0);
+        expect(breadcrumbs()).toEqual([{ category: 'fireworks', message: 'skipped: too late', level: 'info' }]);
+      });
+
+      it('gives no show on a cold start after the sunset', () => {
+        start(new Date(sunset().getTime() + 60_000));
+        tickFor(5000, 1000);
+        expect(trigger()).toBe(0);
+        expect(breadcrumbs()).toEqual([]);
+      });
+
+      it('gives no show on the return from a preview to live time after the sunset', () => {
+        start(new Date(sunset().getTime() - 60_000));
+        jumpTo('2026-10-01T12:00');
+        hideUntil(sunset().getTime() + 3 * 60_000);
+        advance(1000);
+        fireEvent.click(screen.getByRole('button', { name: 'Back to now' }));
+        tickFor(3000, 1000);
+        expect(trigger()).toBe(0);
+        expect(breadcrumbs()).toEqual([{ category: 'fireworks', message: 'skipped: preview', level: 'info' }]);
+      });
+
+      it('waits while a tab is hidden but still ticks, and starts the show on the return', () => {
+        start(new Date(sunset().getTime() - 3000));
+        setVisibility('hidden');
+        tickFor(10_000, 1000);
+        expect(trigger()).toBe(0);
+        setVisibility('visible');
+        advance(1000);
+        expect(trigger()).not.toBe(0);
+      });
+
+      it('leaves a "skipped: reduced motion" breadcrumb when reduced motion is on', () => {
+        const matchMedia = vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
+          matches: query.includes('reduce'), media: query, onchange: null,
+          addEventListener: () => {}, removeEventListener: () => {}, addListener: () => {}, removeListener: () => {},
+          dispatchEvent: () => false,
+        }));
+        start(new Date(sunset().getTime() - 3000));
+        tickFor(5000, 1000);
+        expect(breadcrumbs()).toEqual([{ category: 'fireworks', message: 'skipped: reduced motion', level: 'info' }]);
+        matchMedia.mockRestore();
+      });
     });
 
     describe('sunset countdown (ROADMAP item 43)', () => {

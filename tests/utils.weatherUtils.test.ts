@@ -117,6 +117,32 @@ describe('weatherUtils', () => {
     expect(data.sunsetScoreToday).toBeNull();
     expect(data.sunsetScoreTomorrow).toBeNull();
   });
+
+  it('keeps the cloud layers of the hour nearest the fetch, for the cloud types (ROADMAP item 84)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-06-01T17:20:00Z'));
+    const response = (hourly: boolean) => ({
+      current_weather: { temperature: 20, weathercode: 2, windspeed: 0, winddirection: 0, time: '' },
+      ...(hourly && {
+        hourly: {
+          time: ['2026-06-01T16:00', '2026-06-01T17:00', '2026-06-01T18:00'],
+          cloud_cover_low: [10, 30, 50],
+          cloud_cover_mid: [20, 40, 60],
+          cloud_cover_high: [90, 70, 50],
+          visibility: [24140, 24140, 24140],
+        },
+      }),
+    });
+    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve(response(true)) })) as unknown as typeof fetch;
+    expect((await fetchCurrentWeather(32.44, 42.55)).cloudLayers).toEqual({ low: 30, mid: 40, high: 70 });
+    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve(response(false)) })) as unknown as typeof fetch;
+    expect((await fetchCurrentWeather(33.44, 43.55)).cloudLayers).toBeNull();
+    // An older cache entry has no layers.
+    const cached = { temperature: 12, weatherType: 'cloudy', conditionKey: 'condition.partlyCloudy', lastUpdated: new Date().toISOString() };
+    localStorage.setItem('weather_cache', JSON.stringify({ data: cached, timestamp: Date.now(), latitude: 34.44, longitude: 44.55 }));
+    expect((await fetchCurrentWeather(34.44, 44.55)).cloudLayers).toBeNull();
+    vi.useRealTimers();
+  });
 });
 
 describe('WMO_CODE_MAP (ROADMAP item 10)', () => {

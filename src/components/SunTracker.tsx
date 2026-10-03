@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import * as Sentry from '@sentry/react';
 import {
   getSunPosition,
   getSunTimes,
@@ -56,11 +57,12 @@ import { getTerrainSunTimes, getTerrainMoonTimes } from '../utils/horizonUtils';
 import { getSunArcLabels, getMoonArcLabels } from '../utils/arcLabels';
 import { PremiumContext, usePremium } from '@/hooks/usePremium';
 import PremiumDialog from './PremiumDialog';
-import { passesSunEvent, getCountdownTarget } from '../utils/sunEvents';
+import { watchSunEvent, NO_SUN_EVENT_WATCH, getCountdownTarget } from '../utils/sunEvents';
 import { getCalendarEvent } from '@/utils/calendarEvents';
 import { PLAY_SPEED, PLAY_TICK_MS, clampTimeOffset } from '@/utils/timeTravel';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
 import { DISCO_MS, KONAMI_SEQUENCE, SUNGLASSES_MS, advanceKonami, getEggOverride, registerSunTap, rollUfo } from '@/utils/hiddenEggs';
+import { isCloudEggDay, isCloudEggForced } from '@/utils/skyCloudUtils';
 import DiscoSky from './DiscoSky';
 import Ufo from './Ufo';
 import { loadTemperatureUnit, saveTemperatureUnit, type TemperatureUnit } from '@/utils/temperatureUnit';
@@ -600,17 +602,31 @@ const SunTracker: React.FC = () => {
       }, astroEggOverride)
     : null;
 
-  // Fireworks (ROADMAP item 41): start a show when the 1 s clock passes the next
-  // sunrise or sunset (terrain time when there is one), not after a long clock jump.
-  // Live mode only: a time preview (item 44) never starts them.
+  // Fireworks (ROADMAP items 41 and 80): one show per sunrise or sunset (terrain time
+  // when there is one), at the first live, visible tick up to 15 min after it, if the
+  // page was open before it (watchSunEvent). The ref keeps the armed and the last
+  // celebrated event, so a show never repeats. A time preview (item 44) never starts
+  // one. A hidden tick (a desktop tab still ticks) waits for the return. Each fired or
+  // skipped show leaves a Sentry breadcrumb, with no place or time in it.
   const [fireworksTrigger, setFireworksTrigger] = useState(0);
   const prevClockRef = React.useRef(date);
+  const sunEventWatchRef = React.useRef(NO_SUN_EVENT_WATCH);
   useEffect(() => {
     const prev = prevClockRef.current;
     prevClockRef.current = date;
     // New Year (ROADMAP "Ongoing", Calendar): also when the clock enters 00:00 on Jan 1.
     const entersNewYear = getCalendarEvent(date) === 'new-year' && getCalendarEvent(prev) !== 'new-year';
-    if (!isTimePreview && (entersNewYear || passesSunEvent(prev, date, sunTimes, terrainExtras.terrainSunTimes))) setFireworksTrigger(date.getTime());
+    let fire = !isTimePreview && entersNewYear;
+    if (document.visibilityState !== 'hidden') {
+      const { watch, outcome } = watchSunEvent(sunEventWatchRef.current, date, isTimePreview, sunTimes, terrainExtras.terrainSunTimes);
+      sunEventWatchRef.current = watch;
+      if (outcome) {
+        const skipped = outcome !== 'fired' ? outcome : prefersReducedMotion ? 'reduced motion' : null;
+        Sentry.addBreadcrumb({ category: 'fireworks', message: skipped ? `skipped: ${skipped}` : 'fired', level: 'info' });
+        if (outcome === 'fired') fire = true;
+      }
+    }
+    if (fire) setFireworksTrigger(date.getTime());
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per clock tick
   }, [date]);
 
@@ -658,6 +674,10 @@ const SunTracker: React.FC = () => {
     if (isNight && rollUfo()) setUfoOn(true);
   }
   const handleUfoDone = useCallback(() => setUfoOn(false), []);
+  // Rare lenticular and mammatus clouds (ROADMAP item 84, X1): one day in 30 per place;
+  // `?egg=lenticular` or `?egg=mammatus` forces the day.
+  const [cloudEggForced] = useState(() => isCloudEggForced(window.location.search));
+  const cloudEgg = cloudEggForced || isCloudEggDay(date, location.latitude, location.longitude);
   // Calendar easter eggs (ROADMAP "Ongoing"): one event id per minute.
   const calendarEvent = useMemo(
     () => getCalendarEvent(date, location.latitude),
@@ -731,6 +751,8 @@ const SunTracker: React.FC = () => {
   const cloudCover = useRealWeather ? weatherData?.cloudCoverPercent ?? null : null;
   // The forecast rain amount (ROADMAP item 77); manual weather uses the type's middle value.
   const rainMmH = useRealWeather ? weatherData?.precipitationMmH ?? null : null;
+  // The cover per layer for the cloud types (ROADMAP item 84); manual weather uses the type's own.
+  const cloudLayers = useRealWeather ? weatherData?.cloudLayers ?? null : null;
 
   const skyGradient = useMemo(() => {
     // Clouds dim the sky (ROADMAP item 50): mix toward grey per weather type, scaled
@@ -821,6 +843,8 @@ const SunTracker: React.FC = () => {
             // Manual mode sets the wind itself (ROADMAP item 73): calm, or strong with the switch.
             windSpeedKmh={useRealWeather ? weatherData?.windSpeedKmh ?? null : manualWindy ? MANUAL_STRONG_WIND_KMH : 0}
             rainMmH={rainMmH}
+            cloudLayers={cloudLayers}
+            cloudEgg={cloudEgg}
             windDirectionDeg={weatherData?.windDirectionDeg ?? null}
             compassHeading={activeCompassHeading}
             horizonProfile={horizonProfile}
@@ -833,6 +857,7 @@ const SunTracker: React.FC = () => {
             sunglasses={sunglassesOn}
             onSunTap={handleSunTap}
             calendarEvent={calendarEvent}
+            playDirection={playDirection}
             sunsetCountdown={countdownSeconds === null ? null : { seconds: countdownSeconds, lineOfSight: !!countdownTarget?.lineOfSight }}
           />
           <InfoPanel

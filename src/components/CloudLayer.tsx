@@ -5,17 +5,14 @@ import SceneBird from './SceneBird';
 import SceneFish from './SceneFish';
 import SceneVisitor, { DOLPHIN_SPACING, VISITOR_GRID } from './SceneVisitor';
 import RainCanvas from './RainCanvas';
+import SkyClouds from './SkyClouds';
 import { Bat } from './sceneIcons';
 import { type TimeOfDay } from '../utils/sunUtils';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
-import {
-  getCloudLayout,
-  getCloudMoonlight,
-  getCloudOpacity,
-  getCloudDriftDurationSec,
-  getCloudDriftDirection,
-  getPrecipitationSlantPx,
-} from '../utils/cloudLayoutUtils';
+import { useScenePlaybackRate } from '@/hooks/useScenePlaybackRate';
+import { getSpawnGapFactor, type PlayDirection } from '@/utils/timeTravel';
+import { getPrecipitationSlantPx } from '../utils/cloudLayoutUtils';
+import { type CloudLayers } from '../utils/skyCloudUtils';
 import {
   getWeatherEffects, pickBoat, hasBoatWake, getBoatTone, type BoatKind,
   pickFish, canSpawnFish, getRestStopMotion, type FishKind,
@@ -50,7 +47,8 @@ interface CloudLayerProps {
   date?: Date;
   latitude?: number;
   longitude?: number;
-  cloudCoverPercent?: number | null;
+  // The current hour's cover per layer (ROADMAP item 84, C1); null: the weather type's own.
+  cloudLayers?: CloudLayers | null;
   windSpeedKmh?: number | null;
   windDirectionDeg?: number | null;
   // The forecast rain amount in mm/h (ROADMAP item 77, X1); null: the type's middle value.
@@ -64,6 +62,14 @@ interface CloudLayerProps {
   // night geese can cross it; with its radius (px) and brightness (0-1) for the clouds'
   // silver lining (item 76).
   moon?: { x: number; y: number; r?: number; light?: number } | null;
+  // Time-travel play (ROADMAP item 83): the scene moves 8x faster, backwards in rewind.
+  playDirection?: PlayDirection;
+  // The sun in % of the width and height, with its altitude (°), for the clouds' light
+  // (item 84, C2); the sky gradient for their tint and the colour of their shadows.
+  sun?: { x: number; y: number; altitude: number } | null;
+  skyGradient?: string | null;
+  // A rare lenticular or mammatus day (item 84, X1).
+  cloudEgg?: boolean;
 }
 
 // Birds/fish/ships/leaves travel horizontally at a constant rate (in % of the layer's
@@ -88,30 +94,6 @@ const MOON_GEESE_GAP_MS = 30000;
 // A fixed fallback seed date for callers that don't pass one (e.g. existing tests) -
 // a stable constant, not `new Date()`, so it never changes identity across renders.
 const DEFAULT_SEED_DATE = new Date(0);
-
-// Manual weather mode has no real `cloud_cover` reading, so each type gets a sensible
-// default sky to look right on its own.
-const DEFAULT_CLOUD_COVER: Record<WeatherType, number> = {
-  clear: 0,
-  partly: 25,
-  cloudy: 55,
-  overcast: 90,
-  fog: 95,
-  drizzle: 80,
-  rain: 85,
-  storm: 95,
-  snow: 80,
-  hail: 90,
-};
-
-// Storm deck puffs (ROADMAP item 51) as [cx, cy, rx, ry] in the deck's 100 x 40
-// viewBox: two overlapping rows that make the deck's lower edge lumpy.
-const STORM_DECK_PUFFS: [number, number, number, number][] = [
-  [0, 28, 12, 7], [18, 30, 14, 8], [38, 28, 13, 7], [57, 31, 15, 8], [78, 29, 13, 7], [98, 30, 13, 8],
-  [9, 18, 14, 9], [29, 15, 15, 9], [48, 19, 14, 9], [68, 16, 15, 9], [88, 18, 14, 9],
-];
-
-const CLOUD_DRIFT_AMPLITUDE_VW = 6; // how far clouds glide before easing back
 
 interface MovingEntity {
   id: number;
@@ -358,13 +340,17 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   date = DEFAULT_SEED_DATE,
   latitude = 0,
   longitude = 0,
-  cloudCoverPercent = null,
+  cloudLayers = null,
   windSpeedKmh = null,
   windDirectionDeg = null,
   rainMmH = null,
   isFullscreen = false,
   moonlight = null,
   moon = null,
+  playDirection = 0,
+  sun = null,
+  skyGradient = null,
+  cloudEgg = false,
 }) => {
   const [birds, setBirds] = useState<BirdEntity[]>([]);
   const [fish, setFish] = useState<FishEntity[]>([]);
@@ -381,6 +367,10 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     lastSpawnTimeRef.current = { birds: now, fish: now, ships: now - BOAT_GAP_MIN_MS + 5000, leaves: now };
   }, []);
   const prefersReducedMotion = usePrefersReducedMotion();
+  const sceneRef = useRef<HTMLDivElement>(null);
+  useScenePlaybackRate(sceneRef, playDirection);
+  // During play the spawn gaps shrink by the play factor (item 83), so the scene does not empty.
+  const gapFactor = getSpawnGapFactor(playDirection);
   // Test override (item 85): `?fish=shark` makes every fish spawn a shark.
   const [fishOverride] = useState(() => getFishOverride(window.location.search));
 
@@ -392,23 +382,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     [weatherType, windSpeedKmh]
   );
 
-  const effectiveCloudCover = cloudCoverPercent ?? DEFAULT_CLOUD_COVER[weatherType];
-  const cloudOpacity = getCloudOpacity(effectiveCloudCover);
-  const cloudDriftDurationSec = getCloudDriftDurationSec(windSpeedKmh);
-  const cloudDriftDirection = getCloudDriftDirection(windDirectionDeg);
   const precipSlantPx = getPrecipitationSlantPx(windSpeedKmh, windDirectionDeg);
-
-  // Clouds are derived from cloud_cover/wind/date+location (ROADMAP item 10): stable
-  // positions across renders for the same day/place, live count and opacity. Keyed on
-  // the day string rather than `date` itself, since `date` ticks every second in
-  // SunTracker and the layout only needs to change once a day (see moonExtras in
-  // SunTracker for the same pattern).
-  const cloudSeedDayKey = date.toDateString();
-  const clouds = useMemo(
-    () => getCloudLayout(effectiveCloudCover, date, latitude, longitude),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on cloudSeedDayKey (the day), not `date` itself
-    [effectiveCloudCover, cloudSeedDayKey, latitude, longitude]
-  );
 
   // Drizzle, rain and storm fall on the rain canvas (ROADMAP item 77); null: no rain.
   const rainAmount = getRainMmH(weatherType, rainMmH);
@@ -493,7 +467,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       const currentTime = Date.now();
 
       if (shouldShowBirds) {
-        if (currentTime - lastSpawnTimeRef.current.birds > BIRD_GAP_MIN_MS + Math.random() * BIRD_GAP_RANGE_MS) {
+        if (currentTime - lastSpawnTimeRef.current.birds > (BIRD_GAP_MIN_MS + Math.random() * BIRD_GAP_RANGE_MS) * gapFactor) {
           // 70 %, a third more in the hour before sunset, when the gulls fly to their roost (C2).
           if (Math.random() < (timeOfDay === 'evening' ? 0.93 : 0.7)) {
             const kind = isSunDown ? 'bat' : pickBird(Math.random(), month, latitude, timeOfDay === 'evening');
@@ -506,7 +480,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         }
       } else if (shouldShowMoonGeese) {
         // The twilight bats fly on. One V at a time, about every four minutes.
-        if (currentTime - lastSpawnTimeRef.current.birds > MOON_GEESE_GAP_MS) {
+        if (currentTime - lastSpawnTimeRef.current.birds > MOON_GEESE_GAP_MS * gapFactor) {
           if (Math.random() < 0.12) {
             const next = createBird('geese', window.innerWidth, effects.birdSpeedFactor, Math.random, moonY);
             setBirds(prev => (prev.some(b => b.kind === 'geese') ? prev : [...prev, next]));
@@ -520,7 +494,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       // At the switch between day and night fish, the fish on screen swim on (item 65).
       if (shouldShowFish || shouldShowNightFish) {
         // A quiet night (NR1): a check every 15-25 s instead of every 5-8 s.
-        const gapMs = shouldShowNightFish ? 15000 + Math.random() * 10000 : 5000 + Math.random() * 3000;
+        const gapMs = (shouldShowNightFish ? 15000 + Math.random() * 10000 : 5000 + Math.random() * 3000) * gapFactor;
         if (currentTime - lastSpawnTimeRef.current.fish > gapMs) {
           if (Math.random() < (wetForFish ? 0.35 : 0.7)) { // 70% chance, half of it in rain (E2)
             let newFish: FishEntity | null = null;
@@ -551,7 +525,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       }
 
       if (shouldShowShips) {
-        if (currentTime - lastSpawnTimeRef.current.ships > BOAT_GAP_MIN_MS + Math.random() * BOAT_GAP_RANGE_MS) {
+        if (currentTime - lastSpawnTimeRef.current.ships > (BOAT_GAP_MIN_MS + Math.random() * BOAT_GAP_RANGE_MS) * gapFactor) {
           if (Math.random() < 0.9) { // 90% chance to spawn
             const startX = -8;
             const endX = 108;
@@ -582,7 +556,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       }
 
       if (effects.showLeaves) {
-        if (currentTime - lastSpawnTimeRef.current.leaves > 4000 + Math.random() * 4000) {
+        if (currentTime - lastSpawnTimeRef.current.leaves > (4000 + Math.random() * 4000) * gapFactor) {
           if (Math.random() < 0.6) { // 60% chance to spawn
             const startX = -5;
             const endX = 105;
@@ -602,113 +576,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       }
     };
 
-    const intervalId = setInterval(spawnTick, 500);
+    const intervalId = setInterval(spawnTick, 500 * gapFactor);
 
     return () => {
       clearInterval(intervalId);
     };
-  }, [weatherType, windSpeedKmh, timeOfDay, prefersReducedMotion, isSunDown, isFullscreen, effects.showLeaves, effects.birdSpeedFactor, moonUp, month, latitude, moonY, fishOverride]);
-
-  // The grey/wet-weather cloud tints below (storm/hail/rain/drizzle/fog/snow/
-  // overcast) are ROADMAP item 10's weather-conditioned matrix, unchanged by the
-  // item 15 D redesign - it doesn't restyle the weather illustrations, only the
-  // brand/scene palette, so these stay as component-local literals rather than
-  // scene design tokens (a day/night x 7-weather-type matrix that isn't part of
-  // the style book's D palette).
-  const getCloudColor = () => {
-    switch(weatherType) {
-      case 'clear':
-        return 'transparent';
-      case 'storm':
-        return timeOfDay === 'night'
-          ? 'rgba(20, 20, 25, 0.9)'
-          : 'rgba(60, 60, 70, 0.95)';
-      case 'hail':
-        return timeOfDay === 'night'
-          ? 'rgba(35, 40, 50, 0.85)'
-          : 'rgba(90, 95, 105, 0.9)';
-      case 'rain':
-        return timeOfDay === 'night'
-          ? 'rgba(40, 40, 50, 0.8)'
-          : 'rgba(100, 100, 110, 0.85)';
-      case 'drizzle':
-        return timeOfDay === 'night'
-          ? 'rgba(55, 58, 68, 0.65)'
-          : 'rgba(150, 152, 160, 0.7)';
-      case 'fog':
-        return timeOfDay === 'night'
-          ? 'rgba(120, 125, 135, 0.55)'
-          : 'rgba(215, 218, 222, 0.75)';
-      case 'snow':
-        return timeOfDay === 'night'
-          ? 'rgba(200, 200, 210, 0.6)'
-          : 'rgba(220, 220, 230, 0.8)';
-      case 'overcast':
-        switch(timeOfDay) {
-          case 'dawn':
-            return 'rgba(180, 180, 180, 0.8)';
-          case 'morning':
-          case 'evening':
-            return 'rgba(160, 160, 165, 0.85)';
-          case 'night':
-            return 'rgba(40, 40, 45, 0.7)';
-          case 'astronomical-twilight':
-          case 'nautical-twilight':
-            return 'rgba(60, 60, 65, 0.8)';
-          default:
-            return 'rgba(140, 140, 145, 0.9)';
-        }
-      case 'cloudy':
-      case 'partly':
-      default:
-        // Fair-weather clouds: the style book's D cloud tint per time-of-day,
-        // already scene tokens (ROADMAP item 15) - brand-peach for the golden
-        // hours, the night-sky tokens after dark, plain white by day.
-        switch(timeOfDay) {
-          case 'dawn':
-          case 'morning':
-          case 'evening':
-            return 'hsl(var(--brand-peach) / 0.7)';
-          case 'night':
-            return 'hsl(var(--scene-sky-night-2) / 0.4)';
-          case 'astronomical-twilight':
-          case 'nautical-twilight':
-            return 'hsl(var(--scene-sky-night-3) / 0.5)';
-          default:
-            return 'hsl(var(--scene-glow-white) / 0.8)';
-        }
-    }
-  };
-
-  const getOvercastLayer = () => {
-    if (weatherType === 'clear') return null;
-
-    const intensity = weatherType === 'storm' ? 0.8 :
-                     weatherType === 'hail' ? 0.75 :
-                     weatherType === 'rain' ? 0.7 :
-                     weatherType === 'overcast' ? 0.6 :
-                     weatherType === 'fog' ? 0.5 :
-                     weatherType === 'drizzle' ? 0.45 :
-                     weatherType === 'partly' ? 0.2 : 0.3;
-
-    return (
-      <div
-        className="absolute inset-0 transition-colors duration-[5000ms]"
-        style={{
-          background: `linear-gradient(to bottom, ${getCloudColor()} 0%, transparent 40%)`,
-          opacity: intensity
-        }}
-      />
-    );
-  };
-
-  // "Flat blanket" cloud silhouette for the grey/overcast-family weather, a puffier
-  // one otherwise (partly/cloudy/snow).
-  const isFlatCloudWeather = weatherType === 'storm' || weatherType === 'rain' || weatherType === 'overcast' ||
-    weatherType === 'hail' || weatherType === 'drizzle' || weatherType === 'fog';
-  const cloudPath = isFlatCloudWeather
-    ? "M0 35 Q30 15 60 30 Q90 10 120 25 Q120 50 90 55 Q60 60 30 55 Q0 50 0 35Z"
-    : "M20 40 Q30 20 45 35 Q60 10 75 30 Q90 20 100 35 Q110 45 95 50 Q85 60 60 55 Q35 60 25 50 Q15 45 20 40Z";
+  }, [weatherType, windSpeedKmh, timeOfDay, prefersReducedMotion, isSunDown, isFullscreen, effects.showLeaves, effects.birdSpeedFactor, moonUp, month, latitude, moonY, gapFactor, fishOverride]);
 
   // One fish, or a pair (P6): the companion swims `lag` s behind and leaves last, so its
   // onAnimationEnd removes the pair. FS1 silhouettes (item 85) by SceneFish; night fish
@@ -770,92 +643,34 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     );
     return fishItem.companion ? (
       <React.Fragment key={fishItem.id}>
-        {swimmer('lead', 0, 0)}
-        {swimmer('companion', fishItem.companion.lag, fishItem.companion.dy, remove)}
+        {/* In rewind the lead leaves last (item 83). */}
+        {swimmer('lead', 0, 0, playDirection < 0 ? remove : undefined)}
+        {swimmer('companion', fishItem.companion.lag, fishItem.companion.dy, playDirection < 0 ? undefined : remove)}
       </React.Fragment>
     ) : swimmer(String(fishItem.id), 0, 0, remove);
   };
 
   return (
     <div
+      ref={sceneRef}
       className="absolute inset-0 overflow-hidden pointer-events-none"
       style={{ ['--slant' as string]: `${precipSlantPx}px` }}
     >
       <div data-testid="iceberg" />
-      {getOvercastLayer()}
-
-      {weatherType === 'storm' && (
-        // Storm deck (ROADMAP item 51): a closed dark cloud cover across the top third
-        // of the sky - a solid band with large overlapping, blurred cloud shapes along
-        // its lower edge, so no sky shows through. It overhangs the edges so the blur
-        // does not fade them in.
-        <svg
-          data-testid="storm-deck"
-          className="absolute"
-          style={{ left: '-3%', top: '-3%', width: '106%', height: '40%', filter: 'blur(4px)' }}
-          viewBox="0 0 100 40"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <rect x="0" y="0" width="100" height="28" fill={getCloudColor()} />
-          {STORM_DECK_PUFFS.map(([cx, cy, rx, ry], i) => (
-            // The upper row is a shade darker, so the deck reads as heavy clouds, not a band.
-            <ellipse key={i} cx={cx} cy={cy} rx={rx} ry={ry} fill={i < 6 ? getCloudColor() : 'rgba(0, 0, 0, 0.22)'} />
-          ))}
-        </svg>
-      )}
-
-      {/* Clouds: count/opacity from cloud_cover, drift from wind, positions from a
-          seeded layout stable for the day/place (see cloudLayoutUtils.getCloudLayout). */}
-      {clouds.map((cloud) => {
-        const moonlight = moon?.r ? getCloudMoonlight(cloud, { x: moon.x, y: moon.y, r: moon.r }, window.innerWidth, window.innerHeight) : null;
-        const moonGlow = moon?.light ?? 1;
-        return (
-          <div
-            key={cloud.id}
-            className="absolute transition-colors duration-[5000ms]"
-            style={{
-              left: `${cloud.x}%`,
-              // In a storm the drifting clouds sit below the deck (ROADMAP item 51).
-              top: `${weatherType === 'storm' ? 30 + cloud.y * 0.5 : cloud.y}%`,
-              opacity: cloudOpacity,
-              // Soft blurred clouds (ROADMAP item 15 D polish, style book scene()
-              // k==='d'). On the wrapper, not the <svg>, so it doesn't touch the
-              // snapshot in tests/CloudLayer.test.tsx.
-              filter: 'blur(1.5px)',
-              ['--cloud-scale' as string]: cloud.scale,
-              ['--cloud-dx' as string]: `${CLOUD_DRIFT_AMPLITUDE_VW * cloudDriftDirection}vw`,
-              animation: `cloudDrift ${cloudDriftDurationSec}s ease-in-out infinite alternate`,
-            }}
-          >
-            <svg
-              width="120"
-              height="60"
-              viewBox="0 0 120 60"
-              fill="none"
-            >
-              <path
-                d={cloudPath}
-                fill={getCloudColor()}
-                className="transition-colors duration-[5000ms]"
-              />
-              {/* X2 silver lining (item 76): the cloud's parts near the moon catch its light. */}
-              {moonlight && (
-                <>
-                  <defs>
-                    <radialGradient id={`cloud-moonlight-${cloud.id}`} gradientUnits="userSpaceOnUse" cx={moonlight.cx} cy={moonlight.cy} r={moonlight.r}>
-                      <stop offset="0" stopColor="hsl(var(--scene-moon))" stopOpacity={0.85 * moonGlow} />
-                      <stop offset="0.5" stopColor="hsl(var(--scene-moon))" stopOpacity={0.32 * moonGlow} />
-                      <stop offset="1" stopColor="hsl(var(--scene-moon))" stopOpacity={0} />
-                    </radialGradient>
-                  </defs>
-                  <path d={cloudPath} fill={`url(#cloud-moonlight-${cloud.id})`} data-testid="cloud-moonlight" />
-                </>
-              )}
-            </svg>
-          </div>
-        );
-      })}
+      {/* Clouds by type (ROADMAP item 84), with the overcast veil and their shadows on the sea. */}
+      <SkyClouds
+        weatherType={weatherType}
+        timeOfDay={timeOfDay}
+        date={date}
+        latitude={latitude}
+        longitude={longitude}
+        cloudLayers={cloudLayers}
+        windDirectionDeg={windDirectionDeg}
+        sun={sun}
+        moon={moon}
+        skyGradient={skyGradient}
+        egg={cloudEgg}
+      />
 
       {rainAmount != null && (
         <RainCanvas
@@ -869,10 +684,11 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
 
       {/* Hail: small pellets falling straight/slanted with a tiny settle (shrink +
           fade) at the ground - the calm-motion rule (ROADMAP item 15) rules out an
-          actual bounce. */}
+          actual bounce. Snow and hail keep live speed during play, as the rain (item 83). */}
       {hailPellets.map((pellet) => (
         <div
           key={pellet.id}
+          data-live-speed
           className="absolute rounded-full bg-slate-200 opacity-80"
           style={{
             left: `${pellet.x}%`,
@@ -889,6 +705,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       {snowflakes.map((flake) => (
         <div
           key={flake.id}
+          data-live-speed
           className="absolute text-white opacity-80"
           style={{
             left: `${flake.x}%`,
@@ -1020,15 +837,6 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
           }
           to {
             transform: translateX(var(--dx));
-          }
-        }
-
-        @keyframes cloudDrift {
-          from {
-            transform: scale(var(--cloud-scale, 1)) translateX(0);
-          }
-          to {
-            transform: scale(var(--cloud-scale, 1)) translateX(var(--cloud-dx, 0));
           }
         }
       `}</style>

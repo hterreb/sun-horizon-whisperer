@@ -64,6 +64,16 @@ describe('PremiumDialog (ROADMAP item 14)', () => {
     expect(value.setDialogOpen).toHaveBeenCalledWith(false);
   });
 
+  it('keeps Restore and Cancel readable after a tap: white text on a faint white hover (ROADMAP item 81)', () => {
+    renderDialog(premiumValue({}));
+    for (const name of ['Restore purchase', 'Cancel']) {
+      const button = screen.getByRole('button', { name });
+      expect(button).toHaveClass('hover:text-white', 'hover:bg-white/10');
+      expect(button).not.toHaveClass('hover:text-accent-foreground');
+      expect(button).not.toHaveClass('hover:bg-accent');
+    }
+  });
+
   it('is translated (German)', () => {
     renderDialog(premiumValue({}), 'de');
     expect(screen.getByRole('button', { name: 'Kaufen' })).toBeInTheDocument();

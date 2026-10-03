@@ -1,4 +1,4 @@
-import { getNextSunEvent, passesSunEvent, getCountdownTarget } from '../src/utils/sunEvents';
+import { getNextSunEvent, watchSunEvent, NO_SUN_EVENT_WATCH, CATCH_UP_MS, getCountdownTarget } from '../src/utils/sunEvents';
 
 const at = (hms: string) => new Date(`2026-09-30T${hms}+02:00`);
 const flat = { sunrise: at('07:22:00'), sunset: at('19:05:49') };
@@ -21,26 +21,66 @@ describe('getNextSunEvent (ROADMAP item 41)', () => {
   });
 });
 
-describe('passesSunEvent (ROADMAP item 41)', () => {
-  it('starts the show when a 1 s tick passes the sunset', () => {
-    expect(passesSunEvent(at('19:05:48.600'), at('19:05:49.600'), flat, null)).toBe(true);
-    expect(passesSunEvent(at('19:05:48'), at('19:05:49'), flat, null)).toBe(true);
+describe('watchSunEvent (ROADMAP items 41 and 80)', () => {
+  // Runs the ticks in order and gives each outcome. A tick is a time, or [time, 'preview'].
+  const run = (ticks: (string | [string, 'preview'])[], terrainTimes: typeof terrain | null = null) => {
+    let watch = NO_SUN_EVENT_WATCH;
+    return ticks.map((tick) => {
+      const [hms, mode] = typeof tick === 'string' ? [tick, 'live'] : tick;
+      const result = watchSunEvent(watch, at(hms), mode === 'preview', flat, terrainTimes);
+      watch = result.watch;
+      return result.outcome;
+    });
+  };
+
+  it('starts the show when a 1 s tick passes the sunset, and only once', () => {
+    expect(run(['19:05:48', '19:05:49', '19:05:50', '19:05:51'])).toEqual([null, 'fired', null, null]);
+    expect(run(['19:05:48.600', '19:05:49.600'])).toEqual([null, 'fired']);
   });
 
-  it('does not start the show before or after the event', () => {
-    expect(passesSunEvent(at('19:05:40'), at('19:05:41'), flat, null)).toBe(false);
-    expect(passesSunEvent(at('19:05:50'), at('19:05:51'), flat, null)).toBe(false);
+  it('does not start the show before the event', () => {
+    expect(run(['19:05:40', '19:05:41', '19:05:42'])).toEqual([null, null, null]);
   });
 
   it('uses the terrain sunset, not the flat one, when there is one', () => {
-    expect(passesSunEvent(at('18:49:59'), at('18:50:00'), flat, terrain)).toBe(true);
-    expect(passesSunEvent(at('19:05:49'), at('19:05:50'), flat, terrain)).toBe(false);
+    expect(run(['18:49:59', '18:50:00', '19:05:48', '19:05:50'], terrain)).toEqual([null, 'fired', null, null]);
   });
 
-  it('does not start the show on a clock step longer than 5 s (wake from sleep, time jump)', () => {
-    expect(passesSunEvent(at('19:05:40'), at('19:05:46'), { ...flat, sunset: at('19:05:45') }, null)).toBe(false);
-    expect(passesSunEvent(at('19:00:00'), at('19:10:00'), flat, null)).toBe(false);
-    expect(passesSunEvent(at('19:05:45'), at('19:05:50'), flat, null)).toBe(true);
+  it('catches up a page that was hidden at the event and comes back within 15 min', () => {
+    // Timers stop while the page is hidden: the next tick comes 3 min after the sunset.
+    expect(run(['19:00:00', '19:08:49', '19:08:50'])).toEqual([null, 'fired', null]);
+    expect(run(['15:00:00', '19:05:49'])).toEqual([null, 'fired']);
+    // The last tick that still catches up, 15 min after the event.
+    const lastCatchUp = new Date(flat.sunset.getTime() + CATCH_UP_MS);
+    let watch = watchSunEvent(NO_SUN_EVENT_WATCH, at('19:00:00'), false, flat, null).watch;
+    expect(watchSunEvent(watch, lastCatchUp, false, flat, null).outcome).toBe('fired');
+    watch = watchSunEvent(NO_SUN_EVENT_WATCH, at('19:00:00'), false, flat, null).watch;
+    expect(watchSunEvent(watch, new Date(lastCatchUp.getTime() + 1000), false, flat, null).outcome).toBe('too late');
+  });
+
+  it('gives no show when the page comes back more than 15 min after the event', () => {
+    expect(run(['19:00:00', '19:25:49', '19:25:50'])).toEqual([null, 'too late', null]);
+  });
+
+  it('gives no show on a cold start after the event', () => {
+    expect(run(['19:06:00', '19:06:01', '19:10:00'])).toEqual([null, null, null]);
+  });
+
+  it('gives no show during a preview, nor on the return to live after the event', () => {
+    // Preview ticks across the (preview) sunset.
+    expect(run([['19:05:48', 'preview'], ['19:05:49', 'preview'], ['19:05:50', 'preview']])).toEqual([null, null, null]);
+    // Live before the sunset, a preview while it passes, live again 3 min after it.
+    expect(run(['19:00:00', ['12:00:00', 'preview'], ['12:00:01', 'preview'], '19:08:49', '19:08:50'])).toEqual([null, null, null, 'preview', null]);
+    // A preview before the sunset does not count as the page being open before it.
+    expect(run([['19:00:00', 'preview'], '19:08:49'])).toEqual([null, null]);
+  });
+
+  it('starts the show again on the next event after a preview, once back in live time before it', () => {
+    expect(run(['19:00:00', ['12:00:00', 'preview'], '19:05:00', '19:05:49'])).toEqual([null, null, null, 'fired']);
+  });
+
+  it('keeps sunrise shows', () => {
+    expect(run(['07:21:59', '07:22:00', '07:22:01'])).toEqual([null, 'fired', null]);
   });
 });
 

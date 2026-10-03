@@ -1202,7 +1202,7 @@ Four Sentry reports from the evening and night of 2026-10-01, all from Ravensbur
 
 Six open Sentry feedback reports from 2026-10-02 20:48 to 2026-10-03 18:58, all on release `b7de009`, from Ravensburg and Stuttgart. Sentry has no new errors for sun-chaser in 90 days (only the setup test, SUN-CHASER-1, resolved). Request: "check sentry for all errors and user feedback, analyze, spec it out and pitch me ideas how to solve". Items 80–83 have a recommended spec. Items 84 and 85 are design work, with a lookbook first. Decisions (2026-10-03): "80, no only on sunset, 83 yes thats ok, 84&85 yes please".
 
-### 80. Fireworks you do not miss — S — [SUN-CHASER-V](https://ainabler.sentry.io/issues/SUN-CHASER-V)
+### 80. Fireworks you do not miss — S — [SUN-CHASER-V](https://ainabler.sentry.io/issues/SUN-CHASER-V) — **✅ Done**
 
 - **Feedback (2026-10-03 18:58 CEST, Ravensburg):** "Today the firework didn't work".
 - **Now:** `Fireworks.tsx` and `sunEvents.ts` have not changed since item 41/43 (2026-09-30). A show starts only when one clock tick of at most 5 s (`MAX_CLOCK_STEP_MS`) passes the next sunrise or sunset, in live mode, without reduced motion. The trigger uses the line-of-sight sunset. The feedback came 55 s before the flat sunset (18:59:41), so the line-of-sight sunset behind the western hills had passed without a show. SUN-CHASER-T (13:59) has the same trace ID: one page load, open for 5 h on a phone.
@@ -1216,15 +1216,25 @@ Six open Sentry feedback reports from 2026-10-02 20:48 to 2026-10-03 18:58, all 
   - **FW3 Diagnose only:** a Sentry breadcrumb `fireworks` with "fired" or "skipped" and the reason (hidden step, preview, reduced motion). Cheap, but it fixes nothing.
 - **Pick (2026-10-03):** FW1 with the FW3 breadcrumb. "no only on sunset": a cold app start after the sunset gives no show. The catch-up is only for a page that was open at the sunset and comes back within 15 min (a hidden page whose clock stopped).
 - **Done when:** unit tests for the catch-up rule: hidden at the event and back after 3 min gives one show; back after 20 min gives none; the next tick gives no second show; a preview gives none. In the browser, a clock jump over the sunset gives one show.
+- **Built:**
+  - `watchSunEvent` (`sunEvents.ts`) replaces `passesSunEvent` and the 5 s step rule (`MAX_CLOCK_STEP_MS` is gone). A live tick arms the next sunrise or sunset (the terrain time when there is one). The first live tick after the armed event starts one show when it comes at most 15 min (`CATCH_UP_MS`) after the event. The watch keeps the last celebrated event, so a show never repeats.
+  - A cold start after the event has nothing armed: no show. A preview tick only marks the watch, so the return to live after the event gives no show either; the preview clock never arms an event.
+  - `SunTracker` keeps the watch in a ref. It skips the check on a hidden tick (a desktop tab still ticks), so the show waits for the first visible tick. New Year is unchanged.
+  - FW3: each fired or skipped show adds `Sentry.addBreadcrumb({ category: 'fireworks', level: 'info' })` with the message `fired`, `skipped: preview` (the event passed while a preview was on), `skipped: too late` or `skipped: reduced motion`. No place and no time in it. Reduced motion still gives no show.
+- **Deviations:** sunrise shows use the same catch-up rule as the sunset (one rule for both events). A 1 s tick over the sunrise still starts the show as before; a page hidden at the sunrise now also gets it within 15 min.
+- **Checked:** 15 new tests (886 in all), lint, typecheck and build pass. Unit cases: hidden at the event and back after 3 min: one show; the next tick: no second show; back after 20 min: none; cold start after the sunset: none; preview: none; live, then a preview across the sunset, then live: none. In headless Chromium at 390×844 with touch, Ravensburg, terrain tiles blocked (flat sunset 18:59:41), Playwright's fake clock: the page opens at 18:58:41, the clock stops at 18:59:11 (timers frozen, as on a hidden phone page) and jumps to 19:02:41 without a tick; the first tick after the resume starts a show (the fireworks canvas is lit) and adds the breadcrumb `fired`. A jump to 19:19:41: no show, `skipped: too late`. A hidden tab whose clock ticks across the sunset: no show while hidden, a show on the first visible tick. No console errors apart from the blocked tiles. The item-44 test "does not start the fireworks during a preview" now commits every 10 s instead of every 1 s (a 10 s step past the event would start a show, so the test still catches a broken preview guard, checked by mutation). It takes 0.5–0.8 s instead of 1.9–2.1 s; 5 of 5 runs and two full suites pass. Under a load average above 80 (parallel agents on the same machine), this and other `SunTracker` tests can still exceed the 5 s timeout, on the spec branch too.
 
-### 81. Glass icons stay visible when tapped — S — [SUN-CHASER-Q](https://ainabler.sentry.io/issues/SUN-CHASER-Q)
+### 81. Glass icons stay visible when tapped — S — [SUN-CHASER-Q](https://ainabler.sentry.io/issues/SUN-CHASER-Q) — **✅ Done**
 
 - **Feedback (2026-10-02 20:53):** "Icons disappear when pressing them full screen or feedback".
 - **Now (cause found in the code):** the round glass buttons use the shadcn `variant="ghost"`, which adds `hover:text-accent-foreground`. The app has no `.dark` class, so this is the light token `222 47% 11%`: near-black on the dark glass. On a phone, `:hover` stays after a tap, so the icon stays near-black until the next tap somewhere else. Affected: `FullscreenButton`, `CompassToggle`, the feedback button in `TopLeftButtons`, and the Restore and Close buttons in `PremiumDialog`. `PWAInstallPrompt` already has `hover:text-white` and does not show the bug.
 - **Spec:** add `hover:text-white` to `GLASS_ICON_BUTTON` (`glassChrome.ts`). The active `CompassToggle` adds `hover:text-brand-sky`. The two ghost buttons in `PremiumDialog` add `hover:text-white`. tailwind-merge then drops the ghost class. Do not edit `src/components/ui/`.
 - **Done when:** a test shows that the three top-left buttons have no `hover:text-accent-foreground` class. In the browser at 390×844 with touch: after a tap, each icon stays white (the active compass stays sky blue).
+- **Built:** `GLASS_ICON_BUTTON` gets `hover:text-white`. The active `CompassToggle` adds `hover:text-brand-sky`. The Restore and Cancel buttons in `PremiumDialog` add `hover:text-white hover:bg-white/10`. tailwind-merge drops the ghost `hover:text-accent-foreground` (and in the dialog `hover:bg-accent`). `src/components/ui/` is not edited.
+- **Deviations:** the two `PremiumDialog` buttons also get `hover:bg-white/10`. The ghost `hover:bg-accent` is the light token `210 40% 96.1%` (near-white), so `hover:text-white` alone gives white text on a near-white pill after a tap. `PWAInstallPrompt` uses the same hover.
+- **Checked:** 4 new tests (the three top-left buttons, the active compass, the dialog buttons, `GLASS_ICON_BUTTON`). In headless Chromium at 390×844 with touch, after a tap `:hover` stays on the button: fullscreen, compass (idle) and feedback are `rgb(255, 255, 255)`; the active compass is sky blue `rgb(14, 165, 233)`; in the Premium dialog (`?premium=enforce` with a Play Billing stub) Restore is white on `rgba(255, 255, 255, 0.1)`.
 
-### 82. Jellyfish: a softer night glow — S — [SUN-CHASER-P](https://ainabler.sentry.io/issues/SUN-CHASER-P)
+### 82. Jellyfish: a softer night glow — S — [SUN-CHASER-P](https://ainabler.sentry.io/issues/SUN-CHASER-P) — **✅ Done**
 
 - **Feedback (2026-10-02 20:48):** "Jellyfish is a little too bright at night".
 - **Now:** at night the jellyfish has its own light (item 65): `--scene-fish-jellyfish-glow` (`190 90% 80%`) at opacity 0.95, with a 3 px drop-shadow halo. The other night fish with their own light are outlines at stroke opacity 0.45 with small gold lights. The jellyfish is the brightest thing in the night water.
@@ -1233,8 +1243,10 @@ Six open Sentry feedback reports from 2026-10-02 20:48 to 2026-10-03 18:58, all 
   - **J2:** J1, plus a slow glow that breathes between 0.4 and 0.65 over 5 s. Opacity only, no motion, so it keeps the calm-motion rule.
   - **J3:** the bell as an outline in the moon tone at 0.45, like the lanternfish; only the bell rim glows cyan.
 - **Done when:** a test for the jellyfish night opacity. A night screenshot with a jellyfish beside a lanternfish.
+- **Built (J1):** `createFish` gives the jellyfish with its own light 0.6 instead of 0.95 (before the distance fade), and its halo is `drop-shadow(0 0 2px)` instead of 3 px. The lanternfish, anglerfish and squid do not change.
+- **Checked:** 1 new test (the night jellyfish at 0.6, the other fish with their own light at 0.95, the day jellyfish unchanged). In headless Chromium at 390×844, Ravensburg, 2026-10-03 22:30 (moon down): a jellyfish at opacity 0.547 (0.6 at depth 0.29) with a 2 px halo, a soft cyan glow. No lanternfish came in the same shot (the moon was down, and the spawns are random).
 
-### 83. The scene follows fast forward and rewind — M — [SUN-CHASER-R](https://ainabler.sentry.io/issues/SUN-CHASER-R)
+### 83. The scene follows fast forward and rewind — M — [SUN-CHASER-R](https://ainabler.sentry.io/issues/SUN-CHASER-R) — **✅ Done**
 
 - **Feedback (2026-10-02 22:31):** "During fast forward all elements boats fish birds should go a lot faster as well and backwards when going back".
 - **Now:** play (item 44) moves only the clock (`PLAY_SPEED` 600, 10 min per second). Boats, fish, birds, leaves and clouds are CSS animations (`moveAcrossX`, `cloudDrift`) in `CloudLayer` with fixed durations. `CloudLayer` does not get `playDirection`. The sea and the rain are canvas loops with their own clocks.
@@ -1244,8 +1256,14 @@ Six open Sentry feedback reports from 2026-10-02 20:48 to 2026-10-03 18:58, all 
   - **SP3:** all elements 8× faster in both play directions, always moving forward. Smallest, but no "backwards".
 - **Factor:** 8×. A sailboat at 1.2 %/s then crosses in about 10 s; 600× would be a flash. The calm-motion rule is for live mode; play is the exception (confirmed 2026-10-03: "83 yes thats ok").
 - **Done when:** tests for the rate (direction −1 → −8, 0 → 1, 1 → 8) and for the rewind spawn. In the browser: in forward play a near boat crosses in at most 12 s; in rewind all elements move right to left; after pause the scene is at live speed.
+- **Built (SP1):**
+  - `timeTravel.ts`: `SCENE_PLAY_FACTOR` (8), `getScenePlaybackRate` (−1 → −8, 0 → 1, 1 → 8) and `getSpawnGapFactor` (1/8 during play, else 1). `SunTracker` passes `playDirection` through `SunVisualization` to `CloudLayer`.
+  - `useScenePlaybackRate` (`src/hooks/`) runs after each `CloudLayer` render (each 100 ms play tick and each spawn) and sets the rate on each animation in the scene container (`getAnimations({ subtree: true })`), with no list of animation names, so new scene animations (item 84's clouds) follow. A direction change turns the animations where they are. In rewind, an animation that was not there at the last call starts at its end (`currentTime` = its end time, delay included), so it comes in from the right. A reversed animation fires `animationend` at its start (checked in Chrome), so the entities leave and are removed as in live mode. An infinite animation (the cloud drift) stops at its start when reversed and loses its transform, so in rewind it keeps an hour of animation time in reserve (whole periods, so the phase does not jump). Live: the hook does nothing; after play it sets rate 1 once.
+  - `CloudLayer`: the spawn gaps of birds, the night geese, fish, boats and leaves, and the 500 ms spawn check, are multiplied by `getSpawnGapFactor`. A fish pair is removed by the companion in forward and live mode, by the lead in rewind (the lead reaches its start last).
+- **Deviations:** snow and hail keep live speed (`data-live-speed`, skipped by the hook), as the rain canvas (SP2 not picked). CSS transitions (the 5 s cloud colour fades) also keep rate 1, so a colour change does not run back. A fish pair that spawns in rewind swims side by side (each swimmer starts at its own end). The factor stays 8: a crossing is 116 % of the width, not 100 %, so a near sailboat on a phone takes 12.1 s (about 10 s in the spec), a near rowboat 16 s, a near ferry 8 s; wide screens keep the item-66 pixel cap, so crossings there take width ÷ 430 times longer.
+- **Checked:** 14 new tests (884 in all), lint, typecheck and build pass. In Chromium at 390×844 (Ravensburg, live weather, jump to 2026-10-04 08:00), sampled every 200 ms: live 12 s at rate 1; forward 40 s: the boat, fish and bird animations and the cloud drift at rate 8, all 38 entities left to right. A near sailboat (Math.random pinned low) crossed in 12.2 s (97.1 s live) and left the screen after about 11.3 s. Rewind 30 s: rate −8, all 41 entities right to left; 28 spawns came in at the right edge (x 383–421 px); each entity from before the rewind left at the left edge and was removed; the clouds kept their transform. Pause 10 s: rate 1, 16 entities left to right at 1–8 px/s, as in live mode. At 1280×800 the same (63 entities right to left in rewind). No console errors.
 
-### 84. Clouds by type — M — [SUN-CHASER-T](https://ainabler.sentry.io/issues/SUN-CHASER-T) — lookbook first
+### 84. Clouds by type — M — [SUN-CHASER-T](https://ainabler.sentry.io/issues/SUN-CHASER-T) — **✅ Done**
 
 - **Feedback (2026-10-03 13:59, Stuttgart):** "Redo cloud design with different cloud types and looks".
 - **Now:** two SVG paths: a flat blanket for storm, rain, overcast, hail, drizzle and fog, and one puff for partly, cloudy and snow. One flat colour per weather and time of day (item 10 matrix); fair clouds are brand-peach at dawn, morning and evening. The weather fetch already gets `cloud_cover_low`, `cloud_cover_mid` and `cloud_cover_high` per hour, but only the sunset score uses them.
@@ -1265,6 +1283,75 @@ Six open Sentry feedback reports from 2026-10-02 20:48 to 2026-10-03 18:58, all 
   - **Add-ons:** X1 rare lenticular clouds (still over the ridge) or mammatus after a storm; X2 cloud shadows on the sea; X3 sun rays through the gaps; X4 a 22° halo under a thin high veil; X5 noctilucent clouds in summer twilight; X6 clouds in the calm-water mirror (WV6).
   - **Recommended:** C1, C2, C3, C4, X1, X3. The new shapes stay in today's 120 × 60 box, so the item-76 silver lining works on them. With C3 the clouds glide across the screen, so the silver lining must follow the cloud's current place (the lookbook updates it once per second).
 - **Picks (2026-10-03):** "Cloud picks: C1, C2, C3, C4, X1, X2".
+- **Spec:**
+  - **C1 Real cloud layers:** `weatherUtils` keeps the hourly sample nearest the fetch time as `cloudLayers` (`{ low, mid, high }` in %), null without hourly data and in an older cache entry. `SunTracker` passes it in live mode. Manual weather and a missing sample use the type's own layers (low/mid/high, the lookbook presets; hail is new): clear 0/0/0, partly 25/10/20, cloudy 55/35/40, overcast 90/50/30, fog 95/10/10, drizzle 80/30/20, rain 70/85/50, storm 80/70/95, snow 60/80/30, hail 90/70/40.
+  - The types, as in the lookbook:
+
+    | Layer | When | Type |
+    |---|---|---|
+    | High | 5–59 % | cirrus wisps (2 shapes) |
+    | High | from 60 % | a cirrostratus veil |
+    | Mid | 5–69 % | an altocumulus field (3 shapes) |
+    | Mid | from 70 % | an altostratus sheet |
+    | Low | rain, storm, snow or hail, with low or mid from 50 % | a nimbostratus deck (3 shapes) with rain shafts, none in snow |
+    | Low | rain, storm or hail below that | towering cumulus with one shower shaft |
+    | Low | fog | a stratus band over the horizon |
+    | Low | from 75 % (drizzle from 50 %) | stratus rows over stratocumulus |
+    | Low | 45–74 % | stratocumulus, and cumulus in fair weather |
+    | Low | 5–44 % | cumulus (3 shapes) in fair weather (clear, partly, cloudy), else stratocumulus |
+    | Storm | always | a still cumulonimbus anvil on the horizon |
+
+    A closed deck lets the layers above it show at 0.15 (a stratus deck at 0.15–0.7). A mid sheet halves the high clouds. Fog keeps 0.15 of them. The cover sets the count per 430 px of width; the type sets the density (0.4–0.97). Each shape stays in the 120 × 60 box; a sheet or a deck is a row of boxes. The layout is seeded by the day and the place.
+  - **C2 Lit by the sun:** each cloud has a gradient from its shade side to its lit side, toward the sun (above −12°), else the moon, else the top of the sky. Five palettes per band (day from 12°, golden hour at 5°, sunset at 0°, civil twilight at −4°, night from −12°) blend by the sun's altitude. Wet weather mutes them toward grey. The overcast veil at the top of the sky takes the low clouds' lit colour. This replaces `getCloudColor`: civil twilight gets purple low clouds and pink-orange high clouds, not day white and day grey.
+  - **C3 Depth:** high 0.35, mid 0.7 and low 2.4 px/s at the top of the sky, half that at the horizon. The same px/s on every width (× height / 480 below 480 px of height). Downwind (`getCloudDriftDirection`). Each cloud glides across and comes around; a sheet or a deck glides as one row. Toward the horizon a cloud is smaller (× 1.2 → 0.65), paler (−40 %) and takes on up to 40 % of the sky colour. Reduced motion: no glide. The glides are CSS animations inside CloudLayer, so item 83's play rate reaches them.
+  - **C4 Soft fills:** by day and at night a shaded base; from the golden hour to civil twilight a warm glow on the sun side. Edge blur 2.6 px × the cloud's scale (high × 0.6, mid × 0.75).
+  - **X1:** one day in 30 per place, seeded by the day and the place (like the green flash). Clear, partly or cloudy: two lenticular lenses stand still over the ridge. Storm: mammatus pouches hang under the deck, and the deck has no rain shafts. `?egg=lenticular` and `?egg=mammatus` force the day; the weather still picks the egg.
+  - **X2 Cloud shadows:** in clear, partly and cloudy weather each cumulus and stratocumulus throws a soft patch in the deep water colour on the sea, which glides with it: 0.5 by day, 0.28 in the golden hour, none from sunset. The patch moves away from the sun by 0.12 (day) to 0.3 (golden hour) × the cloud's distance to the sun. A far cloud's shadow lies near the horizon.
+  - **Silver lining (item 76):** `getCloudMoonlight` takes the cloud's current centre and scale. Once a second `SkyClouds` reads each glide's progress (Web Animations API) and moves the lining with it, as the lookbook does. The C2 light direction (in 10° steps) and the X2 shadow follow the same tick.
+  - **Structure:** `SkyClouds.tsx`, mounted first in CloudLayer, so the clouds stay behind the moon disc. The shapes are in `cloudShapes.ts`, the layout, colours and motion in `skyCloudUtils.ts`. CloudLayer loses `getCloudColor`, the overcast layer, the item-51 storm deck and the old clouds; its `cloudCoverPercent` prop becomes `cloudLayers`.
+- **Done when:** tests for the type choice per weather type (live and manual), the colour per time of day with civil twilight, the band speeds in px/s, the X1 rarity and the lining on a moving cloud. In Chrome at 390×844 and 1280×800: partly, cloudy, overcast, rain, storm, fog and snow by day, in the golden hour, at sunset, in civil twilight and at night with the moon; no console errors. The frame cost at 4× CPU throttle at 390×844 and 1440×900 against the old clouds.
+- **Built:**
+  - `src/utils/cloudShapes.ts`: the lookbook's shapes (Ci 2, Cs 1, Ac 3, As 1, Cu 3, Sc 2, St 2, Ns 3, Cb 3, Len 1, Mam 1), each one path in the 120 × 60 box, with rain shafts on Ns and the towering Cu.
+  - `src/utils/skyCloudUtils.ts`:
+    - C1: `DEFAULT_CLOUD_LAYERS`, `getCloudLayers`, `getCloudTypes`, and `getSkyClouds`, the layout as gliders (one cloud, or a row of tiles), seeded by the day and the place.
+    - C3: `getCloudSpeed` and the glide helpers (`getGliderOffset`, `getGliderStartProgress`, `getCloudCentre`).
+    - C2 and C4: `getCloudLight`, `getCloudColors`, `getCloudFill`, `getCloudVeil`, `getLightAngle`, `getSkyColorAt`.
+    - X2: `getCloudShadowLook`, `getCloudShadowBox`. X1: `isCloudEggDay`, `isCloudEggForced`.
+  - `src/components/SkyClouds.tsx` draws the veil, the gliders and the shadows (z 4: over the sea and the waves, under the fish).
+    - Each glide is a CSS animation (`skyGlideRight` or `skyGlideLeft`): the glider is as wide as its track and moves by its own width.
+    - One memoized `CloudSvg` per cloud.
+    - A 1 s tick reads each glide's progress (`getAnimations()[0].effect.getComputedTiming()`) and sets the lining, the light direction and the shadow shift. It skips the update while no glider moved by 1.5 px. Reduced motion: no glide, no tick.
+  - `cloudLayoutUtils.getCloudMoonlight` takes the cloud's current centre and scale in px. `getCloudLayout`, `getCloudCount`, `getCloudOpacity` and `getCloudDriftDurationSec` went with the old clouds.
+  - `CloudLayer` mounts `SkyClouds` where the veil, the storm deck and the clouds were, and gets `cloudLayers`, `sun`, `skyGradient` and `cloudEgg`. `weatherUtils` adds `cloudLayers` to `WeatherData`. `SunTracker` passes it in live mode and sets `cloudEgg`. `SunVisualization` passes the sun (in %, with its altitude) and the sky gradient.
+- **Deviations:**
+  1. The overcast veil takes the C2 colour. The lookbook kept the old matrix colour for it, and with it the civil-twilight bug.
+  2. Hail (not in the lookbook) has its own layers (90/70/40) and is a deck weather with shafts; without a deck it gets showers.
+  3. Clear weather is fair weather (cumulus, lenticulars, shadows), like partly and cloudy. The lookbook had no clear sky.
+  4. The palettes blend by the sun's altitude (12°, 5°, 0°, −4°, −12°), not five fixed times. Without the sun's position, each time of day stands for one altitude.
+  5. The C2 light direction and the X2 shadow shift follow the gliding cloud (the 1 s tick; the light in 10° steps). The lookbook set them once, from the laid-out place.
+  6. A sheet or a deck glides as one row (one animated element), not each tile on its own loop: the same look with fewer animated layers (overcast at 1440×900: 143 clouds in 33 glides).
+  7. The wind speed no longer sets the cloud pace (the old sway took 70–240 s by wind); only the wind direction counts.
+  8. On a mammatus day the rain canvas keeps falling (it is the live weather); only the deck's rain shafts go. The lookbook stopped the rain.
+  9. The old CloudLayer snapshot (ten copies of the blanket path) is gone; the test now checks the deck.
+- **Checked:** 34 new tests (886 in all; the 18 tests of the removed helpers went); lint, typecheck and build pass. Main chunk 568.0 kB (185.0 kB gzipped), was 553.2 kB (178.6 kB). In Chrome, Ravensburg, mocked Open-Meteo with the lookbook layers:
+  - **Look:** 70 screenshots at 390×844 and 1280×800 of partly, cloudy, overcast, rain, storm, fog and snow, on 2026-10-03 at 13:00 (day, sun 38°), 18:20 (golden hour, 5.5°), 18:53 (sunset, 0°) and 19:20 (civil twilight, −4.5°), and on 2026-10-01 at 23:42 (night, moon 21°, 69 % lit). The types and colours match the lookbook in every weather. Civil twilight: purple low clouds, pink-orange cirrus and a dark violet-grey veil (was day white and day grey). No console errors.
+  - **Glide** over 10 s: 390×844 and 1440×900 give the same px/s per type (high 0.29–0.36, mid 0.47–0.64, low 1.41–2.36), at most 2.36 px/s (the sailboat: 5.2), and within 0.005 px/s of the layout on a quiet machine. Wind from the east: the clouds glide to the left.
+  - **Silver lining** at night (cloudy, overcast): over 8 s the lit clouds glided 10–16 px, and the moon position that each lining implies stayed within 2 px of the moon disc.
+  - **X1:** `?egg=lenticular` in partly weather at 18:20: two lenses over the ridge. `?egg=mammatus` in a storm: lit pouches under the deck, no shafts. **X2:** shadows on the sea by day (cloudy: 5 at 390 px, 16 at 1280 px), fainter in the golden hour, none from sunset.
+  - **Reduced motion:** no glide runs; the clouds stand at their laid-out places. Without hourly data the type's own layers apply.
+  - **Frame cost** at 4× CPU throttle: the main-thread time per frame with and without the clouds in the same page (median of five 4 s windows each), against the old clouds measured the same way. All runs at 60–63 fps.
+
+    | | New clouds | Old clouds |
+    |---|---|---|
+    | 390×844 cloudy (10 clouds) | 0.01 ms | 0.37 ms |
+    | 390×844 overcast (60) | 0.25 ms | 0.29 ms |
+    | 390×844 storm (27) | 0.33 ms | 0.75 ms |
+    | 1440×900 partly (18) | 0.32–0.76 ms | 0.21–0.66 ms |
+    | 1440×900 cloudy (35) | 0.63–0.70 ms | 0.36–0.42 ms |
+    | 1440×900 overcast (143) | 0.25 ms | 0.59 ms |
+
+    A storm at 1440×900 runs at 18–22 fps at 4× throttle with the old and the new clouds alike (20–26 ms per frame, from the rain and storm effects); the clouds' share is below the noise. A Chrome trace shows every glide on the compositor, with no compositing failures.
+  - **Not checked:** a real phone, the GPU cost of the blurred layers, a live Open-Meteo response, and item 83's play rate on the glides (not merged yet).
 
 ### 85. Fish redone, with rare sharks and dolphins — M — [SUN-CHASER-S](https://ainabler.sentry.io/issues/SUN-CHASER-S) — **✅ Done**
 

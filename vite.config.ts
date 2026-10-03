@@ -14,7 +14,8 @@ export default defineConfig(({ mode }) => {
   const uploadSourceMaps = !!sentryAuthToken;
   return {
   server: {
-    host: "::",
+    // Local only (AUDIT S-19). For a phone on the same Wi-Fi: `npm run dev -- --host`.
+    host: "localhost",
     port: 8080,
   },
   build: {

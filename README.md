@@ -77,8 +77,8 @@ The app installs as a PWA. `vite-plugin-pwa` generates the service worker and we
 
 Three Deno Edge Functions implement a Stripe subscription backend. **The frontend does not call them yet** — they exist but are not wired into the UI.
 
-- `check-subscription` — looks up the caller's Stripe customer by e-mail and returns subscription status. Upserts the result into a `subscribers` table.
-- `create-checkout` — creates a Stripe Checkout session for the "Sun Chaser Premium" subscription (with a first-time trial).
+- `check-subscription` — reads the caller's Stripe customer ID from the `subscribers` table (by Supabase user ID, never by e-mail) and returns subscription status. Upserts the result into `subscribers`.
+- `create-checkout` — creates a Stripe Checkout session for the "Sun Chaser Premium" subscription (with a first-time trial). On the first checkout it creates the Stripe customer and stores its ID with the user ID.
 - `customer-portal` — creates a Stripe Billing Portal session so a subscriber can manage their subscription.
 
 Required secrets (set with `supabase secrets set`):
@@ -86,7 +86,6 @@ Required secrets (set with `supabase secrets set`):
 - `STRIPE_SECRET_KEY`
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- `SUPABASE_ANON_KEY`
 - `SITE_URL` — used for CORS and Stripe redirect URLs.
 
 The `subscribers` table and its RLS policy are in `supabase/migrations/`. Apply them with `supabase db push` before you deploy the functions. The first Premium release does not use them: Premium is a one-time Google Play purchase in the Play app only, and the web stays free (ROADMAP items 14 and 45). The functions stay for a possible later web sale.

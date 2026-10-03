@@ -3,7 +3,7 @@ import { render, act, fireEvent } from '@testing-library/react';
 import CloudLayer, { WeatherType, createFish, createBird } from '../src/components/CloudLayer';
 import { FISH_WEIGHTS, NIGHT_FISH_WEIGHTS, getWaterSpeedFactor } from '../src/utils/weatherEffectsUtils';
 import type { TimeOfDay } from '../src/utils/sunUtils';
-import { getCloudLayout } from '../src/utils/cloudLayoutUtils';
+import { DEFAULT_CLOUD_LAYERS, getCloudCentre, getGliderStartProgress, getSkyClouds } from '../src/utils/skyCloudUtils';
 
 const mockReducedMotion = (matches: boolean) =>
   vi.spyOn(window, 'matchMedia').mockReturnValue({
@@ -31,14 +31,16 @@ describe('CloudLayer', () => {
   const renderLayer = (weatherType: WeatherType, timeOfDay: string) =>
     render(<CloudLayer weatherType={weatherType} timeOfDay={timeOfDay as TimeOfDay} />);
 
-  it('shows fish during rain', () => {
+  it('draws the clouds by type (ROADMAP item 84)', () => {
     const { container } = renderLayer('rain', 'midday');
-    expect(container.querySelectorAll('svg')).toMatchSnapshot(); // Should include fish icon
+    expect(container.querySelector('[data-testid="sky-clouds"]')?.getAttribute('data-low')).toBe('deck');
+    expect(container.querySelectorAll('[data-testid="sky-cloud"]').length).toBeGreaterThan(0);
   });
 
-  it('draws the closed storm deck only in a storm (ROADMAP item 51)', () => {
-    expect(renderLayer('storm', 'afternoon').container.querySelector('[data-testid="storm-deck"]')).not.toBeNull();
-    expect(renderLayer('rain', 'afternoon').container.querySelector('[data-testid="storm-deck"]')).toBeNull();
+  it("closes the sky with a dark deck in a storm (ROADMAP item 51, now item 84's nimbostratus)", () => {
+    const deck = (type: WeatherType) => renderLayer(type, 'afternoon').container.querySelector('[data-testid="sky-cloud"][data-type="Ns"]');
+    expect(deck('storm')).not.toBeNull();
+    expect(deck('partly')).toBeNull();
   });
 
   it('does not show fish at night', () => {
@@ -353,6 +355,15 @@ describe('CloudLayer', () => {
       expect(createFish('classic', false, false, 390, always(0)).light).toBeUndefined();
     });
 
+    it('gives the night jellyfish a softer glow: 60 %, the other fish with their own light 95 % (ROADMAP item 82)', () => {
+      expect(createFish('jellyfish', false, false, 390, always(0), true).opacity).toBeCloseTo(0.6, 5);
+      for (const kind of ['lanternfish', 'anglerfish', 'squid'] as const) {
+        expect(createFish(kind, false, false, 390, always(0), true).opacity).toBeCloseTo(0.95, 5);
+      }
+      // By day the jellyfish keeps its day look (85 % since FS1, item 85).
+      expect(createFish('jellyfish', false, false, 390, always(0)).opacity).toBeCloseTo(0.85 * (1 - 0.4 * 0.3), 5);
+    });
+
     it('swims no fish faster than the sailboat, none slower than 0.4 %/s (ROADMAP item 66)', () => {
       const kinds = [...FISH_WEIGHTS.map(([kind]) => kind), ...NIGHT_FISH_WEIGHTS.map(([kind]) => kind).filter(k => k !== 'moonlit')];
       for (const kind of kinds) {
@@ -606,10 +617,15 @@ describe('CloudLayer', () => {
 
   describe('silver lining (ROADMAP item 76, X2)', () => {
     it('lights the cloud the moon sits on, and no cloud without the moon', () => {
-      const props = { weatherType: 'cloudy' as const, timeOfDay: 'night' as const, cloudCoverPercent: 55, date: new Date('2026-10-01T23:42:00'), latitude: 47.78, longitude: 9.61 };
-      // The moon at the centre of the first cloud (120 × 60 px, jsdom's window is 1024 × 768).
-      const [cloud] = getCloudLayout(55, props.date, props.latitude, props.longitude);
-      const moon = { x: cloud.x + (60 / window.innerWidth) * 100, y: cloud.y + (30 / window.innerHeight) * 100, r: 22, light: 0.75 };
+      const props = { weatherType: 'cloudy' as const, timeOfDay: 'night' as const, date: new Date('2026-10-01T23:42:00'), latitude: 47.78, longitude: 9.61 };
+      // The moon at the centre of the first low cloud (item 84's layout; jsdom's window is 1024 × 768).
+      const [w, h] = [window.innerWidth, window.innerHeight];
+      const glider = getSkyClouds({
+        weather: 'cloudy', layers: DEFAULT_CLOUD_LAYERS.cloudy, width: w, height: h,
+        seed: `${props.date.toDateString()}|47.8|9.6`, egg: false, direction: 1,
+      }).find(g => g.clouds[0].band === 'low')!;
+      const centre = getCloudCentre(glider, glider.clouds[0], getGliderStartProgress(glider));
+      const moon = { x: (centre.x / w) * 100, y: (centre.y / h) * 100, r: 22, light: 0.75 };
       const lit = render(<CloudLayer {...props} moon={moon} />);
       expect(lit.container.querySelectorAll('[data-testid="cloud-moonlight"]').length).toBeGreaterThan(0);
       lit.unmount();
@@ -644,5 +660,52 @@ describe('CloudLayer rain (ROADMAP item 77)', () => {
     expect(hail).toHaveLength(45);
     expect(new Set(snow).size).toBeGreaterThan(50);
     expect(new Set(hail).size).toBeGreaterThan(40);
+  });
+});
+
+describe('CloudLayer during time-travel play (ROADMAP item 83)', () => {
+  // Math.random pinned to 0: every spawn chance passes, the shortest gaps, a classic fish with a companion.
+  const spawn = (props: Partial<React.ComponentProps<typeof CloudLayer>>, ms: number) => {
+    vi.useFakeTimers();
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
+    const view = render(<CloudLayer weatherType="clear" timeOfDay="midday" {...props} />);
+    act(() => { vi.advanceTimersByTime(ms); });
+    randomSpy.mockRestore();
+    vi.useRealTimers();
+    return view.container;
+  };
+
+  it('sends boats 8x as often in both play directions', () => {
+    // Live: the first boat at 5 s, the next after 55 s. Play: one every 55 / 8 = 6.9 s.
+    const boats = (playDirection: -1 | 0 | 1) =>
+      atWidth(1290, () => spawn({ playDirection }, 21000)).querySelectorAll('[data-testid="scene-boat"]').length;
+    expect(boats(0)).toBe(1);
+    expect(boats(1)).toBe(4);
+    expect(boats(-1)).toBe(4);
+  });
+
+  it('removes a fish pair when its last swimmer leaves: the companion live, the lead in rewind', () => {
+    // A reversed animation ends at its start, so in rewind the lead leaves last.
+    const goneAfterEnd = (playDirection: -1 | 0, swimmer: 0 | 1) => {
+      const container = spawn({ playDirection }, playDirection ? 700 : 9000);
+      const swimmers = [...container.querySelectorAll('[data-testid="scene-fish"]')].map(icon => icon.parentElement as HTMLElement);
+      expect(swimmers).toHaveLength(2);
+      fireEvent.animationEnd(swimmers[swimmer]);
+      return container.querySelector('[data-testid="scene-fish"]') === null;
+    };
+    expect(goneAfterEnd(0, 0)).toBe(false);
+    expect(goneAfterEnd(0, 1)).toBe(true);
+    expect(goneAfterEnd(-1, 1)).toBe(false);
+    expect(goneAfterEnd(-1, 0)).toBe(true);
+  });
+
+  it('keeps snow and hail at live speed, as the rain canvas', () => {
+    const marked = (weatherType: WeatherType, name: string) => {
+      const falling = [...render(<CloudLayer weatherType={weatherType} timeOfDay="midday" playDirection={1} />).container
+        .querySelectorAll<HTMLElement>('div')].filter(el => el.style.animation.startsWith(name));
+      return falling.length > 0 && falling.every(el => el.hasAttribute('data-live-speed'));
+    };
+    expect(marked('snow', 'snowfall')).toBe(true);
+    expect(marked('hail', 'hailFall')).toBe(true);
   });
 });

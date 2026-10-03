@@ -3,6 +3,7 @@ import { type WeatherType } from '../components/CloudLayer';
 import { translate, type MessageKey } from '@/i18n';
 import { type Language } from '@/utils/language';
 import { getPrecipitationMmH } from './rainUtils';
+import { type CloudLayers } from './skyCloudUtils';
 
 export interface WeatherData {
   temperature: number;
@@ -25,6 +26,9 @@ export interface WeatherData {
   // The rain amount in mm/h (ROADMAP item 77, X1); from the weather code when the
   // measured amount is 0 or missing. Null without rain or in an older cache entry.
   precipitationMmH: number | null;
+  // The cover per layer in the hour nearest the fetch (ROADMAP item 84, C1), for the
+  // cloud types. Null without hourly data or in an older cache entry.
+  cloudLayers: CloudLayers | null;
 }
 
 interface OpenMeteoResponse {
@@ -241,6 +245,14 @@ const findNearestHourlySample = (
   };
 };
 
+// The cloud layers now (ROADMAP item 84): the hourly sample nearest `now`.
+const cloudLayersAt = (hourly: OpenMeteoResponse['hourly'], now: Date): CloudLayers | null => {
+  if (!hourly) return null;
+  const sample = findNearestHourlySample(hourly, now);
+  if (!sample || ![sample.low, sample.mid, sample.high].every(Number.isFinite)) return null;
+  return { low: sample.low, mid: sample.mid, high: sample.high };
+};
+
 const scoreSunsetAt = (
   hourly: OpenMeteoResponse['hourly'],
   sunset: Date | null | undefined
@@ -282,7 +294,8 @@ const getCachedWeather = (latitude: number, longitude: number): WeatherData | nu
       cloudCoverPercent: cacheData.data.cloudCoverPercent ?? null,
       windSpeedKmh: cacheData.data.windSpeedKmh ?? null,
       windDirectionDeg: cacheData.data.windDirectionDeg ?? null,
-      precipitationMmH: cacheData.data.precipitationMmH ?? null
+      precipitationMmH: cacheData.data.precipitationMmH ?? null,
+      cloudLayers: cacheData.data.cloudLayers ?? null
     };
   } catch (error) {
     console.error('Error reading weather cache:', error);
@@ -353,7 +366,8 @@ export const fetchCurrentWeather = async (
       cloudCoverPercent: data.current?.cloud_cover ?? null,
       windSpeedKmh: data.current?.wind_speed_10m ?? null,
       windDirectionDeg: data.current?.wind_direction_10m ?? null,
-      precipitationMmH: getPrecipitationMmH(data.current?.precipitation, data.current?.interval, data.current_weather.weathercode)
+      precipitationMmH: getPrecipitationMmH(data.current?.precipitation, data.current?.interval, data.current_weather.weathercode),
+      cloudLayers: cloudLayersAt(data.hourly, new Date())
     };
 
     // Cache the result
@@ -375,7 +389,8 @@ export const fetchCurrentWeather = async (
       cloudCoverPercent: null,
       windSpeedKmh: null,
       windDirectionDeg: null,
-      precipitationMmH: null
+      precipitationMmH: null,
+      cloudLayers: null
     };
   }
 };

@@ -19,11 +19,13 @@ import { type AstroEvent } from '@/utils/astroEvents';
 import { getSunVisibility, getMoonCloudFactor, getMoonLook } from '@/utils/weatherEffectsUtils';
 import { getSeaWindKmh, getReflectionBars } from '@/utils/waveUtils';
 import { getCloudDriftDirection } from '@/utils/cloudLayoutUtils';
+import { type CloudLayers } from '@/utils/skyCloudUtils';
 import SeaCanvas from '@/components/SeaCanvas';
 import { getRainMmH, getRainMistOpacity } from '@/utils/rainUtils';
 import { useLanguage } from '@/hooks/useLanguage';
 import { formatNumber, type MessageKey } from '@/i18n';
 import { type Language } from '@/utils/language';
+import { type PlayDirection } from '@/utils/timeTravel';
 
 // A fixed fallback seed date for callers that don't pass one (e.g. existing tests) -
 // a stable constant, not `new Date()`, so it never changes identity across renders.
@@ -55,6 +57,10 @@ interface SunVisualizationProps {
   windDirectionDeg?: number | null;
   // The forecast rain amount in mm/h (ROADMAP item 77); null: the type's middle value.
   rainMmH?: number | null;
+  // The current hour's cover per layer (ROADMAP item 84, C1); null: the weather type's own.
+  cloudLayers?: CloudLayers | null;
+  // A rare lenticular or mammatus day (ROADMAP item 84, X1).
+  cloudEgg?: boolean;
   // Live compass mode (ROADMAP item 19): the current (smoothed) device heading, or
   // null/undefined for the static 360°-across-the-screen mode. When set, azimuths are
   // mapped through a real field of view centered on this heading (getCompassScreenFraction)
@@ -86,6 +92,8 @@ interface SunVisualizationProps {
   onSunTap?: () => void;
   // Today's calendar easter egg from SunTracker (utils/calendarEvents), or null.
   calendarEvent?: CalendarEvent | null;
+  // Time-travel play from SunTracker (ROADMAP item 83): the scene follows it.
+  playDirection?: PlayDirection;
 }
 
 // Maps an azimuth (0-360°, 0 = North) to a horizontal screen fraction (0-1), for the
@@ -511,6 +519,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   windSpeedKmh = null,
   windDirectionDeg = null,
   rainMmH = null,
+  cloudLayers = null,
+  cloudEgg = false,
   compassHeading = null,
   horizonProfile = null,
   terrainSunTimes = null,
@@ -522,7 +532,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   astroEvent = null,
   sunglasses = false,
   onSunTap,
-  calendarEvent = null
+  calendarEvent = null,
+  playDirection = 0
 }) => {
   const { t, language } = useLanguage();
   // Compass mode (ROADMAP item 19): a real field of view centered on the heading,
@@ -860,7 +871,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         date={date}
         latitude={latitude}
         longitude={longitude}
-        cloudCoverPercent={cloudCoverPercent}
+        cloudLayers={cloudLayers}
         windSpeedKmh={windSpeedKmh}
         windDirectionDeg={windDirectionDeg}
         rainMmH={rainMmH}
@@ -869,6 +880,12 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         moon={isMoonVisible && (moonLook.disc > 0 || moonLook.corona > 0) && containerDimensions.height > 0
           ? { x: (moonX / containerDimensions.width) * 100, y: (moonY / containerDimensions.height) * 100, r: moonRadius, light: moonBright }
           : null}
+        playDirection={playDirection}
+        sun={containerDimensions.height > 0
+          ? { x: (sunX / containerDimensions.width) * 100, y: (sunY / containerDimensions.height) * 100, altitude: sunPosition.altitude }
+          : null}
+        skyGradient={skyGradient}
+        cloudEgg={cloudEgg}
       />
       <WeatherEffects
         weatherType={weatherType}
