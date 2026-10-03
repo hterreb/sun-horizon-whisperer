@@ -1,0 +1,19 @@
+#!/bin/sh
+# summary: Blocks a push that contains a commit whose author or committer e-mail is not
+# on the allow list (AUDIT S-10). The repo is public, so every commit e-mail is public.
+# Enable once per clone: git config core.hooksPath .githooks
+allowed='^(lutz[.]berreth@gmail[.]com|noreply@github[.]com|[0-9]+[+][^@]+@users[.]noreply[.]github[.]com)$'
+zero=0000000000000000000000000000000000000000
+status=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue # branch delete
+  bad=$(git log --format='%h %ae %ce' "$local_sha" --not --remotes="$1" |
+    awk -v re="$allowed" '$2 !~ re || $3 !~ re')
+  if [ -n "$bad" ]; then
+    echo "pre-push: $local_ref has commits with an e-mail that is not allowed:" >&2
+    echo "$bad" >&2
+    status=1
+  fi
+done
+[ "$status" = 0 ] || echo "pre-push: fix with git commit --amend --reset-author (or rebase), then push again." >&2
+exit $status

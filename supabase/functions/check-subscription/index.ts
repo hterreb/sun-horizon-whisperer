@@ -1,5 +1,6 @@
-import Stripe from "https://esm.sh/stripe@14.21.0";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+// npm: specifiers with exact versions, not a third-party CDN (AUDIT S-17).
+import Stripe from "npm:stripe@14.21.0";
+import { createClient } from "npm:@supabase/supabase-js@2.45.0";
 
 const SITE_URL = Deno.env.get("SITE_URL");
 const corsHeaders = {
@@ -69,21 +70,26 @@ Deno.serve(async (req) => {
     const user = userData.user;
     logStep("User authenticated", { userId: user.id });
 
-    const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+    // Fetch API instead of the Node http package (Supabase Edge runtime).
+    const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16", httpClient: Stripe.createFetchHttpClient() });
+    // The Stripe customer belongs to the user ID, never to the e-mail (AUDIT S-12).
+    const { data: subscriber, error: readError } = await supabaseClient
+      .from("subscribers").select("stripe_customer_id").eq("user_id", user.id).maybeSingle();
+    if (readError) throw new Error(`Failed to read subscriber: ${readError.message}`);
+    const customerId: string | null = subscriber?.stripe_customer_id ?? null;
 
-    if (customers.data.length === 0) {
+    if (!customerId) {
       logStep("No customer found, updating unsubscribed state");
+      // No stripe_customer_id here: a checkout running at the same time may have just set it.
       const { error: upsertError } = await supabaseClient.from("subscribers").upsert({
         email: user.email,
         user_id: user.id,
-        stripe_customer_id: null,
         subscribed: false,
         subscription_tier: null,
         subscription_end: null,
         trial_used: false,
         updated_at: new Date().toISOString(),
-      }, { onConflict: 'email' });
+      }, { onConflict: 'user_id' });
       if (upsertError) throw new Error(`Failed to upsert subscriber: ${upsertError.message}`);
       return new Response(JSON.stringify({ subscribed: false, trial_used: false }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -91,7 +97,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    const customerId = customers.data[0].id;
     logStep("Found Stripe customer", { customerId });
 
     const subscriptions = await stripe.subscriptions.list({
@@ -133,7 +138,7 @@ Deno.serve(async (req) => {
       subscription_end: subscriptionEnd,
       trial_used: trialUsed,
       updated_at: new Date().toISOString(),
-    }, { onConflict: 'email' });
+    }, { onConflict: 'user_id' });
     if (upsertError) throw new Error(`Failed to upsert subscriber: ${upsertError.message}`);
 
     logStep("Updated database with subscription info", {
