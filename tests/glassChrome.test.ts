@@ -12,4 +12,8 @@ describe('glassChrome (ROADMAP item 15, direction D)', () => {
     expect(GLASS_ICON_BUTTON).toContain('rounded-full');
     expect(GLASS_ICON_BUTTON).toContain('focus-visible:ring-2');
   });
+
+  it('GLASS_ICON_BUTTON keeps the icon white on hover, as :hover stays after a tap (ROADMAP item 81)', () => {
+    expect(GLASS_ICON_BUTTON).toContain('hover:text-white');
+  });
 });

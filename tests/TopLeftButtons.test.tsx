@@ -75,6 +75,36 @@ describe('TopLeftButtons (ROADMAP items 22 and 23)', () => {
     expect(screen.getAllByRole('button')).toHaveLength(3);
   });
 
+  // ROADMAP item 81: the ghost variant's hover:text-accent-foreground is near-black, and
+  // on a phone :hover stays after a tap. tailwind-merge must drop it for the glass class.
+  it('keeps the three icons white after a tap: no ghost hover text colour', () => {
+    vi.spyOn(feedback, 'isFeedbackAvailable').mockReturnValue(true);
+    renderRow(false, true);
+    const buttons = screen.getAllByRole('button');
+    expect(buttons).toHaveLength(3);
+    for (const button of buttons) {
+      expect(button).not.toHaveClass('hover:text-accent-foreground');
+      expect(button).toHaveClass('text-white', 'hover:text-white');
+    }
+  });
+
+  it('keeps the active compass sky blue after a tap', () => {
+    render(
+      <TopLeftButtons
+        isFullscreen={false}
+        showCursor
+        onFullscreenChange={vi.fn()}
+        compassStatus="active"
+        onCompassEnable={vi.fn()}
+        onCompassDisable={vi.fn()}
+      />
+    );
+    const compass = screen.getByRole('button', { pressed: true });
+    expect(compass).toHaveClass('text-brand-sky', 'hover:text-brand-sky');
+    expect(compass).not.toHaveClass('hover:text-accent-foreground');
+    expect(compass).not.toHaveClass('hover:text-white');
+  });
+
   it('opens the feedback form when the feedback button is clicked', () => {
     vi.spyOn(feedback, 'isFeedbackAvailable').mockReturnValue(true);
     const openFeedbackForm = vi.spyOn(feedback, 'openFeedbackForm').mockResolvedValue(undefined);

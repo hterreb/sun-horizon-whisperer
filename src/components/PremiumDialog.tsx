@@ -42,10 +42,10 @@ const PremiumDialog: React.FC = () => {
           <Button type="button" variant="secondary" className="rounded-full" onClick={buy} autoFocus>
             {t('premium.buy')}
           </Button>
-          <Button type="button" variant="ghost" className="rounded-full text-white" onClick={restore}>
+          <Button type="button" variant="ghost" className="rounded-full text-white hover:text-white hover:bg-white/10" onClick={restore}>
             {t('premium.restore')}
           </Button>
-          <Button type="button" variant="ghost" className="rounded-full text-white ml-auto" onClick={() => setDialogOpen(false)}>
+          <Button type="button" variant="ghost" className="rounded-full text-white hover:text-white hover:bg-white/10 ml-auto" onClick={() => setDialogOpen(false)}>
             {t('common.cancel')}
           </Button>
         </div>

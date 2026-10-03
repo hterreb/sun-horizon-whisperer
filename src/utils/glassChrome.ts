@@ -12,6 +12,7 @@ export const GLASS_SURFACE =
 
 // A round, ≥40px glass icon button (FullscreenButton, CompassToggle): same
 // glass surface, always fully rounded, with a hover state and a visible
-// keyboard focus ring.
+// keyboard focus ring. `hover:text-white` replaces the shadcn ghost variant's
+// near-black hover text: on a phone, :hover stays after a tap (ROADMAP item 81).
 export const GLASS_ICON_BUTTON =
-  `${GLASS_SURFACE} rounded-full hover:bg-[hsl(var(--panel-background)/0.65)] focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-0`;
+  `${GLASS_SURFACE} rounded-full hover:bg-[hsl(var(--panel-background)/0.65)] hover:text-white focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-0`;

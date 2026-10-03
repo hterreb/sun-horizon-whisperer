@@ -235,8 +235,8 @@ export const createFish = (
     duration: rest ? rest.duration : dx / speed,
     easing: rest?.easing,
     // Paler with distance (P3), with depth (P9 haze) and in rain (E2). At night: moonlit
-    // fish at 70 %, fish with their own light at 95 %, both without the depth haze.
-    opacity: (light === 'own' ? 0.95 : 0.7) * (1 - 0.3 * depth) * (light ? 1 : 1 - 0.4 * spec.haze) * (wet ? 0.75 : 1),
+    // fish at 70 %, fish with their own light at 95 % (the jellyfish 60 %, item 82), both without the depth haze.
+    opacity: (light === 'own' ? (kind === 'jellyfish' ? 0.6 : 0.95) : 0.7) * (1 - 0.3 * depth) * (light ? 1 : 1 - 0.4 * spec.haze) * (wet ? 0.75 : 1),
     glow: sunDown && !night && spec.pattern !== 'school' && random() < 0.35, // E1
     companion: spec.pattern === 'companions' && random() < 0.35 // P6
       ? { lag: 2 + random() * 2, dy: (random() - 0.5) * 2.8 }
@@ -710,7 +710,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     const color = fishItem.light === 'moon' || lights
       ? 'hsl(var(--scene-moon))'
       : `hsl(var(--scene-fish-${fishItem.light && fishItem.kind === 'jellyfish' ? 'jellyfish-glow' : fishItem.kind}))`;
-    const halo = fishItem.light === 'own' && !lights ? 'drop-shadow(0 0 3px currentColor)' : undefined;
+    const halo = fishItem.light === 'own' && !lights ? `drop-shadow(0 0 ${fishItem.kind === 'jellyfish' ? 2 : 3}px currentColor)` : undefined; // jellyfish 2 px (item 82)
     const remove = () => setFish(prev => prev.filter(f => f.id !== fishItem.id));
     const body = fishItem.school ? (
       <div className="relative" style={{ width: fishItem.width, height: fishItem.height }}>
