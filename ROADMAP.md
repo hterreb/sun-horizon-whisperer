@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-03. Specced, in build: items 80–85 (Sentry feedback round 2026-10-03). Done: items 1–15, 17–44, 47–79 (item 14: the Play-app code, with `PREMIUM_ENFORCED` off until item 16), item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: item 16 (with it: turn on `PREMIUM_ENFORCED`, and check with a licence tester that a purchase is still there after 3 days, see item 14 "Acknowledge"; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
+Status: last updated 2026-10-04. Done: items 1–15, 17–44, 47–85 (item 14: the Play-app code, with `PREMIUM_ENFORCED` off until item 16), item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: item 16 (with it: turn on `PREMIUM_ENFORCED`, and check with a licence tester that a purchase is still there after 3 days, see item 14 "Acknowledge"; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
 
 ## Verification (2026-09-28)
 
@@ -1200,7 +1200,7 @@ Four Sentry reports from the evening and night of 2026-10-01, all from Ravensbur
 
 ### Feedback round (2026-10-03)
 
-Six open Sentry feedback reports from 2026-10-02 20:48 to 2026-10-03 18:58, all on release `b7de009`, from Ravensburg and Stuttgart. Sentry has no new errors for sun-chaser in 90 days (only the setup test, SUN-CHASER-1, resolved). Request: "check sentry for all errors and user feedback, analyze, spec it out and pitch me ideas how to solve". Items 80–83 have a recommended spec. Items 84 and 85 are design work, with a lookbook first. Decisions (2026-10-03): "80, no only on sunset, 83 yes thats ok, 84&85 yes please".
+Six open Sentry feedback reports from 2026-10-02 20:48 to 2026-10-03 18:58, all on release `b7de009`, from Ravensburg and Stuttgart. Sentry has no new errors for sun-chaser in 90 days (only the setup test, SUN-CHASER-1, resolved). Request: "check sentry for all errors and user feedback, analyze, spec it out and pitch me ideas how to solve". Items 80–83 have a recommended spec. Items 84 and 85 are design work, with a lookbook first. Decisions (2026-10-03): "80, no only on sunset, 83 yes thats ok, 84&85 yes please". Integration (2026-10-04): items 80–85 merged together with no logic conflicts (CloudLayer and SunVisualization kept both sides; item 82's day-opacity test moved to the FS1 value 0.85). 939 tests, lint, typecheck and build pass. In the built app at 390×844, the item-84 clouds and the boats, fish and birds run at 8× in forward play and −8× in rewind, and at 1 after pause; the clouds stay on screen in rewind; no console errors.
 
 ### 80. Fireworks you do not miss — S — [SUN-CHASER-V](https://ainabler.sentry.io/issues/SUN-CHASER-V) — **✅ Done**
 
