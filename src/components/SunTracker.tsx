@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import * as Sentry from '@sentry/react';
 import {
   getSunPosition,
   getSunTimes,
@@ -56,7 +57,7 @@ import { getTerrainSunTimes, getTerrainMoonTimes } from '../utils/horizonUtils';
 import { getSunArcLabels, getMoonArcLabels } from '../utils/arcLabels';
 import { PremiumContext, usePremium } from '@/hooks/usePremium';
 import PremiumDialog from './PremiumDialog';
-import { passesSunEvent, getCountdownTarget } from '../utils/sunEvents';
+import { watchSunEvent, NO_SUN_EVENT_WATCH, getCountdownTarget } from '../utils/sunEvents';
 import { getCalendarEvent } from '@/utils/calendarEvents';
 import { PLAY_SPEED, PLAY_TICK_MS, clampTimeOffset } from '@/utils/timeTravel';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
@@ -601,17 +602,31 @@ const SunTracker: React.FC = () => {
       }, astroEggOverride)
     : null;
 
-  // Fireworks (ROADMAP item 41): start a show when the 1 s clock passes the next
-  // sunrise or sunset (terrain time when there is one), not after a long clock jump.
-  // Live mode only: a time preview (item 44) never starts them.
+  // Fireworks (ROADMAP items 41 and 80): one show per sunrise or sunset (terrain time
+  // when there is one), at the first live, visible tick up to 15 min after it, if the
+  // page was open before it (watchSunEvent). The ref keeps the armed and the last
+  // celebrated event, so a show never repeats. A time preview (item 44) never starts
+  // one. A hidden tick (a desktop tab still ticks) waits for the return. Each fired or
+  // skipped show leaves a Sentry breadcrumb, with no place or time in it.
   const [fireworksTrigger, setFireworksTrigger] = useState(0);
   const prevClockRef = React.useRef(date);
+  const sunEventWatchRef = React.useRef(NO_SUN_EVENT_WATCH);
   useEffect(() => {
     const prev = prevClockRef.current;
     prevClockRef.current = date;
     // New Year (ROADMAP "Ongoing", Calendar): also when the clock enters 00:00 on Jan 1.
     const entersNewYear = getCalendarEvent(date) === 'new-year' && getCalendarEvent(prev) !== 'new-year';
-    if (!isTimePreview && (entersNewYear || passesSunEvent(prev, date, sunTimes, terrainExtras.terrainSunTimes))) setFireworksTrigger(date.getTime());
+    let fire = !isTimePreview && entersNewYear;
+    if (document.visibilityState !== 'hidden') {
+      const { watch, outcome } = watchSunEvent(sunEventWatchRef.current, date, isTimePreview, sunTimes, terrainExtras.terrainSunTimes);
+      sunEventWatchRef.current = watch;
+      if (outcome) {
+        const skipped = outcome !== 'fired' ? outcome : prefersReducedMotion ? 'reduced motion' : null;
+        Sentry.addBreadcrumb({ category: 'fireworks', message: skipped ? `skipped: ${skipped}` : 'fired', level: 'info' });
+        if (outcome === 'fired') fire = true;
+      }
+    }
+    if (fire) setFireworksTrigger(date.getTime());
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per clock tick
   }, [date]);
 

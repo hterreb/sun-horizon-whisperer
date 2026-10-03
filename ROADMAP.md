@@ -1202,7 +1202,7 @@ Four Sentry reports from the evening and night of 2026-10-01, all from Ravensbur
 
 Six open Sentry feedback reports from 2026-10-02 20:48 to 2026-10-03 18:58, all on release `b7de009`, from Ravensburg and Stuttgart. Sentry has no new errors for sun-chaser in 90 days (only the setup test, SUN-CHASER-1, resolved). Request: "check sentry for all errors and user feedback, analyze, spec it out and pitch me ideas how to solve". Items 80–83 have a recommended spec. Items 84 and 85 are design work, with a lookbook first. Decisions (2026-10-03): "80, no only on sunset, 83 yes thats ok, 84&85 yes please".
 
-### 80. Fireworks you do not miss — S — [SUN-CHASER-V](https://ainabler.sentry.io/issues/SUN-CHASER-V)
+### 80. Fireworks you do not miss — S — [SUN-CHASER-V](https://ainabler.sentry.io/issues/SUN-CHASER-V) — **✅ Done**
 
 - **Feedback (2026-10-03 18:58 CEST, Ravensburg):** "Today the firework didn't work".
 - **Now:** `Fireworks.tsx` and `sunEvents.ts` have not changed since item 41/43 (2026-09-30). A show starts only when one clock tick of at most 5 s (`MAX_CLOCK_STEP_MS`) passes the next sunrise or sunset, in live mode, without reduced motion. The trigger uses the line-of-sight sunset. The feedback came 55 s before the flat sunset (18:59:41), so the line-of-sight sunset behind the western hills had passed without a show. SUN-CHASER-T (13:59) has the same trace ID: one page load, open for 5 h on a phone.
@@ -1216,15 +1216,25 @@ Six open Sentry feedback reports from 2026-10-02 20:48 to 2026-10-03 18:58, all 
   - **FW3 Diagnose only:** a Sentry breadcrumb `fireworks` with "fired" or "skipped" and the reason (hidden step, preview, reduced motion). Cheap, but it fixes nothing.
 - **Pick (2026-10-03):** FW1 with the FW3 breadcrumb. "no only on sunset": a cold app start after the sunset gives no show. The catch-up is only for a page that was open at the sunset and comes back within 15 min (a hidden page whose clock stopped).
 - **Done when:** unit tests for the catch-up rule: hidden at the event and back after 3 min gives one show; back after 20 min gives none; the next tick gives no second show; a preview gives none. In the browser, a clock jump over the sunset gives one show.
+- **Built:**
+  - `watchSunEvent` (`sunEvents.ts`) replaces `passesSunEvent` and the 5 s step rule (`MAX_CLOCK_STEP_MS` is gone). A live tick arms the next sunrise or sunset (the terrain time when there is one). The first live tick after the armed event starts one show when it comes at most 15 min (`CATCH_UP_MS`) after the event. The watch keeps the last celebrated event, so a show never repeats.
+  - A cold start after the event has nothing armed: no show. A preview tick only marks the watch, so the return to live after the event gives no show either; the preview clock never arms an event.
+  - `SunTracker` keeps the watch in a ref. It skips the check on a hidden tick (a desktop tab still ticks), so the show waits for the first visible tick. New Year is unchanged.
+  - FW3: each fired or skipped show adds `Sentry.addBreadcrumb({ category: 'fireworks', level: 'info' })` with the message `fired`, `skipped: preview` (the event passed while a preview was on), `skipped: too late` or `skipped: reduced motion`. No place and no time in it. Reduced motion still gives no show.
+- **Deviations:** sunrise shows use the same catch-up rule as the sunset (one rule for both events). A 1 s tick over the sunrise still starts the show as before; a page hidden at the sunrise now also gets it within 15 min.
+- **Checked:** 15 new tests (886 in all), lint, typecheck and build pass. Unit cases: hidden at the event and back after 3 min: one show; the next tick: no second show; back after 20 min: none; cold start after the sunset: none; preview: none; live, then a preview across the sunset, then live: none. In headless Chromium at 390×844 with touch, Ravensburg, terrain tiles blocked (flat sunset 18:59:41), Playwright's fake clock: the page opens at 18:58:41, the clock stops at 18:59:11 (timers frozen, as on a hidden phone page) and jumps to 19:02:41 without a tick; the first tick after the resume starts a show (the fireworks canvas is lit) and adds the breadcrumb `fired`. A jump to 19:19:41: no show, `skipped: too late`. A hidden tab whose clock ticks across the sunset: no show while hidden, a show on the first visible tick. No console errors apart from the blocked tiles. The item-44 test "does not start the fireworks during a preview" now commits every 10 s instead of every 1 s (a 10 s step past the event would start a show, so the test still catches a broken preview guard, checked by mutation). It takes 0.5–0.8 s instead of 1.9–2.1 s; 5 of 5 runs and two full suites pass. Under a load average above 80 (parallel agents on the same machine), this and other `SunTracker` tests can still exceed the 5 s timeout, on the spec branch too.
 
-### 81. Glass icons stay visible when tapped — S — [SUN-CHASER-Q](https://ainabler.sentry.io/issues/SUN-CHASER-Q)
+### 81. Glass icons stay visible when tapped — S — [SUN-CHASER-Q](https://ainabler.sentry.io/issues/SUN-CHASER-Q) — **✅ Done**
 
 - **Feedback (2026-10-02 20:53):** "Icons disappear when pressing them full screen or feedback".
 - **Now (cause found in the code):** the round glass buttons use the shadcn `variant="ghost"`, which adds `hover:text-accent-foreground`. The app has no `.dark` class, so this is the light token `222 47% 11%`: near-black on the dark glass. On a phone, `:hover` stays after a tap, so the icon stays near-black until the next tap somewhere else. Affected: `FullscreenButton`, `CompassToggle`, the feedback button in `TopLeftButtons`, and the Restore and Close buttons in `PremiumDialog`. `PWAInstallPrompt` already has `hover:text-white` and does not show the bug.
 - **Spec:** add `hover:text-white` to `GLASS_ICON_BUTTON` (`glassChrome.ts`). The active `CompassToggle` adds `hover:text-brand-sky`. The two ghost buttons in `PremiumDialog` add `hover:text-white`. tailwind-merge then drops the ghost class. Do not edit `src/components/ui/`.
 - **Done when:** a test shows that the three top-left buttons have no `hover:text-accent-foreground` class. In the browser at 390×844 with touch: after a tap, each icon stays white (the active compass stays sky blue).
+- **Built:** `GLASS_ICON_BUTTON` gets `hover:text-white`. The active `CompassToggle` adds `hover:text-brand-sky`. The Restore and Cancel buttons in `PremiumDialog` add `hover:text-white hover:bg-white/10`. tailwind-merge drops the ghost `hover:text-accent-foreground` (and in the dialog `hover:bg-accent`). `src/components/ui/` is not edited.
+- **Deviations:** the two `PremiumDialog` buttons also get `hover:bg-white/10`. The ghost `hover:bg-accent` is the light token `210 40% 96.1%` (near-white), so `hover:text-white` alone gives white text on a near-white pill after a tap. `PWAInstallPrompt` uses the same hover.
+- **Checked:** 4 new tests (the three top-left buttons, the active compass, the dialog buttons, `GLASS_ICON_BUTTON`). In headless Chromium at 390×844 with touch, after a tap `:hover` stays on the button: fullscreen, compass (idle) and feedback are `rgb(255, 255, 255)`; the active compass is sky blue `rgb(14, 165, 233)`; in the Premium dialog (`?premium=enforce` with a Play Billing stub) Restore is white on `rgba(255, 255, 255, 0.1)`.
 
-### 82. Jellyfish: a softer night glow — S — [SUN-CHASER-P](https://ainabler.sentry.io/issues/SUN-CHASER-P)
+### 82. Jellyfish: a softer night glow — S — [SUN-CHASER-P](https://ainabler.sentry.io/issues/SUN-CHASER-P) — **✅ Done**
 
 - **Feedback (2026-10-02 20:48):** "Jellyfish is a little too bright at night".
 - **Now:** at night the jellyfish has its own light (item 65): `--scene-fish-jellyfish-glow` (`190 90% 80%`) at opacity 0.95, with a 3 px drop-shadow halo. The other night fish with their own light are outlines at stroke opacity 0.45 with small gold lights. The jellyfish is the brightest thing in the night water.
@@ -1233,6 +1243,8 @@ Six open Sentry feedback reports from 2026-10-02 20:48 to 2026-10-03 18:58, all 
   - **J2:** J1, plus a slow glow that breathes between 0.4 and 0.65 over 5 s. Opacity only, no motion, so it keeps the calm-motion rule.
   - **J3:** the bell as an outline in the moon tone at 0.45, like the lanternfish; only the bell rim glows cyan.
 - **Done when:** a test for the jellyfish night opacity. A night screenshot with a jellyfish beside a lanternfish.
+- **Built (J1):** `createFish` gives the jellyfish with its own light 0.6 instead of 0.95 (before the distance fade), and its halo is `drop-shadow(0 0 2px)` instead of 3 px. The lanternfish, anglerfish and squid do not change.
+- **Checked:** 1 new test (the night jellyfish at 0.6, the other fish with their own light at 0.95, the day jellyfish unchanged). In headless Chromium at 390×844, Ravensburg, 2026-10-03 22:30 (moon down): a jellyfish at opacity 0.547 (0.6 at depth 0.29) with a 2 px halo, a soft cyan glow. No lanternfish came in the same shot (the moon was down, and the spawns are random).
 
 ### 83. The scene follows fast forward and rewind — M — [SUN-CHASER-R](https://ainabler.sentry.io/issues/SUN-CHASER-R)
 

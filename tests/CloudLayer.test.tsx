@@ -353,6 +353,15 @@ describe('CloudLayer', () => {
       expect(createFish('classic', false, false, 390, always(0)).light).toBeUndefined();
     });
 
+    it('gives the night jellyfish a softer glow: 60 %, the other fish with their own light 95 % (ROADMAP item 82)', () => {
+      expect(createFish('jellyfish', false, false, 390, always(0), true).opacity).toBeCloseTo(0.6, 5);
+      for (const kind of ['lanternfish', 'anglerfish', 'squid'] as const) {
+        expect(createFish(kind, false, false, 390, always(0), true).opacity).toBeCloseTo(0.95, 5);
+      }
+      // By day the jellyfish keeps its day look.
+      expect(createFish('jellyfish', false, false, 390, always(0)).opacity).toBeCloseTo(0.7 * (1 - 0.4 * 0.3), 5);
+    });
+
     it('swims no fish faster than the sailboat, none slower than 0.4 %/s (ROADMAP item 66)', () => {
       const kinds = [...FISH_WEIGHTS.map(([kind]) => kind), ...NIGHT_FISH_WEIGHTS.map(([kind]) => kind).filter(k => k !== 'moonlit')];
       for (const kind of kinds) {
