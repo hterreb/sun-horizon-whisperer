@@ -21,6 +21,11 @@ describe('sentryScrub', () => {
     );
   });
 
+  it('filters the tile coordinates from a terrain tile URL (AUDIT S-15)', () => {
+    const url = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/12/2155/1434.png';
+    expect(scrubLocationString(url)).toBe('https://s3.amazonaws.com/elevation-tiles-prod/terrarium/[Filtered].png');
+  });
+
   it('scrubs nested event fields without mutating the input', () => {
     const event = {
       request: { url: 'https://x.test/?lat=1.5&lon=-2' },
