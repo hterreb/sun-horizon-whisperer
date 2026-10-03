@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-03. Specced, not built: items 80–83; lookbooks in progress: items 84 and 85 (Sentry feedback round 2026-10-03). Done: items 1–15, 17–44, 47–79 (item 14: the Play-app code, with `PREMIUM_ENFORCED` off until item 16), item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: item 16 (with it: turn on `PREMIUM_ENFORCED`, and check with a licence tester that a purchase is still there after 3 days, see item 14 "Acknowledge"; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
+Status: last updated 2026-10-03. Specced, not built: items 80–83; lookbooks ready, picks pending: items 84 and 85 (Sentry feedback round 2026-10-03). Done: items 1–15, 17–44, 47–79 (item 14: the Play-app code, with `PREMIUM_ENFORCED` off until item 16), item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: item 16 (with it: turn on `PREMIUM_ENFORCED`, and check with a licence tester that a purchase is still there after 3 days, see item 14 "Acknowledge"; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
 
 ## Verification (2026-09-28)
 
@@ -1255,7 +1255,16 @@ Six open Sentry feedback reports from 2026-10-02 20:48 to 2026-10-03 18:58, all 
   - **C3 Depth:** three bands (high, mid, low) with their own drift speed and size; far clouds smaller and paler near the horizon.
   - **C4 Soft fills:** blurred gradient fills instead of one flat colour, in the D palette.
   - **X1:** mammatus or lenticular clouds as rare easter eggs.
-- **Next step:** a lookbook with C1–C4 across the weathers and times of day, as for items 76, 77 and 79. Then picks.
+- **Bug found (2026-10-03):** `getCloudColor` has no `civil-twilight` case, so in civil twilight fair clouds fall back to day white and overcast to day grey. C2 replaces this matrix; without C2, add the case.
+- **Lookbook:** [Cloud Types](https://claude.ai/artifact/RbsfFkWCy3TNhDAXNBgbi5) (private). Controls: weather (8 types), time of day (5) and sliders for low, mid and high cover, plus a wide view and a 390 × 844 phone. Options:
+  - **C0** today's two shapes.
+  - **C1** real cloud layers: cirrus, or a cirrostratus veil from high 60 %; an altocumulus field, or an altostratus sheet from mid 70 %; cumulus, then stratocumulus from low 45 % and stratus from 75 %; a nimbostratus deck with rain shafts; a cumulonimbus anvil on the horizon in a storm. 2–4 shapes per type.
+  - **C2** lit by the sun.
+  - **C3** depth: three bands, gliding at 0.35, 0.7 and 1.2–2.4 px/s (phone; the sailboat is 5.2 px/s).
+  - **C4** soft gradient fills with a 2.6 px edge.
+  - **Add-ons:** X1 rare lenticular clouds (still over the ridge) or mammatus after a storm; X2 cloud shadows on the sea; X3 sun rays through the gaps; X4 a 22° halo under a thin high veil; X5 noctilucent clouds in summer twilight; X6 clouds in the calm-water mirror (WV6).
+  - **Recommended:** C1, C2, C3, C4, X1, X3. The new shapes stay in today's 120 × 60 box, so the item-76 silver lining works on them. With C3 the clouds glide across the screen, so the silver lining must follow the cloud's current place (the lookbook updates it once per second).
+- **Next step:** picks.
 
 ### 85. Fish redone, with rare sharks and dolphins — M — [SUN-CHASER-S](https://ainabler.sentry.io/issues/SUN-CHASER-S) — lookbook first
 
@@ -1269,7 +1278,16 @@ Six open Sentry feedback reports from 2026-10-02 20:48 to 2026-10-03 18:58, all 
   - **Shark:** a dorsal fin cuts the surface, with a faint body below; a slow, straight glide (0.5 %/s). Weight 0.5.
   - **Dolphins:** a pod of 2–3 that rolls at the surface in slow arcs (back and fin only). The calm-motion rule forbids jumping, so no leaps. Weight 0.5.
   - Both use the whale mechanism (`FISH_WEIGHTS`, far out), so "very rare" is about 1 in 200 fish each.
-- **Next step:** a lookbook with F1–F3 and the shark and dolphin variants. Then picks.
+- **Lookbook:** [Fish Redone](https://claude.ai/artifact/9xfwzHXufL3zvZsRiJA6TJ) (private), with all 18 species at real size and 3× by day, at sunset and at night, live strips and a 390 × 844 phone. The codes FS, SH and DO are new; F1–F13 are item 62's. Styles:
+  - **FS0** today's line icons.
+  - **FS1** two-tone silhouettes (dark back, pale belly).
+  - **FS2** refined line art with fins, a gill line and species marks.
+  - **FS3** soft shadows under water; only near fish keep detail.
+  - **Sharks** (0.5 %/s): SH1 a fin and a faint body below; SH2 two fins (dorsal fin and tail tip); SH3 a deep shadow, no fin.
+  - **Dolphins:** DO1 a rolling pod (a slow 4.5 s arc); DO2 backs that surface and fade, opacity only; DO3 the pod below the surface, only the fin tips break it.
+  - **Add-ons:** X1 a ripple above near fish; X2 blur on far fish; X3 a sunset rim light; X4 a V-wake behind sharks and dolphins; X5 night visitors in the moon pool; X6 closer visitors (depth 0.3–1).
+  - **Rarity:** shark 0.5 and dolphin pod 0.5; the classic fish goes from 25 to 24, so the weights still sum to 100. Both swim far out, like the whale. About 1 in 200 fish each, or one of each about every 1¾ hours (a simulation of today's spawn loop).
+- **Next step:** picks.
 
 ---
 
