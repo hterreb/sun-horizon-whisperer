@@ -1,4 +1,6 @@
-import { clampTimeOffset, getTimeTravelRange, toDateTimeLocalValue } from '../src/utils/timeTravel';
+import {
+  SCENE_PLAY_FACTOR, clampTimeOffset, getScenePlaybackRate, getSpawnGapFactor, getTimeTravelRange, toDateTimeLocalValue,
+} from '../src/utils/timeTravel';
 
 const now = new Date(2026, 8, 30, 18, 30, 15);
 const HOUR = 3_600_000;
@@ -35,5 +37,20 @@ describe('toDateTimeLocalValue (ROADMAP item 44)', () => {
   it('gives the local date and time to the minute, zero-padded', () => {
     expect(toDateTimeLocalValue(now)).toBe('2026-09-30T18:30');
     expect(toDateTimeLocalValue(new Date(2027, 0, 5, 7, 4, 59))).toBe('2027-01-05T07:04');
+  });
+});
+
+describe('the scene during play (ROADMAP item 83)', () => {
+  it('plays the scene 8x faster, backwards in rewind, and at live speed when paused', () => {
+    expect(SCENE_PLAY_FACTOR).toBe(8);
+    expect(getScenePlaybackRate(-1)).toBe(-8);
+    expect(getScenePlaybackRate(0)).toBe(1);
+    expect(getScenePlaybackRate(1)).toBe(8);
+  });
+
+  it('shrinks the spawn gaps by the same factor in both play directions', () => {
+    expect(getSpawnGapFactor(-1)).toBe(1 / 8);
+    expect(getSpawnGapFactor(0)).toBe(1);
+    expect(getSpawnGapFactor(1)).toBe(1 / 8);
   });
 });
