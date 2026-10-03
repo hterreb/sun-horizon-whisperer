@@ -50,7 +50,7 @@ const CompassToggle: React.FC<CompassToggleProps> = ({
       onClick={handleClick}
       aria-label={isActive ? t('compass.disable') : t('compass.enable')}
       aria-pressed={isActive}
-      className={`${GLASS_ICON_BUTTON} relative transition-colors ${isActive ? 'text-brand-sky' : 'text-white'}`}
+      className={`${GLASS_ICON_BUTTON} relative transition-colors ${isActive ? 'text-brand-sky hover:text-brand-sky' : 'text-white'}`}
       title={isActive ? t('compass.disable') : t('compass.enable')}
     >
       <Compass className="h-4 w-4" />
