@@ -30,4 +30,4 @@
 
 - Do not mutate `Date` arguments. Copy first: `const d = new Date(date); d.setHours(...)`. `sunUtils.getSunTimes` does this for its fallback times.
 - `requestAnimationFrame` loops (`Fireworks`, `Ufo`, `useCompassHeading`) keep their frame ID in a `useRef`, not in state, so cleanup can always cancel the current frame. `NightStars` keeps it in a local variable of its effect, which the cleanup closes over. `CloudLayer` moves things with CSS animations, and `MidnightGhost` and `TemperatureIceberg` use an interval.
-- Supabase functions are Deno, not Node. Each function is self-contained (its own imports, no shared `src/` code) and runs in its own directory under `supabase/functions/`.
+- Supabase functions are Deno, not Node. Each function is self-contained (its own imports, no shared `src/` code) and runs in its own directory under `supabase/functions/`, with its own `deno.json` and `deno.lock`. Regenerate a lock with the Edge runtime's Deno version (command in README), not with the local Deno: a newer lock format makes the function fail to boot.
