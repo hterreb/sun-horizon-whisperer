@@ -110,20 +110,23 @@ describe('SunTracker', () => {
     expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ title: 'Weather updated' }));
   });
 
-  it('a manually picked weather ignores the real cloud cover for the stars and the moon (items 52, 57)', async () => {
+  it('a manually picked weather ignores the real cloud cover for the stars, the moon and the cloud types (items 52, 57, 84)', async () => {
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 7, longitude: 8 } }) } });
     global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({
       current_weather: { temperature: 20, weathercode: 3, windspeed: 0, winddirection: 0, time: '' },
       current: { cloud_cover: 100, wind_speed_10m: 0, wind_direction_10m: 0 },
+      hourly: { time: ['2026-06-01T18:00'], cloud_cover_low: [90], cloud_cover_mid: [50], cloud_cover_high: [30], visibility: [24140] },
     }) })) as unknown as typeof fetch;
 
     render(<SunTracker />);
     await waitFor(() => expect(visProps.current?.cloudCoverPercent).toBe(100));
+    expect(visProps.current!.cloudLayers).toEqual({ low: 90, mid: 50, high: 30 });
 
     fireEvent.click(screen.getByRole('button', { name: /manual/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
     expect(visProps.current!.weatherType).toBe('clear');
     expect(visProps.current!.cloudCoverPercent).toBeNull();
+    expect(visProps.current!.cloudLayers).toBeNull();
   });
 
   it('toasts when the weather refresh fails (A-5)', async () => {

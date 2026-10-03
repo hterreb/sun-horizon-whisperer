@@ -61,6 +61,7 @@ import { getCalendarEvent } from '@/utils/calendarEvents';
 import { PLAY_SPEED, PLAY_TICK_MS, clampTimeOffset } from '@/utils/timeTravel';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
 import { DISCO_MS, KONAMI_SEQUENCE, SUNGLASSES_MS, advanceKonami, getEggOverride, registerSunTap, rollUfo } from '@/utils/hiddenEggs';
+import { isCloudEggDay, isCloudEggForced } from '@/utils/skyCloudUtils';
 import DiscoSky from './DiscoSky';
 import Ufo from './Ufo';
 import { loadTemperatureUnit, saveTemperatureUnit, type TemperatureUnit } from '@/utils/temperatureUnit';
@@ -658,6 +659,10 @@ const SunTracker: React.FC = () => {
     if (isNight && rollUfo()) setUfoOn(true);
   }
   const handleUfoDone = useCallback(() => setUfoOn(false), []);
+  // Rare lenticular and mammatus clouds (ROADMAP item 84, X1): one day in 30 per place;
+  // `?egg=lenticular` or `?egg=mammatus` forces the day.
+  const [cloudEggForced] = useState(() => isCloudEggForced(window.location.search));
+  const cloudEgg = cloudEggForced || isCloudEggDay(date, location.latitude, location.longitude);
   // Calendar easter eggs (ROADMAP "Ongoing"): one event id per minute.
   const calendarEvent = useMemo(
     () => getCalendarEvent(date, location.latitude),
@@ -731,6 +736,8 @@ const SunTracker: React.FC = () => {
   const cloudCover = useRealWeather ? weatherData?.cloudCoverPercent ?? null : null;
   // The forecast rain amount (ROADMAP item 77); manual weather uses the type's middle value.
   const rainMmH = useRealWeather ? weatherData?.precipitationMmH ?? null : null;
+  // The cover per layer for the cloud types (ROADMAP item 84); manual weather uses the type's own.
+  const cloudLayers = useRealWeather ? weatherData?.cloudLayers ?? null : null;
 
   const skyGradient = useMemo(() => {
     // Clouds dim the sky (ROADMAP item 50): mix toward grey per weather type, scaled
@@ -821,6 +828,8 @@ const SunTracker: React.FC = () => {
             // Manual mode sets the wind itself (ROADMAP item 73): calm, or strong with the switch.
             windSpeedKmh={useRealWeather ? weatherData?.windSpeedKmh ?? null : manualWindy ? MANUAL_STRONG_WIND_KMH : 0}
             rainMmH={rainMmH}
+            cloudLayers={cloudLayers}
+            cloudEgg={cloudEgg}
             windDirectionDeg={weatherData?.windDirectionDeg ?? null}
             compassHeading={activeCompassHeading}
             horizonProfile={horizonProfile}
