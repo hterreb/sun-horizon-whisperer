@@ -1266,7 +1266,7 @@ Six open Sentry feedback reports from 2026-10-02 20:48 to 2026-10-03 18:58, all 
   - **Recommended:** C1, C2, C3, C4, X1, X3. The new shapes stay in today's 120 × 60 box, so the item-76 silver lining works on them. With C3 the clouds glide across the screen, so the silver lining must follow the cloud's current place (the lookbook updates it once per second).
 - **Picks (2026-10-03):** "Cloud picks: C1, C2, C3, C4, X1, X2".
 
-### 85. Fish redone, with rare sharks and dolphins — M — [SUN-CHASER-S](https://ainabler.sentry.io/issues/SUN-CHASER-S) — lookbook first
+### 85. Fish redone, with rare sharks and dolphins — M — [SUN-CHASER-S](https://ainabler.sentry.io/issues/SUN-CHASER-S) — **✅ Done**
 
 - **Feedback (2026-10-03 09:59):** "Redo fish design and add sharks and dolphins as very rare fish".
 - **Now:** 13 day and 5 night species as 24 px line icons (lucide stroke style, no fill; items 62 and 65). `FISH_WEIGHTS` sums to 100; the whale (1) is the rare sea visitor, always far out.
@@ -1306,6 +1306,21 @@ Six open Sentry feedback reports from 2026-10-02 20:48 to 2026-10-03 18:58, all 
 - **Done when:**
   - Tests: the day and night weights sum to 100, with the shark and the dolphins at 0.5; the shark's and the pod's depth (X6) and speed; the night visitors only in the moon pool (X5); FS1 renders all 18 species.
   - In Chromium at 390×844 and 1280×800: day, sunset and night fish (with a jellyfish at night), a forced shark and a forced pod with the wake. No fish, shark or dolphin moves faster than the sailboat in px/s. No console errors.
+- **Built:**
+  - `SceneFish.tsx`: the FS1 shapes of all 18 species from the lookbook (fins, limbs, body, side fins, band, stripes, spikes, spots, whiskers, eyes; no gill lines), drawn by role, back to front, with the body gradient, the night palettes, the gold or blue light points and the E1 spot. The E1 spot of the turtle moved to the centre of its new shell. `sceneIcons.ts` keeps only `Bat`.
+  - `SceneVisitor.tsx`: SH1 (two clip paths: the dorsal fin above the waterline, the blurred shadow below), DO1 (per dolphin a clip above and below, and a `scene-dolphin-roll` and `scene-dolphin-glint` CSS animation, keyframes made from the roll curve in 12 steps) and the X4 wake. The svg lifts itself so the waterline is the swimmer's `y`.
+  - `index.css`: back and belly tokens for 12 species and a belly for the jellyfish (they replace 12 of the 13 E3 tints; the jellyfish keeps its tint), the trout band, the eye, the night pairs and 11 visitor tokens.
+  - `weatherEffectsUtils.ts`: `shark` and `dolphins` in `FishKind`, `FISH_WEIGHTS` and `NIGHT_FISH_WEIGHTS`; `getFishOverride`.
+  - `CloudLayer.tsx`: the `FISH` table without icons, plus the shark (60 px, 0.5 %/s) and the pod (40 px each, 0.7 %/s, pattern `pod`); `createFish` gives the visitors depth 0.3–1, the pod size and roll delays, and the FS1 opacities; the spawn loop reads `?fish=`; `renderFish` uses `SceneFish` and `SceneVisitor` (tone from `getBoatTone`). The swimmer now ends only on its own `animationend`: a dolphin's roll end bubbles up to it, and before this it removed the pod mid-crossing (seen in the browser when a roll clock was set back; item 83's backward play would do the same).
+- **Deviations:**
+  - Each dolphin rolls every 11 s; the lookbook varied this from 9 to 13 s per dolphin. One keyframes rule keeps the roll at exactly 4.5 s and a pure CSS animation.
+  - One shared eye colour (`--scene-fish-eye`) for all species, where the lookbook tinted it per species; at night the visitors' glint is the moon tone (`--scene-moon`), not the lookbook's slightly lighter 92 %. At 10–60 px no difference shows.
+  - With `?fish=` by day, a night species swims in the moon tone (it has no day colours).
+- **Checked:** 23 new tests (893 in all); lint, typecheck and build pass. In headless Chromium at 390×844 and 1280×800, Ravensburg, clear (stubbed forecast), 15 runs, no console errors:
+  - Day (2026-10-03 12:00) and evening (18:50): FS1 classic pairs, minnow schools, perch, pike, carp, catfish, trout and ray read as two-tone shapes, as in the lookbook.
+  - Night (2026-09-27 00:30, full moon at 47°): the moonlit burbot and eel only in the pool layer (opacity 1.0); a forced jellyfish glows at 0.59 with the 2 px halo.
+  - `?fish=shark`: the fin with its glint, the faint body and the V-wake, 33–52 px wide; at night only in the moon pool, with moonlit fins. `?fish=dolphins`: pods of 2 and 3; held mid-roll, the leader's back and fin are above the water with the glint and the wake, the next one rising (day, dusk with the gold glint, and in the moon pool at night).
+  - Speeds on the animation clock: the fastest fish 4.27 px/s at 390 px (a near classic fish, 1.15 %/s) and 4.73 px/s at 1280 px (a near trout); a near sailboat is 4.68 and 5.16 px/s. Sharks 1.15–1.62 px/s, pods 1.8–2.6 px/s.
 
 ---
 

@@ -117,22 +117,36 @@ export const getBoatTone = (timeOfDay: TimeOfDay): BoatTone =>
 export type FishKind =
   | 'classic' | 'minnow' | 'perch' | 'pike' | 'carp' | 'catfish' | 'trout'
   | 'ray' | 'turtle' | 'jellyfish' | 'seahorse' | 'whale' | 'pufferfish'
-  | 'burbot' | 'eel' | 'lanternfish' | 'anglerfish' | 'squid'; // night only (item 65)
+  | 'burbot' | 'eel' | 'lanternfish' | 'anglerfish' | 'squid' // night only (item 65)
+  | 'shark' | 'dolphins'; // the rare sea visitors (item 85): a shark, a pod of 2-3 dolphins
 
+// Item 85: the shark and the dolphin pod are 1 in 200 each; the classic fish gave the 1.
 export const FISH_WEIGHTS: [FishKind, number][] = [
-  ['classic', 25], ['minnow', 18], ['perch', 14], ['pike', 8], ['carp', 10], ['catfish', 4], ['trout', 12],
+  ['classic', 24], ['minnow', 18], ['perch', 14], ['pike', 8], ['carp', 10], ['catfish', 4], ['trout', 12],
   ['ray', 2], ['turtle', 2], ['jellyfish', 2], ['seahorse', 1], ['whale', 1], ['pufferfish', 1],
+  ['shark', 0.5], ['dolphins', 0.5],
 ];
 
 export const pickFish = (r: number): FishKind => pickWeighted(FISH_WEIGHTS, r);
 
+// Test override (item 85): `?fish=<kind>` (e.g. `?fish=shark`) makes every spawn that kind,
+// like `?egg=` for the easter eggs. The rare ones can then be checked in the browser.
+const NIGHT_ONLY_FISH: FishKind[] = ['burbot', 'eel', 'lanternfish', 'anglerfish', 'squid'];
+
+export const getFishOverride = (search: string): FishKind | null => {
+  const kind = new URLSearchParams(search).get('fish');
+  return [...FISH_WEIGHTS.map(([k]) => k), ...NIGHT_ONLY_FISH].find(k => k === kind) ?? null;
+};
+
 // Night mix (ROADMAP item 65, Night waters lookbook), from nautical twilight on. 'moonlit'
 // is a day fish in the moon tone (NF1); pickMoonlitDayFish then picks its species with
-// the day weights of the lake fish, without the minnow school.
-export type NightFishPick = 'moonlit' | 'burbot' | 'eel' | 'lanternfish' | 'jellyfish' | 'anglerfish' | 'squid';
+// the day weights of the lake fish, without the minnow school. The sea visitors swim at night
+// too (item 85, X5), in the moon pool like the moonlit fish, which gave the 1.
+export type NightFishPick = 'moonlit' | 'burbot' | 'eel' | 'lanternfish' | 'jellyfish' | 'anglerfish' | 'squid' | 'shark' | 'dolphins';
 
 export const NIGHT_FISH_WEIGHTS: [NightFishPick, number][] = [
-  ['moonlit', 25], ['burbot', 15], ['eel', 12], ['lanternfish', 30], ['jellyfish', 8], ['anglerfish', 5], ['squid', 5],
+  ['moonlit', 24], ['burbot', 15], ['eel', 12], ['lanternfish', 30], ['jellyfish', 8], ['anglerfish', 5], ['squid', 5],
+  ['shark', 0.5], ['dolphins', 0.5],
 ];
 const MOONLIT_DAY_FISH: FishKind[] = ['classic', 'perch', 'pike', 'carp', 'catfish', 'trout'];
 

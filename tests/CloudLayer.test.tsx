@@ -1,5 +1,5 @@
 import React, { Profiler } from 'react';
-import { render, act } from '@testing-library/react';
+import { render, act, fireEvent } from '@testing-library/react';
 import CloudLayer, { WeatherType, createFish, createBird } from '../src/components/CloudLayer';
 import { FISH_WEIGHTS, NIGHT_FISH_WEIGHTS, getWaterSpeedFactor } from '../src/utils/weatherEffectsUtils';
 import type { TimeOfDay } from '../src/utils/sunUtils';
@@ -312,11 +312,13 @@ describe('CloudLayer', () => {
       expect(createFish('classic', false, false, 390, always(0)).easing).toBeUndefined();
     });
 
-    it('draws a fish of the first species in the mix, in its own tint (E3)', () => {
+    it('draws a fish of the first species in the mix in its own two tones (E3, item 85 FS1)', () => {
       const container = spawnFish({}, 9000);
       const fishIcon = container.querySelector('[data-testid="scene-fish"]');
       expect(fishIcon?.getAttribute('data-kind')).toBe('classic');
-      expect((fishIcon?.parentElement as HTMLElement).style.color).toBe('hsl(var(--scene-fish-classic))');
+      expect((fishIcon?.querySelector('path') as SVGElement).style.fill).toBe('hsl(var(--scene-fish-classic-back))');
+      expect([...fishIcon!.querySelectorAll('stop')].map(stop => (stop as SVGElement).style.stopColor))
+        .toContain('hsl(var(--scene-fish-classic-belly))');
     });
 
     it('sends a companion 2 to 4 s behind (P6)', () => {
@@ -402,7 +404,7 @@ describe('CloudLayer', () => {
         const fishIcon = spawnNight({ timeOfDay, moonlight: moon }, 16000)
           .querySelector('[data-testid="moonlit-fish"] [data-testid="scene-fish"]');
         expect(fishIcon?.getAttribute('data-kind')).toBe('classic');
-        expect((fishIcon?.parentElement as HTMLElement).style.color).toBe('hsl(var(--scene-moon))');
+        expect((fishIcon?.querySelector('path') as SVGElement).style.fill).toBe('hsl(var(--scene-fish-moon-back))');
       }
     });
 
@@ -424,6 +426,104 @@ describe('CloudLayer', () => {
       expect(atWidth(390, () => spawnNight({ moonlight: moon }, 100000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(6);
       // Three phones wide: up to nine, so all six pairs stay (item 70).
       expect(atWidth(1290, () => spawnNight({ moonlight: moon }, 100000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(12);
+    });
+  });
+
+  // ROADMAP item 85 (Fish Redone lookbook picks FS1, SH1, DO1, X4, X5, X6).
+  describe('sea visitors (ROADMAP item 85)', () => {
+    const always = (r: number) => () => r;
+    // The species' own speed in % of the width per second, without the distance slow-down.
+    const ownSpeed = (fish: ReturnType<typeof createFish>) => fish.dx / fish.duration / (1 - 0.45 * fish.depth);
+    // Renders the layer with `?fish=<kind>` in the address, so every spawn is that kind.
+    const spawnForced = (kind: string, props: Partial<React.ComponentProps<typeof CloudLayer>>, ms: number) => {
+      window.history.pushState({}, '', `/?fish=${kind}`);
+      vi.useFakeTimers();
+      const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
+      try {
+        const view = render(<CloudLayer weatherType="clear" timeOfDay="midday" {...props} />);
+        act(() => { vi.advanceTimersByTime(ms); });
+        return view.container;
+      } finally {
+        randomSpy.mockRestore();
+        vi.useRealTimers();
+        window.history.pushState({}, '', '/');
+      }
+    };
+    const finFill = (visitor: Element | null) =>
+      (visitor?.querySelector('g[clip-path*="above"] path') as SVGElement).style.fill;
+
+    it('sends the shark and the pod at a depth of 0.3 to 1 (X6); the whale stays far out', () => {
+      for (const kind of ['shark', 'dolphins'] as const) {
+        expect(createFish(kind, false, false, 390, always(0)).depth).toBeCloseTo(0.3, 5);
+        expect(createFish(kind, false, false, 390, always(0.999)).depth).toBeGreaterThan(0.99);
+      }
+      expect(createFish('whale', false, false, 390, always(0)).depth).toBe(0.75);
+    });
+
+    it('glides the shark at 0.5 %/s and the pod at 0.7 %/s, slower than the sailboat', () => {
+      expect(ownSpeed(createFish('shark', false, false, 390, always(0)))).toBeCloseTo(0.5, 5);
+      expect(ownSpeed(createFish('dolphins', false, false, 390, always(0)))).toBeCloseTo(0.7, 5);
+      // A wide screen: at most a phone's pixels per second (item 66).
+      const desktop = createFish('shark', false, false, 1280, always(0));
+      expect((desktop.dx / desktop.duration) * 1280).toBeCloseTo(0.5 * (1 - 0.45 * 0.3) * 430, 5);
+    });
+
+    it('sizes a near shark 52 px and a far one 33 px; a pod has 2 or 3 dolphins, 1.5 s apart', () => {
+      expect(createFish('shark', false, false, 390, always(0)).width).toBe(52);
+      expect(createFish('shark', false, false, 390, always(0.999)).width).toBe(33);
+      const two = createFish('dolphins', false, false, 390, always(0));
+      expect(two.rolls).toEqual([0, 1.5]);
+      expect(two.width).toBeCloseTo((35 * 82) / 48, 5); // a 35 px dolphin, 82 grid units for two
+      const three = createFish('dolphins', false, false, 390, always(0.6));
+      expect(three.rolls).toHaveLength(3);
+      expect(three.rolls![2] - three.rolls![1]).toBeCloseTo(1.5, 5);
+    });
+
+    it('draws day fish at 85 % (FS1), visitors at 95 %, the night jellyfish at 60 % (item 82)', () => {
+      expect(createFish('trout', false, false, 390, always(0)).opacity).toBeCloseTo(0.85, 5);
+      expect(createFish('shark', false, false, 390, always(0)).opacity).toBeCloseTo(0.95 * (1 - 0.3 * 0.3), 5);
+      expect(createFish('burbot', false, false, 390, always(0), true).opacity).toBeCloseTo(0.75, 5);
+      expect(createFish('jellyfish', false, false, 390, always(0), true).opacity).toBeCloseTo(0.6, 5);
+      expect(createFish('shark', true, false, 390, always(0)).glow).toBe(false); // no E1 spot
+    });
+
+    it('swims a forced shark by day with its fin, a faint body below and a V-wake (SH1, X4)', () => {
+      const shark = spawnForced('shark', {}, 9000).querySelector('[data-testid="scene-visitor"]');
+      expect(shark?.getAttribute('data-kind')).toBe('shark');
+      expect(shark?.querySelectorAll('[data-testid="visitor-wake"]')).toHaveLength(1);
+      expect(finFill(shark)).toBe('hsl(var(--scene-fish-shark))');
+      // The waterline at 67-93 % of the height, like every fish: here depth 0.3, 1 % up.
+      const swimmer = shark?.parentElement as HTMLElement;
+      expect(parseFloat(swimmer.style.top)).toBeCloseTo(84.2, 5);
+      expect(swimmer.style.animation).toContain('moveAcrossX');
+    });
+
+    it('swims a forced pod with a wake behind each dolphin, in dusk colours in the evening (DO1, X4)', () => {
+      const pod = spawnForced('dolphins', { timeOfDay: 'evening' }, 9000).querySelector('[data-testid="scene-visitor"]');
+      expect(pod?.getAttribute('data-kind')).toBe('dolphins');
+      expect(pod?.querySelectorAll('[data-testid="visitor-dolphin"]')).toHaveLength(2);
+      expect(pod?.querySelectorAll('[data-testid="visitor-wake"]')).toHaveLength(2);
+      expect(finFill(pod)).toBe('hsl(var(--scene-fish-dolphin-dusk))');
+    });
+
+    it('ends a pod\'s crossing only with its own glide, not with a dolphin\'s roll (DO1)', () => {
+      const container = spawnForced('dolphins', {}, 9000);
+      const pod = container.querySelector('[data-testid="scene-visitor"]')!;
+      // A roll's animationend bubbles up to the swimmer, e.g. when a play rate runs it backwards.
+      fireEvent.animationEnd(pod.querySelector('[data-testid="visitor-dolphin"] g[style*="scene-dolphin-roll"]')!);
+      expect(container.querySelector('[data-testid="scene-visitor"]')).not.toBeNull();
+      fireEvent.animationEnd(pod.parentElement!);
+      expect(container.querySelector('[data-testid="scene-visitor"]')).toBeNull();
+    });
+
+    it('sends night visitors only into the moon pool, with moonlit fins (X5)', () => {
+      const lit = spawnForced('shark', { timeOfDay: 'night', moonlight: { x: 0.5, strength: 1 } }, 26000);
+      const shark = lit.querySelector('[data-testid="moonlit-fish"] [data-testid="scene-visitor"]');
+      expect(shark).not.toBeNull();
+      expect(finFill(shark)).toBe('hsl(var(--scene-fish-visitor-moon))');
+      expect(spawnForced('dolphins', { timeOfDay: 'night' }, 26000).querySelector('[data-testid="scene-visitor"]')).toBeNull();
+      expect(spawnForced('dolphins', { timeOfDay: 'night', moonlight: { x: 0.5, strength: 0 } }, 26000)
+        .querySelector('[data-testid="scene-visitor"]')).toBeNull();
     });
   });
 
