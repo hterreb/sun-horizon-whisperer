@@ -1,5 +1,5 @@
 import React, { Profiler } from 'react';
-import { render, act } from '@testing-library/react';
+import { render, act, fireEvent } from '@testing-library/react';
 import CloudLayer, { WeatherType, createFish, createBird } from '../src/components/CloudLayer';
 import { FISH_WEIGHTS, NIGHT_FISH_WEIGHTS, getWaterSpeedFactor } from '../src/utils/weatherEffectsUtils';
 import type { TimeOfDay } from '../src/utils/sunUtils';
@@ -553,5 +553,52 @@ describe('CloudLayer rain (ROADMAP item 77)', () => {
     expect(hail).toHaveLength(45);
     expect(new Set(snow).size).toBeGreaterThan(50);
     expect(new Set(hail).size).toBeGreaterThan(40);
+  });
+});
+
+describe('CloudLayer during time-travel play (ROADMAP item 83)', () => {
+  // Math.random pinned to 0: every spawn chance passes, the shortest gaps, a classic fish with a companion.
+  const spawn = (props: Partial<React.ComponentProps<typeof CloudLayer>>, ms: number) => {
+    vi.useFakeTimers();
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
+    const view = render(<CloudLayer weatherType="clear" timeOfDay="midday" {...props} />);
+    act(() => { vi.advanceTimersByTime(ms); });
+    randomSpy.mockRestore();
+    vi.useRealTimers();
+    return view.container;
+  };
+
+  it('sends boats 8x as often in both play directions', () => {
+    // Live: the first boat at 5 s, the next after 55 s. Play: one every 55 / 8 = 6.9 s.
+    const boats = (playDirection: -1 | 0 | 1) =>
+      atWidth(1290, () => spawn({ playDirection }, 21000)).querySelectorAll('[data-testid="scene-boat"]').length;
+    expect(boats(0)).toBe(1);
+    expect(boats(1)).toBe(4);
+    expect(boats(-1)).toBe(4);
+  });
+
+  it('removes a fish pair when its last swimmer leaves: the companion live, the lead in rewind', () => {
+    // A reversed animation ends at its start, so in rewind the lead leaves last.
+    const goneAfterEnd = (playDirection: -1 | 0, swimmer: 0 | 1) => {
+      const container = spawn({ playDirection }, playDirection ? 700 : 9000);
+      const swimmers = [...container.querySelectorAll('[data-testid="scene-fish"]')].map(icon => icon.parentElement as HTMLElement);
+      expect(swimmers).toHaveLength(2);
+      fireEvent.animationEnd(swimmers[swimmer]);
+      return container.querySelector('[data-testid="scene-fish"]') === null;
+    };
+    expect(goneAfterEnd(0, 0)).toBe(false);
+    expect(goneAfterEnd(0, 1)).toBe(true);
+    expect(goneAfterEnd(-1, 1)).toBe(false);
+    expect(goneAfterEnd(-1, 0)).toBe(true);
+  });
+
+  it('keeps snow and hail at live speed, as the rain canvas', () => {
+    const marked = (weatherType: WeatherType, name: string) => {
+      const falling = [...render(<CloudLayer weatherType={weatherType} timeOfDay="midday" playDirection={1} />).container
+        .querySelectorAll<HTMLElement>('div')].filter(el => el.style.animation.startsWith(name));
+      return falling.length > 0 && falling.every(el => el.hasAttribute('data-live-speed'));
+    };
+    expect(marked('snow', 'snowfall')).toBe(true);
+    expect(marked('hail', 'hailFall')).toBe(true);
   });
 });
