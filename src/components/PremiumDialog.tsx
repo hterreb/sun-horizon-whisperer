@@ -24,7 +24,7 @@ const PremiumDialog: React.FC = () => {
   if (!isDialogOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4" onClick={() => setDialogOpen(false)}>
+    <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/50 p-4" onClick={() => setDialogOpen(false)}>
       <div
         role="dialog"
         aria-modal="true"

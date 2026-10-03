@@ -448,7 +448,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   const boatTone = getBoatTone(timeOfDay);
   const seaWindKmh = getSeaWindKmh(windSpeedKmh, weatherType); // the boats' reflection (item 79, X2)
   // The line leaves keep the old ship tone.
-  const lineInk = timeOfDay === 'night' ? 'text-gray-300 text-opacity-60' : 'text-gray-600 text-opacity-80';
+  const lineInk = timeOfDay === 'night' ? 'text-gray-300/60' : 'text-gray-600/80';
 
   // The pool of moonlight (ROADMAP item 65, NF1/NR3): moonlit fish show only within ±9 %
   // of the width from the moon, fading out to ±20 %, as bright as the pool is strong.
@@ -693,7 +693,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
 
     return (
       <div
-        className="absolute inset-0 transition-colors duration-[5000ms]"
+        className="absolute inset-0 transition-colors duration-5000"
         style={{
           background: `linear-gradient(to bottom, ${getCloudColor()} 0%, transparent 40%)`,
           opacity: intensity
@@ -831,7 +831,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         return (
           <div
             key={cloud.id}
-            className="absolute transition-colors duration-[5000ms]"
+            className="absolute transition-colors duration-5000"
             style={{
               left: `${cloud.x}%`,
               // In a storm the drifting clouds sit below the deck (ROADMAP item 51).
@@ -855,7 +855,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
               <path
                 d={cloudPath}
                 fill={getCloudColor()}
-                className="transition-colors duration-[5000ms]"
+                className="transition-colors duration-5000"
               />
               {/* X2 silver lining (item 76): the cloud's parts near the moon catch its light. */}
               {moonlight && (

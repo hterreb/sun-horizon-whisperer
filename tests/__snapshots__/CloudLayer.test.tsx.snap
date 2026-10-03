@@ -9,7 +9,7 @@ NodeList [
     width="120"
   >
     <path
-      class="transition-colors duration-[5000ms]"
+      class="transition-colors duration-5000"
       d="M0 35 Q30 15 60 30 Q90 10 120 25 Q120 50 90 55 Q60 60 30 55 Q0 50 0 35Z"
       fill="rgba(100, 100, 110, 0.85)"
     />
@@ -21,7 +21,7 @@ NodeList [
     width="120"
   >
     <path
-      class="transition-colors duration-[5000ms]"
+      class="transition-colors duration-5000"
       d="M0 35 Q30 15 60 30 Q90 10 120 25 Q120 50 90 55 Q60 60 30 55 Q0 50 0 35Z"
       fill="rgba(100, 100, 110, 0.85)"
     />
@@ -33,7 +33,7 @@ NodeList [
     width="120"
   >
     <path
-      class="transition-colors duration-[5000ms]"
+      class="transition-colors duration-5000"
       d="M0 35 Q30 15 60 30 Q90 10 120 25 Q120 50 90 55 Q60 60 30 55 Q0 50 0 35Z"
       fill="rgba(100, 100, 110, 0.85)"
     />
@@ -45,7 +45,7 @@ NodeList [
     width="120"
   >
     <path
-      class="transition-colors duration-[5000ms]"
+      class="transition-colors duration-5000"
       d="M0 35 Q30 15 60 30 Q90 10 120 25 Q120 50 90 55 Q60 60 30 55 Q0 50 0 35Z"
       fill="rgba(100, 100, 110, 0.85)"
     />
@@ -57,7 +57,7 @@ NodeList [
     width="120"
   >
     <path
-      class="transition-colors duration-[5000ms]"
+      class="transition-colors duration-5000"
       d="M0 35 Q30 15 60 30 Q90 10 120 25 Q120 50 90 55 Q60 60 30 55 Q0 50 0 35Z"
       fill="rgba(100, 100, 110, 0.85)"
     />
@@ -69,7 +69,7 @@ NodeList [
     width="120"
   >
     <path
-      class="transition-colors duration-[5000ms]"
+      class="transition-colors duration-5000"
       d="M0 35 Q30 15 60 30 Q90 10 120 25 Q120 50 90 55 Q60 60 30 55 Q0 50 0 35Z"
       fill="rgba(100, 100, 110, 0.85)"
     />
@@ -81,7 +81,7 @@ NodeList [
     width="120"
   >
     <path
-      class="transition-colors duration-[5000ms]"
+      class="transition-colors duration-5000"
       d="M0 35 Q30 15 60 30 Q90 10 120 25 Q120 50 90 55 Q60 60 30 55 Q0 50 0 35Z"
       fill="rgba(100, 100, 110, 0.85)"
     />
@@ -93,7 +93,7 @@ NodeList [
     width="120"
   >
     <path
-      class="transition-colors duration-[5000ms]"
+      class="transition-colors duration-5000"
       d="M0 35 Q30 15 60 30 Q90 10 120 25 Q120 50 90 55 Q60 60 30 55 Q0 50 0 35Z"
       fill="rgba(100, 100, 110, 0.85)"
     />
@@ -105,7 +105,7 @@ NodeList [
     width="120"
   >
     <path
-      class="transition-colors duration-[5000ms]"
+      class="transition-colors duration-5000"
       d="M0 35 Q30 15 60 30 Q90 10 120 25 Q120 50 90 55 Q60 60 30 55 Q0 50 0 35Z"
       fill="rgba(100, 100, 110, 0.85)"
     />
@@ -117,7 +117,7 @@ NodeList [
     width="120"
   >
     <path
-      class="transition-colors duration-[5000ms]"
+      class="transition-colors duration-5000"
       d="M0 35 Q30 15 60 30 Q90 10 120 25 Q120 50 90 55 Q60 60 30 55 Q0 50 0 35Z"
       fill="rgba(100, 100, 110, 0.85)"
     />

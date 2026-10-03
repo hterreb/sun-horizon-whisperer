@@ -306,7 +306,7 @@ const TWILIGHT_CIVIL_2 = '#E5DEFF'; // ditto - tailwind's `dusk` color, kept for
 // next state's own start color, so the gradient hints at what's coming (a glow at the
 // horizon) instead of ending in a hard band. The 'night'/'midday'/'evening' entries
 // match the --scene-sky-night-*/--scene-sky-day-*/--scene-sky-dusk-* bucket tokens in
-// index.css/tailwind.config.ts exactly; 'dawn' matches --scene-sky-dawn-*.
+// index.css exactly; 'dawn' matches --scene-sky-dawn-*.
 const SKY_GRADIENT_STOPS: Record<TimeOfDay, [string, string, string]> = {
   'night': [NIGHT, NIGHT_2, NIGHT_3],
   'astronomical-twilight': [NIGHT_2, NIGHT_3, TWILIGHT_CIVIL],

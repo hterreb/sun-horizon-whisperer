@@ -937,7 +937,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           aria-label={t('scene.sun')}
           onClick={onSunTap}
           data-testid="sun-dot"
-          className={`absolute rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${compassActive ? '' : 'transition-transform duration-1000'} ${getSunColor()} ${getGlowIntensity()} animate-glow`}
+          className={`absolute rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 ${compassActive ? '' : 'transition-transform duration-1000'} ${getSunColor()} ${getGlowIntensity()} animate-glow`}
           style={{
             left: `${sunX}px`,
             top: `${sunY}px`,
@@ -1149,8 +1149,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
       {containerDimensions.width > 0 && (
         <div
-          // z-[9]: above the fog veil (WeatherEffects, z-[8]), so the chips stay readable (ROADMAP item 60).
-          className={`absolute inset-0 z-[9] pointer-events-none transition-opacity duration-300 ${
+          // z-9: above the fog veil (WeatherEffects, z-[8]), so the chips stay readable (ROADMAP item 60).
+          className={`absolute inset-0 z-9 pointer-events-none transition-opacity duration-300 ${
             cardinalLabelsVisible ? 'opacity-100' : 'opacity-0'
           }`}
           data-testid="cardinal-labels"
@@ -1180,7 +1180,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         // fullscreen (same `cardinalLabelsVisible` condition as ROADMAP item 29). The
         // panel carries the same times for assistive tech, so these pills are decorative.
         <div
-          className={`absolute inset-0 z-[9] pointer-events-none transition-opacity duration-300 ${
+          className={`absolute inset-0 z-9 pointer-events-none transition-opacity duration-300 ${
             cardinalLabelsVisible ? 'opacity-100' : 'opacity-0'
           }`}
           data-testid="arc-labels"
@@ -1247,8 +1247,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       {timeOfDay !== 'night' && (
         <div
           data-testid="sun-altitude"
-          className="absolute z-[9] left-1/2 transform -translate-x-1/2 bottom-1/3 -translate-y-12
-                     bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm"
+          className="absolute z-9 left-1/2 transform -translate-x-1/2 bottom-1/3 -translate-y-12
+                     bg-black/50 text-white px-3 py-1 rounded-full text-sm"
         >
           {sunsetCountdown ? (
             <span className="flex items-center gap-1 tabular-nums">
@@ -1267,7 +1267,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         // to them at every screen height (ROADMAP item 54).
         <div
           className="absolute left-1/2 transform -translate-x-1/2 top-[calc(65%+30px)]
-                     bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-xs"
+                     bg-black/50 text-white px-3 py-1 rounded-full text-xs"
         >
           {t('scene.moonInfo', {
             altitude: formatNumber(language, moonPosition.altitude, 1),

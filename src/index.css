@@ -1,7 +1,297 @@
+@import 'tailwindcss';
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@plugin 'tailwindcss-animate';
+
+@custom-variant dark (&:is(.dark *));
+
+@utility container {
+  margin-inline: auto;
+  padding-inline: 2rem;
+  @media (width >= --theme(--breakpoint-sm)) {
+    max-width: none;
+  }
+  @media (width >= 1400px) {
+    max-width: 1400px;
+  }
+}
+
+@theme {
+  /* The default-palette colours the app uses, at their Tailwind v3 hex values: v4's
+     OKLCH palette is more vivid (the sun's yellow-300 changed visibly). AUDIT D-6. */
+  --color-amber-600: #d97706;
+  --color-blue-400: #60a5fa;
+  --color-blue-500: #3b82f6;
+  --color-blue-700: #1d4ed8;
+  --color-gray-100: #f3f4f6;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af;
+  --color-gray-600: #4b5563;
+  --color-orange-400: #fb923c;
+  --color-red-50: #fef2f2;
+  --color-red-300: #fca5a5;
+  --color-red-400: #f87171;
+  --color-red-600: #dc2626;
+  --color-sky-100: #e0f2fe;
+  --color-slate-200: #e2e8f0;
+  --color-yellow-300: #fde047;
+
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-sidebar: hsl(var(--sidebar-background));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
+
+  --color-dawn: #fec6a1;
+  --color-sunrise: #f97316;
+  --color-day: #0ea5e9;
+  --color-sunset: #ea384c;
+  --color-dusk: #e5deff;
+  --color-night: #1a1f2c;
+
+  --color-twilight-civil: #403e43;
+  --color-twilight-nautical: #221f26;
+  --color-twilight-astronomical: #0f0e11;
+
+  --color-brand-sunset: hsl(var(--brand-sunset));
+  --color-brand-peach: hsl(var(--brand-peach));
+  --color-brand-sky: hsl(var(--brand-sky));
+  --color-brand-cyan: hsl(var(--brand-cyan));
+  --color-brand-night: hsl(var(--brand-night));
+  --color-brand-coral: hsl(var(--brand-coral));
+  --color-brand-gold: hsl(var(--brand-gold));
+  --color-brand-gold-light: hsl(var(--brand-gold-light));
+
+  --color-scene-sky-night-1: hsl(var(--scene-sky-night-1));
+  --color-scene-sky-night-2: hsl(var(--scene-sky-night-2));
+  --color-scene-sky-night-3: hsl(var(--scene-sky-night-3));
+  --color-scene-sky-dawn-1: hsl(var(--scene-sky-dawn-1));
+  --color-scene-sky-dawn-2: hsl(var(--scene-sky-dawn-2));
+  --color-scene-sky-dawn-3: hsl(var(--scene-sky-dawn-3));
+  --color-scene-sky-day-1: hsl(var(--scene-sky-day-1));
+  --color-scene-sky-day-2: hsl(var(--scene-sky-day-2));
+  --color-scene-sky-day-3: hsl(var(--scene-sky-day-3));
+  --color-scene-sky-dusk-1: hsl(var(--scene-sky-dusk-1));
+  --color-scene-sky-dusk-2: hsl(var(--scene-sky-dusk-2));
+  --color-scene-sky-dusk-3: hsl(var(--scene-sky-dusk-3));
+
+  --color-scene-sunGlow-high: hsl(var(--scene-sun-glow-high));
+  --color-scene-sunGlow-low: hsl(var(--scene-sun-glow-low));
+  --color-scene-sunGlow-horizon: hsl(var(--scene-sun-glow-horizon));
+
+  --color-scene-moon: hsl(var(--scene-moon));
+  --color-scene-moonDark: hsl(var(--scene-moon-dark));
+  --color-scene-water: hsl(var(--scene-water));
+
+  --color-scene-ridge-night: hsl(var(--scene-ridge-night));
+  --color-scene-ridge-day: hsl(var(--scene-ridge-day));
+  --color-scene-ridge-golden: hsl(var(--scene-ridge-golden));
+
+  --color-scene-glowWhite: hsl(var(--scene-glow-white));
+  --color-scene-ghostHalo: hsl(var(--scene-ghost-halo));
+
+  --color-scene-iceberg-fill: hsl(var(--scene-iceberg-fill));
+  --color-scene-iceberg-shade: hsl(var(--scene-iceberg-shade));
+  --color-scene-iceberg-glow: hsl(var(--scene-iceberg-glow));
+
+  --color-scene-critter: hsl(var(--scene-critter-silhouette));
+
+  --color-panel-background: hsl(var(--panel-background));
+  --color-panel-border: hsl(var(--panel-border));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-panel: var(--panel-radius);
+
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+  --text-body: 14px;
+  --text-body--line-height: 20px;
+  --text-title: 17px;
+  --text-title--line-height: 24px;
+  --text-display: 28px;
+  --text-display--line-height: 34px;
+  --text-hero: 34px;
+  --text-hero--line-height: 40px;
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-sun-rise: sun-rise 3s ease-out;
+  --animate-sun-set: sun-set 3s ease-out;
+  --animate-glow: glow 5s ease-in-out infinite;
+  --animate-fade-in: fade-in 0.5s ease-out;
+  --animate-mark-rise: mark-rise 2.6s cubic-bezier(0.22, 0.8, 0.3, 1) 0.4s both;
+  --animate-mark-sink: mark-sink 1s ease-in-out both;
+  --animate-mark-glint: fade-in 1s ease-out 1.7s both;
+  --animate-mark-glint-out: fade-out 1s ease-in-out both;
+  --animate-scene-iris: scene-iris 1s cubic-bezier(0.65, 0, 0.25, 1) both;
+  --animate-scene-fade: fade-in 0.2s ease-out both;
+  --animate-aurora-drift: aurora-drift 40s ease-in-out infinite;
+  --animate-green-flash: green-flash 2.5s ease-in-out both;
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+  @keyframes sun-rise {
+    0% {
+      transform: translateY(100%);
+    }
+    100% {
+      transform: translateY(0);
+    }
+  }
+  @keyframes sun-set {
+    0% {
+      transform: translateY(0);
+    }
+    100% {
+      transform: translateY(100%);
+    }
+  }
+  @keyframes glow {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.8;
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes fade-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes mark-rise {
+    from {
+      transform: translateY(44px);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+  @keyframes mark-sink {
+    from {
+      transform: translateY(0);
+    }
+    to {
+      transform: translateY(18px);
+    }
+  }
+  @keyframes scene-iris {
+    from {
+      clip-path: circle(68px at 50% 36%);
+    }
+    to {
+      clip-path: circle(150vmax at 50% 36%);
+    }
+  }
+  @keyframes aurora-drift {
+    0%,
+    100% {
+      transform: translateX(-4%) skewX(-8deg);
+      opacity: 0.55;
+    }
+    50% {
+      transform: translateX(4%) skewX(6deg);
+      opacity: 0.85;
+    }
+  }
+  @keyframes green-flash {
+    0%,
+    100% {
+      opacity: 0;
+    }
+    40%,
+    60% {
+      opacity: 0.9;
+    }
+  }
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+
+  /* Tailwind v3 defaults that v4 dropped (AUDIT D-6): pointer cursor on buttons,
+     gray-400 placeholders. */
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-gray-400);
+  }
+}
 
 @layer base {
   :root {
@@ -65,8 +355,8 @@
      *     getBackgroundGradient, so wiring them in later (item 15) changes no pixels.
      *   - Glass panel: background, border and corner radius for the InfoPanel restyle
      *     (item 15). Not yet applied to InfoPanel.tsx.
-     *   - Type scale: see the fontSize entries (caption/body/title/display/hero) in
-     *     tailwind.config.ts. Tabular figures use Tailwind's built-in `tabular-nums`.
+     *   - Type scale: see the `--text-*` entries (caption/body/title/display/hero) in
+     *     the `@theme` block. Tabular figures use Tailwind's built-in `tabular-nums`.
      * Existing shadcn tokens above are untouched.
      */
 

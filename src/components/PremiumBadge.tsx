@@ -19,11 +19,11 @@ const PremiumBadge: React.FC<{ className?: string }> = ({ className }) => {
     title={isLocked ? t('premium.badge') : t('common.premium')}
     data-testid="premium-badge"
     className={cn(
-      'inline-flex h-3 w-3 flex-shrink-0 rounded-full bg-gradient-to-br from-brand-gold-light to-brand-gold text-brand-night ring-1 ring-white/50 shadow-[0_0_6px_hsl(var(--brand-gold)/0.7)]',
+      'inline-flex h-3 w-3 shrink-0 rounded-full bg-linear-to-br from-brand-gold-light to-brand-gold text-brand-night ring-1 ring-white/50 shadow-[0_0_6px_hsl(var(--brand-gold)/0.7)]',
       className
     )}
   >
-    <svg viewBox="0 0 12 12" className="!size-full">
+    <svg viewBox="0 0 12 12" className="size-full!">
       <path d="M6 3v6M3 6h6" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
     </svg>
   </span>
