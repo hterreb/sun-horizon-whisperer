@@ -3,7 +3,7 @@
 > summary: Audit of the Sun Chaser repository (a React/Vite PWA that shows sun and moon positions and live weather, plus unused Supabase/Stripe edge functions).
 > It lists findings by area (security, correctness, performance, build/CI, dependencies, accessibility, docs) with severity, file location, and a recommended fix.
 > The top of the file has the verification results and a prioritized quick-win list.
-> Audit date: 2026-09-24. Commit audited: `365d8a7` (main). Re-verified 2026-09-28 at `a9882c4`: 44 fixed, 5 partly fixed, 10 new open findings (see the status notes in §3). As of 2026-10-01, all findings are fixed; none is open.
+> Audit date: 2026-09-24. Commit audited: `365d8a7` (main). Re-verified 2026-09-28 at `a9882c4`: 44 fixed, 5 partly fixed, 10 new open findings (see the status notes in §3). As of 2026-10-01, all findings are fixed; none is open. Security re-audit 2026-10-03 (at the merge of PR #80): 12 new findings (S-10 … S-19, D-6, B-9), see the last status note in §3.
 
 ## 1. Verification results
 
@@ -56,6 +56,10 @@ Re-verification, 2026-09-28 (`a9882c4`):
 > C-16, A-6, A-7: fixed by ROADMAP item 39 (loading screen). None of the re-verification findings is open.
 > P-4 `Fireworks`: fixed by ROADMAP item 41 (one canvas, particles and rAF id in refs, no React state per frame).
 
+> **Status 2026-10-03 (security re-audit):** scope: the source, the git history, the live site `sun-chaser.vercel.app`, the GitHub repo settings, Sentry, and the local Android signing key. gitleaks finds no secret in the git history (all refs), in the working tree, or in the live bundle. `.env.local` (Sentry org token, Vercel OIDC token) is gitignored, mode 600, and was never committed. The live site does not serve `/.env`, `/.git`, the sources or the app source maps. No XSS sink in `src/` (`innerHTML`, `dangerouslySetInnerHTML`, `eval`); the `?egg=` URL value is allow-listed; `?premium=enforce` is not in the production bundle.
+> New findings: S-10 … S-19, D-6, B-9. Fixed: S-11, S-14, S-15, S-19. Partly fixed: S-10, S-16, S-18. Open: S-12, S-13, S-17 (Stripe functions and Play billing, both not live yet), D-6, B-9.
+> The git history was rewritten on 2026-10-03 (S-10). Commit IDs in this file and in ROADMAP.md from before that date refer to the old history.
+
 1. Remove the third-party `gptengineer.js` script from production HTML (S-1).
 2. Run `npm audit fix` and commit the lockfile (D-1).
 3. Delete the `console.log` calls that run on every render and on every animation frame (P-1, P-2).
@@ -78,6 +82,16 @@ Re-verification, 2026-09-28 (`a9882c4`):
 | ✅ S-7 | Low | `check-subscription/index.ts:51,101` | `upsert` results are not checked, so DB write failures are silent. | Check `{ error }` and fail visibly. |
 | ✅ S-8 | Low | `src/components/InfoPanel.tsx:130`, `src/utils/weatherUtils.ts:106` | Exact GPS coordinates go to `api.bigdatacloud.net` and `api.open-meteo.com`. No privacy notice. | Round coordinates to 2 decimals (~1 km) before sending; add a short privacy note. |
 | ✅ S-9 | Low | `supabase/` | No migrations for the `subscribers` table, no `config.toml`, no RLS definition in repo. Stripe identity is matched by e-mail only. | Commit schema + RLS policies; store and match `stripe_customer_id` per `user_id`. |
+| 🟡 S-10 | Medium | git history | The repo is public. 16 commits (2025-07) had an author e-mail that is not the owner's personal address (a client work address). | Done: history rewritten to `lutz.berreth@gmail.com` and force-pushed; the repo git config pins `user.email`; `.githooks/pre-push` blocks a push with any other author or committer e-mail (see CLAUDE.md). Open: GitHub keeps the old commits reachable through the pull request refs until GitHub Support removes them. |
+| ✅ S-11 | Medium | GitHub repo settings | Public repo with secret scanning, push protection, Dependabot alerts and Dependabot security updates off, and no protection on `main`. | Done: all four on, plus private vulnerability reporting and CodeQL default setup. `main` is protected (no force push, no delete, CI check `test` required). Non-provider secret patterns and validity checks need a paid plan. |
+| ⬜ S-12 | Medium | `supabase/functions/*/index.ts` (`customers.list({ email })`), `check-subscription/index.ts:77,127` | Rest of S-9: the Stripe customer is still found by e-mail, and the `subscribers` upsert matches on `email`, so it can overwrite `user_id`. If a Supabase account can have an unverified e-mail (e-mail confirmation off, or an OAuth provider that does not verify), an attacker who signs up with the victim's e-mail gets the victim's billing portal (cancel, invoices). The functions are not live. | Before deploying: set `metadata.user_id` at checkout, store `stripe_customer_id` per `user_id` and look it up by that; or reject users without `email_confirmed_at`. |
+| ⬜ S-13 | Medium | `src/hooks/usePremium.ts:107-131`, `src/utils/premium.ts` | Premium is decided on the device only: no server checks the Play purchase token, and `premium-owned` in `localStorage` is the start hint. A patched app gets Premium free. `acknowledge()` exists only in Digital Goods API v1, so a purchase that is not acknowledged is refunded by Play after 3 days. No effect while `PREMIUM_ENFORCED = false`. | Before item 16 turns the gate on: acknowledge and verify purchases on a backend (Play Developer API `purchases.products.acknowledge`), see ROADMAP item 14. |
+| ✅ S-14 | Low | `sun-chaser.vercel.app` responses | No `Content-Security-Policy`, `X-Frame-Options`/`frame-ancestors`, `X-Content-Type-Options`, `Referrer-Policy` or `Permissions-Policy` (HSTS was present). No XSS sink was found, so this is defense in depth. | Done: `vercel.json` sets them. `connect-src` lists the APIs (Open-Meteo, BigDataCloud and its redirect host `api-bdc.io`, AWS terrain tiles, Sentry ingest); `media-src https:` for the radio streams. Checked in a browser with the production build: no CSP violation on start, weather, place name, terrain, place search, feedback form, share and radio. |
+| ✅ S-15 | Low | `src/utils/sentryScrub.ts` | Terrain tile URLs (`…/terrarium/<z>/<x>/<y>.png`) went to Sentry in fetch breadcrumbs unfiltered. A zoom-12 tile gives the user's area to a few km, against the "no coordinates" rule of ROADMAP item 21. | Done: the scrub filters the tile path; test in `tests/utils.sentryScrub.test.ts`. |
+| 🟡 S-16 | Low | Sentry project `ainabler/sun-chaser` | The DSN is public by design (it is in the bundle), so anyone can send events and feedback to the project and use up the quota. | Allowed Domains = `sun-chaser.vercel.app` (set in the Sentry UI; the MCP and the org token cannot change it). Optional: a rate limit on the key and "Prevent Storing of IP Addresses". |
+| ⬜ S-17 | Low | `supabase/functions/*/index.ts:1-2`, `customer-portal/index.ts:82` | The functions import Stripe and supabase-js from `esm.sh` (third-party CDN, no lockfile or integrity check). `customer-portal` logs the portal session URL, which opens the customer's billing portal for anyone who has it. The functions are not live. | Use `npm:` specifiers with a `deno.lock`; log only the session ID. |
+| 🟡 S-18 | Low | `~/sun-chaser-android/android.keystore` (outside git) | The app signing keystore had mode 644, and the home folder is readable by the `staff` group, so other local accounts could copy it. The password file is 600. | `chmod 600 ~/sun-chaser-android/android.keystore` on the build machine. Keep an offline backup and use Play App Signing, so this key is only the upload key. |
+| ✅ S-19 | Low | `vite.config.ts` `server.host` | The dev server listened on all interfaces (`"::"`), so the sources were reachable from the same Wi-Fi while `npm run dev` ran. | Done: `localhost`; `npm run dev -- --host` for phone tests. |
 
 ### 4.2 Correctness
 
@@ -125,6 +139,7 @@ Re-verification, 2026-09-28 (`a9882c4`):
 | ✅ B-6 | Low | `supabase/functions/*` | Deno functions use `std@0.190.0` `serve` (deprecated) and are linted by the browser ESLint config (3 lint errors). No tests. | Use `Deno.serve`; exclude `supabase/` from the Vite ESLint config or give it a Deno config. |
 | ✅ B-7 | Low | `tests/` | jsdom lacks `HTMLMediaElement.play/pause` → stack traces in test output. `test-cases.md` checklist is all unchecked and stale. | Stub `play`/`pause` in `tests/setupTests.ts`; delete or update `test-cases.md`. |
 | ✅ B-8 | Low | `src/components/ui/button.tsx:56` | `npm run lint` shows 1 warning (`react-refresh/only-export-components`) for the shadcn `buttonVariants` export. The file is generated and must not be edited by hand. | Turn the rule off for `src/components/ui/**` in `eslint.config.js`, so the lint output stays clean. |
+| ⬜ B-9 | Low | `.github/workflows/ci.yml` | Actions are pinned by tag (`@v4`), not by commit SHA, and the workflow has no `permissions:` block. The repo default token is read-only, so the risk is low. | Pin `actions/checkout` and `actions/setup-node` to SHAs; add `permissions: contents: read`. |
 
 ### 4.5 Dependencies and dead code
 
@@ -135,6 +150,7 @@ Re-verification, 2026-09-28 (`a9882c4`):
 | ✅ D-3 | Low | `src/components/ui/` | ~48 shadcn components, ~14 used. Tree-shaking keeps the bundle clean, but they add maintenance and lint noise. | Delete unused files; re-add with `npx shadcn add` when needed. |
 | ✅ D-4 | Low | `src/App.tsx:14-15`, `src/hooks/use-toast.ts`, `src/components/ui/use-toast.ts` | Two toast systems mounted (`Toaster` + `Sonner`); Sonner is never called. Toast is imported from two different paths (`@/hooks/use-toast` and `@/components/ui/use-toast`). | Keep one system and one import path. |
 | ✅ D-5 | Low | `supabase/functions/*` | Stripe functions have no caller in `src/` and `/success`, `/pricing` routes do not exist. The "Premium: line-of-sight terrain analysis" product is not implemented. | Finish the feature on a branch, or delete the functions from `main`. |
+| ⬜ D-6 | Low | `package-lock.json` | `npm audit`: 7 high, all the same `braces` stack-exhaustion DoS through `tailwindcss` 3 (`chokidar`, `micromatch`, `fast-glob`). Build time only; not in the shipped bundle. | Upgrade to Tailwind 4 (major), or accept until then. |
 
 ### 4.6 Accessibility and UX
 

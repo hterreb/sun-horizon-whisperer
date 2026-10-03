@@ -8,10 +8,13 @@
 // value logged inside a plain message (e.g. "... (latitude=47.65...") did not match
 // before and leaked. Filtering too much is acceptable; filtering too little is not.
 const LOCATION_PARAM = /\b((?:latitude|longitude|lat|lon|name)=)[^&#\s"']*/gi;
+// Terrain tile URLs (line of sight, ROADMAP item 13) carry the location in the path:
+// the z/x/y of a zoom-10/12 tile gives the user's area to a few km (AUDIT S-15).
+const TERRAIN_TILE = /(\/terrarium\/)\d+\/\d+\/\d+/g;
 const MAX_DEPTH = 10; // ponytail: Sentry payloads are shallow; deeper values pass through unscrubbed
 
 export const scrubLocationString = (value: string): string =>
-  value.replace(LOCATION_PARAM, '$1[Filtered]');
+  value.replace(LOCATION_PARAM, '$1[Filtered]').replace(TERRAIN_TILE, '$1[Filtered]');
 
 // Returns a scrubbed deep copy; strings anywhere in objects/arrays are filtered.
 export const scrubLocation = <T>(value: T, depth = 0): T => {
