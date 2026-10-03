@@ -1,5 +1,6 @@
-import Stripe from "https://esm.sh/stripe@14.21.0";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+// npm: specifiers with exact versions, not a third-party CDN (AUDIT S-17).
+import Stripe from "npm:stripe@14.21.0";
+import { createClient } from "npm:@supabase/supabase-js@2.45.0";
 
 const SITE_URL = Deno.env.get("SITE_URL");
 const corsHeaders = {
@@ -67,19 +68,24 @@ Deno.serve(async (req) => {
     const user = userData.user;
     logStep("User authenticated", { userId: user.id });
 
-    const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
-    if (customers.data.length === 0) {
+    // Fetch API instead of the Node http package (Supabase Edge runtime).
+    const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16", httpClient: Stripe.createFetchHttpClient() });
+    // The Stripe customer belongs to the user ID, never to the e-mail (AUDIT S-12).
+    const { data: subscriber, error: readError } = await supabaseClient
+      .from("subscribers").select("stripe_customer_id").eq("user_id", user.id).maybeSingle();
+    if (readError) throw new Error(`Failed to read subscriber: ${readError.message}`);
+    const customerId: string | null = subscriber?.stripe_customer_id ?? null;
+    if (!customerId) {
       throw new Error("No Stripe customer found for this user");
     }
-    const customerId = customers.data[0].id;
     logStep("Found Stripe customer", { customerId });
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: customerId,
       return_url: `${SITE_URL}/`,
     });
-    logStep("Customer portal session created", { sessionId: portalSession.id, url: portalSession.url });
+    // Not the URL: it opens the billing portal for anyone who has it (AUDIT S-17).
+    logStep("Customer portal session created", { sessionId: portalSession.id });
 
     return new Response(JSON.stringify({ url: portalSession.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

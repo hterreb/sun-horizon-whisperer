@@ -1,5 +1,6 @@
-import Stripe from "https://esm.sh/stripe@14.21.0";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+// npm: specifiers with exact versions, not a third-party CDN (AUDIT S-17).
+import Stripe from "npm:stripe@14.21.0";
+import { createClient } from "npm:@supabase/supabase-js@2.45.0";
 
 const SITE_URL = Deno.env.get("SITE_URL");
 const corsHeaders = {
@@ -30,9 +31,11 @@ Deno.serve(async (req) => {
     });
   }
 
+  // Service role: reads and writes the user's `subscribers` row (RLS allows clients only to read).
   const supabaseClient = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    { auth: { persistSession: false } }
   );
 
   try {
@@ -54,19 +57,35 @@ Deno.serve(async (req) => {
       });
     }
 
-    const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
-    let customerId;
+    // Fetch API instead of the Node http package (Supabase Edge runtime).
+    const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16", httpClient: Stripe.createFetchHttpClient() });
+    // The Stripe customer belongs to the user ID, never to the e-mail (AUDIT S-12): a second
+    // account with the same (unverified) e-mail must not reach another user's customer.
+    const { data: subscriber, error: readError } = await supabaseClient
+      .from("subscribers").select("stripe_customer_id").eq("user_id", user.id).maybeSingle();
+    if (readError) throw new Error(`Failed to read subscriber: ${readError.message}`);
+    let customerId: string | null = subscriber?.stripe_customer_id ?? null;
     let hasHadSubscription = false;
-    if (customers.data.length > 0) {
-      customerId = customers.data[0].id;
+    if (customerId) {
       const existingSubscriptions = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 1 });
       hasHadSubscription = existingSubscriptions.data.length > 0;
+    } else {
+      const customer = await stripe.customers.create(
+        { email: user.email, metadata: { user_id: user.id } },
+        { idempotencyKey: `customer-${user.id}` } // two parallel checkouts create one customer
+      );
+      customerId = customer.id;
+      const { error: upsertError } = await supabaseClient.from("subscribers").upsert({
+        email: user.email,
+        user_id: user.id,
+        stripe_customer_id: customerId,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "user_id" });
+      if (upsertError) throw new Error(`Failed to upsert subscriber: ${upsertError.message}`);
     }
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
-      customer_email: customerId ? undefined : user.email,
       line_items: [
         {
           price_data: {
