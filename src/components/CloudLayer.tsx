@@ -11,6 +11,8 @@ import {
 } from './sceneIcons';
 import { type TimeOfDay } from '../utils/sunUtils';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
+import { useScenePlaybackRate } from '@/hooks/useScenePlaybackRate';
+import { getSpawnGapFactor, type PlayDirection } from '@/utils/timeTravel';
 import { getPrecipitationSlantPx } from '../utils/cloudLayoutUtils';
 import { type CloudLayers } from '../utils/skyCloudUtils';
 import {
@@ -62,6 +64,8 @@ interface CloudLayerProps {
   // night geese can cross it; with its radius (px) and brightness (0-1) for the clouds'
   // silver lining (item 76).
   moon?: { x: number; y: number; r?: number; light?: number } | null;
+  // Time-travel play (ROADMAP item 83): the scene moves 8x faster, backwards in rewind.
+  playDirection?: PlayDirection;
   // The sun in % of the width and height, with its altitude (°), for the clouds' light
   // (item 84, C2); the sky gradient for their tint and the colour of their shadows.
   sun?: { x: number; y: number; altitude: number } | null;
@@ -336,6 +340,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   isFullscreen = false,
   moonlight = null,
   moon = null,
+  playDirection = 0,
   sun = null,
   skyGradient = null,
   cloudEgg = false,
@@ -355,6 +360,10 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     lastSpawnTimeRef.current = { birds: now, fish: now, ships: now - BOAT_GAP_MIN_MS + 5000, leaves: now };
   }, []);
   const prefersReducedMotion = usePrefersReducedMotion();
+  const sceneRef = useRef<HTMLDivElement>(null);
+  useScenePlaybackRate(sceneRef, playDirection);
+  // During play the spawn gaps shrink by the play factor (item 83), so the scene does not empty.
+  const gapFactor = getSpawnGapFactor(playDirection);
 
   // Wind/temperature-driven scene decisions (ROADMAP item 10): strong wind slows birds
   // and adds a few leaves. tempC/sunAltitude aren't known here and don't affect either
@@ -449,7 +458,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       const currentTime = Date.now();
 
       if (shouldShowBirds) {
-        if (currentTime - lastSpawnTimeRef.current.birds > BIRD_GAP_MIN_MS + Math.random() * BIRD_GAP_RANGE_MS) {
+        if (currentTime - lastSpawnTimeRef.current.birds > (BIRD_GAP_MIN_MS + Math.random() * BIRD_GAP_RANGE_MS) * gapFactor) {
           // 70 %, a third more in the hour before sunset, when the gulls fly to their roost (C2).
           if (Math.random() < (timeOfDay === 'evening' ? 0.93 : 0.7)) {
             const kind = isSunDown ? 'bat' : pickBird(Math.random(), month, latitude, timeOfDay === 'evening');
@@ -462,7 +471,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         }
       } else if (shouldShowMoonGeese) {
         // The twilight bats fly on. One V at a time, about every four minutes.
-        if (currentTime - lastSpawnTimeRef.current.birds > MOON_GEESE_GAP_MS) {
+        if (currentTime - lastSpawnTimeRef.current.birds > MOON_GEESE_GAP_MS * gapFactor) {
           if (Math.random() < 0.12) {
             const next = createBird('geese', window.innerWidth, effects.birdSpeedFactor, Math.random, moonY);
             setBirds(prev => (prev.some(b => b.kind === 'geese') ? prev : [...prev, next]));
@@ -476,7 +485,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       // At the switch between day and night fish, the fish on screen swim on (item 65).
       if (shouldShowFish || shouldShowNightFish) {
         // A quiet night (NR1): a check every 15-25 s instead of every 5-8 s.
-        const gapMs = shouldShowNightFish ? 15000 + Math.random() * 10000 : 5000 + Math.random() * 3000;
+        const gapMs = (shouldShowNightFish ? 15000 + Math.random() * 10000 : 5000 + Math.random() * 3000) * gapFactor;
         if (currentTime - lastSpawnTimeRef.current.fish > gapMs) {
           if (Math.random() < (wetForFish ? 0.35 : 0.7)) { // 70% chance, half of it in rain (E2)
             let newFish: FishEntity | null = null;
@@ -507,7 +516,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       }
 
       if (shouldShowShips) {
-        if (currentTime - lastSpawnTimeRef.current.ships > BOAT_GAP_MIN_MS + Math.random() * BOAT_GAP_RANGE_MS) {
+        if (currentTime - lastSpawnTimeRef.current.ships > (BOAT_GAP_MIN_MS + Math.random() * BOAT_GAP_RANGE_MS) * gapFactor) {
           if (Math.random() < 0.9) { // 90% chance to spawn
             const startX = -8;
             const endX = 108;
@@ -538,7 +547,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       }
 
       if (effects.showLeaves) {
-        if (currentTime - lastSpawnTimeRef.current.leaves > 4000 + Math.random() * 4000) {
+        if (currentTime - lastSpawnTimeRef.current.leaves > (4000 + Math.random() * 4000) * gapFactor) {
           if (Math.random() < 0.6) { // 60% chance to spawn
             const startX = -5;
             const endX = 105;
@@ -558,12 +567,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       }
     };
 
-    const intervalId = setInterval(spawnTick, 500);
+    const intervalId = setInterval(spawnTick, 500 * gapFactor);
 
     return () => {
       clearInterval(intervalId);
     };
-  }, [weatherType, windSpeedKmh, timeOfDay, prefersReducedMotion, isSunDown, isFullscreen, effects.showLeaves, effects.birdSpeedFactor, moonUp, month, latitude, moonY]);
+  }, [weatherType, windSpeedKmh, timeOfDay, prefersReducedMotion, isSunDown, isFullscreen, effects.showLeaves, effects.birdSpeedFactor, moonUp, month, latitude, moonY, gapFactor]);
 
   // One fish, or a pair (P6): the companion swims `lag` s behind and leaves last, so its
   // onAnimationEnd removes the pair. Night fish (item 65) are in the moon tone or carry lights.
@@ -641,14 +650,16 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     );
     return fishItem.companion ? (
       <React.Fragment key={fishItem.id}>
-        {swimmer('lead', 0, 0)}
-        {swimmer('companion', fishItem.companion.lag, fishItem.companion.dy, remove)}
+        {/* In rewind the lead leaves last (item 83). */}
+        {swimmer('lead', 0, 0, playDirection < 0 ? remove : undefined)}
+        {swimmer('companion', fishItem.companion.lag, fishItem.companion.dy, playDirection < 0 ? undefined : remove)}
       </React.Fragment>
     ) : swimmer(String(fishItem.id), 0, 0, remove);
   };
 
   return (
     <div
+      ref={sceneRef}
       className="absolute inset-0 overflow-hidden pointer-events-none"
       style={{ ['--slant' as string]: `${precipSlantPx}px` }}
     >
@@ -680,10 +691,11 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
 
       {/* Hail: small pellets falling straight/slanted with a tiny settle (shrink +
           fade) at the ground - the calm-motion rule (ROADMAP item 15) rules out an
-          actual bounce. */}
+          actual bounce. Snow and hail keep live speed during play, as the rain (item 83). */}
       {hailPellets.map((pellet) => (
         <div
           key={pellet.id}
+          data-live-speed
           className="absolute rounded-full bg-slate-200 opacity-80"
           style={{
             left: `${pellet.x}%`,
@@ -700,6 +712,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       {snowflakes.map((flake) => (
         <div
           key={flake.id}
+          data-live-speed
           className="absolute text-white opacity-80"
           style={{
             left: `${flake.x}%`,

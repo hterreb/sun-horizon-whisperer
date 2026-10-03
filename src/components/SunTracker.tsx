@@ -857,6 +857,7 @@ const SunTracker: React.FC = () => {
             sunglasses={sunglassesOn}
             onSunTap={handleSunTap}
             calendarEvent={calendarEvent}
+            playDirection={playDirection}
             sunsetCountdown={countdownSeconds === null ? null : { seconds: countdownSeconds, lineOfSight: !!countdownTarget?.lineOfSight }}
           />
           <InfoPanel

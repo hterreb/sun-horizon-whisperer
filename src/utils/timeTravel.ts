@@ -6,6 +6,21 @@ export const PLAY_SPEED = 600;
 // Clock tick during play, so the motion is smooth.
 export const PLAY_TICK_MS = 100;
 
+// Play direction: -1 rewind, 0 live or paused, 1 fast forward.
+export type PlayDirection = -1 | 0 | 1;
+
+// The scene during play (ROADMAP item 83, SP1): boats, fish, birds, leaves and clouds move
+// 8x faster, backwards in rewind. A near sailboat then crosses a phone in about 12 s.
+export const SCENE_PLAY_FACTOR = 8;
+
+// The playbackRate of the scene's animations: -8 in rewind, 1 live or paused, 8 forward.
+export const getScenePlaybackRate = (direction: PlayDirection): number =>
+  direction === 0 ? 1 : direction * SCENE_PLAY_FACTOR;
+
+// The factor on the scene's spawn gaps: 1/8 during play, so the scene does not empty.
+export const getSpawnGapFactor = (direction: PlayDirection): number =>
+  direction === 0 ? 1 : 1 / SCENE_PLAY_FACTOR;
+
 // Start of today one year back, to end of today one year ahead (local time).
 export const getTimeTravelRange = (now: Date): { min: Date; max: Date } => {
   const min = new Date(now);
