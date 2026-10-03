@@ -49,7 +49,7 @@ describe('TopLeftButtons (ROADMAP items 22 and 23)', () => {
   // clicked fullscreen button keeps focus), so the column never faded out.
   it('comes back for keyboard focus only, not for the focus a click leaves behind', () => {
     const { container } = renderRow(true, false);
-    expect(container.firstChild).toHaveClass('has-[:focus-visible]:opacity-100');
+    expect(container.firstChild).toHaveClass('has-focus-visible:opacity-100');
     expect(container.firstChild).not.toHaveClass('focus-within:opacity-100');
   });
 

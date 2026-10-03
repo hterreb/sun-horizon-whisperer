@@ -71,7 +71,7 @@ const PlaceSearch: React.FC<PlaceSearchProps> = ({ onSelect, autoFocus }) => {
         value={placeQuery}
         onChange={(e) => setPlaceQuery(e.target.value)}
         placeholder={t('search.placeholder')}
-        className={`bg-black bg-opacity-30 rounded px-2 py-1 text-white ${FOCUS_RING}`}
+        className={`bg-black/30 rounded px-2 py-1 text-white ${FOCUS_RING}`}
         role="combobox"
         aria-expanded={placeResults.length > 0}
         aria-controls="manual-location-search-results"
@@ -101,7 +101,7 @@ const PlaceSearch: React.FC<PlaceSearchProps> = ({ onSelect, autoFocus }) => {
                 role="option"
                 aria-selected={false}
                 onClick={() => onSelect(result.latitude, result.longitude, formatGeocodeResultLabel(result))}
-                className={`w-full text-left px-2 py-1 rounded bg-white bg-opacity-5 hover:bg-opacity-20 transition-colors ${FOCUS_RING}`}
+                className={`w-full text-left px-2 py-1 rounded bg-white/5 hover:bg-white/20 transition-colors ${FOCUS_RING}`}
               >
                 {formatGeocodeResultLabel(result)}
               </button>

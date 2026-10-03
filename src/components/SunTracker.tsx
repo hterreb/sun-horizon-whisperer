@@ -886,7 +886,7 @@ const SunTracker: React.FC = () => {
           type="button"
           data-share-hide
           onClick={handleBackToNow}
-          className={`fixed left-1/2 z-20 -translate-x-1/2 ${GLASS_SURFACE} rounded-full px-4 py-2 text-caption font-semibold text-white hover:bg-[hsl(var(--panel-background)/0.65)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70`}
+          className={`fixed left-1/2 z-20 -translate-x-1/2 ${GLASS_SURFACE} rounded-full px-4 py-2 text-caption font-semibold text-white hover:bg-[hsl(var(--panel-background)/0.65)] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70`}
           style={{ bottom: `calc(${isMobile ? '7.5rem' : '4.5rem'} + env(safe-area-inset-bottom))` }}
         >
           {t('time.backToNow')}

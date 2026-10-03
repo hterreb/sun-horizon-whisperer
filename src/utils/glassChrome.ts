@@ -3,7 +3,7 @@
 // floating icon buttons (FullscreenButton, CompassToggle), the MusicPlayer bar
 // and the PWA install prompt all read as one visual system: a translucent
 // dark panel (rgba(10,12,20,.45)) with a thin light border and a soft shadow,
-// built from the item-7 `--panel-*` tokens (tailwind.config.ts / index.css).
+// built from the item-7 `--panel-*` tokens (index.css).
 
 // The dark glass panel background + border + shadow, with no radius or layout
 // baked in (callers add their own rounding, e.g. `rounded-panel` or `rounded-full`).
