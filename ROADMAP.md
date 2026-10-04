@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-04. Done: items 1–15, 17–44, 47–86 (item 14: the Play-app code, with `PREMIUM_ENFORCED` off until item 16), item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: item 16 (with it: turn on `PREMIUM_ENFORCED`, and check with a licence tester that a purchase is still there after 3 days, see item 14 "Acknowledge"; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
+Status: last updated 2026-10-04. Done: items 1–15, 17–44, 47–87 (item 14: the Play-app code, with `PREMIUM_ENFORCED` off until item 16), item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: item 16 (with it: turn on `PREMIUM_ENFORCED`, and check with a licence tester that a purchase is still there after 3 days, see item 14 "Acknowledge"; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
 
 ## Verification (2026-09-28)
 
@@ -1418,8 +1418,19 @@ Six open Sentry feedback reports from 2026-10-02 20:48 to 2026-10-03 18:58, all 
   - A pure `getWeatherAt(data, at)` (`weatherUtils.ts`) returns the forecast hour nearest `at`: temperature, weather type and condition, cloud cover and layers, wind, rain (mm in the hour = mm/h). Outside the forecast it returns the live weather unchanged.
   - `SunTracker`: in a preview, `weatherData` and (in Real mode) `weatherType` come from `getWeatherAt`, memoized on the hour, so play changes the weather once per forecast hour (every 6 s at 10 min/s), not per tick. Manual weather stays manual. No new request in a preview.
   - InfoPanel: the weather heading reads "Forecast" while it shows a forecast hour (new key `weather.forecast` in 5 languages).
-- **Not changed:** the sunset score stays today's and tomorrow's. The cloud layout is new when the layers change, so in play the clouds change at each forecast hour with no cross-fade.
+- **Not changed:** the sunset score stays today's and tomorrow's. The cloud layout is new when the layers change, so in play the clouds change at each forecast hour (cross-fade: item 87).
 - **Checked:** 4 new tests (945 in all); lint and typecheck pass. In headless Chromium at 390×844, Ravensburg, real Open-Meteo forecast, 2026-10-04 02:26: play forward for 60 s showed "Mainly clear" → "Fog" (05:26–10:26) → "Mainly clear", with the temperature following the hours; a jump to 2026-10-08 10:00 showed rain; "Back to now" returned to "Current Weather". No weather request during the preview.
+
+### 87. Clouds cross-fade to a new layout — S — **✅ Done**
+
+- **Feedback (2026-10-04):** "add the fading" (after item 86: in play the clouds jump to a new layout at each forecast hour).
+- **Now:** `SkyClouds` keys its clouds, shadows and veil on `layoutKey` (the day, the weather, the layer cover, the screen, the wind side). A new key replaces the old layout at once.
+- **Spec:**
+  - The old layout stays mounted for `LAYOUT_FADE_MS` (3 s) and fades to 0; its glides go on. The new layout fades in from 0 (`@starting-style`, Tailwind `starting:opacity-0`). Clouds, sea shadows and the overcast veil fade together.
+  - CSS transitions, so item 83's play rate does not speed the fade up or run it back (a forecast hour lasts 6 s in play). Reduced motion: no fade.
+  - The fading layout keeps the glide progress of its last tick, so its light and silver lining do not jump.
+- **Not changed:** the sky gradient (the overcast mix of item 50) still changes at once; a gradient cannot transition in CSS.
+- **Checked:** 2 new tests (947 in all); lint, typecheck and build pass. In headless Chromium at 390×844, Ravensburg, real forecast, play from 2026-10-04 04:15: at the switch to fog, the old layout went 1 → 0 and the fog layout 0 → 1 in about 3 s, also at the next hour (fog to fog with new layers). No new console errors.
 
 ---
 
