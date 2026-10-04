@@ -1,6 +1,6 @@
-// npm: specifiers with exact versions, not a third-party CDN (AUDIT S-17).
-import Stripe from "npm:stripe@14.21.0";
-import { createClient } from "npm:@supabase/supabase-js@2.45.0";
+// Exact npm versions in deno.json, pinned with deno.lock (AUDIT S-17).
+import Stripe from "stripe";
+import { createClient } from "@supabase/supabase-js";
 
 const SITE_URL = Deno.env.get("SITE_URL");
 const corsHeaders = {

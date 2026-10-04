@@ -413,7 +413,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   const boatTone = getBoatTone(timeOfDay);
   const seaWindKmh = getSeaWindKmh(windSpeedKmh, weatherType); // the boats' reflection (item 79, X2)
   // The line leaves keep the old ship tone.
-  const lineInk = timeOfDay === 'night' ? 'text-gray-300 text-opacity-60' : 'text-gray-600 text-opacity-80';
+  const lineInk = timeOfDay === 'night' ? 'text-gray-300/60' : 'text-gray-600/80';
 
   // The pool of moonlight (ROADMAP item 65, NF1/NR3): moonlit fish show only within ±9 %
   // of the width from the moon, fading out to ±20 %, as bright as the pool is strong.

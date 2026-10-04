@@ -76,13 +76,13 @@ const WeatherEffects: React.FC<WeatherEffectsProps> = ({
   const horizonY = containerHeight * 0.65;
 
   return (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden z-[8]">
+    <div className="absolute inset-0 pointer-events-none overflow-hidden z-8">
       {/* Fog: soft bands low over the horizon, translucent so the sun/moon glow
           through rather than being hidden behind them. */}
       {effects.showFog && (
         <div
           data-testid="fog-band"
-          className="absolute left-0 right-0 transition-opacity duration-[3000ms]"
+          className="absolute left-0 right-0 transition-opacity duration-3000"
           style={{
             // Band straddles the horizon: densest just above it, fading up into the sky
             // and a little down over the water.

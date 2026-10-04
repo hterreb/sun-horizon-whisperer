@@ -60,7 +60,7 @@ const TemperatureIceberg: React.FC<TemperatureIcebergProps> = ({ temperature, is
 
   return (
     <div 
-      className="absolute pointer-events-none z-[6] transition-all duration-1000"
+      className="absolute pointer-events-none z-6 transition-all duration-1000"
       style={{
         left: `${position.x}%`,
         top: `${position.y}%`,

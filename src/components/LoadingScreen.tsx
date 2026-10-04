@@ -9,7 +9,7 @@ import { usePremiumGate } from '@/hooks/usePremium';
 
 // A location that arrives sooner than this skips the rise: SunTracker fades the scene
 // in instead, and the rise animation waits this long before it starts
-// (tailwind.config.ts `mark-rise`).
+// (`--animate-mark-rise` in index.css).
 export const FAST_START_MS = 400;
 // After this long with no location, the prompt is probably still open.
 const WAITING_MS = 3000;

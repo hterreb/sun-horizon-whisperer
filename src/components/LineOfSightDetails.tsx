@@ -66,7 +66,7 @@ const LineOfSightDetails: React.FC<LineOfSightDetailsProps> = ({
         step="any"
         value={eyeHeightMeters}
         onChange={(e) => onEyeHeightChange(Number(e.target.value))}
-        className={`bg-black bg-opacity-30 rounded px-2 py-1 text-white w-24 tabular-nums ${FOCUS_RING}`}
+        className={`bg-black/30 rounded px-2 py-1 text-white w-24 tabular-nums ${FOCUS_RING}`}
       />
     </div>
 

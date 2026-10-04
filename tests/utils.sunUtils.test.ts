@@ -279,7 +279,7 @@ describe('sunUtils', () => {
       expect(shifted).toMatch(/^linear-gradient\(to bottom, #[0-9a-fA-F]{6} 0%, #[0-9a-fA-F]{6} 62%, #[0-9a-fA-F]{6} 100%\)$/);
     });
 
-    it("'midday' matches the --scene-sky-day-* bucket tokens (index.css/tailwind.config.ts)", () => {
+    it("'midday' matches the --scene-sky-day-* bucket tokens (index.css)", () => {
       // --scene-sky-day-1/2/3: brand-sky #0EA5E9, brand-cyan #33C3F0, brand-peach #FEC6A1.
       expect(getBackgroundGradient('midday')).toBe(
         'linear-gradient(to bottom, #0EA5E9 0%, #33C3F0 62%, #FEC6A1 100%)'

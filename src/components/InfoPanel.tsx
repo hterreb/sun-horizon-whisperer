@@ -40,13 +40,13 @@ import { useLanguage } from '@/hooks/useLanguage';
 // glassChrome.ts for the one style helper shared more broadly, and its test.
 export const ROW = 'flex justify-between items-center gap-2 border-t border-[hsl(var(--panel-border)/0.12)] pt-1';
 const SECTION_HEADING = 'text-title font-bold flex items-center';
-export const ICON_TOGGLE = 'p-1.5 rounded-full hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70';
-export const FOCUS_RING = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70';
+export const ICON_TOGGLE = 'p-1.5 rounded-full hover:bg-white/10 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70';
+export const FOCUS_RING = 'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70';
 
 // A compact variant of ICON_TOGGLE for the inline "line of sight" buttons (ROADMAP
 // item 30), which sit inside an already-tight row and must not push it past one
 // line at 360px.
-const INLINE_ICON_TOGGLE = 'p-0.5 rounded-full hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 flex-shrink-0';
+const INLINE_ICON_TOGGLE = 'p-0.5 rounded-full hover:bg-white/10 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 shrink-0';
 
 // Line-of-sight terrain rows (ROADMAP items 13 & 30): formats the terrain-adjusted
 // rise/set time against the astronomical one, as a short value, e.g. "18:42 (-23 min)"
@@ -497,11 +497,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
       )}
 
       {/* Header with toggle button */}
-      <div className="p-4 pb-2 flex items-start justify-between flex-shrink-0">
+      <div className="p-4 pb-2 flex items-start justify-between shrink-0">
         <div className="flex-1 min-w-0">
           <h1 className="text-display leading-none font-bold tracking-tight">{t(getTimeOfDayLabel(timeOfDay))}</h1>
           <div className="flex items-start text-body opacity-80 mt-1">
-            <MapPin size={14} className="mr-1 mt-0.5 flex-shrink-0" />
+            <MapPin size={14} className="mr-1 mt-0.5 shrink-0" />
             <div className="flex flex-col min-w-0">
               {loadingLocation ? (
                 <span>{t('location.loading')}</span>
@@ -534,7 +534,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className={`ml-2 ${ICON_TOGGLE} flex-shrink-0`}
+          className={`ml-2 ${ICON_TOGGLE} shrink-0`}
           aria-label={isCollapsed ? t('panel.expand') : t('panel.collapse')}
         >
           {isCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
@@ -542,7 +542,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
       </div>
 
       {!isCollapsed && isLocationFormOpen && (
-        <form onSubmit={handleSubmitLocation} noValidate className="mx-4 mb-3 p-2 space-y-2 text-caption bg-white bg-opacity-10 rounded">
+        <form onSubmit={handleSubmitLocation} noValidate className="mx-4 mb-3 p-2 space-y-2 text-caption bg-white/10 rounded">
           <PlaceSearch onSelect={handleSelectPlace} />
           <div className="flex flex-col gap-1">
             <label htmlFor="manual-location-lat" className="opacity-80">{t('location.latitude')}</label>
@@ -555,7 +555,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               max={90}
               value={latInput}
               onChange={(e) => setLatInput(e.target.value)}
-              className={`bg-black bg-opacity-30 rounded px-2 py-1 text-white tabular-nums ${FOCUS_RING}`}
+              className={`bg-black/30 rounded px-2 py-1 text-white tabular-nums ${FOCUS_RING}`}
             />
           </div>
           <div className="flex flex-col gap-1">
@@ -568,7 +568,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               max={180}
               value={lonInput}
               onChange={(e) => setLonInput(e.target.value)}
-              className={`bg-black bg-opacity-30 rounded px-2 py-1 text-white tabular-nums ${FOCUS_RING}`}
+              className={`bg-black/30 rounded px-2 py-1 text-white tabular-nums ${FOCUS_RING}`}
             />
           </div>
           {locationError && (
@@ -593,7 +593,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             >
           {/* Current Weather Display */}
           {weatherData && (
-            <div className="mb-4 pt-2 border-t border-white border-opacity-20">
+            <div className="mb-4 pt-2 border-t border-white/20">
               <div className="flex items-center justify-between mb-2">
                 <h3 className={SECTION_HEADING}>
                   <Thermometer size={16} className="mr-2" />
@@ -614,7 +614,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   <span className="opacity-80 text-body">{t('weather.temperature')}</span>
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-body tabular-nums">{formatTemperature(weatherData.temperature, temperatureUnit)}</span>
-                    <div className="flex bg-white bg-opacity-10 rounded-full p-1" role="group" aria-label={t('weather.temperatureUnit')}>
+                    <div className="flex bg-white/10 rounded-full p-1" role="group" aria-label={t('weather.temperatureUnit')}>
                       {(['C', 'F'] as const).map((unit) => (
                         <button
                           key={unit}
@@ -622,7 +622,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                           aria-pressed={temperatureUnit === unit}
                           className={`text-caption px-2 py-1 rounded-full transition-colors ${FOCUS_RING} ${
                             temperatureUnit === unit
-                              ? 'bg-white bg-opacity-20 text-white'
+                              ? 'bg-white/20 text-white'
                               : 'text-white opacity-60'
                           }`}
                         >
@@ -646,15 +646,15 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           )}
 
           {/* Weather Mode Toggle */}
-          <div className="mb-4 pt-2 border-t border-white border-opacity-20">
+          <div className="mb-4 pt-2 border-t border-white/20">
             <div className="flex items-center justify-between mb-2">
               <h3 className={SECTION_HEADING}>{t('weather.mode')}</h3>
-              <div className="flex bg-white bg-opacity-10 rounded-full p-1">
+              <div className="flex bg-white/10 rounded-full p-1">
                 <button
                   onClick={() => onWeatherModeToggle(true)}
                   className={`text-caption px-2 py-1 rounded-full transition-colors ${FOCUS_RING} ${
                     useRealWeather
-                      ? 'bg-white bg-opacity-20 text-white'
+                      ? 'bg-white/20 text-white'
                       : 'text-white opacity-60'
                   }`}
                 >
@@ -664,7 +664,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   onClick={() => requirePremium(() => onWeatherModeToggle(false))}
                   className={`text-caption px-2 py-1 rounded-full transition-colors ${FOCUS_RING} ${
                     !useRealWeather
-                      ? 'bg-white bg-opacity-20 text-white'
+                      ? 'bg-white/20 text-white'
                       : 'text-white opacity-60'
                   }`}
                 >
@@ -676,7 +676,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
           {/* Manual Weather Selector - only show when not using real weather */}
           {!useRealWeather && (
-            <div className="mb-4 pt-2 border-t border-white border-opacity-20">
+            <div className="mb-4 pt-2 border-t border-white/20">
               <h3 className={`${SECTION_HEADING} mb-2`}>{t('weather.manualTitle')}</h3>
               <div className="grid grid-cols-3 gap-1">
                 {weatherOptions.map((option) => (
@@ -685,8 +685,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                     onClick={() => onWeatherChange(option.type)}
                     className={`flex items-center justify-center p-2 rounded-full text-caption transition-colors ${FOCUS_RING} ${
                       weatherType === option.type
-                        ? 'bg-white bg-opacity-20 text-white'
-                        : 'bg-white bg-opacity-5 text-white opacity-60 hover:opacity-80'
+                        ? 'bg-white/20 text-white'
+                        : 'bg-white/5 text-white opacity-60 hover:opacity-80'
                     }`}
                   >
                     <span className="mr-1">{option.icon}</span>
@@ -700,8 +700,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 aria-pressed={manualWindy}
                 className={`mt-1 w-full flex items-center justify-center p-2 rounded-full text-caption transition-colors ${FOCUS_RING} ${
                   manualWindy
-                    ? 'bg-white bg-opacity-20 text-white'
-                    : 'bg-white bg-opacity-5 text-white opacity-60 hover:opacity-80'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-white/5 text-white opacity-60 hover:opacity-80'
                 }`}
               >
                 <Wind size={16} className="mr-1" />
@@ -740,7 +740,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                       if (!Number.isNaN(target.getTime())) onTimeJump(target);
                     }}
                     onBlur={() => setTimePickerRange(null)}
-                    className={`bg-black bg-opacity-30 rounded px-1 text-caption text-white tabular-nums [color-scheme:dark] ${FOCUS_RING}`}
+                    className={`bg-black/30 rounded px-1 text-caption text-white tabular-nums scheme-dark ${FOCUS_RING}`}
                   />
                 ) : (
                   <button
@@ -768,7 +768,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
             <div className={ROW}>
               <div className="flex items-center min-w-0">
-                <Sunrise size={18} className="mr-2 flex-shrink-0" />
+                <Sunrise size={18} className="mr-2 shrink-0" />
                 <span className="text-body truncate">{t('sun.sunrise')}</span>
                 {(terrainStatus !== 'idle' || isLocked) && (
                   <button
@@ -856,7 +856,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             {weatherData?.sunsetScoreToday && !isLocked && (
               <div className="text-caption opacity-80 mt-1 space-y-0.5">
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex flex-shrink-0 items-center gap-1">{t('score.label')}<PremiumBadge /></span>
+                  <span className="inline-flex shrink-0 items-center gap-1">{t('score.label')}<PremiumBadge /></span>
                   <span className="inline-flex items-center rounded-full bg-brand-peach text-brand-night px-2 py-0.5 font-semibold tabular-nums">
                     {weatherData.sunsetScoreToday.score}/10
                   </span>
@@ -877,7 +877,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
           {/* Moon information - collapsible */}
           {moonPosition.visible && (
-            <div className="mt-6 pt-4 border-t border-white border-opacity-20">
+            <div className="mt-6 pt-4 border-t border-white/20">
               <div className="flex items-center justify-between mb-2">
                 <h3 className={SECTION_HEADING}>
                   <Moon size={16} className="mr-2" />
@@ -896,7 +896,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               </div>
 
               <div className={`transition-all duration-300 ease-in-out ${
-                isMoonCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[40rem] opacity-100'
+                isMoonCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-160 opacity-100'
               }`}>
                 <div className="space-y-1">
                   <div className={ROW}>
@@ -984,7 +984,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               (ROADMAP item 20). Moved below Moon Information and collapsed by
               default (ROADMAP item 24) - not part of the time-of-day auto-collapse
               effect, so it stays as the user left it. */}
-          <div className="mt-6 pt-4 border-t border-white border-opacity-20">
+          <div className="mt-6 pt-4 border-t border-white/20">
             <div className="flex items-center justify-between mb-2">
               <h3 className={SECTION_HEADING}>
                 {t('golden.title')}
@@ -1034,7 +1034,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           </div>
 
           {/* Upcoming twilight times - collapsible */}
-          <div className="mt-6 pt-4 border-t border-white border-opacity-20">
+          <div className="mt-6 pt-4 border-t border-white/20">
             <div className="flex items-center justify-between mb-2">
               <h3 className={SECTION_HEADING}>
                 {relevantTwilightTimes.type === 'dawn' ? t('twilight.dawnTitle') : t('twilight.duskTitle')}
@@ -1199,7 +1199,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           </div>
 
           {/* Sun position - collapsible */}
-          <div className="mt-6 pt-4 border-t border-white border-opacity-20">
+          <div className="mt-6 pt-4 border-t border-white/20">
             <div className="flex items-center justify-between mb-2">
               <h3 className={SECTION_HEADING}>{t('sunPosition.title')}</h3>
               <button
@@ -1231,9 +1231,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           </div>
 
           {/* Language (ROADMAP item 67): the same segmented style as the °C/°F toggle. */}
-          <div className="mt-6 pt-4 border-t border-white border-opacity-20 flex items-center justify-between gap-2">
+          <div className="mt-6 pt-4 border-t border-white/20 flex items-center justify-between gap-2">
             <span className="text-caption opacity-80">{t('language.label')}</span>
-            <div className="flex bg-white bg-opacity-10 rounded-full p-1" role="group" aria-label={t('language.label')}>
+            <div className="flex bg-white/10 rounded-full p-1" role="group" aria-label={t('language.label')}>
               {LANGUAGES.map((code) => (
                 <button
                   key={code}
@@ -1244,7 +1244,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   title={LANGUAGE_NAMES[code]}
                   className={`text-caption px-2 py-1 rounded-full uppercase transition-colors ${FOCUS_RING} ${
                     language === code
-                      ? 'bg-white bg-opacity-20 text-white'
+                      ? 'bg-white/20 text-white'
                       : 'text-white opacity-60'
                   }`}
                 >
@@ -1256,7 +1256,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
           {/* Anonymous feedback (ROADMAP item 21): only when Sentry is set up */}
           {isFeedbackAvailable() && (
-            <div className="mt-6 pt-4 border-t border-white border-opacity-20">
+            <div className="mt-6 pt-4 border-t border-white/20">
               <button
                 onClick={() => openFeedbackForm(t)}
                 className={`flex items-center gap-2 text-caption opacity-80 hover:opacity-100 transition-opacity rounded ${FOCUS_RING}`}
