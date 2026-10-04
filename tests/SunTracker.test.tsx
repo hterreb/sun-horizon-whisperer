@@ -37,6 +37,7 @@ describe('SunTracker', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     localStorage.clear();
+    sessionStorage.clear();
     // Offline by default: an unmocked fetch reached the real weather, geocode and terrain
     // servers, and a slow answer timed the test out in CI. Tests that need data set their own.
     global.fetch = vi.fn(() => Promise.reject(new Error('offline'))) as unknown as typeof fetch;
@@ -217,6 +218,43 @@ describe('SunTracker', () => {
       delete (document as { fullscreenElement?: Element | null }).fullscreenElement;
       vi.useRealTimers();
     }
+  });
+
+  describe('screen on (ROADMAP item 90)', () => {
+    const renderWithWakeLock = async (displayMode: string | null) => {
+      const request = vi.fn(async () => ({ addEventListener: vi.fn(), release: vi.fn(async () => {}) }));
+      vi.stubGlobal('navigator', {
+        geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 1, longitude: 2 } }) },
+        wakeLock: { request },
+      });
+      const matchMedia = vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
+        matches: query === displayMode,
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }));
+      try {
+        render(<SunTracker />);
+        await act(async () => {});
+      } finally {
+        matchMedia.mockRestore();
+      }
+      return request;
+    };
+
+    it('keeps the screen on in the installed app, where the Fullscreen API is not used', async () => {
+      const request = await renderWithWakeLock('(display-mode: fullscreen)');
+      expect(request).toHaveBeenCalledWith('screen');
+    });
+
+    it('does not keep the screen on in a browser tab outside fullscreen', async () => {
+      const request = await renderWithWakeLock(null);
+      expect(request).not.toHaveBeenCalled();
+    });
   });
 
   describe('manual location (A-4)', () => {
@@ -401,6 +439,34 @@ describe('SunTracker', () => {
       expect(container.lastElementChild).toHaveClass('animate-scene-fade');
       expect(container.lastElementChild).not.toHaveClass('animate-scene-iris');
       matchMedia.mockRestore();
+    });
+
+    it('after a fast return (last visible 2 min ago), fades the scene in instead of the circle (ROADMAP item 90)', () => {
+      sessionStorage.setItem('last-visible', String(Date.now() - 2 * 60 * 1000));
+      const geo = stubPendingGeolocation();
+      const { container } = render(<SunTracker />);
+
+      advance(1000);
+      geo.answer();
+      expect(container.lastElementChild).toHaveClass('animate-scene-fade');
+      expect(container.lastElementChild).not.toHaveClass('animate-scene-iris');
+    });
+
+    it('saves the time the app was last visible on visibilitychange and pagehide (ROADMAP item 90)', () => {
+      stubPendingGeolocation();
+      render(<SunTracker />);
+      expect(sessionStorage.getItem('last-visible')).toBeNull();
+
+      act(() => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      expect(sessionStorage.getItem('last-visible')).toBe(String(Date.now()));
+
+      advance(5000);
+      act(() => {
+        window.dispatchEvent(new Event('pagehide'));
+      });
+      expect(sessionStorage.getItem('last-visible')).toBe(String(Date.now()));
     });
   });
 

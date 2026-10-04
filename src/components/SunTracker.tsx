@@ -64,6 +64,8 @@ import { PLAY_SPEED, PLAY_TICK_MS, clampTimeOffset } from '@/utils/timeTravel';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
 import { DISCO_MS, KONAMI_SEQUENCE, SUNGLASSES_MS, advanceKonami, getEggOverride, registerSunTap, rollUfo } from '@/utils/hiddenEggs';
 import { isCloudEggDay, isCloudEggForced } from '@/utils/skyCloudUtils';
+import { isInstalledApp } from '@/utils/installedApp';
+import { getStartReveal, isFastReturn, loadLastVisible, saveLastVisible } from '@/utils/fastReturn';
 import DiscoSky from './DiscoSky';
 import Ufo from './Ufo';
 import { loadTemperatureUnit, saveTemperatureUnit, type TemperatureUnit } from '@/utils/temperatureUnit';
@@ -90,8 +92,8 @@ const clampEyeHeight = (value: number): number =>
 
 // The scene's side of the loading hand-off (ROADMAP item 39). While loading, the scene
 // is clipped to nothing so the loading screen underneath shows; it then opens through
-// a circle from the mark ('iris'), or fades in ('fade': reduced motion, or a location
-// known within FAST_START_MS).
+// a circle from the mark ('iris'), or fades in ('fade': reduced motion, a location
+// known within FAST_START_MS, or a fast return, item 90; see getStartReveal).
 type Reveal = 'loading' | 'iris' | 'fade' | 'done';
 const REVEAL_CLASS: Record<Reveal, string> = {
   loading: '[clip-path:circle(0_at_50%_36%)]',
@@ -184,12 +186,23 @@ const SunTracker: React.FC = () => {
   const prefersReducedMotion = usePrefersReducedMotion();
   const [reveal, setReveal] = useState<Reveal>(() => (location.loaded ? 'fade' : 'loading'));
   const [isSlowStart, setIsSlowStart] = useState(false);
+  // Fast return (ROADMAP item 90): read once, before this page saves a new time.
+  const [fastReturn] = useState(() => isFastReturn(loadLastVisible(), Date.now()));
   useEffect(() => {
     const timeoutId = setTimeout(() => setIsSlowStart(true), FAST_START_MS);
     return () => clearTimeout(timeoutId);
   }, []);
+  useEffect(() => {
+    const save = () => saveLastVisible();
+    document.addEventListener('visibilitychange', save);
+    window.addEventListener('pagehide', save);
+    return () => {
+      document.removeEventListener('visibilitychange', save);
+      window.removeEventListener('pagehide', save);
+    };
+  }, []);
   if (location.loaded && reveal === 'loading') {
-    setReveal(isSlowStart && !prefersReducedMotion ? 'iris' : 'fade');
+    setReveal(getStartReveal(isSlowStart, prefersReducedMotion, fastReturn));
   }
   useEffect(() => {
     if (reveal !== 'iris' && reveal !== 'fade') return;
@@ -200,8 +213,9 @@ const SunTracker: React.FC = () => {
   // request (or its timeout) can't replace that choice.
   const locationChosenRef = React.useRef(false);
 
-  // Use wake lock when in fullscreen mode
-  useWakeLock(isFullscreen);
+  // Keep the screen on in fullscreen, and always in the installed app (ROADMAP item 90):
+  // the Play app is fullscreen through its display mode, where `isFullscreen` stays false.
+  useWakeLock(isFullscreen || isInstalledApp());
 
   // Live compass mode (ROADMAP item 8, field-of-view mapping in item 19): the raw
   // (smoothed) heading is handed straight down to SunVisualization, which does its own

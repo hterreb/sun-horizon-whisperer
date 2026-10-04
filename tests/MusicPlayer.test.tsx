@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
 import MusicPlayer from '../src/components/MusicPlayer';
 import { toast } from '@/hooks/use-toast';
 
@@ -173,5 +173,75 @@ describe('MusicPlayer', () => {
     render(<MusicPlayer />);
     expect(screen.getByText('FluxFM Chillhop')).toBeInTheDocument();
     getItemSpy.mockRestore();
+  });
+
+  describe('Media Session (ROADMAP item 90)', () => {
+    // jsdom has no Media Session: a fake one that records the handlers.
+    const stubMediaSession = () => {
+      const handlers = new Map<MediaSessionAction, MediaSessionActionHandler | null>();
+      const session = {
+        metadata: null as MediaMetadataInit | null,
+        playbackState: 'none' as MediaSessionPlaybackState,
+        setActionHandler: (action: MediaSessionAction, handler: MediaSessionActionHandler | null) => {
+          handlers.set(action, handler);
+        },
+      };
+      Object.defineProperty(navigator, 'mediaSession', { value: session, configurable: true });
+      vi.stubGlobal('MediaMetadata', class {
+        constructor(init: MediaMetadataInit) {
+          Object.assign(this, init);
+        }
+      });
+      const run = (action: MediaSessionAction) => act(() => handlers.get(action)!({ action }));
+      return { session, handlers, run };
+    };
+
+    afterEach(() => {
+      // Unmount first: the unmount clears the handlers on the fake session.
+      cleanup();
+      delete (navigator as { mediaSession?: MediaSession }).mediaSession;
+    });
+
+    it('shows the station with play, pause and next while the radio plays', () => {
+      const { session, run } = stubMediaSession();
+      render(<MusicPlayer />);
+      expect(session.metadata).toBeNull();
+
+      fireEvent.click(screen.getByRole('switch'));
+      expect(session.playbackState).toBe('playing');
+      expect(session.metadata).toEqual({
+        title: 'FluxFM Chillhop',
+        artist: 'Sun Chaser',
+        artwork: [
+          { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+          { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+        ],
+      });
+
+      run('pause');
+      expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
+      expect(session.playbackState).toBe('paused');
+
+      run('play');
+      expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'true');
+      expect(session.playbackState).toBe('playing');
+
+      // Next is the same action as the Next button.
+      run('nexttrack');
+      expect(screen.getByText('ILoveRadio Lo-Fi')).toBeInTheDocument();
+      expect(session.metadata?.title).toBe('ILoveRadio Lo-Fi');
+    });
+
+    it('clears the handlers and the metadata on unmount', () => {
+      const { session, handlers } = stubMediaSession();
+      const { unmount } = render(<MusicPlayer />);
+      fireEvent.click(screen.getByRole('switch'));
+      unmount();
+
+      expect([...handlers.keys()].sort()).toEqual(['nexttrack', 'pause', 'play']);
+      expect([...handlers.values()]).toEqual([null, null, null]);
+      expect(session.metadata).toBeNull();
+      expect(session.playbackState).toBe('none');
+    });
   });
 });
