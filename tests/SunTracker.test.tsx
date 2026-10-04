@@ -37,6 +37,9 @@ describe('SunTracker', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     localStorage.clear();
+    // Offline by default: an unmocked fetch reached the real weather, geocode and terrain
+    // servers, and a slow answer timed the test out in CI. Tests that need data set their own.
+    global.fetch = vi.fn(() => Promise.reject(new Error('offline'))) as unknown as typeof fetch;
   });
 
   it('does not toast on a successful geolocation lookup (P0-3)', async () => {
