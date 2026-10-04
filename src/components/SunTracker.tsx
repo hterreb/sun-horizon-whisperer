@@ -42,6 +42,7 @@ import { type WeatherType } from './CloudLayer';
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useWakeLock } from '@/hooks/useWakeLock';
+import { useIdleHide } from '@/hooks/useIdleHide';
 import { useCompassHeading } from '@/hooks/useCompassHeading';
 import { useHorizonProfile } from '@/hooks/useHorizonProfile';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
@@ -175,7 +176,7 @@ const SunTracker: React.FC = () => {
     document.documentElement.lang = language;
   }, [language]);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showCursor, setShowCursor] = useState(true);
+  const { isVisible: showCursor, wake: wakeCursor } = useIdleHide(isFullscreen);
   const isMobile = useIsMobile();
 
   // Loading screen hand-off (ROADMAP item 39): the top-left buttons and the radio
@@ -198,8 +199,6 @@ const SunTracker: React.FC = () => {
   // Set once the user picks a location, so a late answer to the startup geolocation
   // request (or its timeout) can't replace that choice.
   const locationChosenRef = React.useRef(false);
-
-  const cursorTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   // Use wake lock when in fullscreen mode
   useWakeLock(isFullscreen);
@@ -242,47 +241,21 @@ const SunTracker: React.FC = () => {
     enableCompass();
   }, [enableCompass, t]);
 
-  // Whenever fullscreen mode toggles (either direction), the cursor should be shown
-  // immediately; the effect below then re-arms the auto-hide timer for fullscreen.
-  // Adjusting state during render (rather than in an effect) avoids an extra commit.
-  const [prevIsFullscreenForCursor, setPrevIsFullscreenForCursor] = useState(isFullscreen);
-  if (isFullscreen !== prevIsFullscreenForCursor) {
-    setPrevIsFullscreenForCursor(isFullscreen);
-    setShowCursor(true);
-  }
-
-  // Hide the cursor after 10 seconds of no movement, but only while in fullscreen.
+  // In fullscreen, a mouse move shows the cursor again and restarts the idle timer
+  // (useIdleHide: 3 s after entering, 10 s after a wake, ROADMAP item 89).
   useEffect(() => {
     if (!isFullscreen) return;
 
-    cursorTimeoutRef.current = setTimeout(() => {
-      setShowCursor(false);
-    }, 10000);
-
-    // Add mouse move listener to show cursor and reset timer
-    const handleMouseMove = () => {
-      setShowCursor(true);
-      if (cursorTimeoutRef.current) {
-        clearTimeout(cursorTimeoutRef.current);
-      }
-      cursorTimeoutRef.current = setTimeout(() => {
-        setShowCursor(false);
-      }, 10000);
-    };
-
     // A tap should bring the cursor (and the fullscreen/compass toggles, which fade
     // together with it - ROADMAP item 18) back too; mobile taps don't fire mousemove.
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('touchstart', handleMouseMove);
+    document.addEventListener('mousemove', wakeCursor);
+    document.addEventListener('touchstart', wakeCursor);
 
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('touchstart', handleMouseMove);
-      if (cursorTimeoutRef.current) {
-        clearTimeout(cursorTimeoutRef.current);
-      }
+      document.removeEventListener('mousemove', wakeCursor);
+      document.removeEventListener('touchstart', wakeCursor);
     };
-  }, [isFullscreen]);
+  }, [isFullscreen, wakeCursor]);
 
   // Update time every second for smooth clock display, every PLAY_TICK_MS during play.
   useEffect(() => {

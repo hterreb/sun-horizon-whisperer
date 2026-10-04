@@ -1688,7 +1688,7 @@ Order: the fixes first (items 89–91). Item 91 measures a baseline, so items 92
 
 Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per frame on item 91's phone profile. For comparison, the clouds of item 84 added 0.25–0.30 ms.
 
-### 89. Faster fade when entering fullscreen — S
+### 89. Faster fade when entering fullscreen — S — **✅ Done**
 
 - **Feedback (2026-10-04):** "faster fade out, 10s is too much when switching to fullscreen, but ok if I activate it by clicking when already in full-screen mode".
 - **Now:** in fullscreen, `SunTracker` hides the cursor and the chrome (`showCursor`) after 10 s without a mouse move or a tap. Entering fullscreen starts the same 10 s timer. On a desktop the pointer moves a little after the click on the fullscreen button, and each move starts the 10 s again.
@@ -1698,6 +1698,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   3. After the first hide, a mouse move or a tap shows the chrome and hides it after 10 s, as today.
   4. Leaving fullscreen shows the chrome, as today.
 - **Done when:** a test with fake timers: enter → hidden at 3 s; a move at 2 s → hidden at 5 s; a tap after the hide → visible, hidden 10 s later. In the browser on a desktop and on a phone, the chrome fades 3 s after entering fullscreen.
+- **Built (2026-10-04):** the new hook `useIdleHide` (`src/hooks/useIdleHide.ts`) has the two constants and the rules 2–4. `SunTracker` (the cursor and the top-left buttons), `InfoPanel` and `MusicPlayer` use it. The panel and the radio had their own 10 s timers, which the spec did not name. Without the change, they faded 7 s after the rest. A move or a tap anywhere wakes the top-left buttons; the panel and the radio wake on a hover, a focus or a tap on them, as before. Tests: the three "Done when" cases for the hook and for `SunTracker`; the panel and radio tests now hide at 3 s (6 new tests, 960 in all). Lint and typecheck pass. Open: the check in the browser on a desktop and on a phone.
 
 ### 90. Keep alive in the Android app: screen on, radio in the background — M
 

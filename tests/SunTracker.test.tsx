@@ -180,11 +180,43 @@ describe('SunTracker', () => {
     vi.useRealTimers();
   });
 
-  it('enters and exits fullscreen mode, hiding cursor as appropriate', async () => {
-    render(<SunTracker />);
-    // Simulate fullscreen button click
-    // fireEvent.click(screen.getByTestId('fullscreen-button'));
-    // Optionally check for fullscreen state
+  it('enters and exits fullscreen mode, hiding cursor as appropriate (ROADMAP item 89)', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 1, longitude: 2 } }) } });
+    const advance = (ms: number) => act(() => {
+      vi.advanceTimersByTime(ms);
+    });
+    const setFullscreenElement = (element: Element | null) => act(() => {
+      Object.defineProperty(document, 'fullscreenElement', { value: element, configurable: true });
+      document.dispatchEvent(new Event('fullscreenchange'));
+    });
+    const { container } = render(<SunTracker />);
+    // The top-left buttons (with the fullscreen listener) mount after the 200 ms fade.
+    advance(250);
+    const scene = container.lastElementChild!;
+
+    try {
+      setFullscreenElement(document.documentElement);
+      advance(2000);
+      fireEvent.mouseMove(document);
+      advance(2999);
+      expect(scene).not.toHaveClass('cursor-none');
+      advance(1);
+      expect(scene).toHaveClass('cursor-none');
+
+      fireEvent.touchStart(document);
+      expect(scene).not.toHaveClass('cursor-none');
+      advance(9999);
+      expect(scene).not.toHaveClass('cursor-none');
+      advance(1);
+      expect(scene).toHaveClass('cursor-none');
+
+      setFullscreenElement(null);
+      expect(scene).not.toHaveClass('cursor-none');
+    } finally {
+      delete (document as { fullscreenElement?: Element | null }).fullscreenElement;
+      vi.useRealTimers();
+    }
   });
 
   describe('manual location (A-4)', () => {

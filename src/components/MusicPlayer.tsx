@@ -5,6 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useIdleHide } from '@/hooks/useIdleHide';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
 
 interface MusicPlayerProps {
@@ -43,51 +44,15 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const { t } = useLanguage();
   const [volume, setVolume] = useState([0.5]);
-  const [isVisible, setIsVisible] = useState(true);
   const [stationIndex, setStationIndex] = useState(loadStoredStationIndex);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const fadeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isPlayingRef = useRef(isPlaying);
   const stationIndexRef = useRef(stationIndex);
   const errorAttemptsRef = useRef(0);
   const isMobile = useIsMobile();
 
-  // Whenever fullscreen mode toggles (either direction), the player should be visible
-  // immediately; the effect below then re-arms the auto-fade timer for fullscreen.
-  // Adjusting state during render (rather than in an effect) avoids an extra commit.
-  const [prevIsFullscreen, setPrevIsFullscreen] = useState(isFullscreen);
-  if (isFullscreen !== prevIsFullscreen) {
-    setPrevIsFullscreen(isFullscreen);
-    setIsVisible(true);
-  }
-
-  // Fade out after 10 seconds, but only while in fullscreen.
-  useEffect(() => {
-    if (!isFullscreen) return;
-
-    fadeTimeoutRef.current = setTimeout(() => {
-      setIsVisible(false);
-    }, 10000);
-
-    return () => {
-      if (fadeTimeoutRef.current) {
-        clearTimeout(fadeTimeoutRef.current);
-      }
-    };
-  }, [isFullscreen]);
-
-  const handleMouseEnter = () => {
-    if (isFullscreen) {
-      setIsVisible(true);
-      // Reset the fade timer
-      if (fadeTimeoutRef.current) {
-        clearTimeout(fadeTimeoutRef.current);
-      }
-      fadeTimeoutRef.current = setTimeout(() => {
-        setIsVisible(false);
-      }, 10000);
-    }
-  };
+  // In fullscreen the player fades out: 3 s after entering, 10 s after a wake (ROADMAP item 89).
+  const { isVisible, wake: handleMouseEnter } = useIdleHide(isFullscreen);
 
   // Keyboard focus and touch also need to bring the controls back, not just mouse hover.
   const handleFocus = handleMouseEnter;
