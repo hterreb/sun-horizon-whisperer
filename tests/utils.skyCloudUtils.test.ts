@@ -16,6 +16,8 @@ import {
   getGliderOffset,
   getGliderStartProgress,
   getLightAngle,
+  getRowOpacity,
+  getRowSpan,
   getSkyClouds,
   getSkyColorAt,
   getTimeOfDayAltitude,
@@ -328,5 +330,37 @@ describe('the silver lining follows a gliding cloud (ROADMAP items 76 and 84)', 
     // Far on, the light no longer reaches it.
     const gone = getCloudCentre(glider, cloud, start + 600 / Math.abs(glider.to - glider.from));
     expect(getCloudMoonlight({ ...gone, scale: cloud.scale }, moon)).toBeNull();
+  });
+});
+
+describe('sheets and decks lit as one (ROADMAP item 88, D1)', () => {
+  it('lays one gradient across the screen, the same for every tile of the row', () => {
+    const scale = 2.4;
+    for (const angle of [0, 30, 150, null]) {
+      const [a, b] = [-40, 138].map(left => ({ left, span: getRowSpan(left, scale, 390, angle) }));
+      // Back on screen (px), both tiles' gradients start and end at the same points, give
+      // or take the half-unit steps.
+      expect(Math.abs(a.span.x1 * scale + a.left - (b.span.x1 * scale + b.left))).toBeLessThanOrEqual(scale / 2);
+      expect(Math.abs(a.span.x2 * scale + a.left - (b.span.x2 * scale + b.left))).toBeLessThanOrEqual(scale / 2);
+      expect(a.span.y1).toBe(b.span.y1);
+      expect(a.span.r).toBe(b.span.r);
+    }
+    // Toward the light: to the right at 0°, from above without a light.
+    const right = getRowSpan(0, 1, 390, 0);
+    expect(right.x2).toBeGreaterThan(right.x1);
+    const above = getRowSpan(0, 1, 390, null);
+    expect(above.y2).toBeLessThan(above.y1);
+  });
+
+  it('makes a row tile solid with its glow at the lit end, and puts the opacity on the row', () => {
+    const tile = { type: 'Ns' as const, variant: 0, band: 'low' as const, tint: 0 };
+    const span = getRowSpan(100, 3, 390, 10);
+    const fill = getCloudFill(tile, 'rain', getCloudLight(3), 10, null, span);
+    expect(fill.stops.every(stop => stop.endsWith(', 1.000)'))).toBe(true);
+    expect([fill.x1, fill.y1, fill.x2, fill.y2]).toEqual([span.x1, span.y1, span.x2, span.y2]);
+    expect(fill.glow).toMatchObject({ cx: span.x2, cy: span.y2, r: span.r });
+    // A single cloud keeps its see-through fill.
+    expect(getCloudFill(tile, 'rain', getCloudLight(3), 10, null).stops[0]).toMatch(/, 0\.930\)$/);
+    expect(getRowOpacity({ band: 'low', opacity: 0.97 })).toBeCloseTo(0.97 * 0.93);
   });
 });
