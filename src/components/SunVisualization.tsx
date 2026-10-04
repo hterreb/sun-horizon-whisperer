@@ -19,6 +19,7 @@ import { type AstroEvent } from '@/utils/astroEvents';
 import { getSunVisibility, getMoonCloudFactor, getMoonLook } from '@/utils/weatherEffectsUtils';
 import { getSeaWindKmh, getReflectionBars } from '@/utils/waveUtils';
 import { getCloudDriftDirection } from '@/utils/cloudLayoutUtils';
+import { type CloudLayers } from '@/utils/skyCloudUtils';
 import SeaCanvas from '@/components/SeaCanvas';
 import { getRainMmH, getRainMistOpacity } from '@/utils/rainUtils';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -56,6 +57,10 @@ interface SunVisualizationProps {
   windDirectionDeg?: number | null;
   // The forecast rain amount in mm/h (ROADMAP item 77); null: the type's middle value.
   rainMmH?: number | null;
+  // The current hour's cover per layer (ROADMAP item 84, C1); null: the weather type's own.
+  cloudLayers?: CloudLayers | null;
+  // A rare lenticular or mammatus day (ROADMAP item 84, X1).
+  cloudEgg?: boolean;
   // Live compass mode (ROADMAP item 19): the current (smoothed) device heading, or
   // null/undefined for the static 360°-across-the-screen mode. When set, azimuths are
   // mapped through a real field of view centered on this heading (getCompassScreenFraction)
@@ -514,6 +519,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   windSpeedKmh = null,
   windDirectionDeg = null,
   rainMmH = null,
+  cloudLayers = null,
+  cloudEgg = false,
   compassHeading = null,
   horizonProfile = null,
   terrainSunTimes = null,
@@ -864,7 +871,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         date={date}
         latitude={latitude}
         longitude={longitude}
-        cloudCoverPercent={cloudCoverPercent}
+        cloudLayers={cloudLayers}
         windSpeedKmh={windSpeedKmh}
         windDirectionDeg={windDirectionDeg}
         rainMmH={rainMmH}
@@ -874,6 +881,11 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           ? { x: (moonX / containerDimensions.width) * 100, y: (moonY / containerDimensions.height) * 100, r: moonRadius, light: moonBright }
           : null}
         playDirection={playDirection}
+        sun={containerDimensions.height > 0
+          ? { x: (sunX / containerDimensions.width) * 100, y: (sunY / containerDimensions.height) * 100, altitude: sunPosition.altitude }
+          : null}
+        skyGradient={skyGradient}
+        cloudEgg={cloudEgg}
       />
       <WeatherEffects
         weatherType={weatherType}

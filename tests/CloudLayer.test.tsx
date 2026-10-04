@@ -3,7 +3,7 @@ import { render, act, fireEvent } from '@testing-library/react';
 import CloudLayer, { WeatherType, createFish, createBird } from '../src/components/CloudLayer';
 import { FISH_WEIGHTS, NIGHT_FISH_WEIGHTS, getWaterSpeedFactor } from '../src/utils/weatherEffectsUtils';
 import type { TimeOfDay } from '../src/utils/sunUtils';
-import { getCloudLayout } from '../src/utils/cloudLayoutUtils';
+import { DEFAULT_CLOUD_LAYERS, getCloudCentre, getGliderStartProgress, getSkyClouds } from '../src/utils/skyCloudUtils';
 
 const mockReducedMotion = (matches: boolean) =>
   vi.spyOn(window, 'matchMedia').mockReturnValue({
@@ -31,14 +31,16 @@ describe('CloudLayer', () => {
   const renderLayer = (weatherType: WeatherType, timeOfDay: string) =>
     render(<CloudLayer weatherType={weatherType} timeOfDay={timeOfDay as TimeOfDay} />);
 
-  it('shows fish during rain', () => {
+  it('draws the clouds by type (ROADMAP item 84)', () => {
     const { container } = renderLayer('rain', 'midday');
-    expect(container.querySelectorAll('svg')).toMatchSnapshot(); // Should include fish icon
+    expect(container.querySelector('[data-testid="sky-clouds"]')?.getAttribute('data-low')).toBe('deck');
+    expect(container.querySelectorAll('[data-testid="sky-cloud"]').length).toBeGreaterThan(0);
   });
 
-  it('draws the closed storm deck only in a storm (ROADMAP item 51)', () => {
-    expect(renderLayer('storm', 'afternoon').container.querySelector('[data-testid="storm-deck"]')).not.toBeNull();
-    expect(renderLayer('rain', 'afternoon').container.querySelector('[data-testid="storm-deck"]')).toBeNull();
+  it("closes the sky with a dark deck in a storm (ROADMAP item 51, now item 84's nimbostratus)", () => {
+    const deck = (type: WeatherType) => renderLayer(type, 'afternoon').container.querySelector('[data-testid="sky-cloud"][data-type="Ns"]');
+    expect(deck('storm')).not.toBeNull();
+    expect(deck('partly')).toBeNull();
   });
 
   it('does not show fish at night', () => {
@@ -515,10 +517,15 @@ describe('CloudLayer', () => {
 
   describe('silver lining (ROADMAP item 76, X2)', () => {
     it('lights the cloud the moon sits on, and no cloud without the moon', () => {
-      const props = { weatherType: 'cloudy' as const, timeOfDay: 'night' as const, cloudCoverPercent: 55, date: new Date('2026-10-01T23:42:00'), latitude: 47.78, longitude: 9.61 };
-      // The moon at the centre of the first cloud (120 × 60 px, jsdom's window is 1024 × 768).
-      const [cloud] = getCloudLayout(55, props.date, props.latitude, props.longitude);
-      const moon = { x: cloud.x + (60 / window.innerWidth) * 100, y: cloud.y + (30 / window.innerHeight) * 100, r: 22, light: 0.75 };
+      const props = { weatherType: 'cloudy' as const, timeOfDay: 'night' as const, date: new Date('2026-10-01T23:42:00'), latitude: 47.78, longitude: 9.61 };
+      // The moon at the centre of the first low cloud (item 84's layout; jsdom's window is 1024 × 768).
+      const [w, h] = [window.innerWidth, window.innerHeight];
+      const glider = getSkyClouds({
+        weather: 'cloudy', layers: DEFAULT_CLOUD_LAYERS.cloudy, width: w, height: h,
+        seed: `${props.date.toDateString()}|47.8|9.6`, egg: false, direction: 1,
+      }).find(g => g.clouds[0].band === 'low')!;
+      const centre = getCloudCentre(glider, glider.clouds[0], getGliderStartProgress(glider));
+      const moon = { x: (centre.x / w) * 100, y: (centre.y / h) * 100, r: 22, light: 0.75 };
       const lit = render(<CloudLayer {...props} moon={moon} />);
       expect(lit.container.querySelectorAll('[data-testid="cloud-moonlight"]').length).toBeGreaterThan(0);
       lit.unmount();
