@@ -1,4 +1,4 @@
-import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, hasBoatWake, getBoatTone, pickFish, FISH_WEIGHTS, canSpawnFish, getRestStopMotion, pickNightFish, pickMoonlitDayFish, NIGHT_FISH_WEIGHTS, MAX_NIGHT_FISH, getWaterSpeedFactor, getWaterLimit, getStarCloudFactor, getTwilightStars, getSkyOvercastMix, getSunVisibility, getMoonCloudFactor, getMoonLook, BIRD_WEIGHTS, pickBird, isBirdInSeason } from '../src/utils/weatherEffectsUtils';
+import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, hasBoatWake, getBoatTone, pickFish, FISH_WEIGHTS, canSpawnFish, getRestStopMotion, pickNightFish, pickMoonlitDayFish, NIGHT_FISH_WEIGHTS, MAX_NIGHT_FISH, getFishOverride, getWaterSpeedFactor, getWaterLimit, getStarCloudFactor, getTwilightStars, getSkyOvercastMix, getSunVisibility, getMoonCloudFactor, getMoonLook, BIRD_WEIGHTS, pickBird, isBirdInSeason } from '../src/utils/weatherEffectsUtils';
 
 describe('getWeatherEffects (ROADMAP item 10)', () => {
   it('shows fog only for the fog type', () => {
@@ -136,10 +136,33 @@ describe('getBoatTone (ROADMAP item 73, B3)', () => {
 describe('fish mix (ROADMAP item 62)', () => {
   it('has weights that sum to 100 and sends out every species', () => {
     expect(FISH_WEIGHTS.reduce((sum, [, weight]) => sum + weight, 0)).toBe(100);
-    const picks = Array.from({ length: 100 }, (_, i) => pickFish(i / 100));
+    const picks = Array.from({ length: 200 }, (_, i) => pickFish(i / 200));
     expect(new Set(picks)).toEqual(new Set(FISH_WEIGHTS.map(([kind]) => kind)));
-    expect(picks.filter(k => k === 'classic').length).toBe(25);
-    expect(picks.filter(k => k === 'whale').length).toBe(1);
+    expect(picks.filter(k => k === 'classic').length).toBe(48);
+    expect(picks.filter(k => k === 'whale').length).toBe(2);
+  });
+
+  it('sends a shark and a dolphin pod as 1 in 200 fish each; the classic fish gave the 1 (ROADMAP item 85)', () => {
+    expect(FISH_WEIGHTS).toContainEqual(['shark', 0.5]);
+    expect(FISH_WEIGHTS).toContainEqual(['dolphins', 0.5]);
+    expect(FISH_WEIGHTS).toContainEqual(['classic', 24]);
+    const picks = Array.from({ length: 200 }, (_, i) => pickFish(i / 200));
+    expect(picks.filter(k => k === 'shark')).toHaveLength(1);
+    expect(picks.filter(k => k === 'dolphins')).toHaveLength(1);
+  });
+
+  it('counts a shark or a pod as one fish in the limit, like the whale (E4)', () => {
+    const four = ['classic', 'perch', 'pike', 'carp'] as const;
+    expect(canSpawnFish([...four], 'shark')).toBe(true);
+    expect(canSpawnFish([...four, 'dolphins'], 'shark')).toBe(false);
+  });
+
+  it('reads the test override ?fish=<kind>, for the rare ones too (ROADMAP item 85)', () => {
+    expect(getFishOverride('?fish=shark')).toBe('shark');
+    expect(getFishOverride('?fish=dolphins')).toBe('dolphins');
+    expect(getFishOverride('?egg=ufo&fish=lanternfish')).toBe('lanternfish');
+    expect(getFishOverride('?fish=kraken')).toBeNull();
+    expect(getFishOverride('')).toBeNull();
   });
 
   it('allows at most five fish, but turtles and jellyfish never count (E4)', () => {
@@ -155,9 +178,15 @@ describe('fish mix (ROADMAP item 62)', () => {
 describe('night fish mix (ROADMAP item 65)', () => {
   it('has weights that sum to 100 and sends out every night fish', () => {
     expect(NIGHT_FISH_WEIGHTS.reduce((sum, [, weight]) => sum + weight, 0)).toBe(100);
-    const picks = Array.from({ length: 100 }, (_, i) => pickNightFish(i / 100));
-    expect(new Set(picks)).toEqual(new Set(['moonlit', 'burbot', 'eel', 'lanternfish', 'jellyfish', 'anglerfish', 'squid']));
-    expect(picks.filter(k => k === 'lanternfish').length).toBe(30);
+    const picks = Array.from({ length: 200 }, (_, i) => pickNightFish(i / 200));
+    expect(new Set(picks)).toEqual(new Set(['moonlit', 'burbot', 'eel', 'lanternfish', 'jellyfish', 'anglerfish', 'squid', 'shark', 'dolphins']));
+    expect(picks.filter(k => k === 'lanternfish').length).toBe(60);
+  });
+
+  it('sends the sea visitors at night too, 1 in 200 each; the moonlit fish gave the 1 (ROADMAP item 85, X5)', () => {
+    expect(NIGHT_FISH_WEIGHTS).toContainEqual(['shark', 0.5]);
+    expect(NIGHT_FISH_WEIGHTS).toContainEqual(['dolphins', 0.5]);
+    expect(NIGHT_FISH_WEIGHTS).toContainEqual(['moonlit', 24]);
   });
 
   it('lights the lake fish by the moon, but not the minnow school (NF1)', () => {
