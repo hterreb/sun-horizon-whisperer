@@ -2,12 +2,12 @@ import React, { memo, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { type WeatherType } from './CloudLayer';
 import { type TimeOfDay, getBackgroundGradient, getWaterColors } from '@/utils/sunUtils';
 import { getCloudDriftDirection, getCloudMoonlight } from '@/utils/cloudLayoutUtils';
-import { CLOUD_SHAPES } from '@/utils/cloudShapes';
+import { CLOUD_SHAPES, getShaftStrands } from '@/utils/cloudShapes';
 import {
   type CloudGlider, type CloudLayers, type CloudLight, type SkyCloud,
   getCloudCentre, getCloudFill, getCloudLayers, getCloudLight, getCloudShadowBox,
   getCloudShadowLook, getCloudTypes, getCloudVeil, getGliderOffset, getGliderStartProgress, getLightAngle,
-  getSceneScale, getSkyClouds, getSkyColorAt, getTimeOfDayAltitude,
+  getRowOpacity, getRowSpan, getSceneScale, getSkyClouds, getSkyColorAt, getTimeOfDayAltitude,
 } from '@/utils/skyCloudUtils';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 
@@ -47,6 +47,8 @@ interface CloudSvgProps {
   angle: number | null;
   skyGradient: string;
   height: number;
+  width: number;
+  rowLeft?: number; // a tile of a row (item 88, D1): its left edge on screen, px
   liningX?: number;
   liningY?: number;
   liningR?: number;
@@ -56,10 +58,11 @@ interface CloudSvgProps {
 // One cloud. Memoized on plain values, so the once-a-second tick only redraws a cloud
 // whose light direction or silver lining changed.
 const CloudSvg = memo(function CloudSvg({
-  cloud, gradId, weather, light, angle, skyGradient, height, liningX, liningY, liningR, moonGlow,
+  cloud, gradId, weather, light, angle, skyGradient, height, width, rowLeft, liningX, liningY, liningR, moonGlow,
 }: CloudSvgProps) {
   const shape = CLOUD_SHAPES[cloud.type][cloud.variant];
-  const fill = getCloudFill(cloud, weather, light, angle, cloud.tint > 0 ? getSkyColorAt(skyGradient, cloud.y / height) : null);
+  const span = rowLeft === undefined ? null : getRowSpan(rowLeft, cloud.scale, width, angle);
+  const fill = getCloudFill(cloud, weather, light, angle, cloud.tint > 0 ? getSkyColorAt(skyGradient, cloud.y / height) : null, span);
   const size = { width: 120 * cloud.scale, height: 60 * cloud.scale };
   return (
     <div
@@ -68,7 +71,7 @@ const CloudSvg = memo(function CloudSvg({
         left: cloud.x,
         top: cloud.y - 30 * cloud.scale,
         ...size,
-        opacity: cloud.opacity,
+        opacity: span ? 1 : cloud.opacity,
         filter: `blur(${(2.6 * BAND_BLUR[cloud.band] * cloud.scale).toFixed(2)}px)`,
       }}
       data-testid="sky-cloud"
@@ -107,8 +110,11 @@ const CloudSvg = memo(function CloudSvg({
             </radialGradient>
           )}
         </defs>
-        {cloud.shafts && shape.shafts?.map(([x, w, slant, y0]) => (
-          <path key={x} d={`M${x} ${y0}H${x + w}L${x + w + slant} ${y0 + 110}H${x + slant}Z`} fill={`url(#${gradId}s)`} />
+        {/* Rain shafts as strands (item 88, S2); each strand fades along its own length. */}
+        {cloud.shafts && shape.shafts?.map(shaft => (
+          <g key={shaft[0]} stroke={`url(#${gradId}s)`} strokeLinecap="round" fill="none" data-testid="rain-shaft">
+            {getShaftStrands(shaft).map(([d, w]) => <path key={d} d={d} strokeWidth={w} />)}
+          </g>
         ))}
         <path d={shape.d} fill={`url(#${gradId}f)`} />
         {fill.shade && <path d={shape.d} fill={`url(#${gradId}v)`} />}
@@ -131,6 +137,9 @@ const glideStyle = (glider: CloudGlider, reduced: boolean): React.CSSProperties 
         animation: `${glider.to > glider.from ? 'skyGlideRight' : 'skyGlideLeft'} ${glider.durationSec.toFixed(1)}s linear ${glider.delaySec.toFixed(1)}s infinite`,
       }
     : { left: Math.round(getGliderOffset(glider, getGliderStartProgress(glider)) * 10) / 10 };
+
+// A sheet or a deck: a row of tiles that glides as one.
+const row = (glider: CloudGlider): boolean => glider.clouds.length > 1;
 
 const canTick = typeof Element !== 'undefined' && typeof Element.prototype.getAnimations === 'function';
 
@@ -262,13 +271,15 @@ const SkyClouds: React.FC<SkyCloudsProps> = ({
             key={glider.id}
             ref={out ? undefined : el => { glideRefs.current[i] = el; }}
             className="absolute left-0 top-0"
-            style={glideStyle(glider, reduced)}
-            data-testid={glider.clouds.length > 1 ? 'cloud-row' : 'cloud-glider'}
+            style={row(glider) ? { ...glideStyle(glider, reduced), opacity: getRowOpacity(glider.clouds[0]) } : glideStyle(glider, reduced)}
+            data-testid={row(glider) ? 'cloud-row' : 'cloud-glider'}
             data-speed={glider.speed.toFixed(2)}
           >
             {glider.clouds.map((cloud, j) => {
               const centre = getCloudCentre(glider, cloud, progress[i]);
               const lining = moonPx && moonPx.r > 0 ? getCloudMoonlight({ ...centre, scale: cloud.scale }, moonPx) : null;
+              // D1: a row is lit as one, toward the light seen from the screen's middle.
+              const lit = row(glider) ? { x: width / 2, y: cloud.y } : centre;
               return (
                 <CloudSvg
                   key={j}
@@ -276,9 +287,11 @@ const SkyClouds: React.FC<SkyCloudsProps> = ({
                   gradId={`${uid}-${glider.id}-${j}`}
                   weather={weather}
                   light={light}
-                  angle={getLightAngle(centre, source)}
+                  angle={getLightAngle(lit, source)}
                   skyGradient={sky}
                   height={height}
+                  width={width}
+                  rowLeft={row(glider) ? Math.round(centre.x - 60 * cloud.scale) : undefined}
                   liningX={lining ? quantize(lining.cx, LINING_STEP) : undefined}
                   liningY={lining ? quantize(lining.cy, LINING_STEP) : undefined}
                   liningR={lining ? quantize(lining.r, LINING_STEP) : undefined}

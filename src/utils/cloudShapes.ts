@@ -3,16 +3,22 @@
 // one SVG path, so the moon's silver lining (item 76) fills it the same way. Wide sheets
 // (Cs, As, St, Ns) are rows of these boxes. `shafts` are rain shafts under the shape, as
 // [x, width, slant, y0] in the same units; they reach 110 units down. Pure data.
+// Item 88 (Cloud Edges lookbook): G1 rounds the box-filling fields, S2 draws the shafts
+// as strands.
 
 export type CloudType = 'Ci' | 'Cs' | 'Ac' | 'As' | 'Cu' | 'Sc' | 'St' | 'Ns' | 'Cb' | 'Len' | 'Mam';
+
+export type Shaft = [number, number, number, number];
 
 export interface CloudShape {
   name: string;
   d: string;
   top: number; // the highest point, in box units
   bottom: number; // the lowest point
-  shafts?: [number, number, number, number][];
+  shafts?: Shaft[];
 }
+
+export const SHAFT_LENGTH = 110;
 
 interface Ellipse { cx: number; cy: number; rx: number; ry: number; rot: number }
 interface Rect { r: [number, number, number, number] }
@@ -67,9 +73,9 @@ const hook = (x0: number, y0: number, len: number): Ellipse[] => {
   const end = pts[pts.length - 1];
   return [...chain(pts, 3.4, t => 0.5 + 1.4 * t * t), E(end[0] + 1.5, end[1] - 2.5, 3, 1.5, -62)];
 };
-const streak = (y0: number, j: number, ry = 1): Ellipse[] => {
+const streak = (y0: number, j: number, ry = 1, from = 4, to = 116): Ellipse[] => {
   const pts: [number, number][] = [];
-  for (let x = 4; x <= 116; x += 7) pts.push([x, y0 + 3.5 * Math.sin(x / 26 + j * 1.3)]);
+  for (let x = from; x <= to; x += 7) pts.push([x, y0 + 3.5 * Math.sin(x / 26 + j * 1.3)]);
   return chain(pts, 4.6, t => (0.55 + 0.8 * Math.sin(Math.PI * t)) * ry);
 };
 const acRows = (): Ellipse[] => {
@@ -93,6 +99,17 @@ const acWaves = (): Ellipse[] => {
   }
   return parts;
 };
+// G1: the puffs get smaller toward an oval and drop out at its edge, with a little jitter,
+// so a field does not show its 120 × 60 box.
+const oval = (parts: Ellipse[]): Ellipse[] => parts.flatMap(p => {
+  const q = ((p.cx - 60) / 58) ** 2 + ((p.cy - 30) / 24) ** 2;
+  if (q > 1) return [];
+  const h = (n: number) => hash3(Math.round(p.cx * 10), Math.round(p.cy * 10), n);
+  const k = (1 - 0.55 * q) * (0.7 + 0.6 * h(1));
+  return [E(p.cx + (h(2) - 0.5) * 5, p.cy + (h(3) - 0.5) * 3, p.rx * k, p.ry * k, p.rot + (h(4) - 0.5) * 20)];
+});
+// G1: each cirrus streak has its own length (a share of the full one) and offset.
+const STREAKS: [number, number][] = [[0.45, 12], [0.85, -8], [1, 3], [0.6, -14]];
 const acPatch = (): Ellipse[] => Array.from({ length: 16 }, (_, i) => {
   const ang = hash3(i, 1, 9) * Math.PI * 2;
   const rr = Math.sqrt(hash3(i, 2, 9));
@@ -109,10 +126,10 @@ const CB_ANVIL: Part[] = [
 export const CLOUD_SHAPES: Record<CloudType, CloudShape[]> = {
   Ci: [
     shape('Hooks', [...hook(8, 44, 34), ...hook(40, 34, 36), ...hook(76, 46, 32)]),
-    shape('Streaks', [0, 1, 2, 3].flatMap(j => streak(14 + 10 * j, j))),
+    shape('Streaks', STREAKS.flatMap(([len, off], j) => streak(14 + 10 * j, j, 1, 60 + off - 54 * len, 60 + off + 54 * len))),
   ],
   Cs: [shape('Veil', [R(-8, 22, 136, 14), E(60, 22, 70, 5), E(60, 36, 70, 5), ...streak(18, 0, 0.6), ...streak(40, 2, 0.6)])],
-  Ac: [shape('Rows', acRows()), shape('Waves', acWaves()), shape('Patch', acPatch())],
+  Ac: [shape('Rows', oval(acRows())), shape('Waves', oval(acWaves())), shape('Patch', acPatch())],
   As: [shape('Sheet', [E(60, 30, 58, 11), E(28, 28, 26, 9), E(92, 31, 26, 10), E(60, 22, 40, 6)])],
   Cu: [
     shape('Flat', [E(38, 39, 15, 7), E(57, 33, 19, 13), E(77, 37, 15, 9), E(92, 41, 9, 5), E(25, 42, 9, 4), R(25, 41, 67, 5)]),
@@ -141,3 +158,13 @@ export const CLOUD_SHAPES: Record<CloudType, CloudShape[]> = {
   Len: [shape('Lens stack', [E(60, 42, 46, 5.5), E(60, 31, 34, 4), E(60, 22, 22, 3.2)])],
   Mam: [shape('Pouches', [R(-4, -6, 128, 30), ...Array.from({ length: 9 }, (_, i) => E(8 + 13.5 * i, 28 + (i % 2) * 2, 6.6, 6 + (i % 2) * 0.6))])],
 };
+
+// S2: a rain shaft as 8 thin slanted strands of different lengths, so it reads as falling
+// rain and not as a column. Each is [path, stroke width] in box units.
+export const getShaftStrands = ([x, w, slant, y0]: Shaft): [string, number][] =>
+  Array.from({ length: 8 }, (_, i) => {
+    const r = (n: number) => hash3(i, Math.round(x * 10), n);
+    const sx = x + w * ((i + 0.5) / 8) + (r(1) - 0.5) * (w / 8);
+    const len = (0.5 + 0.5 * r(2)) * SHAFT_LENGTH;
+    return [`M${f1(sx)} ${y0}l${f1((slant * len) / SHAFT_LENGTH)} ${f1(len)}`, Math.round((0.8 + 0.9 * r(3)) * 100) / 100];
+  });

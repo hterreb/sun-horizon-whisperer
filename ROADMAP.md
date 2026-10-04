@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-04. Done: items 1–15, 17–44, 47–87 (item 14: the Play-app code, with `PREMIUM_ENFORCED` off until item 16), item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: item 16 (with it: turn on `PREMIUM_ENFORCED`, and check with a licence tester that a purchase is still there after 3 days, see item 14 "Acknowledge"; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
+Status: last updated 2026-10-04. Done: items 1–15, 17–44, 47–88 (item 14: the Play-app code, with `PREMIUM_ENFORCED` off until item 16), item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: item 16 (with it: turn on `PREMIUM_ENFORCED`, and check with a licence tester that a purchase is still there after 3 days, see item 14 "Acknowledge"; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
 
 ## Verification (2026-09-28)
 
@@ -1431,6 +1431,22 @@ Six open Sentry feedback reports from 2026-10-02 20:48 to 2026-10-03 18:58, all 
   - The fading layout keeps the glide progress of its last tick, so its light and silver lining do not jump.
 - **Not changed:** the sky gradient (the overcast mix of item 50) still changes at once; a gradient cannot transition in CSS.
 - **Checked:** 2 new tests (947 in all); lint, typecheck and build pass. In headless Chromium at 390×844, Ravensburg, real forecast, play from 2026-10-04 04:15: at the switch to fog, the old layout went 1 → 0 and the fog layout 0 → 1 in about 3 s, also at the next hour (fog to fog with new layers). No new console errors.
+
+### 88. Clouds without box edges — S — **✅ Done**
+
+- **Feedback (2026-10-04):** "some of the clouds look very rectangular, can you please check and propose different design options?"
+- **Now (item 84):** three things show the 120 × 60 box of a cloud:
+  1. The rain shafts (nimbostratus deck, towering cumulus) are trapezoids with hard sides: 30–40 px wide columns down to the horizon on a phone.
+  2. A sheet or a deck is a row of tiles that overlap. Each tile has its own light gradient and its own glow toward the sun, and each tile is see-through, so the overlaps are denser. The row shows vertical bands with straight edges.
+  3. The altocumulus "Rows" and "Waves" fill their box with an even grid of puffs, and the cirrus "Streaks" are four lines of the same length. The box outline shows.
+- **Lookbook:** [Cloud Edges](https://claude.ai/artifact/SLHaFsy2GvstVC84VZz1w6) (private), on the real cloud layer captured from the app (390 × 844): S0–S3 for the shafts (soft curtains, rain strands, no shafts), D0–D3 for the rows (one light per sheet, light from above, ragged deck), G0–G2 for the fields (oval edge, round shapes only).
+- **Picks (2026-10-04):** "s2,d1,g1".
+- **Spec:**
+  - **S2 Rain strands:** `getShaftStrands` (`cloudShapes.ts`) draws each shaft as 8 thin slanted strands, spread across the shaft's width, 0.5–1 × its 110 units long, 0.8–1.7 units wide, seeded by the shaft. The shaft gradient strokes them, so each strand fades along its own length.
+  - **D1 One light per sheet:** `getRowSpan` (`skyCloudUtils.ts`) lays one gradient across the screen, toward the light seen from the screen's middle, and maps it into each tile's units (half-unit steps). The glow sits at the lit end. The tiles are solid (alpha 1, opacity 1); the row carries the opacity (`getRowOpacity`: density × band alpha). The tick moves the gradient with the glide, as it does the silver lining.
+  - **G1 Oval edge:** the puffs of "Rows" and "Waves" get smaller toward an oval (58 × 24 units) and drop out at its edge, with a seeded jitter of place, size and turn. The four "Streaks" get their own lengths (0.45, 0.85, 1, 0.6 × the full one) and offsets.
+- **Deviations:** no extra 0.7-unit blur on the strands (the lookbook had one): the cloud's own edge blur (2.6 px × scale) already softens them.
+- **Checked:** 7 new tests (954 in all); lint and typecheck pass. In headless Chromium at 390 × 844, Ravensburg, manual weather (rain at dusk, storm and overcast by day, partly at dusk), before and after: the rain columns and the vertical bands in the decks are gone, the altocumulus field is an oval. No console errors.
 
 ---
 

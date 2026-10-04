@@ -470,22 +470,42 @@ export interface CloudFill {
   shafts: [string, string];
 }
 
+// D1 (item 88): a sheet or a deck is lit as one, so its tiles show no seams. One gradient
+// across the screen, toward the light seen from the screen's middle, in a tile's units
+// (`left`: the tile's left edge on screen, px). The tiles are solid; the row carries
+// their opacity (getRowOpacity), so the overlaps are not denser.
+export interface CloudSpan { x1: number; y1: number; x2: number; y2: number; r: number }
+export const getRowSpan = (left: number, scale: number, width: number, angleDeg: number | null): CloudSpan => {
+  const t = ((angleDeg ?? -90) * Math.PI) / 180;
+  const ux = Math.cos(t);
+  const uy = Math.sin(t);
+  const half = (width / 2) * Math.abs(ux) + 30 * scale * Math.abs(uy) + 4 * scale;
+  const round = (n: number) => Math.round(n * 2) / 2; // half-unit steps, like the lining
+  return {
+    x1: round((width / 2 - ux * half - left) / scale), y1: round(30 - (uy * half) / scale),
+    x2: round((width / 2 + ux * half - left) / scale), y2: round(30 + (uy * half) / scale),
+    r: round((1.2 * half) / scale),
+  };
+};
+export const getRowOpacity = (cloud: Pick<SkyCloud, 'band' | 'opacity'>): number => cloud.opacity * BAND_ALPHA[cloud.band];
+
 // The fill of one cloud. `angleDeg` is the direction from the cloud to the light (0 = to
 // the right, 90 = down), or null for light from above. `sky` is the sky colour at the
-// cloud's height, for the C3 tint.
+// cloud's height, for the C3 tint. `span`: a tile of a row (D1), solid and lit as one.
 export const getCloudFill = (
   cloud: Pick<SkyCloud, 'type' | 'variant' | 'band' | 'tint'>,
   weather: WeatherType,
   light: CloudLight,
   angleDeg: number | null,
   sky: Rgb | null,
+  span: CloudSpan | null = null,
 ): CloudFill => {
   let { lit, shade } = getCloudColors(cloud.type, cloud.band, weather, light);
   if (sky && cloud.tint > 0) {
     lit = mixRgb(lit, sky, cloud.tint);
     shade = mixRgb(shade, sky, cloud.tint);
   }
-  const a = BAND_ALPHA[cloud.band];
+  const a = span ? 1 : BAND_ALPHA[cloud.band];
   const t = ((angleDeg ?? -90) * Math.PI) / 180;
   const ux = Math.cos(t);
   const uy = Math.sin(t);
@@ -496,11 +516,12 @@ export const getCloudFill = (
   const shape = CLOUD_SHAPES[cloud.type][cloud.variant];
   const cool = light.day + light.night;
   const warm = 1 - cool;
+  const box = span ?? { x1: round(60 - ux * half), y1: round(30 - uy * half), x2, y2, r: round(half * 1.2) };
   return {
-    x1: round(60 - ux * half), y1: round(30 - uy * half), x2, y2,
+    x1: box.x1, y1: box.y1, x2: box.x2, y2: box.y2,
     stops: [rgba(shade, a), rgba(mixRgb(shade, lit, 0.5), a), rgba(lit, a)],
     shade: cool > 0.02 ? { top: shape.top, bottom: shape.bottom, to: rgba(mixRgb(shade, [30, 40, 60], 0.25), 0.45 * cool) } : null,
-    glow: warm > 0.02 ? { cx: x2, cy: y2, r: round(half * 1.2), from: rgba(lit, 0.6 * warm), to: rgba(lit, 0) } : null,
+    glow: warm > 0.02 ? { cx: box.x2, cy: box.y2, r: box.r, from: rgba(lit, 0.6 * warm), to: rgba(lit, 0) } : null,
     shafts: [rgba(shade, 0.5), rgba(shade, 0)],
   };
 };

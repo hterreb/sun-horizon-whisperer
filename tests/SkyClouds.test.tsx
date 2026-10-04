@@ -100,6 +100,36 @@ describe('SkyClouds (ROADMAP item 84)', () => {
   });
 });
 
+describe('SkyClouds without box edges (ROADMAP item 88)', () => {
+  it('draws a deck as solid tiles in one see-through row, lit as one (D1)', () => {
+    const container = sky({ weatherType: 'rain', sun: { x: 80, y: 40, altitude: 3 } });
+    const rows = [...container.querySelectorAll<HTMLElement>('[data-testid="cloud-row"]')];
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(Number(row.style.opacity)).toBeGreaterThan(0);
+      expect(Number(row.style.opacity)).toBeLessThan(1);
+      const tiles = [...row.querySelectorAll<HTMLElement>('[data-testid="sky-cloud"]')];
+      // The same gradient on screen: the tile's left edge (px) plus its start (units × scale).
+      const starts = tiles.map(tile => {
+        const scale = parseFloat(tile.style.width) / 120;
+        const x1 = Number(tile.querySelector('linearGradient')!.getAttribute('x1'));
+        return Math.round((parseFloat(tile.style.left) + x1 * scale) / 4);
+      });
+      for (const tile of tiles) expect(tile.style.opacity).toBe('1');
+      expect(new Set(starts).size).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('draws the rain shafts as strands (S2)', () => {
+    const shafts = [...sky({ weatherType: 'rain' }).querySelectorAll('[data-testid="rain-shaft"]')];
+    expect(shafts.length).toBeGreaterThan(0);
+    for (const shaft of shafts) {
+      expect(shaft.getAttribute('stroke')).toMatch(/^url\(#.+s\)$/);
+      expect(shaft.querySelectorAll('path')).toHaveLength(8);
+    }
+  });
+});
+
 describe('SkyClouds layout cross-fade (ROADMAP item 87)', () => {
   afterEach(() => vi.useRealTimers());
 
