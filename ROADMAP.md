@@ -2,10 +2,10 @@
 
 > summary: Prioritized list of Sun Chaser features, done and open, each with a short spec. The Status line says which items are done.
 > P0 = quick fixes and polish, P1 = core sky features, P2 = line-of-sight terrain analysis (Premium later, free now),
-> P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
+> P3 = redesign and Google Play release, Version 2.0 = a livelier, smarter sky (items 89–97). An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-04. Done: items 1–15, 17–44, 47–88 (item 14: the Play-app code, with `PREMIUM_ENFORCED` off until item 16), item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: item 16 (with it: turn on `PREMIUM_ENFORCED`, and check with a licence tester that a purchase is still there after 3 days, see item 14 "Acknowledge"; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
+Status: last updated 2026-10-04. Done: items 1–15, 17–44, 47–88 (item 14: the Play-app code, with `PREMIUM_ENFORCED` off until item 16), item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: item 16 (with it: turn on `PREMIUM_ENFORCED`, and check with a licence tester that a purchase is still there after 3 days, see item 14 "Acknowledge"; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), [Version 2.0](#version-20--a-livelier-smarter-sky) (items 89–97, specced 2026-10-04; item 94 needs a lookbook first), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
 
 ## Verification (2026-09-28)
 
@@ -1670,6 +1670,184 @@ Six open Sentry feedback reports from 2026-10-02 20:48 to 2026-10-03 18:58, all 
   - `public/.well-known/assetlinks.json` has the SHA-256 fingerprint of this local key. With Play App Signing, add the Play app signing key's fingerprint from the Play Console to this file.
   - Package name decided (2026-10-02): `com.ainabler.sunchaser`. It has the brand and the app name, no personal name and no country domain, because the app is for all countries. It stays fixed after the first Play upload.
   - Distribution for phone tests: the Play Console internal testing track (decided 2026-10-02).
+
+---
+
+## Version 2.0 — A livelier, smarter sky
+
+Request (2026-10-04): "shark attacking and eating other fish; fish & bird collision avoidance, at the moment some fish swim right at top of each other or at boats and birds can sometimes also fly directly at each other; planes that leave cloud strips in the distance, with a flight radar connection; satellites in the night, with satellite tracking; sea is a bit crowded now, maybe too many fish, and it takes a while until it fills up, pitch some ideas how to circumnavigate; clickable elements, get infos when you click on a boat, fish, bird, plane, satellite, cloud, the sun, the moon, the terrain; performance improvements; faster fade out, 10s is too much when switching to fullscreen, but ok if I activate it by clicking when already in full-screen mode; keep alive in the android app".
+
+Decisions (2026-10-04):
+
+- **Premium:** the live flight radar (item 96) and the satellite tracking (item 97). All other parts are free. As item 45 decided, the gate works only in the Play app; the web gets all features free.
+- **Keep alive:** both the screen and the background (item 90).
+- **Shark hunt:** a lookbook first (item 94).
+- **Sea fill:** warm start, busy and quiet phases, lower caps (item 93). Not picked: a density setting.
+
+Order: the fixes first (items 89–91). Item 91 measures a baseline, so items 92–97 each have a frame budget. Item 92's lane planner comes before items 93 and 94, which use it. Items 89 and 90 are small and help the Play release (item 16), so they can ship before the rest.
+
+Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per frame on item 91's phone profile. For comparison, the clouds of item 84 added 0.25–0.30 ms.
+
+### 89. Faster fade when entering fullscreen — S
+
+- **Feedback (2026-10-04):** "faster fade out, 10s is too much when switching to fullscreen, but ok if I activate it by clicking when already in full-screen mode".
+- **Now:** in fullscreen, `SunTracker` hides the cursor and the chrome (`showCursor`) after 10 s without a mouse move or a tap. Entering fullscreen starts the same 10 s timer. On a desktop the pointer moves a little after the click on the fullscreen button, and each move starts the 10 s again.
+- **Spec:**
+  1. Two constants: `ENTER_HIDE_MS = 3000` and `WAKE_HIDE_MS = 10000`.
+  2. On entering fullscreen, the chrome hides after 3 s. A mouse move or a tap before this first hide starts the 3 s again, not 10 s.
+  3. After the first hide, a mouse move or a tap shows the chrome and hides it after 10 s, as today.
+  4. Leaving fullscreen shows the chrome, as today.
+- **Done when:** a test with fake timers: enter → hidden at 3 s; a move at 2 s → hidden at 5 s; a tap after the hide → visible, hidden 10 s later. In the browser on a desktop and on a phone, the chrome fades 3 s after entering fullscreen.
+
+### 90. Keep alive in the Android app: screen on, radio in the background — M
+
+- **Feedback (2026-10-04):** "keep alive in the android app". Decision: both, the screen and the background.
+- **Now:**
+  - `useWakeLock(isFullscreen)` keeps the screen on only in Fullscreen-API fullscreen. `isFullscreen` comes from `document.fullscreenElement` (`FullscreenButton`). The Play app (TWA, `display: fullscreen`) is fullscreen through the manifest's display mode, and there `document.fullscreenElement` stays null. So the wake lock never starts, and the phone sleeps after its screen timeout.
+  - The radio (`MusicPlayer`, an `HTMLAudioElement`) has no Media Session. Android shows no lock-screen controls, and it can stop the audio sooner in the background.
+  - When Android stops the app in the background, the next start shows the loading screen again.
+- **Spec:**
+  1. **K1 Screen on:** a pure helper `isInstalledApp()`: true when `matchMedia('(display-mode: fullscreen)')` or `matchMedia('(display-mode: standalone)')` matches. `SunTracker` calls `useWakeLock(isFullscreen || isInstalledApp())`. The hook already gets the lock again on `visibilitychange`. A normal browser tab does not change: there the lock stays fullscreen only.
+  2. **K2 Radio in the background:** while the radio plays, set `navigator.mediaSession.metadata` (the station name, "Sun Chaser", the app icon as artwork), `playbackState`, and the action handlers `play`, `pause` and `nexttrack` (the next station, as the Next button of item 5). The audio plays on with the screen off and in another app. The lock screen and the notification shade show the controls.
+  3. **K3 Fast return:** save the time the app was last visible in `sessionStorage` (`last-visible`, with try/catch). When the page loads and that time is less than 30 min ago, skip the iris and use the `fade` reveal. When the system stopped the app fully, the app starts fresh, as today.
+- **Not in scope:** a "Keep screen on" switch. Add one when users ask for it; the power button still turns the screen off.
+- **Done when:** unit tests for `isInstalledApp` and for the K3 reveal choice. On an Android phone with the Play test build: the app open for 10 min without a touch → the screen stays on; the radio plays for 10 min with the screen off, and the lock screen shows the station with play, pause and next; 2 min in another app and back → no iris (this also checks that `sessionStorage` is still there after a reload by the system).
+
+### 91. Performance: measure, then fix the hot spots — M
+
+- **Request (2026-10-04):** "performance improvements".
+- **Now (from the code, not measured yet):**
+  - **H1 The clock tick renders everything:** `SunTracker` ticks every second (every `PLAY_TICK_MS` during play) and renders the whole tree: `InfoPanel` (1,277 lines), `SunVisualization` (1,294 lines) and `CloudLayer` with every fish, bird and boat. Only `SkyClouds` uses `React.memo`. `CloudLayer` uses the date only for its month and its seeds.
+  - **H2 Glass over moving content:** the glass buttons and the panel use `backdrop-blur-md`. When the sea, the rain or the fish move behind them, the browser blurs again on every frame.
+  - **H3 Filters on moving things:** the jellyfish and squid halos (`drop-shadow`), the boat lights, the shark's blurred shadow and others are filters on moving elements. They repaint on every frame.
+  - **H4 Canvas loops:** `SeaCanvas` (about 30 fps), `RainCanvas` and `NightStars` draw at up to 2× device pixels.
+  - **H5 One large bundle:** the last local build has one JS chunk of 695 KB (before gzip). The easter eggs, the share card and the place search load at start.
+- **Spec:**
+  1. **Measure first.** A script `scripts/perf-trace.mjs` (Playwright with the Chrome DevTools Protocol) opens fixed scenes with a stubbed forecast and a fixed clock: Ravensburg, clear by day with fish, boats and birds; at night with stars; in rain; in fullscreen idle. It runs each scene for 60 s at 390×844 with 4× CPU throttle (the phone profile) and at 1280×800 without throttle. It writes per second: scripting, rendering and painting time, the p95 frame time, long tasks and the JS heap. Run it on `main` and write the baseline into this item.
+  2. **Fix the hypotheses in order, one commit each, and measure after each.** Keep a fix only when it gives a gain:
+     - H1: `React.memo` on `CloudLayer` and the other scene parts. Give them the date rounded to the minute where they need no seconds.
+     - H2: a smaller blur radius, or a solid glass colour without blur while the chrome is hidden in fullscreen.
+     - H3: replace the filters on moving things with drawn glows (a radial gradient in the SVG), and give the moving wrappers `will-change: transform`, so the compositor moves them.
+     - H4: draw the sea at 1× device pixels (it is soft anyway), and at 20 fps in fullscreen idle.
+     - H5: `React.lazy` for the easter eggs, the share card and the place search.
+  3. No visual change: compare screenshots of each scene before and after.
+- **Done when:** the baseline and the numbers after each fix are in this item. Targets, to check against the baseline: on the phone profile at least 30 % less main-thread time per second and a p95 frame time of 33 ms or less; at 1280×800 a p95 frame time of 16.7 ms or less (60 fps); a start bundle at least 25 % smaller. All tests pass, and the screenshots show no difference. The trace script stays in `scripts/`, so items 92–97 can check their frame budget.
+
+### 92. No overlaps: fish, birds and boats plan their lanes — M
+
+- **Feedback (2026-10-04):** "fish & bird collision avoidance, at the moment some fish swim right at top of each other or at boats and birds can sometimes also fly directly at each other".
+- **Now:** every fish, bird and boat crosses from left to right at its own constant speed (the `moveAcrossX` CSS animation). Its height (`y`) is random at spawn, and nothing checks the others. A faster fish catches up with a slower one at the same height and swims through it. Near fish (67–93 % of the height) cross the boat hulls (67–87 %, 94 % in fullscreen). A gull (2.5 %/s) overtakes a heron (1.6 %/s) at the same height, and other birds fly through the hovering kestrel.
+- **Pitch:**
+  - **A1 Lanes planned at spawn (recommended):** all motion is known when a thing spawns: the start, the speed and the rest-stop easing. So the app can calculate where each thing is at any time, and give the new one a free height. No per-frame code, the glide stays straight, and the calm-motion rule holds.
+  - **A2 Steering (boids):** on each frame, each animal turns away from the others. This needs a rAF loop and per-frame state for every animal (against the CSS architecture), costs frame time, and makes the animals wiggle. Not recommended.
+- **Spec (A1):**
+  1. A pure util `src/utils/scenePaths.ts`. `xAt(entity, t)` gives the left edge in % at time t: linear, or along the rest-stop curve of `getRestStopMotion`. `findLane(candidate, others, now)` tests heights near the random pick, in steps of a quarter of the candidate's height and within the type's band. It gives the nearest height where the candidate's box touches no other box during the shared time, with a margin of 25 % of the smaller height. It samples every 0.5 s: at most a few thousand box checks per spawn, a few times per minute.
+  2. Fish check against all fish and all boats; a boat's box includes the hull and its reflection. Birds check against all birds, the bats and the night geese included. Boats check against boats and fish. A pair (P6) or a school uses its whole box, with the lag.
+  3. No free height: skip this spawn. The next check tries again.
+  4. Time-travel play (item 83) changes the rate of all animations by the same factor, so the plan holds, also backwards.
+  5. Item 93's warm start places its first set with `findLane` too.
+- **Done when:** unit tests for `xAt` (linear and with a rest stop) and for `findLane` (a free height, a full band, a pair). A simulation test: 30 min of spawns with the real rules and a fixed seed → no two boxes touch, and the spawn rate drops by 15 % or less. In the browser at 390×844 and 1280×800, 10 min each by day and at night: no overlaps.
+
+### 93. A calmer sea that is full from the start — M
+
+- **Feedback (2026-10-04):** "sea is a bit crowded now, maybe too many fish, and it takes a while until it fills up, pitch some ideas how to circumnavigate".
+- **Now:** a phone shows at most 5 fish (3 at night), 3 boats and 4 birds. Turtles and jellyfish do not count against the fish limit. `getWaterLimit` grows the limits with the width (item 70): ×3 at 1280 px, so 15 fish, 9 boats and 12 birds. Everything enters at the left edge: the first fish comes after 5–8 s, the first boat after 5 s, and on a desktop it takes 4–5 min until animals are spread over the whole width.
+- **Pitch:**
+  - **S1 Warm start:** the scene opens full. The first set starts part of the way across.
+  - **S2 Lower caps:** fewer fish and boats, and less growth on wide screens.
+  - **S3 Busy and quiet phases:** the target number follows the time of day, with slow lulls.
+  - **S4 A density setting:** Calm / Normal / Lively in the panel.
+  - **S5 Both directions:** half of the animals cross from the right. More natural, but head-on meetings need item 92, and every drawing needs a mirrored form.
+- **Picks (2026-10-04):** "Warm start, Busy and quiet phases, Lower caps" (S1, S3, S2).
+- **Spec:**
+  1. **S1 Warm start:** at load, and when a group starts again (for example the day fish after rain), spawn the group's target number at once. Each one gets a random progress p of 0.1–0.9 and a negative `animation-delay` of −p × its duration, so it starts p of the way across. The rest-stop easing works with a negative delay too. Each one gets its height from `findLane` (item 92). Then the normal spawn loop continues.
+  2. **S2 Lower caps:** `MAX_FISH` 5 → 3, `MAX_NIGHT_FISH` 3 → 2, `MAX_BOATS` 3 → 2; `MAX_BIRDS` stays 4. Turtles and jellyfish count against the fish limit. `getWaterLimit` grows the limits with the width up to ×1.5, not ×3 (1280 px: 5 fish, 3 boats, 6 birds). This takes back part of item 70.
+  3. **S3 Busy and quiet phases:** a pure util `getSceneDensity(date, sunTimes, seed)` gives a factor of 0.3–1. The base curve: 1 in the hour around sunrise and around sunset (feeding time, and the birds fly to their roost), 0.7 by day, 0.5 at night. A slow lull on top: a seeded noise in 10-minute steps (the seed is the day and the rounded place, as for the clouds) takes away 0–40 %. The factor multiplies the caps (rounded, at least 1) and the spawn chance. When the target goes down, nothing is removed: the animals on screen swim on.
+  4. The calm-motion rule stays: no speed changes.
+- **Not picked:** S4 (a density setting) and S5 (both directions).
+- **Depends on:** item 92.
+- **Done when:** unit tests for the caps, the width growth and `getSceneDensity` (the curve, the lull range, the same value for the same seed). A simulation test: 1 s after load the sea has at least 60 % of its target; over a simulated day the mean number on screen follows the curve. In the browser at 390×844 and 1280×800: the sea is full at load and quieter than today.
+
+### 94. Shark hunt — M — lookbook first
+
+- **Feedback (2026-10-04):** "shark attacking and eating other fish".
+- **Conflict:** the calm-motion rule (items 15, 62 and 66): slow straight glides, no fish faster than the sailboat (1.2 %/s), no jumping. An attack is fast by nature. Decision (2026-10-04): a lookbook first.
+- **Now:** a shark (item 85, SH1) is 1 in 200 fish, by day and at night (in the moon pool). It glides at 0.5 %/s at a depth of 0.3–1 and does not touch other fish.
+- **Lookbook (to build):**
+  - **H1 Gentle gulp:** the shark keeps its glide. Its lane is planned to meet a small fish, and the fish fades into the shark's shadow with a few bubbles.
+  - **H2 Short chase:** the shark speeds up to at most 1.2 %/s for a few seconds; nearby small fish turn away.
+  - **H3 The school splits:** a minnow school opens around the shark and closes behind it. No fish is eaten.
+  - **H4 Near miss:** the fish sinks into the dark water just in time.
+  - **H5 From below:** the shark rises from the deep haze under a fish; a ring of bubbles, and the fish is gone.
+  - **Add-ons:** X1 a ripple ring on the surface; X2 small fish keep away from the shark's lane for a while; X3 the shark slows down after a meal; X4 a hunt on some sharks only (for example 1 in 2).
+  - Each variant on a day, a dusk and a moon-pool night strip, at real size and at 3×, and on a 390×844 phone.
+- **Mechanics (all variants):** a hunt is a planned meeting. When a shark spawns, item 92's `xAt` finds a small fish (a minnow school, a classic fish, a perch, a trout) in the same depth band whose path the shark meets on screen (at 20–80 % of the width). The shark takes that lane. At the meeting time a timeout plays the hunt on that fish. No per-frame code. No hunts during time-travel play (item 83).
+- **Depends on:** item 92.
+- **Done when:** the lookbook is built and the picks are in this item. Then the spec, the build and the tests.
+
+### 95. Info cards: tap anything in the scene — L
+
+- **Feedback (2026-10-04):** "clickable elements, get infos when you click on a boat, fish, bird, plane, satellite, cloud, the sun, the moon, the terrain". Free.
+- **Now:** the scene layer (`CloudLayer`) is `pointer-events-none`. Only the sun is a button: 7 taps give it sunglasses (hidden egg). The fish are 7–60 px wide, many smaller than a finger.
+- **Spec:**
+  1. **Hit areas:** each fish, bird, boat, plane and satellite wrapper gets `pointer-events-auto` and an invisible hit area of at least 44 × 44 px around it (the WCAG 2.5.5 target size). The rest of the scene stays `pointer-events-none`: a tap on empty water does nothing, and touch scrolling in the panel (item 2) does not change.
+  2. **Card:** a small glass card (the glass style, 18 px corners) shows above the tapped point, inside the screen. It closes on a tap outside, on Escape, or after 15 s. One card at a time.
+  3. **Follow, do not stop:** the tapped thing moves on (a stop would break item 92's lane plan and item 94's hunt). A thin ring follows it as a child of its wrapper, so the same CSS animation moves it. When the thing leaves the screen, the card stays until it closes.
+  4. **Content** (every text in `en.ts`, `de.ts`, `es.ts`, `it.ts` and `fr.ts`):
+     - **Fish:** the species, one fact (for example "Lanternfish make their own light"), and day or night fish.
+     - **Bird:** the species, one fact (for example "Geese fly in a V to save energy"), and its season (item 74).
+     - **Boat:** the type (sailboat, ferry, fishing boat, rowboat, freighter) and one fact.
+     - **Cloud:** the cloud type (item 84), its layer (low, middle, high) and the cover in % from the forecast.
+     - **Sun:** the altitude and the direction, the next event with a countdown ("Sunset in 2 h 13 min"), and the golden hour. The 7-tap egg stays: each tap counts, and the card opens on the first.
+     - **Moon:** the phase name, the lit part in %, rise and set, and the distance (supermoon).
+     - **Terrain:** the direction, the horizon angle, and the distance and height of the ridge point. Today `computeHorizonProfile` stores only the angle per azimuth; it also stores the distance and the height of the point that gives the angle. Peak names (OpenStreetMap `natural=peak`) are a later step.
+     - **Plane and satellite:** items 96 and 97 add their cards.
+  5. **Accessibility:** the sun, the moon and the terrain are buttons with an `aria-label` and work with the keyboard. The moving things are pointer-only and `aria-hidden`.
+  6. With `prefers-reduced-motion` there are no moving things, so only the sun, moon, cloud and terrain cards.
+- **Done when:** unit tests for the card content per type and for the ridge distance and height. Component tests: a tap on a fish opens its card; a tap outside closes it; the sun still counts 7 taps. In the browser at 390×844: each type can be tapped, the card stays inside the screen, and the frame budget holds (item 91).
+
+### 96. Planes with contrails; live flight radar — L — Premium (the live radar)
+
+- **Feedback (2026-10-04):** "planes that leave cloud strips in the distance, with a flight radar connection". Decision: the live radar is Premium.
+- **Spec, free: planes and contrails:**
+  1. A small airliner silhouette crosses high and far (y 8–30 %), at 0.3–0.6 %/s, about one every 3–6 min by day. At night only its lights show: a white light that blinks slowly (every 2 s) and the red or green wing light. No planes in fog, overcast, storm or rain: they cannot be seen.
+  2. **Contrails from the real upper air:** the forecast request gets `temperature_250hPa` and `relative_humidity_250hPa` (about 10.4 km high). A pure util `getContrail(tempC, rhPercent)`:
+     - warmer than −40 °C: no contrail;
+     - −40 °C or colder, RH below 40 %: a short trail that fades in about 10 s;
+     - RH 65 % or more: the air is about saturated with respect to ice, so the trail stays, spreads slowly to a band and fades over 5–10 min;
+     - between: a medium trail (about 1 min).
+     The thresholds are constants, to tune against photos of the real sky.
+  3. The trail is a thin line behind the plane. It grows with the plane (CSS, the same animation clock), and widens and fades slowly. It takes the light of the sky: white by day, pink and gold at sunset (the clouds' light, item 84).
+  4. Planes get their lanes with the birds (item 92).
+- **Spec, Premium: live flight radar:**
+  1. **Source:** the adsb.lol API (open ADS-B data). The free OpenSky API is for non-commercial use only, so a Premium feature cannot use it. Before the build, check the adsb.lol endpoint, CORS, rate limits and licence terms (ODbL attribution). When CORS is closed, a Vercel Edge function forwards the request.
+  2. **Request:** the aircraft within 100 km, every 15 s, only while the app is visible and the live radar is on. Send the place rounded to 0.1° (about 11 km), not the exact place.
+  3. **Place on the screen:** from the observer to each aircraft, the bearing gives x (`getAzimuthScreenFraction`, or the compass field of view in compass mode, item 19), and the elevation angle gives y (the altitude scale of the sun arc). An aircraft below 1° or behind the terrain (`horizonAngleAt`) does not show. Between two requests each aircraft moves on with its speed and track, so the motion is smooth. A jet 50 km away moves about 0.3°/s, which is calm.
+  4. The contrail rule of the free part applies to each aircraft above 8 km.
+  5. **Card (item 95):** the callsign, the airline, the aircraft type, the altitude, the speed, and the route when adsb.lol has one; "Data: adsb.lol".
+  6. A "Live planes" switch in the panel with the gold plus (item 35). Off by default, because it sends the rounded place to a third party. `usePremium` gates it in the Play app; on the web it is free (item 45).
+  7. CSP: add the host to `connect-src` in `vercel.json`. The privacy policy (item 16) names adsb.lol.
+- **Depends on:** item 92; item 95 for the card.
+- **Done when:** unit tests for `getContrail`, the bearing and the elevation angle (known places), the dead reckoning, and the rounding of the place. In the browser with a stubbed feed: the planes show at the right direction and height, also in compass mode, and hide behind the terrain. With the real feed in Ravensburg: the directions match a flight-radar website within about 2°. The frame budget holds (item 91).
+
+### 97. Satellites at night; satellite tracking — L — Premium (the tracking)
+
+- **Feedback (2026-10-04):** "satellites in the night, with satellite tracking". Decision: the tracking is Premium.
+- **Background:** a satellite is visible only when it is dark on the ground and the satellite is still in sunlight. That is mostly in the 1–2 h after dusk and before dawn. A satellite fades out when it enters the Earth's shadow.
+- **Spec, free: satellites:**
+  1. When the sun is below −6° and the sky is clear or partly cloudy, a small white dot crosses the sky in a straight line at 0.1–0.3 %/s. About one every 2–4 min in the 2 h after dusk and before dawn, fewer in the middle of the night. Some fade out in the middle of the sky (into the Earth's shadow). No blinking: that is a plane.
+  2. The clouds dim the dots with the stars' cloud factor (item 52).
+- **Spec, Premium: satellite tracking:**
+  1. **Data:** the CelesTrak GP data (orbits as OMM JSON) for the groups `stations` (ISS, Tiangong), `visual` (about 100 bright satellites) and `last-30-days` (for a fresh Starlink train). Fetch once a day and cache it in `localStorage`, as the weather. CelesTrak updates the data every 2 h and blocks clients that fetch the same data more often.
+  2. **Orbits:** SGP4 with `satellite.js` (MIT), a new dependency, loaded with a dynamic `import()` only when the tracking is on. SGP4 is too much code to write by hand.
+  3. **Visibility:** a satellite shows when its elevation is above 10°, the sun is below −6° at the observer, and the satellite is in sunlight (a cylinder test against the Earth's shadow, with the sun direction from `sunUtils`). The brightness comes from the distance; the ISS is brighter.
+  4. **Place on the screen:** as for the planes (item 96): the azimuth gives x, the elevation gives y, and the terrain hides it. A new position every second, with CSS in between. The ISS crosses the sky in about 5 min, which is calm.
+  5. **Pass reminder:** "ISS visible at 20:14, from W to SE, up to 54°", 10 min before, with the notification of item 69 (while the app is open).
+  6. **Card (item 95):** the name, the altitude, the speed, the time until it enters the Earth's shadow, and the next pass.
+  7. A "Satellite tracking" switch in the panel with the gold plus. On by default for Premium: it sends no place, because the data is global. `usePremium` gates it in the Play app; on the web it is free (item 45).
+  8. CSP: add `celestrak.org` to `connect-src`.
+- **Depends on:** item 95 for the card.
+- **Done when:** unit tests for the shadow test, the visibility rule and the pass search (against a known ISS pass from heavens-above.com, within 1 min and 2°). In the browser with a fixed clock on the evening of a known ISS pass: the ISS crosses at the right time and in the right direction, and fades into the shadow. The frame budget holds (item 91).
 
 ---
 
