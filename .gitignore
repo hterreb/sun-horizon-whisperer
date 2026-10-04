@@ -27,3 +27,6 @@ vite.config.ts.timestamp-*
 .vercel
 .env*
 .playwright-mcp/
+
+# A Deno run in the repo root writes a stray lock; each Supabase function has its own (AUDIT S-17).
+/deno.lock
