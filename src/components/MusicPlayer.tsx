@@ -232,7 +232,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
         type="button"
         onClick={handleNext}
         aria-label={t('music.next')}
-        className="text-white/80 hover:text-white transition-colors rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+        className="text-white/80 hover:text-white transition-colors rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70"
       >
         <SkipForward className="h-4 w-4" />
       </button>

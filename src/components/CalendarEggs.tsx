@@ -40,7 +40,7 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherTy
           data-testid="season-badge"
           // On the water, clear of the InfoPanel (top) and the arc labels (horizon).
           style={{ top: horizonY + 90 }}
-          className={`absolute left-1/2 z-[9] -translate-x-1/2 whitespace-nowrap rounded-full px-3 py-1 text-caption text-white pointer-events-none ${GLASS_SURFACE}`}
+          className={`absolute left-1/2 z-9 -translate-x-1/2 whitespace-nowrap rounded-full px-3 py-1 text-caption text-white pointer-events-none ${GLASS_SURFACE}`}
         >
           {seasonText}
         </div>
@@ -95,8 +95,8 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherTy
         <svg
           data-testid="black-cat"
           aria-hidden="true"
-          // z-[5]: in front of the terrain silhouette, drawn later in SunVisualization.
-          className="absolute z-[5] pointer-events-none"
+          // z-5: in front of the terrain silhouette, drawn later in SunVisualization.
+          className="absolute z-5 pointer-events-none"
           style={{ left: '-10%', top: horizonY - 30, ['--dx' as string]: '120vw', animation: 'egg-glide 45s linear forwards' }}
           width={48}
           height={30}

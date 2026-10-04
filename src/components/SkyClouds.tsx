@@ -201,7 +201,7 @@ const SkyClouds: React.FC<SkyCloudsProps> = ({
       {veil && (
         // The overcast veil over the top of the sky (item 10), in the clouds' light (C2).
         <div
-          className="absolute inset-0 transition-colors duration-[5000ms]"
+          className="absolute inset-0 transition-colors duration-5000"
           style={{ background: `linear-gradient(to bottom, ${veil.color} 0%, transparent 40%)`, opacity: veil.opacity }}
           data-testid="cloud-veil"
         />

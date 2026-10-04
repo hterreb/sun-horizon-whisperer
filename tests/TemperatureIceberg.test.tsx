@@ -15,9 +15,10 @@ const mockReducedMotion = (matches: boolean) =>
   } as unknown as MediaQueryList);
 
 describe('TemperatureIceberg', () => {
-  it('uses an arbitrary-value Tailwind z-index class (C-12)', () => {
+  // C-12: v3 had no z-6 and needed z-[6]; v4 generates z-6 (AUDIT D-6).
+  it('uses a z-index class that Tailwind generates (C-12)', () => {
     const { container } = render(<TemperatureIceberg temperature={-5} isVisible={true} />);
-    const iceberg = container.querySelector('.z-\\[6\\]');
+    const iceberg = container.querySelector('.z-6');
     expect(iceberg).toBeInTheDocument();
   });
 

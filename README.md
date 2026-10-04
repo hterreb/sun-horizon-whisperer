@@ -88,6 +88,12 @@ Required secrets (set with `supabase secrets set`):
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SITE_URL` — used for CORS and Stripe redirect URLs.
 
+Each function has its own `deno.json` (exact npm versions) and `deno.lock` (integrity hashes; the Edge runtime refuses to boot when they do not match). Write the lock with the Deno version of the Edge runtime (Deno 2.1.4 in `edge-runtime` v1.77.1), not with a newer local Deno, whose lock format the runtime cannot read:
+
+```sh
+docker run --rm -v "$PWD/supabase/functions/<name>":/fn -w /fn denoland/deno:2.1.4 cache --node-modules-dir=none index.ts
+```
+
 The `subscribers` table and its RLS policy are in `supabase/migrations/`. Apply them with `supabase db push` before you deploy the functions. The first Premium release does not use them: Premium is a one-time Google Play purchase in the Play app only, and the web stays free (ROADMAP items 14 and 45). The functions stay for a possible later web sale.
 
 ## Lovable
