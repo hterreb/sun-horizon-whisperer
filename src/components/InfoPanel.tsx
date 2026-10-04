@@ -597,7 +597,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               <div className="flex items-center justify-between mb-2">
                 <h3 className={SECTION_HEADING}>
                   <Thermometer size={16} className="mr-2" />
-                  {t('weather.current')}
+                  {t(weatherData.isForecast ? 'weather.forecast' : 'weather.current')}
                 </h3>
                 <button
                   onClick={onWeatherRefresh}

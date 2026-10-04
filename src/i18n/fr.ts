@@ -57,6 +57,7 @@ export const fr: Record<keyof typeof en, string> = {
 
   // Weather
   'weather.current': "Météo actuelle",
+  'weather.forecast': "Prévisions",
   'weather.refresh': "Actualiser la météo",
   'weather.temperature': "Température :",
   'weather.temperatureUnit': "Unité de température",

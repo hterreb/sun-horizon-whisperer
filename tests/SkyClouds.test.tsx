@@ -1,6 +1,6 @@
 import React from 'react';
-import { render } from '@testing-library/react';
-import SkyClouds from '../src/components/SkyClouds';
+import { act, render } from '@testing-library/react';
+import SkyClouds, { LAYOUT_FADE_MS } from '../src/components/SkyClouds';
 import type { WeatherType } from '../src/components/CloudLayer';
 import type { TimeOfDay } from '../src/utils/sunUtils';
 import { DEFAULT_CLOUD_LAYERS, getCloudCentre, getGliderStartProgress, getSkyClouds } from '../src/utils/skyCloudUtils';
@@ -97,5 +97,48 @@ describe('SkyClouds (ROADMAP item 84)', () => {
     expect(sky({ weatherType: 'cloudy', timeOfDay: 'night' }).querySelector('[data-testid="cloud-moonlight"]')).toBeNull();
     // No radius (the night geese's moon): no lining.
     expect(sky({ weatherType: 'cloudy', timeOfDay: 'night', moon: { x: moon.x, y: moon.y } }).querySelector('[data-testid="cloud-moonlight"]')).toBeNull();
+  });
+});
+
+describe('SkyClouds layout cross-fade (ROADMAP item 87)', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('fades the old layout out and the new one in, and drops the old one after the fade', () => {
+    vi.useFakeTimers();
+    const props = {
+      timeOfDay: 'midday' as TimeOfDay, date: DATE, latitude: 47.78, longitude: 9.61, cloudLayers: null,
+      windDirectionDeg: 270, sun: null, moon: null, skyGradient: null, egg: false,
+    };
+    const { container, rerender } = render(<SkyClouds {...props} weatherType="partly" />);
+    const layouts = () => [...container.querySelectorAll<HTMLElement>('[data-testid="sky-clouds"]')];
+    const first = layouts()[0];
+    expect(layouts()).toHaveLength(1);
+
+    rerender(<SkyClouds {...props} weatherType="overcast" />);
+    expect(layouts()).toHaveLength(2);
+    // The old layout keeps its DOM (its glides go on) and fades to 0; the new one fades in.
+    expect(layouts()[0]).toBe(first);
+    expect(first.dataset.fading).toBe('true');
+    expect(first.style.opacity).toBe('0');
+    expect(layouts()[1].dataset.fading).toBeUndefined();
+    expect(layouts()[1].className).toContain('starting:opacity-0');
+    // The new veil fades in on a wrapper, not on its own inline opacity.
+    expect(container.querySelector('[data-testid="cloud-veil"]')!.parentElement!.className).toContain('starting:opacity-0');
+
+    act(() => {
+      vi.advanceTimersByTime(LAYOUT_FADE_MS);
+    });
+    expect(layouts()).toHaveLength(1);
+    expect(layouts()[0].dataset.low).toBe('stratus');
+  });
+
+  it('does not fade when only the light changes', () => {
+    const props = {
+      weatherType: 'partly' as WeatherType, date: DATE, latitude: 47.78, longitude: 9.61, cloudLayers: null,
+      windDirectionDeg: 270, sun: null, moon: null, skyGradient: null, egg: false,
+    };
+    const { container, rerender } = render(<SkyClouds {...props} timeOfDay="midday" />);
+    rerender(<SkyClouds {...props} timeOfDay="nautical-twilight" />);
+    expect(container.querySelectorAll('[data-testid="sky-clouds"]')).toHaveLength(1);
   });
 });

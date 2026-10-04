@@ -134,6 +134,19 @@ const glideStyle = (glider: CloudGlider, reduced: boolean): React.CSSProperties 
 
 const canTick = typeof Element !== 'undefined' && typeof Element.prototype.getAnimations === 'function';
 
+// A new layout (a forecast hour in time travel, the weather, a new day) cross-fades with
+// the old one (ROADMAP item 87). A transition, so item 83's play rate does not speed it up
+// or run it back; a forecast hour lasts 6 s in play.
+export const LAYOUT_FADE_MS = 3000;
+const FADE = 'transition-opacity duration-3000 ease-in-out starting:opacity-0 motion-reduce:transition-none';
+
+interface Layout {
+  key: string;
+  gliders: CloudGlider[];
+  weather: WeatherType;
+  low: string;
+}
+
 const SkyClouds: React.FC<SkyCloudsProps> = ({
   weatherType, timeOfDay, date, latitude, longitude, cloudLayers, windDirectionDeg, sun, moon, skyGradient, egg,
 }) => {
@@ -165,8 +178,6 @@ const SkyClouds: React.FC<SkyCloudsProps> = ({
   const moonPx = moon ? { x: (moon.x / 100) * width, y: (moon.y / 100) * height, r: moon.r ?? 0 } : null;
   const source = sun && sun.altitude > -12 ? sunPx : moonPx;
   const sky = skyGradient ?? getBackgroundGradient(timeOfDay);
-  const veil = getCloudVeil(weatherType, light);
-  const shadowLook = getCloudShadowLook(weatherType, light);
   const shadowColor = useMemo(() => getWaterColors(sky).deep, [sky]);
 
   // Where each glider is now. Once a second the tick reads each glide's progress (so the
@@ -193,24 +204,63 @@ const SkyClouds: React.FC<SkyCloudsProps> = ({
   }, [gliders, layoutKey, reduced]);
 
   const moonGlow = moon?.light ?? 1;
-  const types = getCloudTypes(weatherType, layers);
   const scale = getSceneScale(height);
+
+  // The layout fading out (item 87), with the glide progress it had; the new one fades in.
+  const layout = useMemo<Layout>(
+    () => ({ key: layoutKey, gliders, weather: weatherType, low: getCloudTypes(weatherType, layers).low ?? 'none' }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on layoutKey, which holds every input
+    [layoutKey]
+  );
+  const [shown, setShown] = useState<{ current: Layout; fading: (Layout & { progress: number[] }) | null }>(
+    () => ({ current: layout, fading: null })
+  );
+  if (shown.current.key !== layoutKey) {
+    const old = shown.current;
+    setShown({
+      current: layout,
+      fading: { ...old, progress: ticked?.key === old.key ? ticked.progress : old.gliders.map(getGliderStartProgress) },
+    });
+  }
+  useEffect(() => {
+    if (!shown.fading) return;
+    const id = setTimeout(() => setShown(prev => ({ ...prev, fading: null })), LAYOUT_FADE_MS);
+    return () => clearTimeout(id);
+  }, [shown.fading]);
+  const layouts = [
+    ...(shown.fading ? [{ ...shown.fading, out: true }] : []),
+    { ...layout, progress, out: false },
+  ];
 
   return (
     <>
-      {veil && (
-        // The overcast veil over the top of the sky (item 10), in the clouds' light (C2).
-        <div
-          className="absolute inset-0 transition-colors duration-5000"
-          style={{ background: `linear-gradient(to bottom, ${veil.color} 0%, transparent 40%)`, opacity: veil.opacity }}
-          data-testid="cloud-veil"
-        />
-      )}
-      <div key={layoutKey} className="absolute inset-0" data-testid="sky-clouds" data-low={types.low ?? 'none'}>
+      {layouts.map(({ key, weather, out }) => {
+        const veil = getCloudVeil(weather, light);
+        // The fade is on a wrapper: an inline opacity would win over the starting style.
+        return veil && (
+          <div key={key} className={`absolute inset-0 ${FADE}`} style={out ? { opacity: 0 } : undefined}>
+            {/* The overcast veil over the top of the sky (item 10), in the clouds' light (C2). */}
+            <div
+              className="absolute inset-0"
+              style={{ background: `linear-gradient(to bottom, ${veil.color} 0%, transparent 40%)`, opacity: veil.opacity }}
+              data-testid="cloud-veil"
+            />
+          </div>
+        );
+      })}
+      {layouts.map(({ key, gliders, weather, low, progress, out }) => (
+      <div
+        key={key}
+        className={`absolute inset-0 ${FADE}`}
+        style={out ? { opacity: 0 } : undefined}
+        data-testid="sky-clouds"
+        data-low={low}
+        data-fading={out || undefined}
+      >
         {gliders.map((glider, i) => (
           <div
             key={glider.id}
-            ref={el => { glideRefs.current[i] = el; }}
+            ref={out ? undefined : el => { glideRefs.current[i] = el; }}
             className="absolute left-0 top-0"
             style={glideStyle(glider, reduced)}
             data-testid={glider.clouds.length > 1 ? 'cloud-row' : 'cloud-glider'}
@@ -224,7 +274,7 @@ const SkyClouds: React.FC<SkyCloudsProps> = ({
                   key={j}
                   cloud={cloud}
                   gradId={`${uid}-${glider.id}-${j}`}
-                  weather={weatherType}
+                  weather={weather}
                   light={light}
                   angle={getLightAngle(centre, source)}
                   skyGradient={sky}
@@ -239,9 +289,12 @@ const SkyClouds: React.FC<SkyCloudsProps> = ({
           </div>
         ))}
       </div>
-      {shadowLook && (
+      ))}
+      {layouts.map(({ key, gliders, weather, progress, out }) => {
+        const shadowLook = getCloudShadowLook(weather, light);
+        return shadowLook && (
         // X2: the shadows on the sea, over the water and the waves, under the fish (z 5).
-        <div key={`shadows-${layoutKey}`} className="absolute inset-0" style={{ zIndex: 4 }} data-testid="cloud-shadows">
+        <div key={`shadows-${key}`} className={`absolute inset-0 ${FADE}`} style={{ zIndex: 4, opacity: out ? 0 : undefined }} data-testid="cloud-shadows">
           {gliders.map((glider, i) => {
             const cloud = glider.clouds[0];
             if (!cloud.shadow) return null;
@@ -268,7 +321,8 @@ const SkyClouds: React.FC<SkyCloudsProps> = ({
             );
           })}
         </div>
-      )}
+        );
+      })}
       <style>{`
         @keyframes skyGlideRight {
           to { transform: translateX(100%); }

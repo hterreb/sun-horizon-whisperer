@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release. An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-04. Done: items 1–15, 17–44, 47–85 (item 14: the Play-app code, with `PREMIUM_ENFORCED` off until item 16), item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: item 16 (with it: turn on `PREMIUM_ENFORCED`, and check with a licence tester that a purchase is still there after 3 days, see item 14 "Acknowledge"; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
+Status: last updated 2026-10-04. Done: items 1–15, 17–44, 47–87 (item 14: the Play-app code, with `PREMIUM_ENFORCED` off until item 16), item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: item 16 (with it: turn on `PREMIUM_ENFORCED`, and check with a licence tester that a purchase is still there after 3 days, see item 14 "Acknowledge"; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
 
 ## Verification (2026-09-28)
 
@@ -547,7 +547,7 @@ Seven feedback reports from production (Ravensburg, release `6da35c1`, 29 Sep 16
     - The gold plus from item 35 on the row. The feature stays free while `PREMIUM_ENFORCED` is false.
   - **Preview (offset not 0):** the row shows the date and time, for example "Oct 3, 18:42" (reuse `formatMoonDate` in `InfoPanel.tsx`). A "Back to now" glass pill at the bottom centre, above the radio, stays visible in fullscreen. It sets the offset to 0 and stops play.
   - **Stays live:** the weather and the sunset score (there is no weather for other times), and the spawns of birds, fish and boats. The countdown (item 43) and the fireworks (item 41) run only in live mode.
-  - Not part of this item: weather from the Open-Meteo hourly forecast for the next 7 days.
+  - Not part of this item: weather from the Open-Meteo hourly forecast for the next 7 days (built in item 86).
 - **Done when:**
   - Tests: an offset of +6 h gives `getSunPosition(now + 6 h)`. Play forward moves `date` by 10 min per second (fake timers). "Back to now" returns to live. A preview does not fetch the weather again. No countdown and no fireworks during a preview.
   - In the browser: play through a sunset. The sun moves along its arc, the sky colours change, and the panel times follow. One play tick takes less than 16 ms in the profiler.
@@ -1408,6 +1408,29 @@ Six open Sentry feedback reports from 2026-10-02 20:48 to 2026-10-03 18:58, all 
   - Night (2026-09-27 00:30, full moon at 47°): the moonlit burbot and eel only in the pool layer (opacity 1.0); a forced jellyfish glows at 0.59 with the 2 px halo.
   - `?fish=shark`: the fin with its glint, the faint body and the V-wake, 33–52 px wide; at night only in the moon pool, with moonlit fins. `?fish=dolphins`: pods of 2 and 3; held mid-roll, the leader's back and fin are above the water with the glint and the wake, the next one rising (day, dusk with the gold glint, and in the moon pool at night).
   - Speeds on the animation clock: the fastest fish 4.27 px/s at 390 px (a near classic fish, 1.15 %/s) and 4.73 px/s at 1280 px (a near trout); a near sailboat is 4.68 and 5.16 px/s. Sharks 1.15–1.62 px/s, pods 1.8–2.6 px/s.
+
+### 86. Time travel shows the forecast weather — S — **✅ Done**
+
+- **Feedback (2026-10-04):** "while fast forwarding the weather stays the same, it should change the weather from weather forecasts".
+- **Now:** item 44 keeps the live weather in a preview. The weather request already gets hourly cloud layers and visibility for 2 days (for the sunset score), but no weather code, temperature, wind or rain per hour.
+- **Spec:**
+  - Add `temperature_2m`, `weather_code`, `cloud_cover`, `wind_speed_10m`, `wind_direction_10m` and `precipitation` to `hourly=`, with `past_days=1&forecast_days=7` (yesterday to 6 days ahead, 192 hours). Keep the hourly block in `WeatherData` and in the cache; a cache entry without it is refetched.
+  - A pure `getWeatherAt(data, at)` (`weatherUtils.ts`) returns the forecast hour nearest `at`: temperature, weather type and condition, cloud cover and layers, wind, rain (mm in the hour = mm/h). Outside the forecast it returns the live weather unchanged.
+  - `SunTracker`: in a preview, `weatherData` and (in Real mode) `weatherType` come from `getWeatherAt`, memoized on the hour, so play changes the weather once per forecast hour (every 6 s at 10 min/s), not per tick. Manual weather stays manual. No new request in a preview.
+  - InfoPanel: the weather heading reads "Forecast" while it shows a forecast hour (new key `weather.forecast` in 5 languages).
+- **Not changed:** the sunset score stays today's and tomorrow's. The cloud layout is new when the layers change, so in play the clouds change at each forecast hour (cross-fade: item 87).
+- **Checked:** 4 new tests (945 in all); lint and typecheck pass. In headless Chromium at 390×844, Ravensburg, real Open-Meteo forecast, 2026-10-04 02:26: play forward for 60 s showed "Mainly clear" → "Fog" (05:26–10:26) → "Mainly clear", with the temperature following the hours; a jump to 2026-10-08 10:00 showed rain; "Back to now" returned to "Current Weather". No weather request during the preview.
+
+### 87. Clouds cross-fade to a new layout — S — **✅ Done**
+
+- **Feedback (2026-10-04):** "add the fading" (after item 86: in play the clouds jump to a new layout at each forecast hour).
+- **Now:** `SkyClouds` keys its clouds, shadows and veil on `layoutKey` (the day, the weather, the layer cover, the screen, the wind side). A new key replaces the old layout at once.
+- **Spec:**
+  - The old layout stays mounted for `LAYOUT_FADE_MS` (3 s) and fades to 0; its glides go on. The new layout fades in from 0 (`@starting-style`, Tailwind `starting:opacity-0`). Clouds, sea shadows and the overcast veil fade together.
+  - CSS transitions, so item 83's play rate does not speed the fade up or run it back (a forecast hour lasts 6 s in play). Reduced motion: no fade.
+  - The fading layout keeps the glide progress of its last tick, so its light and silver lining do not jump.
+- **Not changed:** the sky gradient (the overcast mix of item 50) still changes at once; a gradient cannot transition in CSS.
+- **Checked:** 2 new tests (947 in all); lint, typecheck and build pass. In headless Chromium at 390×844, Ravensburg, real forecast, play from 2026-10-04 04:15: at the switch to fog, the old layout went 1 → 0 and the fog layout 0 → 1 in about 3 s, also at the next hour (fog to fog with new layers). No new console errors.
 
 ---
 
