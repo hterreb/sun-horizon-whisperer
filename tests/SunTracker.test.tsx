@@ -469,6 +469,35 @@ describe('SunTracker', () => {
       expect(weatherFetches()).toBe(before);
     });
 
+    it('during a preview the weather follows the hourly forecast (ROADMAP item 86)', async () => {
+      global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({
+        current_weather: { temperature: 20, weathercode: 0, windspeed: 5, winddirection: 0, time: '' },
+        current: { cloud_cover: 0, wind_speed_10m: 5, wind_direction_10m: 0 },
+        hourly: {
+          time: ['2026-09-30T12:00', '2026-09-30T13:00', '2026-09-30T14:00'],
+          cloud_cover_low: [0, 0, 80], cloud_cover_mid: [0, 0, 60], cloud_cover_high: [0, 0, 20], visibility: [24000, 24000, 8000],
+          temperature_2m: [20, 19, 13.6], weather_code: [0, 0, 63], cloud_cover: [0, 0, 95],
+          wind_speed_10m: [5, 5, 30], wind_direction_10m: [0, 0, 250], precipitation: [0, 0, 4],
+        },
+      }) })) as unknown as typeof fetch;
+      vi.setSystemTime(NOON);
+      saveManualLocation(RAVENSBURG.latitude, RAVENSBURG.longitude, 'Ravensburg');
+      render(<SunTracker />);
+      await act(() => vi.advanceTimersByTimeAsync(300));
+      expect(visProps.current!.weatherType).toBe('clear');
+
+      jumpTo('2026-09-30T14:10'); // TZ is UTC in tests: nearest forecast hour 14:00
+      expect(visProps.current).toMatchObject({
+        weatherType: 'rain', temperatureC: 14, cloudCoverPercent: 95, windSpeedKmh: 30, rainMmH: 4,
+        cloudLayers: { low: 80, mid: 60, high: 20 },
+      });
+      expect(screen.getByText('Forecast')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Back to now' }));
+      expect(visProps.current).toMatchObject({ weatherType: 'clear', temperatureC: 20, cloudCoverPercent: 0 });
+      expect(screen.getByText('Current Weather')).toBeInTheDocument();
+    });
+
     it('starts the fireworks when live time passes the sunset (control)', () => {
       const sunset = getSunTimes(NOON, RAVENSBURG.latitude, RAVENSBURG.longitude).sunset!;
 

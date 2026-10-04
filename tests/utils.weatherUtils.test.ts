@@ -1,4 +1,4 @@
-import { fetchCurrentWeather, getSunsetScore, getScoreReason, WMO_CODE_MAP } from '../src/utils/weatherUtils';
+import { fetchCurrentWeather, getSunsetScore, getScoreReason, getWeatherAt, WMO_CODE_MAP, type WeatherData } from '../src/utils/weatherUtils';
 import { type WeatherType } from '../src/components/CloudLayer';
 describe('weatherUtils', () => {
   it('fetches weather data (mocked)', async () => {
@@ -367,5 +367,45 @@ describe('fetchCurrentWeather rain amount (ROADMAP item 77, X1)', () => {
     };
     localStorage.setItem('weather_cache', JSON.stringify({ data: cached, timestamp: Date.now(), latitude: 20, longitude: 20 }));
     expect((await fetchCurrentWeather(20, 20)).precipitationMmH).toBeNull();
+  });
+});
+
+describe('getWeatherAt (ROADMAP item 86)', () => {
+  const live: WeatherData = {
+    temperature: 20, weatherType: 'clear', conditionKey: 'condition.clearSky', lastUpdated: new Date(), isRealWeather: true,
+    sunsetScoreToday: null, sunsetScoreTomorrow: null, cloudCoverPercent: 0, windSpeedKmh: 5, windDirectionDeg: 0,
+    precipitationMmH: null, cloudLayers: { low: 0, mid: 0, high: 0 },
+    hourly: {
+      time: ['2026-10-04T00:00', '2026-10-04T01:00'],
+      cloud_cover_low: [10, 70], cloud_cover_mid: [0, 40], cloud_cover_high: [0, 5], visibility: [24000, 9000],
+      temperature_2m: [8.4, 7.6], weather_code: [2, 65], cloud_cover: [30, 100],
+      wind_speed_10m: [12, 40], wind_direction_10m: [180, 270], precipitation: [0, 9.5],
+    },
+  };
+
+  it('returns the forecast hour nearest the time', () => {
+    expect(getWeatherAt(live, new Date('2026-10-04T00:40:00Z'))).toMatchObject({
+      isForecast: true, temperature: 8, weatherType: 'rain', conditionKey: 'condition.heavyRain',
+      cloudCoverPercent: 100, windSpeedKmh: 40, windDirectionDeg: 270, precipitationMmH: 9.5,
+      cloudLayers: { low: 70, mid: 40, high: 5 },
+    });
+    expect(getWeatherAt(live, new Date('2026-10-04T00:20:00Z'))).toMatchObject({ weatherType: 'cloudy', temperature: 8 });
+  });
+
+  it('returns the live weather outside the forecast or without one', () => {
+    expect(getWeatherAt(live, new Date('2026-10-03T23:00:00Z'))).toBe(live);
+    expect(getWeatherAt(live, new Date('2026-10-04T02:00:00Z'))).toBe(live);
+    expect(getWeatherAt({ ...live, hourly: null }, new Date('2026-10-04T00:00:00Z')).isForecast).toBeUndefined();
+    const noWeatherCode = { ...live, hourly: { ...live.hourly!, weather_code: undefined } };
+    expect(getWeatherAt(noWeatherCode, new Date('2026-10-04T00:00:00Z'))).toBe(noWeatherCode);
+  });
+
+  it('requests the hourly weather for yesterday to 6 days ahead', async () => {
+    const fetchMock = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current_weather: { temperature: 20, weathercode: 0, windspeed: 0, winddirection: 0, time: '' } }) })) as unknown as typeof fetch;
+    global.fetch = fetchMock;
+    await fetchCurrentWeather(4, 4);
+    const calledUrl = String((fetchMock as ReturnType<typeof vi.fn>).mock.calls[0][0]);
+    expect(calledUrl).toContain(',temperature_2m,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,precipitation');
+    expect(calledUrl).toContain('&past_days=1&forecast_days=7');
   });
 });

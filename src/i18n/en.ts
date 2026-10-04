@@ -57,6 +57,7 @@ export const en = {
 
   // Weather
   'weather.current': 'Current Weather',
+  'weather.forecast': 'Forecast',
   'weather.refresh': 'Refresh weather',
   'weather.temperature': 'Temperature:',
   'weather.temperatureUnit': 'Temperature unit',

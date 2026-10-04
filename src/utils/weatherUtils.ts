@@ -29,6 +29,27 @@ export interface WeatherData {
   // The cover per layer in the hour nearest the fetch (ROADMAP item 84, C1), for the
   // cloud types. Null without hourly data or in an older cache entry.
   cloudLayers: CloudLayers | null;
+  // The hourly forecast, yesterday to 6 days ahead (ROADMAP item 86), for time travel.
+  // Null on the fallback weather.
+  hourly: HourlyForecast | null;
+  // Set by getWeatherAt: this is a forecast hour, not the current weather.
+  isForecast?: boolean;
+}
+
+// Open-Meteo's hourly block. The weather fields (item 86) are optional: a test or an
+// older response may not have them.
+export interface HourlyForecast {
+  time: string[];
+  cloud_cover_low: number[];
+  cloud_cover_mid: number[];
+  cloud_cover_high: number[];
+  visibility: number[];
+  temperature_2m?: (number | null)[];
+  weather_code?: (number | null)[];
+  cloud_cover?: (number | null)[];
+  wind_speed_10m?: (number | null)[];
+  wind_direction_10m?: (number | null)[];
+  precipitation?: (number | null)[]; // mm in the hour before `time`
 }
 
 interface OpenMeteoResponse {
@@ -48,13 +69,7 @@ interface OpenMeteoResponse {
     precipitation?: number; // mm over `interval` seconds
     interval?: number;
   };
-  hourly?: {
-    time: string[];
-    cloud_cover_low: number[];
-    cloud_cover_mid: number[];
-    cloud_cover_high: number[];
-    visibility: number[];
-  };
+  hourly?: HourlyForecast;
 }
 
 // Cache interface
@@ -282,6 +297,8 @@ const getCachedWeather = (latitude: number, longitude: number): WeatherData | nu
 
     // An entry from before ROADMAP item 67 has English texts instead of keys.
     if (!cacheData.data.conditionKey) return null;
+    // An entry from before ROADMAP item 86 has no forecast for time travel.
+    if (!('hourly' in cacheData.data)) return null;
     
     // Convert lastUpdated back to Date object. Also normalize the sunset score and
     // cloud/wind fields: a cache entry written before ROADMAP item 11/10 won't have
@@ -344,7 +361,8 @@ export const fetchCurrentWeather = async (
       `&current_weather=true` +
       `&current=cloud_cover,wind_speed_10m,wind_direction_10m,precipitation` +
       `&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility` +
-      `&timezone=UTC&forecast_days=2`;
+      `,temperature_2m,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,precipitation` +
+      `&timezone=UTC&past_days=1&forecast_days=7`;
 
     const response = await fetch(url);
     if (!response.ok) {
@@ -367,7 +385,8 @@ export const fetchCurrentWeather = async (
       windSpeedKmh: data.current?.wind_speed_10m ?? null,
       windDirectionDeg: data.current?.wind_direction_10m ?? null,
       precipitationMmH: getPrecipitationMmH(data.current?.precipitation, data.current?.interval, data.current_weather.weathercode),
-      cloudLayers: cloudLayersAt(data.hourly, new Date())
+      cloudLayers: cloudLayersAt(data.hourly, new Date()),
+      hourly: data.hourly ?? null
     };
 
     // Cache the result
@@ -390,9 +409,37 @@ export const fetchCurrentWeather = async (
       windSpeedKmh: null,
       windDirectionDeg: null,
       precipitationMmH: null,
-      cloudLayers: null
+      cloudLayers: null,
+      hourly: null
     };
   }
+};
+
+const HOUR_MS = 60 * 60 * 1000;
+
+// The weather at another time (time travel, ROADMAP item 86): the forecast hour nearest
+// `at`. Outside the forecast (yesterday to 6 days ahead), the live weather unchanged.
+export const getWeatherAt = (data: WeatherData, at: Date): WeatherData => {
+  const { hourly } = data;
+  const start = hourly?.time.length ? parseHourlyTime(hourly.time[0]) : null;
+  if (!hourly || !start) return data;
+  const i = Math.round((at.getTime() - start.getTime()) / HOUR_MS);
+  const code = hourly.weather_code?.[i];
+  const temperature = hourly.temperature_2m?.[i];
+  if (code == null || temperature == null) return data;
+  const { type, conditionKey } = mapWeatherCode(code);
+  return {
+    ...data,
+    isForecast: true,
+    temperature: Math.round(temperature),
+    weatherType: type,
+    conditionKey,
+    cloudCoverPercent: hourly.cloud_cover?.[i] ?? null,
+    windSpeedKmh: hourly.wind_speed_10m?.[i] ?? null,
+    windDirectionDeg: hourly.wind_direction_10m?.[i] ?? null,
+    precipitationMmH: getPrecipitationMmH(hourly.precipitation?.[i], 3600, code),
+    cloudLayers: cloudLayersAt(hourly, at),
+  };
 };
 
 export const clearWeatherCache = (): void => {

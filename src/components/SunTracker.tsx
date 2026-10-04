@@ -25,7 +25,7 @@ import {
   type MoonPosition,
   type MoonTimes
 } from '../utils/moonUtils';
-import { fetchCurrentWeather, type WeatherData } from '../utils/weatherUtils';
+import { fetchCurrentWeather, getWeatherAt, type WeatherData } from '../utils/weatherUtils';
 import { getSkyOvercastMix, getStarCloudFactor } from '@/utils/weatherEffectsUtils';
 import { getAstroEvent, parseEggOverride, METEOR_SHOWER_RATE } from '@/utils/astroEvents';
 import SunVisualization from './SunVisualization';
@@ -81,6 +81,7 @@ const SUNSET_REMINDER_STORAGE_KEY = 'sunset-reminder';
 const DEFAULT_EYE_HEIGHT_M = 1.7;
 // Manual weather's strong-wind switch (ROADMAP item 73): above the 40 km/h strong-wind line.
 const MANUAL_STRONG_WIND_KMH = 50;
+const HOUR_MS = 60 * 60 * 1000;
 const MAX_EYE_HEIGHT_M = 1000;
 
 const clampEyeHeight = (value: number): number =>
@@ -135,14 +136,21 @@ const SunTracker: React.FC = () => {
   const [timeOffsetMs, setTimeOffsetMs] = useState(0);
   const [playDirection, setPlayDirection] = useState<-1 | 0 | 1>(0);
   const timeOffsetRef = React.useRef(0);
-  // A preview (any other time than now) is active. The weather, the sunset score and
-  // the spawns stay live; the fireworks (item 41) and the countdown (item 43) run only
-  // when this is false.
+  // A preview (any other time than now) is active. The weather follows the hourly
+  // forecast (item 86); the sunset score and the spawns stay live; the fireworks (item 41)
+  // and the countdown (item 43) run only when this is false.
   const isTimePreview = timeOffsetMs !== 0;
-  const [weatherType, setWeatherType] = useState<WeatherType>('clear');
-  const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
+  const [manualOrLiveWeatherType, setWeatherType] = useState<WeatherType>('clear');
+  const [liveWeatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [isLoadingWeather, setIsLoadingWeather] = useState(false);
   const [useRealWeather, setUseRealWeather] = useState(true);
+  // The forecast hour of the preview (item 86): one step per hour, not per play tick.
+  const previewHour = isTimePreview ? Math.round(date.getTime() / HOUR_MS) : null;
+  const weatherData = useMemo(
+    () => (liveWeatherData && previewHour !== null ? getWeatherAt(liveWeatherData, new Date(previewHour * HOUR_MS)) : liveWeatherData),
+    [liveWeatherData, previewHour]
+  );
+  const weatherType = useRealWeather && weatherData?.isForecast ? weatherData.weatherType : manualOrLiveWeatherType;
   const [manualWindy, setManualWindy] = useState(false);
   // Display unit only (ROADMAP backlog "Unit toggle °C/°F"); effects stay in °C.
   const [temperatureUnit, setTemperatureUnit] = useState<TemperatureUnit>(() => loadTemperatureUnit(navigator.language));
@@ -769,8 +777,8 @@ const SunTracker: React.FC = () => {
   const handleWeatherModeToggle = (useReal: boolean) => {
     setUseRealWeather(useReal);
     
-    if (useReal && weatherData) {
-      setWeatherType(weatherData.weatherType);
+    if (useReal && liveWeatherData) {
+      setWeatherType(liveWeatherData.weatherType);
     }
   };
 
