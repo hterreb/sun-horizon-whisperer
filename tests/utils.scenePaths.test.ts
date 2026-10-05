@@ -1,4 +1,4 @@
-import { findLane, getSceneTime, setSceneRate, xAt, LIVE_SCENE_CLOCK, type LaneCandidate, type ScenePath } from '../src/utils/scenePaths';
+import { findLane, firstMeeting, getSceneTime, setSceneRate, xAt, LIVE_SCENE_CLOCK, type LaneCandidate, type ScenePath } from '../src/utils/scenePaths';
 import { getRestStopMotion } from '../src/utils/weatherEffectsUtils';
 
 // A glide at 1 % of the width per second, from x -5 to 101, 5 % wide and 4 % high.
@@ -105,5 +105,22 @@ describe('scene clock (ROADMAP item 92)', () => {
     expect(getSceneTime(rewind, 13_000)).toBe(26 - 8);
     const live = setSceneRate(rewind, 13_000, 1);
     expect(getSceneTime(live, 14_000)).toBe(19);
+  });
+});
+
+describe('firstMeeting (ROADMAP item 94)', () => {
+  it('finds when a faster box catches up with a slower one at the same height', () => {
+    // The slow one starts at 20 % at 0.5 %/s; the fast one at -5 % at 1 %/s: they touch when the
+    // gap of 20 % is gone, after 40 s.
+    const slow: ScenePath = { start: 0, duration: 200, x: 20, dx: 100, width: 5, y: 70, height: 4 };
+    expect(firstMeeting(glide(0, 72), slow, 0)).toBe(40.5); // the first sample (every 0.5 s) after that
+    // From a later time on: that time, while they touch.
+    expect(firstMeeting(glide(0, 72), slow, 45)).toBe(45);
+  });
+
+  it('finds no meeting at another height, or when the boxes stay apart', () => {
+    const slow: ScenePath = { start: 0, duration: 200, x: 20, dx: 100, width: 5, y: 70, height: 4 };
+    expect(firstMeeting(glide(0, 80), slow, 0)).toBeNull();
+    expect(firstMeeting(glide(0, 72, { x: 60, dx: 41, duration: 41 }), slow, 0)).toBeNull();
   });
 });

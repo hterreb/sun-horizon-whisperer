@@ -1,7 +1,7 @@
 import React, { Profiler } from 'react';
 import { render, act, fireEvent } from '@testing-library/react';
 import CloudLayer, { WeatherType, createFish, createBird, spawnTick, type SceneEntities, type SpawnRules, type SpawnTimes } from '../src/components/CloudLayer';
-import { findLane, xAt, type ScenePath } from '../src/utils/scenePaths';
+import { findLane, firstMeeting, xAt, type ScenePath } from '../src/utils/scenePaths';
 import { FISH_WEIGHTS, NIGHT_FISH_WEIGHTS, MAX_FISH, MAX_NIGHT_FISH, getWaterSpeedFactor, getSceneLimit } from '../src/utils/weatherEffectsUtils';
 import { getSceneDensity, getDensityCurve } from '../src/utils/sceneDensity';
 import { getSunTimes, getTimeOfDay } from '../src/utils/sunUtils';
@@ -770,6 +770,7 @@ describe('lane planning (ROADMAP item 92)', () => {
     let boatSpawns = 0;
     const touches = new Set<string>(); // fish-fish, boat-boat, bird-bird
     const water = new Set<string>(); // all water pairs, fish-boat included
+    const dives = new Set<string>(); // item 94: the fish that dive under a boat
     for (let ms = 500; ms <= 30 * 60_000; ms += 500) {
       const t = ms / 1000;
       const onScreen = <T extends { path?: ScenePath }>(list: T[]) => list.filter(e => !e.path || t < endOf(e.path));
@@ -778,6 +779,7 @@ describe('lane planning (ROADMAP item 92)', () => {
       spawns += next.birds.length - scene.birds.length + next.fish.length - scene.fish.length + next.ships.length - scene.ships.length;
       boatSpawns += next.ships.length - scene.ships.length;
       scene = next;
+      scene.fish.forEach(f => { if (f.dive !== undefined) dives.add(String(f.id)); });
       for (let dt = 0; dt < 0.5; dt += 0.1) {
         touching(scene.fish, t + dt, touches);
         touching(scene.ships, t + dt, touches);
@@ -785,7 +787,8 @@ describe('lane planning (ROADMAP item 92)', () => {
         touching([...scene.fish, ...scene.ships], t + dt, water);
       }
     }
-    const fishBoat = [...water].filter(pair => !touches.has(pair)).length;
+    // A fish and a boat that meet, where the fish does not dive (item 94).
+    const fishBoat = [...water].filter(pair => !touches.has(pair) && !pair.split('|').some(id => dives.has(id))).length;
     return { spawns, boatSpawns, touches: touches.size, fishBoat };
   };
   const rules = (view: SpawnRules['view'], extra: Partial<SpawnRules> = {}): SpawnRules => ({
@@ -805,9 +808,9 @@ describe('lane planning (ROADMAP item 92)', () => {
     expect(random.touches + random.fishBoat).toBeGreaterThan(0); // the check finds touches without a plan
     expect(planned.touches).toBe(0);
     // Boats have the right of way: no boat waits for the fish. A fish that swims when a boat
-    // takes a full band can still meet it (at most 1 in 10 min).
+    // takes a full band dives under it (item 94), so no fish meets a boat without a dive.
     expect(planned.boatSpawns).toBeGreaterThanOrEqual(random.boatSpawns);
-    expect(planned.fishBoat).toBeLessThanOrEqual(3);
+    expect(planned.fishBoat).toBe(0);
     expect(planned.spawns).toBeGreaterThanOrEqual(0.85 * random.spawns);
   });
 });
@@ -1069,5 +1072,168 @@ describe('CloudLayer info cards (ROADMAP item 95)', () => {
       expect.any(Object),
       expect.stringMatching(/^cloud-/),
     );
+  });
+});
+
+// ROADMAP item 94: the shark hunt, and the fish that dive under a boat.
+describe('the shark hunt (ROADMAP item 94)', () => {
+  const rules = (extra: Partial<SpawnRules> = {}): SpawnRules => ({
+    weatherType: 'clear', timeOfDay: 'midday', windSpeedKmh: 10, birdSpeedFactor: 1, showLeaves: false,
+    isFullscreen: false, moonUp: false, moonY: null, month: 10, latitude: 47.8, gapFactor: 1, rewind: false,
+    fishOverride: 'shark', density: 1, view: { width: 390, height: 844 }, ...extra,
+  });
+  // One check with a fish due (the groups show already, so no warm start).
+  const firstShark = (extra: Partial<SpawnRules>, seed: number) => {
+    const last: SpawnTimes = { birds: 1e9, fish: 0, ships: 1e9, leaves: 1e9, shown: { birds: true, fish: true, ships: true } };
+    const scene = spawnTick({ birds: [], fish: [], ships: [], leaves: [] }, last, rules(extra), 60_000, 60, mulberry32(seed));
+    return { scene, last, shark: scene.fish.find(f => f.kind === 'shark') };
+  };
+
+  it('lets 1 in 2 sharks hunt, with H1-H4 at even odds; the prey waits behind the left edge', () => {
+    const counts: Record<string, number> = {};
+    let sharks = 0;
+    for (let seed = 1; seed <= 400; seed++) {
+      const { scene, shark } = firstShark({}, seed);
+      if (!shark) continue;
+      sharks++;
+      if (!shark.hunt) continue;
+      counts[shark.hunt.variant] = (counts[shark.hunt.variant] ?? 0) + 1;
+      const prey = scene.fish.find(f => f.id === shark.hunt!.preyId)!;
+      expect(prey.kind).toBe({ H1: 'classic', H2: 'perch', H3: 'minnow', H4: 'trout' }[shark.hunt.variant]);
+      expect(prey.depth).toBe(shark.depth);
+      expect(prey.companion).toBeUndefined();
+      expect(prey.delay).toBeGreaterThan(0);
+      expect(prey.path!.start).toBeGreaterThan(60);
+    }
+    const hunts = Object.values(counts).reduce((a, b) => a + b, 0);
+    expect(hunts / sharks).toBeGreaterThan(0.4);
+    expect(hunts / sharks).toBeLessThan(0.6);
+    for (const variant of ['H1', 'H2', 'H3', 'H4']) expect(counts[variant] / hunts).toBeGreaterThan(0.15);
+  });
+
+  it('hunts at night only in the moon pool, and with no minnows', () => {
+    let hunts = 0;
+    for (let seed = 1; seed <= 200; seed++) {
+      const { shark, scene } = firstShark({ timeOfDay: 'night', moonUp: true, poolX: 40 }, seed);
+      if (!shark?.hunt) continue;
+      hunts++;
+      expect(shark.hunt.variant).not.toBe('H3');
+      expect(scene.fish.find(f => f.id === shark.hunt!.preyId)!.light).toBe('moon');
+      expect(Math.abs(shark.hunt.fx!.x - 40)).toBeLessThanOrEqual(9);
+    }
+    expect(hunts).toBeGreaterThan(0);
+    // Without a pool there is no night hunt.
+    for (let seed = 1; seed <= 50; seed++) {
+      expect(firstShark({ timeOfDay: 'night', moonUp: true, poolX: null }, seed).shark?.hunt).toBeUndefined();
+    }
+  });
+
+  it('plans no hunt during time-travel play', () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      expect(firstShark({ gapFactor: 1 / 8 }, seed).shark?.hunt).toBeUndefined();
+      expect(firstShark({ gapFactor: 1 / 8, rewind: true }, seed).shark?.hunt).toBeUndefined();
+    }
+  });
+
+  it('keeps new small fish out of the shark\'s lane for 60 s after the hunt (X2)', () => {
+    let seed = 1;
+    let first = firstShark({ huntOverride: 'H4' }, seed);
+    while (!first.shark?.hunt) first = firstShark({ huntOverride: 'H4' }, ++seed);
+    const { last, shark } = first;
+    expect(last.keepAway).toEqual([expect.objectContaining({ start: shark!.hunt!.meetAt, duration: 60, y: shark!.path!.y })]);
+  });
+
+  it('gives a fish a dive 2 s before a boat on its fallback lane meets it', () => {
+    const fish = { ...createFish('carp', false, false, 390, mulberry32(1)), id: 7 };
+    // A slow fish whose box covers the whole water: no boat lane is clear of it.
+    const path: ScenePath = { start: 0, duration: 1000, x: 30, dx: 75, width: 5, y: 0, height: 100 };
+    const last = (): SpawnTimes => ({ birds: 1e9, fish: 1e9, ships: 0, leaves: 1e9, shown: { birds: true, fish: true, ships: true } });
+    const lane = (candidate: { y: number }, others: readonly ScenePath[]) => (others.length ? null : candidate.y);
+    const tick = (extra: Partial<SpawnRules>) => spawnTick(
+      { birds: [], fish: [{ ...fish, path }], ships: [], leaves: [] }, last(), rules({ fishOverride: null, ...extra }),
+      200_000, 10, () => 0.3, lane,
+    );
+    const scene = tick({});
+    expect(scene.ships).toHaveLength(1);
+    const meet = firstMeeting(scene.ships[0].path!, path, 10)!;
+    expect(meet).toBeGreaterThan(12);
+    expect(scene.fish[0].dive).toBe(meet - 2);
+    // During play nothing dives.
+    expect(tick({ gapFactor: 1 / 8 }).fish[0].dive).toBeUndefined();
+  });
+
+  // The component: `?fish=shark&hunt=Hn`, every spawn a hunting shark with its prey.
+  const hunt = (variant: string, run: (container: HTMLElement, view: ReturnType<typeof render>) => void) => {
+    vi.useFakeTimers();
+    const randomSpy = vi.spyOn(Math, 'random').mockImplementation(mulberry32(94));
+    window.history.pushState({}, '', `/?fish=shark&hunt=${variant}`);
+    try {
+      const view = render(<CloudLayer warmStart={false} weatherType="clear" timeOfDay="midday" />);
+      run(view.container, view);
+    } finally {
+      window.history.pushState({}, '', '/');
+      randomSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  };
+  // In steps of 10 s, so the effects (which set the hunt timeouts) run between them, as in a browser.
+  const advance = (sec: number) => {
+    for (let t = 0; t < sec; t += 10) act(() => { vi.advanceTimersByTime(Math.min(10, sec - t) * 1000); });
+  };
+  const hunted = (container: HTMLElement) => [...container.querySelectorAll<HTMLElement>('[data-testid="hunted-fish"]')];
+
+  it.each(['H1', 'H2'])('%s: the timeout fades the prey into the shark, and its fade\'s end removes it', variant => {
+    hunt(variant, container => {
+      advance(10);
+      expect(hunted(container)).toHaveLength(0);
+      advance(700);
+      // A far shark meets its prey after up to 6 min. (A fish that dives under a boat fades too.)
+      const prey = hunted(container).filter(fish => fish.getAttribute('style')?.includes('sceneHuntFade'));
+      expect(prey.length).toBeGreaterThan(0);
+      expect(prey[0].getAttribute('style')?.includes('sceneHuntSlow')).toBe(variant === 'H1');
+      const fx = container.querySelectorAll('[data-testid="hunt-fx"]');
+      expect(fx.length).toBeGreaterThan(0);
+      expect(fx[0].querySelectorAll('[data-testid="hunt-bubble"]')).toHaveLength(variant === 'H1' ? 4 : 0);
+      const fish = container.querySelectorAll('[data-testid="scene-fish"]').length;
+      const all = hunted(container).length;
+      endAnimation(prey[0], 'sceneHuntFade');
+      expect(hunted(container)).toHaveLength(all - 1);
+      expect(container.querySelectorAll('[data-testid="scene-fish"]')).toHaveLength(fish - 1);
+      // The ripple's end takes the traces away.
+      endAnimation(fx[0].querySelector('[data-testid="hunt-ripple"]')!, 'sceneHuntRipple');
+      expect(container.querySelectorAll('[data-testid="hunt-fx"]')).toHaveLength(fx.length - 1);
+    });
+  });
+
+  it('H3: the minnows move around the shark and back; no fish is eaten', () => {
+    hunt('H3', container => {
+      advance(700);
+      expect(hunted(container)).toHaveLength(0);
+      const moving = [...container.querySelectorAll<HTMLElement>('[data-testid="scene-fish"]')]
+        .filter(minnow => minnow.getAttribute('style')?.includes('sceneHuntShift'));
+      expect(moving.length).toBeGreaterThanOrEqual(4);
+      expect(container.querySelectorAll('[data-testid="hunt-fx"]')).toHaveLength(0);
+    });
+  });
+
+  it('H4: the trout fades to 30 % and swims on', () => {
+    hunt('H4', container => {
+      advance(700);
+      const prey = hunted(container);
+      expect(prey.length).toBeGreaterThan(0);
+      expect(prey[0].getAttribute('style')).toContain('sceneHuntFaint');
+      endAnimation(prey[0], 'sceneHuntFaint');
+      expect(hunted(container)).toHaveLength(prey.length);
+    });
+  });
+
+  it('plays no hunt that was planned before time-travel play started', () => {
+    hunt('H1', (container, view) => {
+      advance(10);
+      view.rerender(<CloudLayer warmStart={false} weatherType="clear" timeOfDay="midday" playDirection={1} />);
+      advance(700);
+      expect(hunted(container)).toHaveLength(0);
+      expect(container.querySelectorAll('[data-testid="hunt-fx"]')).toHaveLength(0);
+    });
   });
 });

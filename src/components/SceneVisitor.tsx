@@ -86,6 +86,10 @@ const colors = (kind: 'shark' | 'dolphins', tone: VisitorTone) => {
   return { back: fish(species), belly: fish(`${species}-belly`), shadow: fish('visitor-shadow'), shadowOpacity: 0.3, glint: 'hsl(var(--scene-glow-white) / 0.75)' };
 };
 
+// The glint on the water by light (item 94's ripple and bubbles use it too).
+// eslint-disable-next-line react-refresh/only-export-components -- a colour helper next to its drawing
+export const getVisitorGlint = (tone: VisitorTone): string => colors('shark', tone).glint;
+
 const line = (color: string, width: number, opacity?: number): CSSProperties =>
   ({ fill: 'none', stroke: color, strokeWidth: width, strokeLinecap: 'round', opacity });
 
