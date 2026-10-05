@@ -3,6 +3,7 @@ import { Leaf } from 'lucide-react';
 import SceneBoat, { BOAT_HEIGHT_PX, BOAT_WIDTH_PX } from './SceneBoat';
 import SceneBird from './SceneBird';
 import SceneFish from './SceneFish';
+import SceneHuntFx from './SceneHuntFx';
 import SceneVisitor, {
   DOLPHIN_SPACING, VISITOR_GRID, VISITOR_VIEW_HEIGHT, SHARK_ABOVE_WATER, DOLPHINS_ABOVE_WATER,
 } from './SceneVisitor';
@@ -14,7 +15,12 @@ import { getSceneDensity } from '@/utils/sceneDensity';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import { useScenePlaybackRate } from '@/hooks/useScenePlaybackRate';
 import { getScenePlaybackRate, getSpawnGapFactor, type PlayDirection } from '@/utils/timeTravel';
-import { findLane, getSceneTime, setSceneRate, LIVE_SCENE_CLOCK, type ScenePath } from '@/utils/scenePaths';
+import { findLane, firstMeeting, getSceneTime, setSceneRate, LIVE_SCENE_CLOCK, type ScenePath } from '@/utils/scenePaths';
+import {
+  BODY_LINE, HUNTER_SHARE, HUNT_PREY, HUNT_VARIANTS, SLOW_EASING, SLOW_SEC, SHIFT_KEYS, getHuntOverride, getKeepAwayPath,
+  isSmallFish, pickMeetX, planMeeting, planPreyHunt, toLinearEasing,
+  type HuntFx, type HuntPlan, type HuntVariant, type PreyHunt,
+} from '@/utils/sharkHunt';
 import { getPrecipitationSlantPx } from '../utils/cloudLayoutUtils';
 import { type CloudLayers, getDaySeed } from '../utils/skyCloudUtils';
 import {
@@ -134,7 +140,7 @@ interface MovingEntity {
   y: number; // top offset, in % of the layer height (fixed for the entity's lifetime)
   dx: number; // horizontal travel distance, in vw, applied via the CSS animation
   duration: number; // seconds
-  delay?: number; // s, negative: a warm start (item 93, S1) begins part of the way across
+  delay?: number; // s, negative: a warm start (item 93, S1) begins part of the way across; positive: a shark's prey waits (item 94)
   fadeIn?: boolean; // a warm start after the load fades in over 2 s (item 93)
 }
 
@@ -208,6 +214,9 @@ interface FishEntity extends MovingEntity {
   school?: { left: number; top: number }[]; // P5: each minnow's offset in px
   companion?: { lag: number; dy: number }; // P6: a second fish, `lag` s behind, `dy` % lower
   rolls?: number[]; // DO1 (item 85): each dolphin's roll delay in s, 2 or 3 dolphins
+  hunt?: HuntPlan; // a hunting shark (item 94): its prey and the hunt's timeline
+  dive?: number; // item 94: the scene time when the fish dives under a boat (the H4 fade)
+  hunted?: PreyHunt; // item 94: the hunt that plays on this fish
 }
 
 // Builds one fish (ROADMAP item 62). `wet` = rain or drizzle, where fish swim deeper (E2).
@@ -215,12 +224,13 @@ interface FishEntity extends MovingEntity {
 // eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
 export const createFish = (
   kind: FishKind, sunDown: boolean, wet: boolean, viewportWidth: number, random = Math.random, night = false,
+  atDepth?: number, // item 94: a shark's prey swims at the shark's depth
 ): FishEntity => {
   const spec = FISH[kind];
   const light = night ? (GLOWING_AT_NIGHT.includes(kind) ? 'own' : 'moon') : undefined;
   const visitor = VISITORS.includes(kind);
   // P3: a random distance; the whale always passes far out, a shark or a pod at 0.3-1 (X6).
-  const depth = kind === 'whale' ? 0.75 + random() * 0.25 : visitor ? 0.3 + random() * 0.7 : random();
+  const depth = atDepth ?? (kind === 'whale' ? 0.75 + random() * 0.25 : visitor ? 0.3 + random() * 0.7 : random());
   const nearness = 1 - FAR_SHRINK * depth;
   const size = Math.round(spec.size * nearness);
   let width = size;
@@ -386,6 +396,7 @@ export interface SceneEntities {
 export interface SpawnTimes {
   birds: number; fish: number; ships: number; leaves: number;
   shown?: { birds: boolean; fish: boolean; ships: boolean };
+  keepAway?: ScenePath[]; // item 94 (X2): the lanes that new small fish keep out of
 }
 
 // What the spawn rules read from the props, the play state and the window.
@@ -405,6 +416,8 @@ export interface SpawnRules {
   fishOverride: FishKind | null; // `?fish=` (item 85)
   density: number; // busy and quiet phases (item 93, S3): scales the limits and the chances, 0.3-1
   view: { width: number; height: number }; // the scene in px
+  poolX?: number | null; // the moon's x in % while its pool shows: a night hunt meets there (item 94)
+  huntOverride?: HuntVariant | null; // `?hunt=` (item 94)
 }
 type View = SpawnRules['view'];
 
@@ -433,6 +446,7 @@ const fishLane = (fish: FishEntity, view: View, rewind: boolean): LaneShape => {
       above: percentOfHeight(above * unit, view),
       height: percentOfHeight(VISITOR_VIEW_HEIGHT * unit, view),
       band: FISH_BAND,
+      curve: fish.curve, // a hunting shark's chase and slow-down (item 94)
     };
   }
   // A pair (P6): the second fish is `dy` % lower and `lag` s behind. A pair that spawns in
@@ -504,6 +518,11 @@ export const spawnTick = (
   // At load the scene's reveal covers the warm start. A group that starts later (after a storm,
   // at dawn) fades in, so its animals do not pop up mid-scene.
   const atLoad = last.shown === undefined;
+  // Item 94: the hunts and the dives under a boat play only live, not during time-travel play.
+  const live = gapFactor === 1 && !rewind;
+  // X2: the lanes of the hunts of the last 60 s.
+  const keepAway = (last.keepAway ?? []).filter(p => p.start + p.duration > sceneTime);
+  last.keepAway = keepAway;
   const place = <T extends MovingEntity>(
     item: T, shape: LaneShape, others: ScenePath[], progress = 0,
   ): (T & { path: ScenePath }) | null => {
@@ -599,6 +618,54 @@ export const spawnTick = (
     // At most three fish, two at night (item 93), 1.5x on wide screens. Far fish first, so a
     // near fish swims in front.
     const limit = getSceneLimit(shouldShowNightFish ? MAX_NIGHT_FISH : MAX_FISH, view.width, density);
+    // Item 94: a hunting shark. At its spawn the plan picks a meeting point, then for each
+    // variant whose prey can swim now (no minnows at night) the shark's path to that point and
+    // the prey's path, at the shark's depth and body line, from the left edge. Both need a free
+    // lane; the prey's is checked against all but its shark. One of the variants that pass, at
+    // random. The prey joins the fish at once (beyond the limit) and waits behind the left edge
+    // until its start (a positive animation-delay). null: no hunt, the shark only glides.
+    const planHunter = (shark: FishEntity, others: ScenePath[]): FishEntity | null => {
+      const poolX = shouldShowNightFish ? rules.poolX ?? null : null;
+      if (shouldShowNightFish && poolX === null) return null;
+      const meetX = pickMeetX(random, poolX);
+      if (meetX === null) return null;
+      const huntShark = {
+        start: sceneTime, x: shark.x, width: percentOfWidth(shark.width, view), dx: shark.dx, speed: shark.dx / shark.duration,
+      };
+      const variants = rules.huntOverride ? [rules.huntOverride] : HUNT_VARIANTS;
+      const options = variants.flatMap(variant => {
+        if (shouldShowNightFish && HUNT_PREY[variant] === 'minnow') return [];
+        const prey: FishEntity = {
+          ...createFish(HUNT_PREY[variant], isSunDown, wetForFish, view.width, random, shouldShowNightFish, shark.depth),
+          companion: undefined,
+        };
+        const preyPath = { x: prey.x, width: percentOfWidth(prey.width, view), speed: prey.dx / prey.duration };
+        const meeting = planMeeting(variant, huntShark, preyPath, meetX, poolX);
+        if (!meeting) return [];
+        const placed = place(
+          { ...shark, duration: meeting.duration, curve: meeting.curve, easing: meeting.curve && toLinearEasing(meeting.curve) },
+          fishLane({ ...shark, curve: meeting.curve }, view, rewind), others,
+        );
+        if (!placed) return [];
+        const y = placed.y + percentOfHeight((BODY_LINE * shark.size) / VISITOR_GRID - prey.height / 2, view);
+        const shape = fishLane(prey, view, rewind);
+        const path: ScenePath = {
+          start: meeting.preyStart, duration: prey.duration, x: prey.x, dx: prey.dx, width: shape.width, y, height: shape.height,
+        };
+        if (lane({ ...path, band: [y, y], view }, others, sceneTime) === null) return [];
+        const plan = planPreyHunt(variant, meeting, huntShark, { ...prey, speed: preyPath.speed }, placed.y, view, sceneTime);
+        if (!plan) return [];
+        return [{
+          shark: { ...placed, hunt: { ...plan, preyId: prey.id } },
+          prey: { ...prey, y, path, delay: meeting.preyStart - sceneTime },
+        }];
+      });
+      if (options.length === 0) return null;
+      const pick = options[Math.floor(random() * options.length)];
+      fish = [...fish, pick.prey]; // before its shark, so it swims behind it
+      last.keepAway = [...keepAway, getKeepAwayPath(pick.shark.path, pick.shark.hunt.meetAt)];
+      return pick.shark;
+    };
     // undefined: no fish for the light (NR3); null: no free lane.
     const makeFish = (progress: number) => {
       let newFish: FishEntity | undefined;
@@ -612,7 +679,15 @@ export const spawnTick = (
       } else {
         newFish = createFish(rules.fishOverride ?? pickFish(random()), isSunDown, wetForFish, view.width, random);
       }
-      return newFish && place(newFish, fishLane(newFish, view, rewind), pathsOf(fish, ships), progress);
+      if (!newFish) return undefined;
+      const others = pathsOf(fish, ships);
+      // Item 94: 1 in 2 new sharks hunt (X4), only live (not during play, not at a warm start).
+      if (newFish.kind === 'shark' && progress === 0 && live && (rules.huntOverride || random() < HUNTER_SHARE)) {
+        const hunter = planHunter(newFish, others);
+        if (hunter) return hunter;
+      }
+      // X2: new small fish keep out of a hunting shark's lane for 60 s.
+      return place(newFish, fishLane(newFish, view, rewind), isSmallFish(newFish.kind) ? [...others, ...keepAway] : others, progress);
     };
     if (warm && !shown.fish) {
       fill(() => fish.length, limit, progress => {
@@ -667,7 +742,18 @@ export const spawnTick = (
       // other way round"): a lane clear of the fish when there is one, else any lane clear of
       // the boats. The fish never stop a boat; new fish plan around it.
       const shape = boatLane(newShip, view, rules.isFullscreen);
-      return place(newShip, shape, pathsOf(ships, fish), progress) ?? place(newShip, shape, pathsOf(ships), progress);
+      const clear = place(newShip, shape, pathsOf(ships, fish), progress);
+      if (clear) return clear;
+      const placed = place(newShip, shape, pathsOf(ships), progress);
+      // Item 94: each fish that the boat on this lane meets dives (the H4 fade) 2 s before.
+      if (placed && live) {
+        fish = fish.map(f => {
+          if (!f.path) return f;
+          const at = firstMeeting(placed.path, f.path, sceneTime);
+          return at === null ? f : { ...f, dive: Math.min(f.dive ?? Infinity, Math.max(sceneTime, at - 2)) };
+        });
+      }
+      return placed;
     };
     if (warm && !shown.ships) {
       fill(() => ships.length, limit, progress => {
@@ -714,6 +800,21 @@ export const spawnTick = (
   return birds === scene.birds && fish === scene.fish && ships === scene.ships && leaves === scene.leaves
     ? scene
     : { birds, fish, ships, leaves };
+};
+
+// The hunt on a prey (item 94), inside its wrapper, so its crossing does not change. H1: it
+// slows to the shark's speed and fades into the shark's shadow; H2: it fades; H4 (and a fish
+// that dives under a boat): it fades to 30 % and swims on. The filter only while a fish fades out.
+const preyHuntStyle = (hunted: PreyHunt): React.CSSProperties => {
+  const fade = 'sceneHuntFade 2s ease-in-out';
+  if (hunted.variant === 'H1') {
+    return {
+      ['--hunt-dx' as string]: `${hunted.slowPx ?? 0}px`,
+      animation: `sceneHuntSlow ${SLOW_SEC}s ${SLOW_EASING} forwards, ${fade} 0.3s forwards`,
+    };
+  }
+  if (hunted.variant === 'H2') return { animation: `${fade} forwards` };
+  return { animation: 'sceneHuntFaint 2s ease-in-out forwards' };
 };
 
 // A warm start after the load (item 93): the opacity from 0 to the element's own, over 2 s.
@@ -797,6 +898,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   const gapFactor = getSpawnGapFactor(playDirection);
   // Test override (item 85): `?fish=shark` makes every fish spawn a shark.
   const [fishOverride] = useState(() => getFishOverride(window.location.search));
+  // Test override (item 94): `?hunt=H1` makes every shark hunt with H1.
+  const [huntOverride] = useState(() => getHuntOverride(window.location.search));
   // Busy and quiet phases (item 93, S3). In a ref, so the spawn loop does not restart each
   // time the date ticks.
   const density = sunTimes ? getSceneDensity(date, sunTimes, getDaySeed(date, latitude, longitude)) : 1;
@@ -858,6 +961,9 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   const month = date.getMonth() + 1;
   const moonY = moon ? Math.round(moon.y) : null;
   const poolX = (moonlight?.x ?? 0.5) * 100;
+  // A night hunt meets in the pool (item 94). In a ref, as the density: the moon moves on.
+  const poolXRef = useRef<number | null>(null);
+  useEffect(() => { poolXRef.current = moonUp ? poolX : null; }, [moonUp, poolX]);
   const poolMask = `linear-gradient(to right, transparent ${poolX - 20}%, #000 ${poolX - 9}%, #000 ${poolX + 9}%, transparent ${poolX + 20}%)`;
 
   // Spawn loop: periodically checks whether a new bird/fish/ship/leaf is due, and
@@ -868,8 +974,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   useEffect(() => {
     // Reduced motion: skip spawning birds, fish, ships and leaves entirely (static sky).
     if (prefersReducedMotion) return;
-    const rules: Omit<SpawnRules, 'view' | 'density'> = {
-      weatherType, timeOfDay, windSpeedKmh, isFullscreen, moonUp, moonY, month, latitude, gapFactor, fishOverride,
+    const rules: Omit<SpawnRules, 'view' | 'density' | 'poolX'> = {
+      weatherType, timeOfDay, windSpeedKmh, isFullscreen, moonUp, moonY, month, latitude, gapFactor, fishOverride, huntOverride,
       birdSpeedFactor: effects.birdSpeedFactor,
       showLeaves: effects.showLeaves,
       rewind: playDirection < 0,
@@ -879,7 +985,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       const now = Date.now();
       const view = { width: window.innerWidth, height: window.innerHeight };
       updateEntities(prev => spawnTick(
-        prev, lastSpawnTimeRef.current, { ...rules, view, density: densityRef.current }, now, getSceneTime(sceneClockRef.current, now),
+        prev, lastSpawnTimeRef.current, { ...rules, view, density: densityRef.current, poolX: poolXRef.current }, now, getSceneTime(sceneClockRef.current, now),
       ));
     };
 
@@ -890,7 +996,46 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     return () => {
       clearInterval(intervalId);
     };
-  }, [weatherType, windSpeedKmh, timeOfDay, prefersReducedMotion, isFullscreen, effects.showLeaves, effects.birdSpeedFactor, moonUp, month, latitude, moonY, gapFactor, playDirection, fishOverride, updateEntities]);
+  }, [weatherType, windSpeedKmh, timeOfDay, prefersReducedMotion, isFullscreen, effects.showLeaves, effects.birdSpeedFactor, moonUp, month, latitude, moonY, gapFactor, playDirection, fishOverride, huntOverride, updateEntities]);
+
+  // The shark hunts (item 94): a timeout per planned hunt, and per fish that dives under a boat,
+  // gives the prey its hunt (CSS animations in renderFish) and puts the ripple and the bubbles
+  // on the water. Only live: when time-travel play starts, the planned hunts are dropped.
+  const [huntFx, setHuntFx] = useState<HuntFx[]>([]);
+  const huntTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const huntsDoneRef = useRef(new Set<string>());
+  useEffect(() => {
+    const timers = huntTimersRef.current;
+    const done = huntsDoneRef.current;
+    const pending = fish.flatMap(f => [
+      ...(f.hunt ? [{ key: `hunt-${f.id}`, at: f.hunt.fireAt, preyId: f.hunt.preyId, prey: f.hunt.prey, fx: f.hunt.fx && {
+        ...f.hunt.fx, id: f.id, tone: f.light === 'moon' ? 'moon' as const : boatTone === 'day' ? 'day' as const : 'dusk' as const,
+      } }] : []),
+      ...(f.dive !== undefined ? [{ key: `dive-${f.id}`, at: f.dive, preyId: f.id, prey: { variant: 'H4' as const }, fx: undefined }] : []),
+    ]);
+    if (playDirection !== 0) {
+      timers.forEach(clearTimeout);
+      timers.clear();
+      pending.forEach(h => done.add(h.key));
+      return;
+    }
+    const now = getSceneTime(sceneClockRef.current, Date.now());
+    for (const hunt of pending) {
+      if (timers.has(hunt.key) || done.has(hunt.key)) continue;
+      timers.set(hunt.key, setTimeout(() => {
+        timers.delete(hunt.key);
+        done.add(hunt.key);
+        if (!entitiesRef.current.fish.some(f => f.id === hunt.preyId)) return;
+        updateEntities(prev => ({ ...prev, fish: prev.fish.map(f => (f.id === hunt.preyId ? { ...f, hunted: hunt.prey } : f)) }));
+        const fx = hunt.fx;
+        if (fx) setHuntFx(list => [...list, fx]);
+      }, Math.max(0, (hunt.at - now) * 1000)));
+    }
+  }, [fish, playDirection, boatTone, updateEntities]);
+  useEffect(() => {
+    const timers = huntTimersRef.current;
+    return () => timers.forEach(clearTimeout);
+  }, []);
 
   // Item 95: a moving thing takes taps only on its wrapper and hit area (pointer only, hidden
   // from screen readers); the scene layer itself stays pointer-events-none.
@@ -911,6 +1056,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       ? `drop-shadow(0 0 ${kind === 'jellyfish' ? 2 : 3}px hsl(var(--scene-fish-${kind === 'jellyfish' ? 'jellyfish-glow' : 'squid'})))`
       : undefined;
     const remove = () => updateEntities(prev => ({ ...prev, fish: prev.fish.filter(f => f.id !== fishItem.id) }));
+    const { hunted } = fishItem;
     const body = kind === 'shark' || kind === 'dolphins' ? (
       <SceneVisitor
         kind={kind}
@@ -927,7 +1073,14 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             light={fishItem.light}
             size={fishItem.size}
             className="absolute"
-            style={{ left: spot.left, top: spot.top }}
+            style={{
+              left: spot.left, top: spot.top,
+              // H3 (item 94): the minnow moves up or down around the shark and back.
+              ...(hunted?.minnows?.[i] && {
+                ['--hunt-dy' as string]: `${hunted.minnows[i].dy}px`,
+                animation: `sceneHuntShift ${hunted.minnowSec}s linear ${hunted.minnows[i].delay}s both`,
+              }),
+            }}
           />
         ))}
       </div>
@@ -965,7 +1118,16 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         // its animationend bubbles up here (e.g. when a play rate runs it backwards).
         onAnimationEnd={removes ? (event => { if (endsCrossing(event)) remove(); }) : undefined}
       >
-        {body}
+        {hunted && hunted.variant !== 'H3' ? (
+          <div
+            style={preyHuntStyle(hunted)}
+            data-testid="hunted-fish"
+            // H1, H2: the fish is gone at the end of its fade.
+            onAnimationEnd={event => { if (event.target === event.currentTarget && event.animationName === 'sceneHuntFade') remove(); }}
+          >
+            {body}
+          </div>
+        ) : body}
         {onInfo && <HitArea {...hitBox} ring={infoRing === `fish-${fishItem.id}-${key}`} />}
       </div>
     );
@@ -977,6 +1139,10 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       </React.Fragment>
     ) : swimmer(String(fishItem.id), 0, 0, true);
   };
+
+  const renderHuntFx = (fx: HuntFx) => (
+    <SceneHuntFx key={fx.id} fx={fx} onDone={() => setHuntFx(list => list.filter(f => f.id !== fx.id))} />
+  );
 
   return (
     <div
@@ -1086,12 +1252,14 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       {/* Fish (ROADMAP items 62, 64). Moonlit night fish swim in the masked pool layer, so
           they show only in the moonlight; the layer is always there, so they can always leave. */}
       {fish.filter(f => f.light !== 'moon').map(renderFish)}
+      {huntFx.filter(fx => fx.tone !== 'moon').map(renderHuntFx)}
       <div
         className="absolute inset-0"
         style={{ zIndex: 5, opacity: moonlight?.strength ?? 0, maskImage: poolMask, WebkitMaskImage: poolMask }}
         data-testid="moonlit-fish"
       >
         {fish.filter(f => f.light === 'moon').map(renderFish)}
+        {huntFx.filter(fx => fx.tone === 'moon').map(renderHuntFx)}
       </div>
 
 
@@ -1174,6 +1342,43 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         @keyframes sceneFadeIn {
           from {
             opacity: 0;
+          }
+        }
+
+        @keyframes sceneHuntSlow {
+          to {
+            transform: translateX(var(--hunt-dx));
+          }
+        }
+
+        @keyframes sceneHuntFade {
+          to {
+            opacity: 0;
+            filter: blur(1.5px) brightness(0.65);
+          }
+        }
+
+        @keyframes sceneHuntFaint {
+          to {
+            opacity: 0.3;
+          }
+        }
+
+        @keyframes sceneHuntShift {
+          0% {
+            transform: translateY(0);
+            animation-timing-function: ease-in-out;
+          }
+          ${(SHIFT_KEYS.open * 100).toFixed(1)}% {
+            transform: translateY(var(--hunt-dy));
+            animation-timing-function: linear;
+          }
+          ${(SHIFT_KEYS.close * 100).toFixed(1)}% {
+            transform: translateY(var(--hunt-dy));
+            animation-timing-function: ease-in-out;
+          }
+          100% {
+            transform: translateY(0);
           }
         }
 

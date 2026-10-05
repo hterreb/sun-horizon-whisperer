@@ -68,6 +68,18 @@ const meetsAcross = (a: ScenePath, b: ScenePath, from: number, margin: number): 
   return false;
 };
 
+// The first scene time (a sample, every 0.5 s, from `from` on) when the two boxes touch, or
+// null. Item 94: a boat on its fallback lane (item 92) finds the fish it meets, so they dive.
+export const firstMeeting = (a: ScenePath, b: ScenePath, from: number): number | null => {
+  if (a.y >= b.y + b.height || b.y >= a.y + a.height) return null;
+  const t0 = Math.max(from, a.start, b.start);
+  const t1 = Math.min(endOf(a), endOf(b));
+  for (let t = t0; t <= t1; t += LANE_SAMPLE_SEC) {
+    if (xAt(a, t - (a.lag ?? 0)) < xAt(b, t) + b.width && xAt(b, t - (b.lag ?? 0)) < xAt(a, t) + a.width) return t;
+  }
+  return null;
+};
+
 export interface LaneCandidate extends ScenePath {
   band: [number, number]; // the highest and the lowest y that the type can take
   view: { width: number; height: number }; // the scene in px, so the margin is the same distance across and down
