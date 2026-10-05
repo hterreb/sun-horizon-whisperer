@@ -156,10 +156,11 @@ describe('CloudLayer', () => {
       expect(container.textContent).not.toContain('🦇');
     });
 
-    it('draws bats as a solid dark silhouette (ROADMAP item 64, B2)', () => {
+    it('draws bats as a filled silhouette in the birds\' colour, with a slow bob (ROADMAP items 64, 99)', () => {
       const bat = spawn({ timeOfDay: 'civil-twilight' }, 9000).querySelector('[data-testid="scene-bat"]') as SVGElement;
       expect(bat.getAttribute('fill')).toBe('currentColor');
-      expect(bat.style.color).toBe('hsl(var(--scene-critter-silhouette) / 0.9)');
+      expect(bat.style.color).toBe('');
+      expect(bat.style.animation).toContain('batBob');
     });
 
     it('flies bats right after sunset, in civil twilight (ROADMAP item 40)', () => {
@@ -561,6 +562,19 @@ describe('CloudLayer', () => {
     };
     const always = (r: number) => () => r;
     const speed = (bird: ReturnType<typeof createBird>) => bird.dx / bird.duration; // % of the width per second
+
+    it('flies bats near and far, small, in the birds\' look, with a 1-2 % bob of 3-4 s (item 99)', () => {
+      const near = createBird('bat', 390, 1, always(0));
+      const far = createBird('bat', 390, 1, always(0.99));
+      expect(near).toMatchObject({ depth: 0, size: 24, opacity: 0.6, bob: { amp: 1, period: 3, phase: 0 } });
+      expect(far.depth).toBeCloseTo(0.99, 10);
+      expect(far.size).toBeLessThan(near.size);
+      expect(far.opacity).toBeLessThan(near.opacity);
+      expect(far.y).toBeGreaterThan(near.y);
+      expect(far.bob!.amp).toBeLessThanOrEqual(2);
+      expect(far.bob!.period).toBeLessThanOrEqual(4);
+      expect(createBird('gull', 390, 1, always(0)).bob).toBeUndefined();
+    });
 
     it('flies no bird faster than 2.5 %/s, half of the old 5 %/s, and the bats too (M2)', () => {
       for (const kind of ['gull', 'heron', 'stork', 'swan', 'geese', 'cormorant', 'starlings', 'bat'] as const) {

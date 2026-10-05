@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Bat } from './sceneIcons';
+import LunarDragon from './LunarDragon';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { type CalendarEvent } from '@/utils/calendarEvents';
 import { type TimeOfDay } from '@/utils/sunUtils';
@@ -30,6 +31,7 @@ const FLAKES = Array.from({ length: 28 }, (_, i) => ({ left: (i * 37) % 100, dur
 const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherType, moon, horizonY }) => {
   const prefersReducedMotion = usePrefersReducedMotion();
   const [catDone, setCatDone] = useState(false);
+  const [dragonDone, setDragonDone] = useState(false);
   const isNight = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
   const seasonText = event ? SEASON_TEXT[event] : undefined;
 
@@ -115,6 +117,11 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherTy
           <circle cx={35.5} cy={13} r={1.1} fill="#FDE047" />
           <circle cx={41} cy={13} r={1.1} fill="#FDE047" />
         </svg>
+      )}
+
+      {event === 'lunar-new-year' && !dragonDone && !prefersReducedMotion && (
+        // ROADMAP item 100: one flight per page view.
+        <LunarDragon timeOfDay={timeOfDay} onDone={() => setDragonDone(true)} />
       )}
 
       <style>{`

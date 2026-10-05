@@ -755,10 +755,12 @@ describe('SunTracker', () => {
         expect(starts).toHaveLength(11);
       });
 
-      it('with the toggle off, schedules no tones', () => {
+      it('with the toggle off, schedules no tones, but the pill counts down (item 98)', () => {
         runToCountdown(false);
         expect(starts).toHaveLength(0);
-        expect(screen.getByTestId('sun-altitude')).not.toHaveTextContent('Sunset in');
+        tickFor(4000, 1000);
+        expect(screen.getByTestId('sun-altitude')).toHaveTextContent('Sunset in 7 s');
+        expect(starts).toHaveLength(0);
       });
 
       it('with the page hidden at T-11 s, schedules no tones', () => {
@@ -768,7 +770,6 @@ describe('SunTracker', () => {
         Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
         tickFor(13_000, 1000);
         expect(starts).toHaveLength(0);
-        expect(screen.getByTestId('sun-altitude')).not.toHaveTextContent('Sunset in');
       });
 
       it('during a preview, schedules no tones', () => {
@@ -780,6 +781,7 @@ describe('SunTracker', () => {
         jumpTo(`2026-09-30T${pad(minuteBefore.getHours())}:${pad(minuteBefore.getMinutes())}`);
         tickFor(80_000, 1000);
         expect(starts).toHaveLength(0);
+        expect(screen.getByTestId('sun-altitude')).not.toHaveTextContent('Sunset in');
       });
     });
 

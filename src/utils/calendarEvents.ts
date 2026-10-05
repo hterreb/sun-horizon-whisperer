@@ -5,6 +5,7 @@ import { getNextFullMoon } from './moonUtils';
 export type CalendarEvent =
   | 'new-year' // 00:00-00:00:59 on Jan 1: fireworks
   | 'friday-13' // a black cat walks along the horizon once
+  | 'lunar-new-year' // a dragon flies across the sky once (ROADMAP item 100)
   | 'solstice-longest' // the solstice day with the longest day for this hemisphere
   | 'solstice-shortest'
   | 'equinox'
@@ -30,6 +31,10 @@ export const getSeasonInstant = (year: number, month: 2 | 5 | 8 | 11): Date => {
 
 const sameLocalDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 
+// Lunar New Year (ROADMAP item 100), Hong Kong Observatory dates. Extend the list in 2035.
+const LUNAR_NEW_YEAR = ['2027-02-06', '2028-01-26', '2029-02-13', '2030-02-03', '2031-01-23', '2032-02-11', '2033-01-31', '2034-02-19', '2035-02-08'];
+const localIsoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 const getSeasonEvent = (date: Date, latitude: number): CalendarEvent | null => {
   const month = date.getMonth();
   if (month !== 2 && month !== 5 && month !== 8 && month !== 11) return null;
@@ -43,12 +48,13 @@ const getSeasonEvent = (date: Date, latitude: number): CalendarEvent | null => {
 const isHalloweenFullMoon = (year: number) => getNextFullMoon(new Date(year, 9, 28)) < new Date(year, 10, 4);
 
 // One event id, or null. When two could apply, the most specific (shortest) wins:
-// the New Year minute, then single days (Friday the 13th, solstice/equinox,
+// the New Year minute, then single days (Lunar New Year, Friday the 13th, solstice/equinox,
 // Halloween), then the 3 Christmas days. Without a latitude, the north is assumed.
 export const getCalendarEvent = (date: Date, latitude = 0): CalendarEvent | null => {
   const month = date.getMonth();
   const day = date.getDate();
   if (month === 0 && day === 1 && date.getHours() === 0 && date.getMinutes() === 0) return 'new-year';
+  if (LUNAR_NEW_YEAR.includes(localIsoDay(date))) return 'lunar-new-year';
   if (day === 13 && date.getDay() === 5) return 'friday-13';
   const season = getSeasonEvent(date, latitude);
   if (season) return season;

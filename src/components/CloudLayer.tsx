@@ -287,7 +287,7 @@ const BIRDS: Record<FlyerKind, { size: number; speed: number; group: BirdGroup; 
   cormorant: { size: 30, speed: 2.4, group: 'line' },
   kestrel: { size: 24, speed: 2, group: 'one', hover: true },
   starlings: { size: 7, speed: 2, group: 'flock', far: true },
-  bat: { size: 38, speed: 2.5, group: 'one' },
+  bat: { size: 24, speed: 2.5, group: 'one' }, // item 99 (BT2): smaller than a gull, as a real bat
 };
 
 // The group shapes, in bird widths, the leader in front. They never change in flight.
@@ -323,6 +323,7 @@ interface BirdEntity extends MovingEntity {
   easing?: string; // M8: a CSS linear() easing that hangs still mid-crossing
   curve?: [number, number][]; // the easing's points, for the lane plan (item 92)
   path?: ScenePath; // the lane plan (item 92), set at spawn
+  bob?: { amp: number; period: number; phase: number }; // item 99 (BT5): vh, s, 0-1 of a wave
 }
 
 // Builds one bird, group or bat (ROADMAP item 74). `y` is the centre line. `windFactor` slows
@@ -333,8 +334,8 @@ export const createBird = (
   kind: FlyerKind, viewportWidth: number, windFactor = 1, random = Math.random, moonY?: number,
 ): BirdEntity => {
   const spec = BIRDS[kind];
-  // M3: a random distance. Bats keep today's look; the night geese pass at a fixed distance.
-  const depth = kind === 'bat' ? 0 : moonY !== undefined ? 0.2 : spec.far ? 0.8 + random() * 0.2 : random();
+  // M3: a random distance, bats too (item 99, BT1); the night geese pass at a fixed distance.
+  const depth = moonY !== undefined ? 0.2 : spec.far ? 0.8 + random() * 0.2 : random();
   const nearness = 1 - FAR_SHRINK * depth;
   const size = Math.round(spec.size * nearness);
   const spots = birdGroup(spec.group, random);
@@ -353,14 +354,16 @@ export const createBird = (
     group: spots.length > 1 ? spots.map(([x, y]) => ({ left: (x - minX) * size, top: (y - minY) * size })) : undefined,
     x: startX,
     // Near birds fly high (20 % of the height), far ones lower (50 %), well above the horizon
-    // (65 %). Bats keep today's 20-50 %.
-    y: moonY ?? (kind === 'bat' ? 20 + random() * 30 : 20 + depth * 30 + (random() - 0.5) * 4),
+    // (65 %). Bats too (item 99).
+    y: moonY ?? 20 + depth * 30 + (random() - 0.5) * 4,
     dx,
     duration: hover ? hover.duration : dx / speed,
     easing: hover?.easing,
     curve: hover?.curve,
-    // Bats carry their own 90 % in the icon colour (item 64); the night geese are dark at 90 %.
-    opacity: kind === 'bat' ? 1 : moonY !== undefined ? 0.9 : 0.6 * (1 - 0.3 * depth),
+    // Bats in the birds' look (item 99); the night geese are dark at 90 %.
+    opacity: moonY !== undefined ? 0.9 : 0.6 * (1 - 0.3 * depth),
+    // BT5 slow bob (item 99): 1-2 % of the height, one wave per 3-4 s, from a random phase.
+    bob: kind === 'bat' ? { amp: 1 + random(), period: 3 + random(), phase: random() } : undefined,
   };
 };
 
@@ -448,14 +451,14 @@ const fishLane = (fish: FishEntity, view: View, rewind: boolean): LaneShape => {
   };
 };
 
-// Birds fly with their centre from 20 % (near) to 50 % of the height (far), ±2 %; the bats at
-// 20-50 % (item 74, M3). The night geese keep to the moon's height, ±2 %.
+// Birds and bats (item 99) fly with their centre from 20 % (near) to 50 % of the height (far),
+// ±2 % (item 74, M3). The night geese keep to the moon's height, ±2 %. A bat's bob (vh, about
+// % of the height) widens its lane.
 const BIRD_BAND: [number, number] = [18, 52];
-const BAT_BAND: [number, number] = [20, 50];
-const birdLane = (bird: BirdEntity, view: View, band: [number, number]): LaneShape => ({
+const birdLane = (bird: BirdEntity, view: View, band = BIRD_BAND): LaneShape => ({
   width: percentOfWidth(bird.width, view),
-  above: percentOfHeight(bird.height / 2, view),
-  height: percentOfHeight(bird.height, view),
+  above: percentOfHeight(bird.height / 2, view) + (bird.bob?.amp ?? 0),
+  height: percentOfHeight(bird.height, view) + 2 * (bird.bob?.amp ?? 0),
   band,
   curve: bird.curve,
 });
@@ -555,7 +558,7 @@ export const spawnTick = (
     const makeBird = (progress: number) => {
       const kind = isSunDown ? 'bat' : pickBird(random(), month, latitude, timeOfDay === 'evening');
       const next = createBird(kind, view.width, rules.birdSpeedFactor, random);
-      return place(next, birdLane(next, view, kind === 'bat' ? BAT_BAND : BIRD_BAND), pathsOf(birds), progress);
+      return place(next, birdLane(next, view), pathsOf(birds), progress);
     };
     if (warm && !shown.birds) {
       fill(() => birds.length, limit, progress => {
@@ -1072,7 +1075,16 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         >
           <div className="relative" style={{ width: bird.width, height: bird.height, transform: 'translateY(-50%)' }}>
             {bird.kind === 'bat' ? (
-              <Bat size={bird.size} strokeWidth={0.6} fill="currentColor" style={{ color: 'hsl(var(--scene-critter-silhouette) / 0.9)' }} data-testid="scene-bat" />
+              <Bat
+                size={bird.size}
+                strokeWidth={0.6}
+                fill="currentColor"
+                data-testid="scene-bat"
+                style={bird.bob && {
+                  ['--bob' as string]: `${bird.bob.amp}vh`,
+                  animation: `batBob ${bird.bob.period / 2}s ease-in-out ${-bird.bob.phase * bird.bob.period}s infinite alternate`,
+                }}
+              />
             ) : bird.group ? bird.group.map((spot, i) => (
               <SceneBird key={i} kind={bird.kind as BirdKind} width={bird.size} className="absolute" style={{ left: spot.left, top: spot.top }} />
             )) : (
@@ -1168,6 +1180,15 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         @keyframes snowfall {
           to {
             transform: translateY(100vh) translateX(20px);
+          }
+        }
+
+        @keyframes batBob {
+          from {
+            transform: translateY(calc(-1 * var(--bob)));
+          }
+          to {
+            transform: translateY(var(--bob));
           }
         }
 

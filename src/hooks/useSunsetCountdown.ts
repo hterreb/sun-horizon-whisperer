@@ -50,9 +50,11 @@ export const primeCountdownAudio = () => {
 };
 
 // Schedules the 10 ticks and the chime when the 1 s clock `now` reaches T-11 s before
-// `target`, only while `active` (toggle on, live time) and the page is visible.
-// Returns the seconds left (10 to 1) during the countdown, else null.
-export const useSunsetCountdown = (target: Date | null, now: Date, active: boolean): number | null => {
+// `target`, only while `live` (live time), `soundOn` (the toggle) and the page is visible.
+// Returns the seconds left (10 to 1) in live time, also with the sound off (item 98),
+// else null.
+export const useSunsetCountdown = (target: Date | null, now: Date, live: boolean, soundOn: boolean): number | null => {
+  const active = live && soundOn;
   // The target the tones are scheduled for. Set during render (not in an effect), the
   // same pattern as SunTracker's cursor state.
   const [scheduledFor, setScheduledFor] = useState<number | null>(null);
@@ -78,6 +80,6 @@ export const useSunsetCountdown = (target: Date | null, now: Date, active: boole
     return () => oscillators.forEach((oscillator) => oscillator.stop());
   }, [scheduledFor]);
 
-  const isCounting = active && scheduledFor === targetMs && remainingMs !== null && remainingMs > 0 && remainingMs <= COUNTDOWN_MS;
+  const isCounting = live && remainingMs !== null && remainingMs > 0 && remainingMs <= COUNTDOWN_MS;
   return isCounting ? Math.ceil(remainingMs / 1000) : null;
 };
