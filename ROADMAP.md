@@ -1448,6 +1448,63 @@ Six open Sentry feedback reports from 2026-10-02 20:48 to 2026-10-03 18:58, all 
 - **Deviations:** no extra 0.7-unit blur on the strands (the lookbook had one): the cloud's own edge blur (2.6 px × scale) already softens them.
 - **Checked:** 7 new tests (954 in all); lint and typecheck pass. In headless Chromium at 390 × 844, Ravensburg, manual weather (rain at dusk, storm and overcast by day, partly at dusk), before and after: the rain columns and the vertical bands in the decks are gone, the altocumulus field is an oval. No console errors.
 
+### Feedback round (2026-10-05)
+
+Three Sentry feedback reports, all on release `d79d115` (the current `main`), from Ravensburg. SUN-CHASER-W and -X share a trace ID: one page load on 2026-10-04. SUN-CHASER-Y (2026-10-05 22:15) is archived ("ignored forever") in Sentry. Sentry has no new errors for sun-chaser in 30 days (only the setup test). Request: "check sentry for all errors and user feedback, analyze, spec it out and pitch me ideas how to solve". Item 98 is a fix with a recommended spec. Items 99 and 100 are design work, with a lookbook first.
+
+### 98. The countdown you do not miss — S — [SUN-CHASER-W](https://ainabler.sentry.io/issues/SUN-CHASER-W) — **✅ Done**
+
+- **Feedback (2026-10-04 18:49 CEST, Ravensburg):** "Fireworks are working now but I didn't hear the countdown".
+- **Now:** the fireworks (items 41, 80) and the countdown (item 43) are two features. The fireworks always run at the line-of-sight sunset. The countdown runs at the same sunset, but only when the bell toggle in the Sunset row is on. The toggle is off by default, and the app shows no countdown at all when it is off. With the toggle saved as on, a page load creates the `AudioContext` without a user gesture: the browser keeps it suspended, `resume()` fails, and the ticks are silent. Nothing tells the user.
+- **Cause:** not provable from Sentry (a feedback event has no breadcrumbs). In order of likelihood:
+  1. The bell toggle was off (the default). The user expects the countdown to be part of the fireworks.
+  2. The toggle was on from an earlier visit. The page was loaded again and not tapped before the sunset, so the `AudioContext` stayed suspended.
+- **Options:**
+  - **CD1 Silent pill for everyone (recommended):** the altitude pill shows "Sunset in 10 s … 1 s" before each fireworks sunset, also with the toggle off. The sound stays opt-in.
+  - **CD2 Unlock on the first tap (recommended):** with the toggle on, the first `pointerdown` anywhere on the page resumes the `AudioContext` (one listener, removed after it runs).
+  - **CD3 Fail visibly (recommended):** with the toggle on, if the `AudioContext` is not `running` 60 s before the target, show a toast: "Tap to turn on the sunset sound". The tap resumes it.
+  - **CD4 Teach the bell:** after the first fireworks show with the toggle off, one toast: "Want to hear the countdown next time?" with the bell. Once per device (`localStorage`).
+  - **CD5 Fireworks sound:** soft Web Audio pops with the show. Only with the toggle on.
+- **Pick (2026-10-05):** "cd1". CD2–CD5 are not done.
+- **Spec (CD1):** `useSunsetCountdown(target, now, live, soundOn)` returns the seconds left (10 to 1) in live time, with or without the sound. It schedules the tones only with `soundOn` (the bell toggle) and the page visible. `SunTracker` passes `!isTimePreview` and `isCountdownOn`. A preview shows no pill.
+- **Checked:** the item-43 test "toggle off" now expects the pill ("Sunset in 7 s") and no tones; the preview test expects no pill. 954 tests, lint and typecheck pass.
+
+### 99. Bats like the birds: smaller, near and far, a natural flight — M — [SUN-CHASER-X](https://ainabler.sentry.io/issues/SUN-CHASER-X) — **✅ Done**
+
+- **Feedback (2026-10-04 19:06 CEST, Ravensburg):** "Bats should be a little lighter and also behave more like the birds be closer and in the distance and have natural flight paterns".
+- **Now (`CloudLayer.tsx`, `createBird`):** a bat is always near (`depth` 0), always 38 px, always alone, 90 % silhouette black (item 64), on a straight line at 2.5 %/s, 20–50 % down the sky. It is bigger than the gull (34 px), although a real bat is much smaller. So the bats look heavy and all the same.
+- **Options:**
+  - **BT1 Depth like the birds:** a random `depth`; far bats smaller, paler and lower, as the birds (`FAR_SHRINK`, `0.6 × (1 − 0.3 × depth)` haze). Near bats stay dark enough for civil twilight (item 64).
+  - **BT2 Lighter weight:** a near bat 24 px instead of 38 px (a pipistrelle is smaller than a gull).
+  - **BT3 Small groups:** sometimes 2–4 loose bats (fixed shape, like the bird groups).
+  - **BT4 Gentle swoop:** one slow, shallow dip per crossing (2–4 % of the height, eased), not a wiggle.
+  - **BT5 Slow bob:** a soft up and down of 1–2 % of the height, 3–4 s per wave.
+  - **BT6 Real bat flight:** quick zig-zags and turns. Most natural, but against the calm-scene rule (item 15: no wiggle, no turns), so not recommended.
+- **Lookbook:** [Dusk Bats 2](https://claude.ai/artifact/FVVMW5TnATvS1QkPhjXEVC) (private). Controls: colour (today / birds' look), size (38 / 28 / 24 px), depth, groups, motion (BT0, BT4, BT5, BT6), civil or nautical twilight; a phone and a wide view.
+- **Recommended:** BT1 + BT2 + BT3, then BT4 or BT5 by eye in the lookbook. Motion must stay at or below 2.5 %/s and phone px/s on wide screens.
+- **Decision (2026-10-05):** "lighter colour just a little like the birds": the bats take the birds' silhouette opacity, `0.6 × (1 − 0.3 × depth)`, instead of 90 %. Size, depth, groups and motion are picked in the lookbook.
+- **Picks (2026-10-05, lookbook):** birds' look, 24 px (BT2), near and far (BT1), alone (no BT3), BT5 slow bob.
+- **Spec:** in `createBird` (`CloudLayer.tsx`) a bat is like a bird: a random `depth`, the birds' `y` (20 % + depth × 30 %) and opacity `0.6 × (1 − 0.3 × depth)`; `BIRDS.bat.size` is 24. The `Bat` icon takes the group's silhouette colour (no own 90 %). BT5: each bat gets `bob` (1–2 vh, 3–4 s per wave, a random phase); the `batBob` keyframes move the icon up and down, `ease-in-out`, `alternate`. The Halloween bats (`CalendarEggs`) stay as they are.
+- **Checked:** a new `createBird` test (near and far size, opacity, `y`, bob ranges; no bob on a gull); the item-64 test now expects the birds' colour and the bob. 955 tests, lint and typecheck pass. Headless Chromium, 390 × 844, Ravensburg 19:12 (civil twilight): bats spawn every 9 s, 15–20 px wide, opacity 0.46–0.53, each moves about ±8 px up and down, about 7 px/s across. No console errors.
+
+### 100. A dragon at Lunar New Year — M — [SUN-CHASER-Y](https://ainabler.sentry.io/issues/SUN-CHASER-Y) — **✅ Done**
+
+- **Feedback (2026-10-05 22:15 CEST, Ravensburg):** "A dragon on Chinese lunar new year". Archived in Sentry: confirm that it is a request.
+- **Now:** `calendarEvents.ts` has New Year, solstice, Halloween, Christmas and Friday the 13th. There is no Lunar New Year.
+- **Spec:**
+  - `getCalendarEvent` returns `'lunar-new-year'` on the day of Lunar New Year, from a fixed date list (as the eclipse list in `astroEvents.ts`): 2027-02-06, 2028-01-26, 2029-02-13, 2030-02-03, 2031-01-23, 2032-02-11, 2033-01-31, 2034-02-19, 2035-02-08 (check against the Hong Kong Observatory table).
+  - A dragon glides once across the sky per page view on that day, in one straight, slow line (like the black cat on Friday the 13th). Its body is a fixed S shape; it does not wiggle. `?egg=dragon` shows it at once. Reduced motion: no dragon. One special event at a time.
+- **Lookbook:** [Lunar New Year](https://claude.ai/artifact/8qZ4mdiMtMtcAPgJodZhAz) (private), by day, at sunset and at night, with Z1 for 2027 and 2028.
+- **Feedback on the lookbook (2026-10-05):** "i want a real dragon that flies through the sky". The lookbook now shows RD1 a Chinese lóng (no wings; red-gold or jade-gold) and RD2 a winged Western dragon; motion M1 fixed S, M2 a slow body wave (5 s), M3 a shallow rise and dip, M4 slow wing beats (RD2; against the calm rule); F1 a cloud trail, F2 a pearl (RD1). DR1–DR4 and Z1 below are replaced.
+- **Lookbook options:** DR1 a red paper-kite dragon by day; DR2 a gold-red parade dragon with a lantern string; DR3 a dragon of stars at night; DR4 a dragon-shaped cloud (subtle, all day).
+- **Open question:** a dragon every Lunar New Year, or the zodiac animal of each year (2027 goat, 2028 monkey, …)? Answered by the picks: a dragon every year.
+- **Picks (2026-10-05):** RD1 lóng, M2 body wave, M3 rise and dip, F1 cloud trail, F2 pearl; "but make the color random, red, jade, or complete gold". M2 is a deliberate exception to the calm-scene rule (no wiggle) for this once-a-year event.
+- **Spec as built:**
+  - `calendarEvents.ts`: `'lunar-new-year'` for the whole local day of the dates above, after the New Year minute and before Friday the 13th. `?egg=dragon` forces it (`SunTracker`).
+  - `LunarDragon.tsx`: the lookbook's RD1 drawing (SVG built once, the body redrawn in one rAF loop; the frame ID in a `useRef`). Colour per page view, at random: red-gold, jade-gold or gold (`DRAGON_PALETTES`). Light by time of day: day, sunset (civil twilight, dawn, evening), night. 224 px long (0.66 px per unit), 23 % down the sky, 1.6 %/s capped at 6.24 px/s (a phone crossing takes about 108 s). M3: ±3 % of the height over the crossing, nose along the path. F1: a wisp every 18 px, fading over 20 s.
+  - `CalendarEggs`: one flight per page view (`dragonDone`); none under reduced motion.
+- **Checked:** tests: the date list (whole day, 2027 and 2035, not the day after); the dragon gets one of the three colours, still flies at 100 s on a 390 px phone, is gone at 160 s; no dragon under reduced motion. 957 tests, lint (our files) and typecheck pass. Headless Chromium, Ravensburg, 2027-02-06, after 45 s: a red dragon at 13:00 (390 × 844), a gold one at 17:40 (civil twilight), a gold one at 21:00 (1280 × 800, night light). No console errors.
+
 ---
 
 ## P1 — Core sky features

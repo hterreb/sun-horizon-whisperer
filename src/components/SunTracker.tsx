@@ -686,16 +686,19 @@ const SunTracker: React.FC = () => {
   // `?egg=lenticular` or `?egg=mammatus` forces the day.
   const [cloudEggForced] = useState(() => isCloudEggForced(window.location.search));
   const cloudEgg = cloudEggForced || isCloudEggDay(date, location.latitude, location.longitude);
-  // Calendar easter eggs (ROADMAP "Ongoing"): one event id per minute.
+  // Calendar easter eggs (ROADMAP "Ongoing"): one event id per minute. `?egg=dragon`
+  // forces Lunar New Year (item 100).
+  const [dragonForced] = useState(() => new URLSearchParams(window.location.search).get('egg') === 'dragon');
   const calendarEvent = useMemo(
-    () => getCalendarEvent(date, location.latitude),
+    () => (dragonForced ? 'lunar-new-year' : getCalendarEvent(date, location.latitude)),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on passMinuteKey, not `date` itself
     [passMinuteKey, location.latitude]
   );
 
   // Sunset countdown (ROADMAP item 43): 10 s of ticks and a chime at the next sunset
   // (line of sight when there is one). Live time only; the tap that turns it on
-  // starts the audio (browsers allow sound only after a user gesture).
+  // starts the audio (browsers allow sound only after a user gesture). The pill counts
+  // down for everyone, the sound only with the toggle on (item 98).
   const [isCountdownOn, setIsCountdownOn] = useState(() => {
     try {
       return localStorage.getItem(SUNSET_COUNTDOWN_STORAGE_KEY) === 'on';
@@ -714,7 +717,7 @@ const SunTracker: React.FC = () => {
     if (next) primeCountdownAudio();
   }, [isCountdownOn]);
   const countdownTarget = getCountdownTarget(date, sunTimes, terrainExtras.terrainSunTimes, isLineOfSightOn);
-  const countdownSeconds = useSunsetCountdown(countdownTarget?.time ?? null, date, isCountdownOn && !isTimePreview);
+  const countdownSeconds = useSunsetCountdown(countdownTarget?.time ?? null, date, !isTimePreview, isCountdownOn);
 
   // Sunset reminder (ROADMAP item 69): a notification SUNSET_REMINDER_MIN before the same
   // target, while the app is open. Live time only. The tap that turns it on asks for the

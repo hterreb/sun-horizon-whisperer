@@ -26,6 +26,14 @@ describe('getCalendarEvent', () => {
     expect(getCalendarEvent(new Date(2026, 11, 31, 23, 59, 59))).toBeNull();
   });
 
+  it('returns lunar-new-year on the whole day of Lunar New Year only (item 100)', () => {
+    expect(getCalendarEvent(new Date(2027, 1, 6, 0, 0))).toBe('lunar-new-year');
+    expect(getCalendarEvent(new Date(2027, 1, 6, 23, 59))).toBe('lunar-new-year');
+    expect(getCalendarEvent(new Date(2035, 1, 8, 12))).toBe('lunar-new-year');
+    expect(getCalendarEvent(new Date(2027, 1, 7, 12))).toBeNull();
+    expect(getCalendarEvent(new Date(2028, 1, 6, 12))).toBeNull();
+  });
+
   it('returns friday-13 on a Friday the 13th only', () => {
     expect(getCalendarEvent(new Date(2026, 10, 13, 20))).toBe('friday-13'); // a Friday
     expect(getCalendarEvent(new Date(2026, 9, 13, 20))).toBeNull(); // a Tuesday

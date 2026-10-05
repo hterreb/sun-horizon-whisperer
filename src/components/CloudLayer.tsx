@@ -248,7 +248,7 @@ const BIRDS: Record<FlyerKind, { size: number; speed: number; group: BirdGroup; 
   cormorant: { size: 30, speed: 2.4, group: 'line' },
   kestrel: { size: 24, speed: 2, group: 'one', hover: true },
   starlings: { size: 7, speed: 2, group: 'flock', far: true },
-  bat: { size: 38, speed: 2.5, group: 'one' },
+  bat: { size: 24, speed: 2.5, group: 'one' }, // item 99 (BT2): smaller than a gull, as a real bat
 };
 
 // The group shapes, in bird widths, the leader in front. They never change in flight.
@@ -282,6 +282,7 @@ interface BirdEntity extends MovingEntity {
   opacity: number;
   group?: { left: number; top: number }[]; // each bird's offset in px
   easing?: string; // M8: a CSS linear() easing that hangs still mid-crossing
+  bob?: { amp: number; period: number; phase: number }; // item 99 (BT5): vh, s, 0-1 of a wave
 }
 
 // Builds one bird, group or bat (ROADMAP item 74). `y` is the centre line. `windFactor` slows
@@ -292,8 +293,8 @@ export const createBird = (
   kind: FlyerKind, viewportWidth: number, windFactor = 1, random = Math.random, moonY?: number,
 ): BirdEntity => {
   const spec = BIRDS[kind];
-  // M3: a random distance. Bats keep today's look; the night geese pass at a fixed distance.
-  const depth = kind === 'bat' ? 0 : moonY !== undefined ? 0.2 : spec.far ? 0.8 + random() * 0.2 : random();
+  // M3: a random distance, bats too (item 99, BT1); the night geese pass at a fixed distance.
+  const depth = moonY !== undefined ? 0.2 : spec.far ? 0.8 + random() * 0.2 : random();
   const nearness = 1 - FAR_SHRINK * depth;
   const size = Math.round(spec.size * nearness);
   const spots = birdGroup(spec.group, random);
@@ -312,13 +313,15 @@ export const createBird = (
     group: spots.length > 1 ? spots.map(([x, y]) => ({ left: (x - minX) * size, top: (y - minY) * size })) : undefined,
     x: startX,
     // Near birds fly high (20 % of the height), far ones lower (50 %), well above the horizon
-    // (65 %). Bats keep today's 20-50 %.
-    y: moonY ?? (kind === 'bat' ? 20 + random() * 30 : 20 + depth * 30 + (random() - 0.5) * 4),
+    // (65 %). Bats too (item 99).
+    y: moonY ?? 20 + depth * 30 + (random() - 0.5) * 4,
     dx,
     duration: hover ? hover.duration : dx / speed,
     easing: hover?.easing,
-    // Bats carry their own 90 % in the icon colour (item 64); the night geese are dark at 90 %.
-    opacity: kind === 'bat' ? 1 : moonY !== undefined ? 0.9 : 0.6 * (1 - 0.3 * depth),
+    // Bats in the birds' look (item 99); the night geese are dark at 90 %.
+    opacity: moonY !== undefined ? 0.9 : 0.6 * (1 - 0.3 * depth),
+    // BT5 slow bob (item 99): 1-2 % of the height, one wave per 3-4 s, from a random phase.
+    bob: kind === 'bat' ? { amp: 1 + random(), period: 3 + random(), phase: random() } : undefined,
   };
 };
 
@@ -742,7 +745,16 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         >
           <div className="relative" style={{ width: bird.width, height: bird.height, transform: 'translateY(-50%)' }}>
             {bird.kind === 'bat' ? (
-              <Bat size={bird.size} strokeWidth={0.6} fill="currentColor" style={{ color: 'hsl(var(--scene-critter-silhouette) / 0.9)' }} data-testid="scene-bat" />
+              <Bat
+                size={bird.size}
+                strokeWidth={0.6}
+                fill="currentColor"
+                data-testid="scene-bat"
+                style={bird.bob && {
+                  ['--bob' as string]: `${bird.bob.amp}vh`,
+                  animation: `batBob ${bird.bob.period / 2}s ease-in-out ${-bird.bob.phase * bird.bob.period}s infinite alternate`,
+                }}
+              />
             ) : bird.group ? bird.group.map((spot, i) => (
               <SceneBird key={i} kind={bird.kind as BirdKind} width={bird.size} className="absolute" style={{ left: spot.left, top: spot.top }} />
             )) : (
@@ -828,6 +840,15 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         @keyframes snowfall {
           to {
             transform: translateY(100vh) translateX(20px);
+          }
+        }
+
+        @keyframes batBob {
+          from {
+            transform: translateY(calc(-1 * var(--bob)));
+          }
+          to {
+            transform: translateY(var(--bob));
           }
         }
 

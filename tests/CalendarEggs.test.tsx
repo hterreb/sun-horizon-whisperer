@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import CalendarEggs from '../src/components/CalendarEggs';
 
 const mockReducedMotion = (matches: boolean) =>
@@ -62,10 +62,33 @@ describe('CalendarEggs', () => {
     expect(screen.queryByTestId('black-cat')).toBeNull();
   });
 
+  it('flies the Lunar New Year dragon once, in one of three colours, then removes it (item 100)', () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => frames.push(cb));
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    // jsdom has no layout: a 390 × 844 phone.
+    vi.spyOn(Element.prototype, 'clientWidth', 'get').mockReturnValue(390);
+    vi.spyOn(Element.prototype, 'clientHeight', 'get').mockReturnValue(844);
+    render(<CalendarEggs {...base} event="lunar-new-year" />);
+    const dragon = screen.getByTestId('lunar-dragon');
+    expect(['red', 'jade', 'gold']).toContain(dragon.getAttribute('data-palette'));
+    // 6.24 px/s: the 224 px dragon crosses 390 px in about 108 s, then its trail fades (20 s).
+    let clock = 0;
+    const runTo = (ms: number) => act(() => {
+      while (frames.length && clock <= ms) { frames.shift()!(clock); clock += 500; }
+    });
+    runTo(100_000);
+    expect(screen.getByTestId('lunar-dragon')).toBeTruthy();
+    runTo(160_000);
+    expect(screen.queryByTestId('lunar-dragon')).toBeNull();
+  });
+
   it('turns the moving eggs off under reduced motion, keeps the static ones', () => {
     mockReducedMotion(true);
     const { rerender } = render(<CalendarEggs {...base} event="friday-13" />);
     expect(screen.queryByTestId('black-cat')).toBeNull();
+    rerender(<CalendarEggs {...base} event="lunar-new-year" />);
+    expect(screen.queryByTestId('lunar-dragon')).toBeNull();
     rerender(<CalendarEggs {...base} event="halloween-bats" />);
     expect(screen.queryByTestId('halloween-bat')).toBeNull();
     rerender(<CalendarEggs {...base} event="christmas" />);
