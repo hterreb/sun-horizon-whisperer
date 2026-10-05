@@ -1,0 +1,20 @@
+{
+  "latitude": 47.78,
+  "longitude": 9.62,
+  "timezone": "UTC",
+  "current_weather": { "time": "2026-09-16T12:00", "temperature": 14.2, "weathercode": 63, "windspeed": 14.8, "winddirection": 240, "is_day": 1 },
+  "current": { "time": "2026-09-16T12:00", "interval": 900, "cloud_cover": 100, "wind_speed_10m": 14.8, "wind_direction_10m": 240, "precipitation": 0.6 },
+  "hourly": {
+    "time": ["2026-09-16T06:00", "2026-09-16T12:00", "2026-09-16T18:00", "2026-09-17T06:00", "2026-09-17T12:00", "2026-09-17T18:00"],
+    "cloud_cover_low": [80, 85, 70, 60, 40, 30],
+    "cloud_cover_mid": [70, 70, 60, 50, 30, 20],
+    "cloud_cover_high": [40, 40, 30, 30, 20, 10],
+    "visibility": [9000, 7000, 9000, 12000, 18000, 24140],
+    "temperature_2m": [12.0, 14.2, 13.1, 10.5, 16.0, 15.2],
+    "weather_code": [61, 63, 61, 3, 2, 1],
+    "cloud_cover": [100, 100, 95, 90, 60, 40],
+    "wind_speed_10m": [12.0, 14.8, 13.0, 9.0, 8.0, 6.0],
+    "wind_direction_10m": [240, 240, 250, 250, 260, 260],
+    "precipitation": [1.2, 2.4, 1.0, 0, 0, 0]
+  }
+}

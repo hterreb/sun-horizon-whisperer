@@ -30,3 +30,6 @@ vite.config.ts.timestamp-*
 
 # A Deno run in the repo root writes a stray lock; each Supabase function has its own (AUDIT S-17).
 /deno.lock
+
+# Output of scripts/perf-trace.mjs (ROADMAP item 91).
+/scripts/perf-results/
