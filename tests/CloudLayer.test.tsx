@@ -753,20 +753,26 @@ describe('lane planning (ROADMAP item 92)', () => {
     let scene: SceneEntities = { birds: [], fish: [], ships: [], leaves: [] };
     const last = { birds: 0, fish: 0, ships: 5000 - 55000, leaves: 0 }; // the first boat after 5 s, as at mount
     let spawns = 0;
-    const touches = new Set<string>();
+    let boatSpawns = 0;
+    const touches = new Set<string>(); // fish-fish, boat-boat, bird-bird
+    const water = new Set<string>(); // all water pairs, fish-boat included
     for (let ms = 500; ms <= 30 * 60_000; ms += 500) {
       const t = ms / 1000;
       const onScreen = <T extends { path?: ScenePath }>(list: T[]) => list.filter(e => !e.path || t < endOf(e.path));
       scene = { birds: onScreen(scene.birds), fish: onScreen(scene.fish), ships: onScreen(scene.ships), leaves: [] };
       const next = spawnTick(scene, last, rules, ms, t, random, plan ? findLane : candidate => candidate.y);
       spawns += next.birds.length - scene.birds.length + next.fish.length - scene.fish.length + next.ships.length - scene.ships.length;
+      boatSpawns += next.ships.length - scene.ships.length;
       scene = next;
       for (let dt = 0; dt < 0.5; dt += 0.1) {
-        touching([...scene.fish, ...scene.ships], t + dt, touches);
+        touching(scene.fish, t + dt, touches);
+        touching(scene.ships, t + dt, touches);
         touching(scene.birds, t + dt, touches);
+        touching([...scene.fish, ...scene.ships], t + dt, water);
       }
     }
-    return { spawns, touches: touches.size };
+    const fishBoat = [...water].filter(pair => !touches.has(pair)).length;
+    return { spawns, boatSpawns, touches: touches.size, fishBoat };
   };
   const rules = (view: SpawnRules['view'], extra: Partial<SpawnRules> = {}): SpawnRules => ({
     weatherType: 'clear', timeOfDay: 'midday', windSpeedKmh: 10, birdSpeedFactor: 1, showLeaves: false,
@@ -779,11 +785,15 @@ describe('lane planning (ROADMAP item 92)', () => {
     { name: 'a desktop by day', scene: rules({ width: 1280, height: 800 }) },
     { name: 'a phone in the evening', scene: rules({ width: 390, height: 844 }, { timeOfDay: 'evening' }) },
     { name: 'a phone at night, with the moon', scene: rules({ width: 390, height: 844 }, { timeOfDay: 'night', moonUp: true, moonY: 30 }) },
-  ])('keeps all boxes apart on $name, with at most 15 percent fewer spawns', ({ scene }) => {
+  ])('keeps all boxes apart on $name, with at most 15 percent fewer spawns and no fewer boats', ({ scene }) => {
     const planned = simulate(scene, true);
     const random = simulate(scene, false);
-    expect(random.touches).toBeGreaterThan(0); // the check finds touches without a plan
+    expect(random.touches + random.fishBoat).toBeGreaterThan(0); // the check finds touches without a plan
     expect(planned.touches).toBe(0);
+    // Boats have the right of way: no boat waits for the fish. A fish that swims when a boat
+    // takes a full band can still meet it (at most 1 in 10 min).
+    expect(planned.boatSpawns).toBeGreaterThanOrEqual(random.boatSpawns);
+    expect(planned.fishBoat).toBeLessThanOrEqual(3);
     expect(planned.spawns).toBeGreaterThanOrEqual(0.85 * random.spawns);
   });
 });

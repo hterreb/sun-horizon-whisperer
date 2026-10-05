@@ -479,8 +479,8 @@ const pathsOf = (...groups: { path?: ScenePath }[][]): ScenePath[] =>
 // One check of the spawn loop (every 500 ms): a new bird, fish, boat or leaf when its gap has
 // passed and its chance comes up, and an empty group when the weather or the time no longer
 // has it. Item 92: a new fish, bird or boat takes a free lane (findLane): fish check against
-// the fish and the boats, boats against the boats and the fish, birds against all flyers. With
-// no free lane it does not spawn, and the next check tries again. Item 93: the limits and the
+// the fish and the boats, boats against the boats (and the fish when they can), birds against
+// all flyers. With no free lane it does not spawn, and the next check tries again. Item 93: the limits and the
 // chances are scaled by `rules.density` (S3); when a group starts (at load, or when the weather
 // or the time lets it back), it fills to its limit at once, part of the way across (S1, warm
 // start). `now` is the wall clock (ms) for the gaps, `sceneTime` the scene clock (s) for the
@@ -663,7 +663,11 @@ export const spawnTick = (
         kind,
         depth,
       };
-      return place(newShip, boatLane(newShip, view, rules.isFullscreen), pathsOf(ships, fish), progress);
+      // Boats have the right of way (Lutz, 2026-10-05: "the fish should avoid the boats not the
+      // other way round"): a lane clear of the fish when there is one, else any lane clear of
+      // the boats. The fish never stop a boat; new fish plan around it.
+      const shape = boatLane(newShip, view, rules.isFullscreen);
+      return place(newShip, shape, pathsOf(ships, fish), progress) ?? place(newShip, shape, pathsOf(ships), progress);
     };
     if (warm && !shown.ships) {
       fill(() => ships.length, limit, progress => {
