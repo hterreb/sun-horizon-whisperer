@@ -111,6 +111,7 @@ interface MovingEntity {
   dx: number; // horizontal travel distance, in vw, applied via the CSS animation
   duration: number; // seconds
   delay?: number; // s, negative: a warm start (item 93, S1) begins part of the way across
+  fadeIn?: boolean; // a warm start after the load fades in over 2 s (item 93)
 }
 
 // ROADMAP item 36: a mixed fleet at a random distance. `y` is the boat's bottom edge.
@@ -476,6 +477,9 @@ export const spawnTick = (
   // ago, and all of it is still to come. A warm start (item 93, S1) begins `progress` of the
   // way across: its crossing began progress × duration ago, and the negative animation-delay
   // puts it there (also on the rest-stop curve, which CSS applies to the progress).
+  // At load the scene's reveal covers the warm start. A group that starts later (after a storm,
+  // at dawn) fades in, so its animals do not pop up mid-scene.
+  const atLoad = last.shown === undefined;
   const place = <T extends MovingEntity>(
     item: T, shape: LaneShape, others: ScenePath[], progress = 0,
   ): (T & { path: ScenePath }) | null => {
@@ -487,7 +491,10 @@ export const spawnTick = (
     const band: [number, number] = [shape.band[0] - shape.above, shape.band[1] - shape.above];
     const y = lane({ ...path, band, view }, others, rewind ? start : sceneTime);
     if (y === null) return null;
-    return { ...item, y: y + shape.above, path: { ...path, y }, ...(progress > 0 && { delay: -progress * item.duration }) };
+    return {
+      ...item, y: y + shape.above, path: { ...path, y },
+      ...(progress > 0 && { delay: -progress * item.duration, fadeIn: !atLoad }),
+    };
   };
 
   // Warm start (S1): only live, not during time-travel play (item 83), where the gaps are 8x
@@ -680,6 +687,13 @@ export const spawnTick = (
     ? scene
     : { birds, fish, ships, leaves };
 };
+
+// A warm start after the load (item 93): the opacity from 0 to the element's own, over 2 s.
+const FADE_IN = ', sceneFadeIn 2s ease-out';
+// Only the end of the crossing removes a thing: not its fade-in (item 93), and not a dolphin's
+// roll (item 85), an animation inside whose animationend bubbles up (e.g. when a play rate runs it backwards).
+const endsCrossing = (event: React.AnimationEvent): boolean =>
+  event.target === event.currentTarget && event.animationName === 'moveAcrossX';
 
 // Deterministic pseudo-random value in [0, 1), seeded by an integer. Lets raindrop/
 // snowflake/hail layouts be derived during render (pure, no `Math.random()`) while
@@ -893,15 +907,15 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
           opacity: fishItem.opacity,
           filter: halo,
           ['--dx' as string]: `${fishItem.dx}vw`,
-          animation: `moveAcrossX ${fishItem.duration}s linear ${lag + (fishItem.delay ?? 0)}s forwards`,
+          animation: `moveAcrossX ${fishItem.duration}s linear ${lag + (fishItem.delay ?? 0)}s forwards${fishItem.fadeIn ? FADE_IN : ''}`,
           // Rest stop (P8). A browser without CSS linear() ignores it and glides straight. Set
           // only with a stop: React writes undefined as '', which wipes the shorthand's `linear`
           // and leaves CSS's default `ease` (item 74 found this).
-          ...(fishItem.easing && { animationTimingFunction: fishItem.easing }),
+          ...(fishItem.easing && { animationTimingFunction: fishItem.fadeIn ? `${fishItem.easing}, ease-out` : fishItem.easing }),
         }}
         // Only the crossing's own end: the dolphins' roll (item 85) is an animation inside, and
         // its animationend bubbles up here (e.g. when a play rate runs it backwards).
-        onAnimationEnd={removes ? (event => { if (event.target === event.currentTarget) remove(); }) : undefined}
+        onAnimationEnd={removes ? (event => { if (endsCrossing(event)) remove(); }) : undefined}
       >
         {body}
       </div>
@@ -999,11 +1013,11 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             opacity: bird.opacity,
             color: 'hsl(var(--scene-critter-silhouette))',
             ['--dx' as string]: `${bird.dx}vw`,
-            animation: `moveAcrossX ${bird.duration}s linear ${bird.delay ?? 0}s forwards`,
+            animation: `moveAcrossX ${bird.duration}s linear ${bird.delay ?? 0}s forwards${bird.fadeIn ? FADE_IN : ''}`,
             // Hang in the wind (M8), set only with a stop, as for the fish.
-            ...(bird.easing && { animationTimingFunction: bird.easing }),
+            ...(bird.easing && { animationTimingFunction: bird.fadeIn ? `${bird.easing}, ease-out` : bird.easing }),
           }}
-          onAnimationEnd={() => updateEntities(prev => ({ ...prev, birds: prev.birds.filter(b => b.id !== bird.id) }))}
+          onAnimationEnd={event => { if (endsCrossing(event)) updateEntities(prev => ({ ...prev, birds: prev.birds.filter(b => b.id !== bird.id) })); }}
         >
           <div className="relative" style={{ width: bird.width, height: bird.height, transform: 'translateY(-50%)' }}>
             {bird.kind === 'bat' ? (
@@ -1042,9 +1056,9 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
               zIndex: 7,
               opacity: nearness,
               ['--dx' as string]: `${ship.dx}vw`,
-              animation: `moveAcrossX ${ship.duration}s linear ${ship.delay ?? 0}s forwards`,
+              animation: `moveAcrossX ${ship.duration}s linear ${ship.delay ?? 0}s forwards${ship.fadeIn ? FADE_IN : ''}`,
             }}
-            onAnimationEnd={() => updateEntities(prev => ({ ...prev, ships: prev.ships.filter(s => s.id !== ship.id) }))}
+            onAnimationEnd={event => { if (endsCrossing(event)) updateEntities(prev => ({ ...prev, ships: prev.ships.filter(s => s.id !== ship.id) })); }}
           >
             {/* Scale from the bottom-left corner, then lift by the boat's height, so `top` is the waterline. */}
             <div style={{ transform: `translateY(-100%) scale(${boatScale(ship)})`, transformOrigin: 'bottom left' }}>
@@ -1092,6 +1106,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         @keyframes snowfall {
           to {
             transform: translateY(100vh) translateX(20px);
+          }
+        }
+
+        @keyframes sceneFadeIn {
+          from {
+            opacity: 0;
           }
         }
 

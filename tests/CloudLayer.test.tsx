@@ -30,6 +30,13 @@ const atWidth = <T,>(width: number, run: () => T): T => {
   }
 };
 
+// jsdom has no AnimationEvent: an animationend with its animation's name, as a browser sends it.
+const endAnimation = (element: Element, animationName: string) => {
+  const event = new Event('animationend', { bubbles: true });
+  Object.defineProperty(event, 'animationName', { value: animationName });
+  fireEvent(element, event);
+};
+
 describe('CloudLayer', () => {
   const renderLayer = (weatherType: WeatherType, timeOfDay: string) =>
     render(<CloudLayer weatherType={weatherType} timeOfDay={timeOfDay as TimeOfDay} />);
@@ -527,7 +534,7 @@ describe('CloudLayer', () => {
       // A roll's animationend bubbles up to the swimmer, e.g. when a play rate runs it backwards.
       fireEvent.animationEnd(pod.querySelector('[data-testid="visitor-dolphin"] g[style*="scene-dolphin-roll"]')!);
       expect(container.querySelector('[data-testid="scene-visitor"]')).not.toBeNull();
-      fireEvent.animationEnd(pod.parentElement!);
+      endAnimation(pod.parentElement!, 'moveAcrossX');
       expect(container.querySelector('[data-testid="scene-visitor"]')).toBeNull();
     });
 
@@ -696,7 +703,7 @@ describe('CloudLayer during time-travel play (ROADMAP item 83)', () => {
       const container = spawn({ playDirection }, playDirection ? 700 : 9000);
       const swimmers = [...container.querySelectorAll('[data-testid="scene-fish"]')].map(icon => icon.parentElement as HTMLElement);
       expect(swimmers).toHaveLength(2);
-      fireEvent.animationEnd(swimmers[swimmer]);
+      endAnimation(swimmers[swimmer], 'moveAcrossX');
       return container.querySelector('[data-testid="scene-fish"]') === null;
     };
     expect(goneAfterEnd(0, 0)).toBe(false);
@@ -826,6 +833,7 @@ describe('a calmer sea that is full from the start (ROADMAP item 93)', () => {
         expect(progress).toBeGreaterThanOrEqual(0.1);
         expect(progress).toBeLessThanOrEqual(0.9);
         expect(thing.path?.start).toBeCloseTo(0.5 - progress * thing.duration, 6);
+        expect(thing.fadeIn).toBe(false); // at load the scene's reveal covers it
       }
     }
   });
@@ -886,7 +894,29 @@ describe('a calmer sea that is full from the start (ROADMAP item 93)', () => {
     expect(sea.fish).toHaveLength(0);
     sea = run(sea, last, () => rules(phone), 70_500, 70_500, random);
     expect(sea.fish).toHaveLength(MAX_FISH);
-    expect(sea.fish.every(fish => (fish.delay ?? 0) < 0)).toBe(true);
+    expect(sea.fish.every(fish => (fish.delay ?? 0) < 0 && fish.fadeIn)).toBe(true);
+  });
+
+  it('fades a group that starts again in over 2 s; only the end of the crossing removes it', () => {
+    vi.useFakeTimers();
+    const view = atWidth(390, () => render(<CloudLayer weatherType="clear" timeOfDay="midday" />));
+    const fishWrappers = () => [...view.container.querySelectorAll('[data-testid="scene-fish"]')]
+      .map(icon => icon.closest<HTMLElement>('div[style*="moveAcrossX"]')!);
+    expect(fishWrappers().length).toBeGreaterThan(0);
+    expect(fishWrappers().every(el => !el.style.animation.includes('sceneFadeIn'))).toBe(true);
+    atWidth(390, () => {
+      view.rerender(<CloudLayer weatherType="storm" timeOfDay="midday" />);
+      act(() => { vi.advanceTimersByTime(1000); });
+      view.rerender(<CloudLayer weatherType="clear" timeOfDay="midday" />);
+    });
+    vi.useRealTimers();
+    const back = fishWrappers();
+    expect(back.length).toBeGreaterThan(0);
+    // Opacity only: the crossing keeps its duration and its delay; the fade is a second animation.
+    expect(back.every(el => /^moveAcrossX [\d.]+s linear -?[\d.]+s forwards, sceneFadeIn 2s ease-out$/.test(el.style.animation))).toBe(true);
+    const count = back.length;
+    endAnimation(back[0], 'sceneFadeIn');
+    expect(fishWrappers()).toHaveLength(count);
   });
 
   it('removes nothing when the target goes down: the animals swim on', () => {
