@@ -1722,6 +1722,23 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   - **H3 Filters on moving things:** the jellyfish and squid halos (`drop-shadow`), the boat lights, the shark's blurred shadow and others are filters on moving elements. They repaint on every frame.
   - **H4 Canvas loops:** `SeaCanvas` (about 30 fps), `RainCanvas` and `NightStars` draw at up to 2× device pixels.
   - **H5 One large bundle:** the last local build has one JS chunk of 695 KB (before gzip). The easter eggs, the share card and the place search load at start.
+- **Baseline (2026-10-05, main d79d115):** `npm run perf:trace -- --runs 2`, headless Chrome 154 on an Apple Silicon Mac. Each value is the median of 2 runs of 60 s, because other jobs used the CPU at the same time. Script and Render (style + layout) and Main busy come from CDP `Performance.getMetrics`; Paint (PrePaint + Layerize on the main thread) and Off-main (compositor, viz and GPU threads) come from the trace. Values are ms per second. Phone = 390×844 @3x with 4× CPU throttle; desktop = 1280×800 @1x.
+
+  | Profile | Scene | Script | Render | Paint | Off-main | Main busy | Frame p95 ms | Frame max ms | Long tasks/min | Heap MB |
+  |---|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
+  | phone | day | 19 | 19 | 9 | 100 | 92 | 16.8 | 225 | 0 | 7.2 |
+  | phone | night | 100 | 12 | 8 | 135 | 176 | 16.8 | 17 | 0 | 10.2 |
+  | phone | rain | 45 | 25 | 11 | 117 | 138 | 16.7 | 100 | 0 | 7.7 |
+  | phone | fullscreen | 20 | 19 | 8 | 38 | 91 | 16.7 | 33 | 0 | 7.2 |
+  | desktop | day | 9 | 7 | 3 | 146 | 38 | 16.8 | 17 | 0 | 7.4 |
+  | desktop | night | 32 | 3 | 3 | 172 | 57 | 16.8 | 25 | 0 | 8.5 |
+  | desktop | rain | 27 | 9 | 5 | 191 | 70 | 16.7 | 17 | 0 | 8.4 |
+  | desktop | fullscreen | 11 | 8 | 4 | 73 | 48 | 16.8 | 17 | 0 | 7.7 |
+
+  - All scenes run at 60 FPS, and the p95 frame time already meets the targets. Headless Chrome does not wait for the GPU, so the GPU cost shows in Off-main and not in the frame times.
+  - Start bundle (`npm run build`): `index` JS 581.34 kB (190.11 kB gzip) + `workbox-window` 5.65 kB (2.20 kB gzip) = 586.99 kB (192.31 kB gzip). The share card (`modern-screenshot`, 22.22 kB) already loads later. CSS: 56.08 kB (11.24 kB gzip).
+  - **Hot spots (CPU profile, phone):** at night, the `NightStars` frame loop takes 73 ms/s of 176 ms/s. It sets `fillStyle` and `shadowBlur` for each star on every frame (60 fps), and `fill` and the GC add 18 ms/s more. By day, JS is small (about 16 ms/s): `SeaCanvas` (`drawImage`, `drawMirror`) 9 ms/s, React and the clock (`formatTime`) 4 ms/s. The glass is the largest cost by day: when fullscreen hides it, Off-main falls from 100 to 38 ms/s (phone) and from 146 to 73 ms/s (desktop).
+  - **Order by expected gain:** H2 (glass blur), then the `NightStars` loop (new; draw the stars to a cached layer and twinkle fewer of them, or at a lower rate), then H4 (`SeaCanvas`), H1 and H3. H5 changes only the start time.
 - **Spec:**
   1. **Measure first.** A script `scripts/perf-trace.mjs` (Playwright with the Chrome DevTools Protocol) opens fixed scenes with a stubbed forecast and a fixed clock: Ravensburg, clear by day with fish, boats and birds; at night with stars; in rain; in fullscreen idle. It runs each scene for 60 s at 390×844 with 4× CPU throttle (the phone profile) and at 1280×800 without throttle. It writes per second: scripting, rendering and painting time, the p95 frame time, long tasks and the JS heap. Run it on `main` and write the baseline into this item.
   2. **Fix the hypotheses in order, one commit each, and measure after each.** Keep a fix only when it gives a gain:
