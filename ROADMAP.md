@@ -1688,7 +1688,7 @@ Order: the fixes first (items 89–91). Item 91 measures a baseline, so items 92
 
 Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per frame on item 91's phone profile. For comparison, the clouds of item 84 added 0.25–0.30 ms.
 
-### 89. Faster fade when entering fullscreen — S
+### 89. Faster fade when entering fullscreen — S — **✅ Done**
 
 - **Feedback (2026-10-04):** "faster fade out, 10s is too much when switching to fullscreen, but ok if I activate it by clicking when already in full-screen mode".
 - **Now:** in fullscreen, `SunTracker` hides the cursor and the chrome (`showCursor`) after 10 s without a mouse move or a tap. Entering fullscreen starts the same 10 s timer. On a desktop the pointer moves a little after the click on the fullscreen button, and each move starts the 10 s again.
@@ -1698,8 +1698,9 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   3. After the first hide, a mouse move or a tap shows the chrome and hides it after 10 s, as today.
   4. Leaving fullscreen shows the chrome, as today.
 - **Done when:** a test with fake timers: enter → hidden at 3 s; a move at 2 s → hidden at 5 s; a tap after the hide → visible, hidden 10 s later. In the browser on a desktop and on a phone, the chrome fades 3 s after entering fullscreen.
+- **Built (2026-10-04):** the new hook `useIdleHide` (`src/hooks/useIdleHide.ts`) has the two constants and the rules 2–4. `SunTracker` (the cursor and the top-left buttons), `InfoPanel` and `MusicPlayer` use it. The panel and the radio had their own 10 s timers, which the spec did not name. Without the change, they faded 7 s after the rest. A move or a tap anywhere wakes the top-left buttons; the panel and the radio wake on a hover, a focus or a tap on them, as before. Tests: the three "Done when" cases for the hook and for `SunTracker`; the panel and radio tests now hide at 3 s (6 new tests, 960 in all). Lint and typecheck pass. Open: the check in the browser on a desktop and on a phone.
 
-### 90. Keep alive in the Android app: screen on, radio in the background — M
+### 90. Keep alive in the Android app: screen on, radio in the background — M — **✅ Done**
 
 - **Feedback (2026-10-04):** "keep alive in the android app". Decision: both, the screen and the background.
 - **Now:**
@@ -1712,6 +1713,11 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   3. **K3 Fast return:** save the time the app was last visible in `sessionStorage` (`last-visible`, with try/catch). When the page loads and that time is less than 30 min ago, skip the iris and use the `fade` reveal. When the system stopped the app fully, the app starts fresh, as today.
 - **Not in scope:** a "Keep screen on" switch. Add one when users ask for it; the power button still turns the screen off.
 - **Done when:** unit tests for `isInstalledApp` and for the K3 reveal choice. On an Android phone with the Play test build: the app open for 10 min without a touch → the screen stays on; the radio plays for 10 min with the screen off, and the lock screen shows the station with play, pause and next; 2 min in another app and back → no iris (this also checks that `sessionStorage` is still there after a reload by the system).
+- **Built (2026-10-04):**
+  - **K1:** `isInstalledApp()` (`src/utils/installedApp.ts`) replaces the display-mode check in `PWAInstallPrompt`, which now uses it too. It keeps the two other checks of `PWAInstallPrompt`: iOS `navigator.standalone` and an `android-app://` referrer (a page that the TWA opens). `SunTracker` calls `useWakeLock(isFullscreen || isInstalledApp())`. A desktop browser in fullscreen (F11 or the Fullscreen API) can also match `display-mode: fullscreen`. There the screen stays on and the install prompt does not show.
+  - **K2:** `MusicPlayer` sets the Media Session: the station name, "Sun Chaser" and the manifest's `any` icons (`icon-192.png`, `icon-512.png`) as metadata, `playbackState`, and the handlers `play`, `pause` and `nexttrack` (the function of the Next button). It clears them on unmount. `playStream` and `handleNext` are now `useCallback`s, so the handlers stay the same between renders.
+  - **K3:** `src/utils/fastReturn.ts`: `saveLastVisible` (on `visibilitychange` and `pagehide`), `loadLastVisible`, `isFastReturn` (less than 30 min ago, not in the future) and `getStartReveal`, the pure reveal choice. `SunTracker` reads the time once, at load.
+  - **Checked:** 14 new tests (974 in all): `isInstalledApp`, the K3 choice and storage, the Media Session on a fake session, and in `SunTracker` the wake lock in the installed app and the fade after a fast return. Lint, typecheck and build pass. Open: the phone checks of "Done when" on the Play test build.
 
 ### 91. Performance: measure, then fix the hot spots — M
 
