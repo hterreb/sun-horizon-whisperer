@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { type TimeOfDay } from '@/utils/sunUtils';
 
 // Lunar New Year dragon (ROADMAP item 100, lookbook picks RD1, M2, M3, F1, F2): a Chinese
@@ -246,12 +246,13 @@ const LunarDragon: React.FC<LunarDragonProps> = ({ timeOfDay, onDone }) => {
   const frameRef = useRef(0);
   const [palette] = useState(() => (['red', 'jade', 'gold'] as const)[Math.floor(Math.random() * 3)]);
   const tod = toTod(timeOfDay);
+  // An id for the gradient and the filter; React's `:r0:` colons do not work in url(#…).
+  const uid = useId().replace(/:/g, '');
 
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
     svg.textContent = '';
-    const uid = Math.random().toString(36).slice(2);
     const blur = el('filter', { id: `blur-${uid}`, x: '-50%', y: '-100%', width: '200%', height: '300%' }, el('defs', {}, svg));
     el('feGaussianBlur', { stdDeviation: 3 }, blur);
     const trail = el('g', { filter: `url(#blur-${uid})` }, svg);
