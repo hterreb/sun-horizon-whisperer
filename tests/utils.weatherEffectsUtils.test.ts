@@ -1,4 +1,4 @@
-import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, hasBoatWake, getBoatTone, pickFish, FISH_WEIGHTS, canSpawnFish, getRestStopMotion, pickNightFish, pickMoonlitDayFish, NIGHT_FISH_WEIGHTS, MAX_NIGHT_FISH, getFishOverride, getWaterSpeedFactor, getWaterLimit, getStarCloudFactor, getTwilightStars, getSkyOvercastMix, getSunVisibility, getMoonCloudFactor, getMoonLook, BIRD_WEIGHTS, pickBird, isBirdInSeason } from '../src/utils/weatherEffectsUtils';
+import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, hasBoatWake, getBoatTone, pickFish, FISH_WEIGHTS, canSpawnFish, getRestStopMotion, pickNightFish, pickMoonlitDayFish, NIGHT_FISH_WEIGHTS, MAX_FISH, MAX_NIGHT_FISH, MAX_BIRDS, getFishOverride, getWaterSpeedFactor, getWaterLimit, getSceneLimit, getStarCloudFactor, getTwilightStars, getSkyOvercastMix, getSunVisibility, getMoonCloudFactor, getMoonLook, BIRD_WEIGHTS, pickBird, isBirdInSeason } from '../src/utils/weatherEffectsUtils';
 
 describe('getWeatherEffects (ROADMAP item 10)', () => {
   it('shows fog only for the fog type', () => {
@@ -152,9 +152,8 @@ describe('fish mix (ROADMAP item 62)', () => {
   });
 
   it('counts a shark or a pod as one fish in the limit, like the whale (E4)', () => {
-    const four = ['classic', 'perch', 'pike', 'carp'] as const;
-    expect(canSpawnFish([...four], 'shark')).toBe(true);
-    expect(canSpawnFish([...four, 'dolphins'], 'shark')).toBe(false);
+    expect(canSpawnFish(['classic', 'perch'])).toBe(true);
+    expect(canSpawnFish(['classic', 'perch', 'dolphins'])).toBe(false);
   });
 
   it('reads the test override ?fish=<kind>, for the rare ones too (ROADMAP item 85)', () => {
@@ -165,13 +164,11 @@ describe('fish mix (ROADMAP item 62)', () => {
     expect(getFishOverride('')).toBeNull();
   });
 
-  it('allows at most five fish, but turtles and jellyfish never count (E4)', () => {
-    const four = ['classic', 'perch', 'pike', 'carp'] as const;
-    expect(canSpawnFish([...four], 'trout')).toBe(true);
-    expect(canSpawnFish([...four, 'trout'], 'seahorse')).toBe(false);
-    expect(canSpawnFish([...four, 'trout'], 'turtle')).toBe(true);
-    expect(canSpawnFish([...four, 'trout'], 'jellyfish')).toBe(true);
-    expect(canSpawnFish([...four, 'turtle', 'jellyfish', 'jellyfish'], 'trout')).toBe(true);
+  it('allows at most three fish, turtles and jellyfish included (ROADMAP item 93, S2)', () => {
+    expect(MAX_FISH).toBe(3);
+    expect(canSpawnFish(['classic', 'perch'])).toBe(true);
+    expect(canSpawnFish(['classic', 'perch', 'trout'])).toBe(false);
+    expect(canSpawnFish(['classic', 'turtle', 'jellyfish'])).toBe(false);
   });
 });
 
@@ -194,11 +191,11 @@ describe('night fish mix (ROADMAP item 65)', () => {
     expect(picks).toEqual(new Set(['classic', 'perch', 'pike', 'carp', 'catfish', 'trout']));
   });
 
-  it('allows at most three fish at night, but jellyfish still come (NR1)', () => {
-    const three = ['classic', 'lanternfish', 'burbot'] as const;
-    expect(canSpawnFish(three.slice(0, 2), 'eel', MAX_NIGHT_FISH)).toBe(true);
-    expect(canSpawnFish([...three], 'eel', MAX_NIGHT_FISH)).toBe(false);
-    expect(canSpawnFish([...three], 'jellyfish', MAX_NIGHT_FISH)).toBe(true);
+  it('allows at most two fish at night, jellyfish included (NR1, ROADMAP item 93)', () => {
+    expect(MAX_NIGHT_FISH).toBe(2);
+    expect(canSpawnFish(['lanternfish'], MAX_NIGHT_FISH)).toBe(true);
+    expect(canSpawnFish(['lanternfish', 'burbot'], MAX_NIGHT_FISH)).toBe(false);
+    expect(canSpawnFish(['lanternfish', 'jellyfish'], MAX_NIGHT_FISH)).toBe(false);
   });
 });
 
@@ -216,6 +213,24 @@ describe('getWaterLimit (ROADMAP item 70)', () => {
     expect(getWaterLimit(5, 1440)).toBe(17);
     expect(getWaterLimit(3, 1440)).toBe(10);
     expect(getWaterLimit(5, 1920)).toBe(22);
+  });
+});
+
+describe('getSceneLimit (ROADMAP item 93, S2 and S3)', () => {
+  it('keeps the phone limits and grows them with the width up to 1.5x', () => {
+    expect([MAX_FISH, MAX_NIGHT_FISH, MAX_BIRDS].map(base => getSceneLimit(base, 390))).toEqual([3, 2, 4]);
+    expect(getSceneLimit(2, 390)).toBe(2); // the boats
+    // 1280 px: 5 fish, 3 boats, 6 birds (it was 15, 9 and 12).
+    expect([MAX_FISH, 2, MAX_BIRDS].map(base => getSceneLimit(base, 1280))).toEqual([5, 3, 6]);
+    expect(getSceneLimit(MAX_FISH, 1920)).toBe(5);
+    expect(getSceneLimit(MAX_FISH, 560)).toBe(4); // 1.3x: below the 1.5x cap
+  });
+
+  it('scales the limit by the density, rounded, at least 1', () => {
+    expect(getSceneLimit(MAX_FISH, 390, 0.7)).toBe(2);
+    expect(getSceneLimit(MAX_FISH, 1280, 0.5)).toBe(2);
+    expect(getSceneLimit(MAX_NIGHT_FISH, 390, 0.3)).toBe(1);
+    expect(getSceneLimit(MAX_BIRDS, 1280, 1)).toBe(6);
   });
 });
 

@@ -1,10 +1,12 @@
 import React, { Profiler } from 'react';
 import { render, act, fireEvent } from '@testing-library/react';
-import CloudLayer, { WeatherType, createFish, createBird, spawnTick, type SceneEntities, type SpawnRules } from '../src/components/CloudLayer';
+import CloudLayer, { WeatherType, createFish, createBird, spawnTick, type SceneEntities, type SpawnRules, type SpawnTimes } from '../src/components/CloudLayer';
 import { findLane, xAt, type ScenePath } from '../src/utils/scenePaths';
-import { FISH_WEIGHTS, NIGHT_FISH_WEIGHTS, getWaterSpeedFactor } from '../src/utils/weatherEffectsUtils';
+import { FISH_WEIGHTS, NIGHT_FISH_WEIGHTS, MAX_FISH, MAX_NIGHT_FISH, getWaterSpeedFactor, getSceneLimit } from '../src/utils/weatherEffectsUtils';
+import { getSceneDensity, getDensityCurve } from '../src/utils/sceneDensity';
+import { getSunTimes, getTimeOfDay } from '../src/utils/sunUtils';
 import type { TimeOfDay } from '../src/utils/sunUtils';
-import { DEFAULT_CLOUD_LAYERS, getCloudCentre, getGliderStartProgress, getSkyClouds } from '../src/utils/skyCloudUtils';
+import { DEFAULT_CLOUD_LAYERS, getCloudCentre, getDaySeed, getGliderStartProgress, getSkyClouds, mulberry32 } from '../src/utils/skyCloudUtils';
 
 const mockReducedMotion = (matches: boolean) =>
   vi.spyOn(window, 'matchMedia').mockReturnValue({
@@ -134,7 +136,7 @@ describe('CloudLayer', () => {
     const spawn = (props: Partial<React.ComponentProps<typeof CloudLayer>>, ms: number) => {
       vi.useFakeTimers();
       const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
-      const view = render(<CloudLayer weatherType="clear" timeOfDay="midday" {...props} />);
+      const view = render(<CloudLayer warmStart={false} weatherType="clear" timeOfDay="midday" {...props} />);
       act(() => { vi.advanceTimersByTime(ms); });
       randomSpy.mockRestore();
       vi.useRealTimers();
@@ -202,17 +204,17 @@ describe('CloudLayer', () => {
       expect(container.querySelectorAll('[data-testid="scene-boat"]').length).toBe(2);
     });
 
-    it('never has more than 3 boats out at once on a phone (ROADMAP item 40)', () => {
+    it('never has more than 2 boats out at once on a phone (ROADMAP items 40 and 93)', () => {
       // Spawns at ~5, 60, 115 and 170 s; no boat finishes its crossing in the test.
       const container = atWidth(390, () => spawn({}, 180000));
-      expect(container.querySelectorAll('[data-testid="scene-boat"]').length).toBe(3);
+      expect(container.querySelectorAll('[data-testid="scene-boat"]').length).toBe(2);
     });
 
     it('sends more boats far out, toward the horizon (ROADMAP item 71)', () => {
       // A roll of 0.25 gives the distance √0.25 = 0.5, so the waterline is at 67 + 0.5 × 20 = 77 %.
       vi.useFakeTimers();
       const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.25);
-      const { container } = render(<CloudLayer weatherType="clear" timeOfDay="midday" />);
+      const { container } = render(<CloudLayer warmStart={false} weatherType="clear" timeOfDay="midday" />);
       act(() => { vi.advanceTimersByTime(21000); });
       randomSpy.mockRestore();
       vi.useRealTimers();
@@ -220,10 +222,10 @@ describe('CloudLayer', () => {
       expect(wrapper.style.top).toBe('77%');
     });
 
-    it('lets more boats out on a wide screen (ROADMAP item 70)', () => {
-      // 1290 px is three phones wide: up to 9 boats, so all four spawns stay.
+    it('lets more boats out on a wide screen, at most 1.5x (ROADMAP items 70 and 93)', () => {
+      // 1290 px is three phones wide, but the limit grows only to 1.5 x 2 = 3: three of the four spawns stay.
       const container = atWidth(1290, () => spawn({}, 180000));
-      expect(container.querySelectorAll('[data-testid="scene-boat"]').length).toBe(4);
+      expect(container.querySelectorAll('[data-testid="scene-boat"]').length).toBe(3);
     });
 
     it('sails each boat type at its own speed (ROADMAP item 40)', () => {
@@ -276,7 +278,7 @@ describe('CloudLayer', () => {
     const spawnFish = (props: Partial<React.ComponentProps<typeof CloudLayer>>, ms: number, random = 0) => {
       vi.useFakeTimers();
       const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(random);
-      const view = render(<CloudLayer weatherType="clear" timeOfDay="midday" {...props} />);
+      const view = render(<CloudLayer warmStart={false} weatherType="clear" timeOfDay="midday" {...props} />);
       act(() => { vi.advanceTimersByTime(ms); });
       randomSpy.mockRestore();
       vi.useRealTimers();
@@ -387,16 +389,15 @@ describe('CloudLayer', () => {
       expect((desktop.dx / desktop.duration) * 1290).toBeCloseTo(1.15 * 430, 5);
     });
 
-    it('keeps at most five fish on screen on a phone (E4)', () => {
+    it('keeps at most three fish on screen on a phone (E4, ROADMAP item 93)', () => {
       // A classic fish pair every 5.5 s; none finishes its crossing in the test.
       const container = atWidth(390, () => spawnFish({}, 40000));
-      expect(container.querySelectorAll('[data-testid="scene-fish"]').length).toBe(10); // 5 pairs
+      expect(container.querySelectorAll('[data-testid="scene-fish"]').length).toBe(6); // 3 pairs
     });
 
-    it('allows five fish per phone width on a wide screen (ROADMAP item 70)', () => {
-      // 1290 px: up to 15 fish, so all seven pairs from 40 s stay; by 90 s the 15 are reached.
-      expect(atWidth(1290, () => spawnFish({}, 40000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(14);
-      expect(atWidth(1290, () => spawnFish({}, 90000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(30);
+    it('allows 1.5x the fish on a wide screen (ROADMAP items 70 and 93)', () => {
+      // 1290 px: up to 1.5 x 3 = 4.5, so 5 fish; of the seven pairs from 40 s, five stay.
+      expect(atWidth(1290, () => spawnFish({}, 40000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(10);
     });
   });
 
@@ -406,7 +407,7 @@ describe('CloudLayer', () => {
     const spawnNight = (props: Partial<React.ComponentProps<typeof CloudLayer>>, ms: number, random = 0) => {
       vi.useFakeTimers();
       const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(random);
-      const view = render(<CloudLayer weatherType="clear" timeOfDay="night" {...props} />);
+      const view = render(<CloudLayer warmStart={false} weatherType="clear" timeOfDay="night" {...props} />);
       act(() => { vi.advanceTimersByTime(ms); });
       randomSpy.mockRestore();
       vi.useRealTimers();
@@ -434,12 +435,12 @@ describe('CloudLayer', () => {
       expect(container.querySelectorAll('[data-testid="fish-light"]').length).toBe(5);
     });
 
-    it('keeps the night quiet: a check every 15-25 s, at most three fish (NR1)', () => {
+    it('keeps the night quiet: a check every 15-25 s, at most two fish (NR1, ROADMAP item 93)', () => {
       expect(spawnNight({ moonlight: moon }, 14000).querySelector('[data-testid="scene-fish"]')).toBeNull();
-      // A moonlit classic pair every 15.5 s; six tries in 100 s, three pairs stay on a phone.
-      expect(atWidth(390, () => spawnNight({ moonlight: moon }, 100000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(6);
-      // Three phones wide: up to nine, so all six pairs stay (item 70).
-      expect(atWidth(1290, () => spawnNight({ moonlight: moon }, 100000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(12);
+      // A moonlit classic pair every 15.5 s; six tries in 100 s, two pairs stay on a phone.
+      expect(atWidth(390, () => spawnNight({ moonlight: moon }, 100000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(4);
+      // Three phones wide: up to 1.5 x 2 = 3 pairs (items 70 and 93).
+      expect(atWidth(1290, () => spawnNight({ moonlight: moon }, 100000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(6);
     });
   });
 
@@ -454,7 +455,7 @@ describe('CloudLayer', () => {
       vi.useFakeTimers();
       const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
       try {
-        const view = render(<CloudLayer weatherType="clear" timeOfDay="midday" {...props} />);
+        const view = render(<CloudLayer warmStart={false} weatherType="clear" timeOfDay="midday" {...props} />);
         act(() => { vi.advanceTimersByTime(ms); });
         return view.container;
       } finally {
@@ -545,7 +546,7 @@ describe('CloudLayer', () => {
     const spawnBirds = (props: Partial<React.ComponentProps<typeof CloudLayer>>, ms: number, random = 0) => {
       vi.useFakeTimers();
       const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(random);
-      const view = render(<CloudLayer weatherType="clear" timeOfDay="midday" {...props} />);
+      const view = render(<CloudLayer warmStart={false} weatherType="clear" timeOfDay="midday" {...props} />);
       act(() => { vi.advanceTimersByTime(ms); });
       randomSpy.mockRestore();
       vi.useRealTimers();
@@ -603,7 +604,8 @@ describe('CloudLayer', () => {
       // A roll of 0 sends a gull every 8.5 s. jsdom never ends the animations, so they stay.
       expect(spawnBirds({}, 8000).querySelector('[data-testid="scene-bird"]')).toBeNull();
       expect(atWidth(390, () => spawnBirds({}, 120000)).querySelectorAll('[data-testid="scene-bird"]').length).toBe(4);
-      expect(atWidth(1290, () => spawnBirds({}, 120000)).querySelectorAll('[data-testid="scene-bird"]').length).toBe(12);
+      // At most 1.5x on a wide screen (item 93).
+      expect(atWidth(1290, () => spawnBirds({}, 120000)).querySelectorAll('[data-testid="scene-bird"]').length).toBe(6);
     });
 
     it('crosses the moon with a V of geese at night, in the migration months only (W14)', () => {
@@ -671,7 +673,7 @@ describe('CloudLayer during time-travel play (ROADMAP item 83)', () => {
   const spawn = (props: Partial<React.ComponentProps<typeof CloudLayer>>, ms: number) => {
     vi.useFakeTimers();
     const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
-    const view = render(<CloudLayer weatherType="clear" timeOfDay="midday" {...props} />);
+    const view = render(<CloudLayer warmStart={false} weatherType="clear" timeOfDay="midday" {...props} />);
     act(() => { vi.advanceTimersByTime(ms); });
     randomSpy.mockRestore();
     vi.useRealTimers();
@@ -679,12 +681,13 @@ describe('CloudLayer during time-travel play (ROADMAP item 83)', () => {
   };
 
   it('sends boats 8x as often in both play directions', () => {
-    // Live: the first boat at 5 s, the next after 55 s. Play: one every 55 / 8 = 6.9 s.
+    // Live: the first boat at 5 s, the next after 55 s. Play: one every 55 / 8 = 6.9 s, up to the
+    // limit of 3 at 1290 px (item 93).
     const boats = (playDirection: -1 | 0 | 1) =>
-      atWidth(1290, () => spawn({ playDirection }, 21000)).querySelectorAll('[data-testid="scene-boat"]').length;
+      atWidth(1290, () => spawn({ playDirection }, 14000)).querySelectorAll('[data-testid="scene-boat"]').length;
     expect(boats(0)).toBe(1);
-    expect(boats(1)).toBe(4);
-    expect(boats(-1)).toBe(4);
+    expect(boats(1)).toBe(3);
+    expect(boats(-1)).toBe(3);
   });
 
   it('removes a fish pair when its last swimmer leaves: the companion live, the lead in rewind', () => {
@@ -761,7 +764,7 @@ describe('lane planning (ROADMAP item 92)', () => {
   const rules = (view: SpawnRules['view'], extra: Partial<SpawnRules> = {}): SpawnRules => ({
     weatherType: 'clear', timeOfDay: 'midday', windSpeedKmh: 10, birdSpeedFactor: 1, showLeaves: false,
     isFullscreen: false, moonUp: false, moonY: null, month: 10, latitude: 47.8, gapFactor: 1, rewind: false,
-    fishOverride: null, view, ...extra,
+    fishOverride: null, density: 1, view, ...extra,
   });
 
   it.each([
@@ -775,5 +778,162 @@ describe('lane planning (ROADMAP item 92)', () => {
     expect(random.touches).toBeGreaterThan(0); // the check finds touches without a plan
     expect(planned.touches).toBe(0);
     expect(planned.spawns).toBeGreaterThanOrEqual(0.85 * random.spawns);
+  });
+});
+
+// ROADMAP item 93: the warm start (S1), the lower limits (S2) and the busy and quiet phases (S3),
+// with the real spawn rules (spawnTick) and a seeded random.
+describe('a calmer sea that is full from the start (ROADMAP item 93)', () => {
+  const rules = (view: SpawnRules['view'], extra: Partial<SpawnRules> = {}): SpawnRules => ({
+    weatherType: 'clear', timeOfDay: 'midday', windSpeedKmh: 10, birdSpeedFactor: 1, showLeaves: false,
+    isFullscreen: false, moonUp: false, moonY: null, month: 10, latitude: 47.8, gapFactor: 1, rewind: false,
+    fishOverride: null, density: 1, view, ...extra,
+  });
+  const phone = { width: 390, height: 844 };
+  const desktop = { width: 1280, height: 800 };
+  const endOf = (p: ScenePath) => p.start + p.duration + (p.lag ?? 0);
+  const empty = (): SceneEntities => ({ birds: [], fish: [], ships: [], leaves: [] });
+  // A check every 500 ms from `fromMs` on; a thing leaves at the end of its crossing.
+  const run = (
+    scene: SceneEntities, last: SpawnTimes, rulesAt: (ms: number) => SpawnRules, fromMs: number, toMs: number,
+    random: () => number, onTick?: (scene: SceneEntities, ms: number) => void,
+  ) => {
+    for (let ms = fromMs; ms <= toMs; ms += 500) {
+      const t = ms / 1000;
+      const onScreen = <T extends { path?: ScenePath }>(list: T[]) => list.filter(e => !e.path || t < endOf(e.path));
+      scene = { birds: onScreen(scene.birds), fish: onScreen(scene.fish), ships: onScreen(scene.ships), leaves: [] };
+      scene = spawnTick(scene, last, rulesAt(ms), ms, t, random);
+      onTick?.(scene, ms);
+    }
+    return scene;
+  };
+  const freshTimes = (): SpawnTimes => ({ birds: 0, fish: 0, ships: 5000 - 55000, leaves: 0 });
+  const seaTarget = (r: SpawnRules) =>
+    getSceneLimit(r.timeOfDay === 'night' ? MAX_NIGHT_FISH : MAX_FISH, r.view.width, r.density) + getSceneLimit(2, r.view.width, r.density);
+
+  it.each([
+    { name: 'a phone by day', scene: rules(phone) },
+    { name: 'a desktop by day', scene: rules(desktop) },
+    { name: 'a phone at night, with the moon', scene: rules(phone, { timeOfDay: 'night', moonUp: true, moonY: 30 }) },
+    { name: 'a desktop in a lull', scene: rules(desktop, { timeOfDay: 'evening', density: 0.6 }) },
+  ])('fills at least 60 % of the sea 1 s after load on $name, part of the way across', ({ scene }) => {
+    for (let seed = 1; seed <= 5; seed++) {
+      const sea = run(empty(), freshTimes(), () => scene, 500, 1000, mulberry32(seed));
+      expect(sea.fish.length + sea.ships.length).toBeGreaterThanOrEqual(0.6 * seaTarget(scene));
+      for (const thing of [...sea.fish, ...sea.ships, ...sea.birds]) {
+        // Each one started 0.1-0.9 of the way across: a negative delay and a path that began in the past.
+        const progress = -(thing.delay ?? 0) / thing.duration;
+        expect(progress).toBeGreaterThanOrEqual(0.1);
+        expect(progress).toBeLessThanOrEqual(0.9);
+        expect(thing.path?.start).toBeCloseTo(0.5 - progress * thing.duration, 6);
+      }
+    }
+  });
+
+  it('opens the scene with fish and boats on their way, at once after mount', () => {
+    vi.useFakeTimers();
+    const { container } = atWidth(390, () => render(<CloudLayer weatherType="clear" timeOfDay="midday" />));
+    vi.useRealTimers();
+    const movers = [...container.querySelectorAll<HTMLElement>('div')]
+      .filter(el => el.style.animation.startsWith('moveAcrossX') && el.querySelector('[data-testid="scene-boat"], [data-testid="scene-fish"]'));
+    expect(container.querySelector('[data-testid="scene-boat"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="scene-fish"]')).not.toBeNull();
+    // moveAcrossX <duration>s linear <delay>s forwards: the lead swimmer and each boat start part of the way across.
+    expect(movers.some(el => parseFloat(el.style.animation.split(' ')[3]) < 0)).toBe(true);
+  });
+
+  it('places the warm start with the lane plan: no two boxes touch', () => {
+    for (let seed = 1; seed <= 5; seed++) {
+      const sea = run(empty(), freshTimes(), () => rules(desktop), 500, 500, mulberry32(seed));
+      const water = [...sea.fish, ...sea.ships].map(e => e.path as ScenePath);
+      for (let t = 0.5; t < 120; t += 0.5) {
+        const boxes = water.filter(p => t >= p.start && t <= endOf(p))
+          .map(p => ({ l: xAt(p, t - (p.lag ?? 0)), r: xAt(p, t) + p.width, top: p.y, bottom: p.y + p.height }));
+        for (let i = 0; i < boxes.length; i++) {
+          for (let j = i + 1; j < boxes.length; j++) {
+            const [a, b] = [boxes[i], boxes[j]];
+            expect(a.l < b.r && b.l < a.r && a.top < b.bottom && b.top < a.bottom).toBe(false);
+          }
+        }
+      }
+    }
+  });
+
+  it('starts a rest stop part of the way along its curve', () => {
+    // `?fish=pike`: each fish rests on the way (P8). The negative delay puts it on the curve at its progress.
+    const sea = run(empty(), freshTimes(), () => rules(phone, { fishOverride: 'pike' }), 500, 500, mulberry32(3));
+    expect(sea.fish.length).toBe(MAX_FISH);
+    for (const pike of sea.fish) {
+      expect(pike.easing).toMatch(/^linear\(/);
+      expect(pike.path?.curve).toBe(pike.curve);
+      expect(pike.path?.start).toBeLessThan(0.5);
+    }
+  });
+
+  it('does not warm-start during time-travel play: the sea fills by its 8x faster spawns', () => {
+    for (const rewind of [false, true]) {
+      const sea = run(empty(), freshTimes(), () => rules(desktop, { gapFactor: 1 / 8, rewind }), 500, 500, mulberry32(1));
+      expect(sea.fish.length + sea.ships.length).toBeLessThanOrEqual(2);
+      expect([...sea.fish, ...sea.ships].every(thing => thing.delay === undefined)).toBe(true);
+    }
+  });
+
+  it('fills a group again when it starts again: the fish after a storm', () => {
+    const random = mulberry32(5);
+    const last = freshTimes();
+    let sea = run(empty(), last, () => rules(phone), 500, 60_000, random);
+    sea = run(sea, last, () => rules(phone, { weatherType: 'storm' }), 60_500, 70_000, random);
+    expect(sea.fish).toHaveLength(0);
+    sea = run(sea, last, () => rules(phone), 70_500, 70_500, random);
+    expect(sea.fish).toHaveLength(MAX_FISH);
+    expect(sea.fish.every(fish => (fish.delay ?? 0) < 0)).toBe(true);
+  });
+
+  it('removes nothing when the target goes down: the animals swim on', () => {
+    const random = mulberry32(7);
+    const last = freshTimes();
+    let sea = run(empty(), last, () => rules(desktop), 500, 500, random);
+    expect(sea.fish).toHaveLength(5);
+    sea = run(sea, last, () => rules(desktop, { density: 0.3 }), 1000, 1000, random);
+    expect(sea.fish).toHaveLength(5);
+  });
+
+  it('follows the busy and quiet phases over a simulated day', () => {
+    // Friedrichshafen on 2026-10-05, a phone, clear weather, the real time of day.
+    const lat = 47.65;
+    const lon = 9.48;
+    const midnight = new Date('2026-10-05T00:00:00Z');
+    const sunTimes = getSunTimes(new Date('2026-10-05T12:00:00Z'), lat, lon);
+    const seed = getDaySeed(midnight, lat, lon);
+    const rulesAt = (ms: number) => {
+      const date = new Date(midnight.getTime() + ms);
+      return rules(phone, {
+        timeOfDay: getTimeOfDay(date, sunTimes), density: getSceneDensity(date, sunTimes, seed), moonUp: true, moonY: 30,
+      });
+    };
+    const byPhase = new Map<number, { sum: number; n: number }>();
+    const hourly = Array.from({ length: 24 }, () => ({ count: 0, density: 0, n: 0 }));
+    run(empty(), freshTimes(), rulesAt, 500, 24 * 3_600_000 - 500, mulberry32(93), (scene, ms) => {
+      const date = new Date(midnight.getTime() + ms);
+      const count = scene.fish.length + scene.ships.length;
+      const phase = byPhase.get(getDensityCurve(date, sunTimes)) ?? { sum: 0, n: 0 };
+      byPhase.set(getDensityCurve(date, sunTimes), { sum: phase.sum + count, n: phase.n + 1 });
+      const hour = hourly[date.getUTCHours()];
+      hour.count += count;
+      hour.density += getSceneDensity(date, sunTimes, seed);
+      hour.n += 1;
+    });
+    const mean = (phase: number) => (byPhase.get(phase)?.sum ?? 0) / (byPhase.get(phase)?.n ?? 1);
+    // Busiest in the hours around sunrise and sunset, quieter by day, quietest at night.
+    expect(mean(1)).toBeGreaterThan(mean(0.7));
+    expect(mean(0.7)).toBeGreaterThan(mean(0.5));
+    // Hour by hour, the mean number on screen goes with the density (the lulls included).
+    const xs = hourly.map(h => h.density / h.n);
+    const ys = hourly.map(h => h.count / h.n);
+    const avg = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
+    const [mx, my] = [avg(xs), avg(ys)];
+    const cov = xs.reduce((s, x, i) => s + (x - mx) * (ys[i] - my), 0);
+    const r = cov / Math.sqrt(xs.reduce((s, x) => s + (x - mx) ** 2, 0) * ys.reduce((s, y) => s + (y - my) ** 2, 0));
+    expect(r).toBeGreaterThan(0.7);
   });
 });

@@ -853,6 +853,7 @@ const SunTracker: React.FC = () => {
             rainMmH={rainMmH}
             cloudLayers={cloudLayers}
             cloudEgg={cloudEgg}
+            sunTimes={sunTimes}
             windDirectionDeg={weatherData?.windDirectionDeg ?? null}
             compassHeading={activeCompassHeading}
             horizonProfile={horizonProfile}
