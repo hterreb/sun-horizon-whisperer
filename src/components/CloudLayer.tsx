@@ -24,6 +24,7 @@ import {
 } from '../utils/weatherEffectsUtils';
 import { getSeaWindKmh, getBoatReflection } from '../utils/waveUtils';
 import { getRainMmH } from '../utils/rainUtils';
+import { type SceneInfoTarget } from '@/utils/sceneInfo';
 
 // ROADMAP item 10: more than the original 6 types - fog, drizzle and hail join the
 // weather-dependent clouds/illustrations, and "partly" splits out the old single
@@ -73,7 +74,30 @@ interface CloudLayerProps {
   skyGradient?: string | null;
   // A rare lenticular or mammatus day (item 84, X1).
   cloudEgg?: boolean;
+  // Info cards (ROADMAP item 95): a tap on a fish, a bird, a boat or a cloud calls onInfo with
+  // the tapped point (px in the viewport) and the thing's ring id; `infoRing` is the ring id of
+  // the thing whose card is open, which then shows a thin ring.
+  onInfo?: SceneInfoHandler;
+  infoRing?: string | null;
 }
+
+export type SceneInfoHandler = (target: SceneInfoTarget, point: { x: number; y: number }, ring: string) => void;
+
+// Item 95: the least tap target (WCAG 2.5.5), in px.
+const HIT_PX = 44;
+
+// An invisible hit area of at least HIT_PX x HIT_PX around a thing's box (`width` x `height` px,
+// centred at `cx`, `cy` in its wrapper), with the ring when the thing's card is open. A child
+// of the wrapper, so the wrapper's CSS animation moves the ring too.
+const HitArea: React.FC<{ cx: number; cy: number; width: number; height: number; ring: boolean }> = ({ cx, cy, width, height, ring }) => {
+  const w = Math.max(HIT_PX, width);
+  const h = Math.max(HIT_PX, height);
+  return (
+    <span className="absolute" style={{ left: cx - w / 2, top: cy - h / 2, width: w, height: h }} data-testid="scene-hit">
+      {ring && <span className="absolute inset-0 rounded-full border border-white/70" data-testid="scene-info-ring" />}
+    </span>
+  );
+};
 
 // Birds/fish/ships/leaves travel horizontally at a constant rate (in % of the layer's
 // width per second; resting fish pause on the way, see getRestStopMotion). A CSS
@@ -643,6 +667,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   sun = null,
   skyGradient = null,
   cloudEgg = false,
+  onInfo,
+  infoRing = null,
 }) => {
   // The things that cross the scene. The state renders them; the ref has the latest lists at
   // once, so the spawn loop plans each new lane around all of them (item 92), also around one
@@ -765,6 +791,14 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     };
   }, [weatherType, windSpeedKmh, timeOfDay, prefersReducedMotion, isFullscreen, effects.showLeaves, effects.birdSpeedFactor, moonUp, month, latitude, moonY, gapFactor, playDirection, fishOverride, updateEntities]);
 
+  // Item 95: a moving thing takes taps only on its wrapper and hit area (pointer only, hidden
+  // from screen readers); the scene layer itself stays pointer-events-none.
+  const tappable = (target: SceneInfoTarget, ring: string) => onInfo ? {
+    'aria-hidden': true,
+    className: 'absolute pointer-events-auto cursor-pointer',
+    onClick: (event: React.MouseEvent) => onInfo(target, { x: event.clientX, y: event.clientY }, ring),
+  } : { className: 'absolute' };
+
   // One fish, or a pair (P6): the companion swims `lag` s behind and leaves last, so its
   // onAnimationEnd removes the pair. FS1 silhouettes (item 85) by SceneFish; night fish
   // (item 65) are in the moon tone or carry their lights. A shark or a dolphin pod by SceneVisitor.
@@ -799,10 +833,20 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     ) : (
       <SceneFish kind={kind} light={fishItem.light} size={fishItem.size} glow={fishItem.glow} />
     );
+    // The hit area: a shark's or a pod's box reaches above the waterline `y` (item 85).
+    const visitorUnit = fishItem.size / VISITOR_GRID;
+    const hitBox = kind === 'shark' || kind === 'dolphins'
+      ? {
+          cx: fishItem.width / 2,
+          cy: (VISITOR_VIEW_HEIGHT / 2 - (kind === 'shark' ? SHARK_ABOVE_WATER : DOLPHINS_ABOVE_WATER)) * visitorUnit,
+          width: fishItem.width,
+          height: VISITOR_VIEW_HEIGHT * visitorUnit,
+        }
+      : { cx: fishItem.width / 2, cy: fishItem.height / 2, width: fishItem.width, height: fishItem.height };
     const swimmer = (key: string, lag: number, dy: number, removes: boolean) => (
       <div
         key={key}
-        className="absolute"
+        {...tappable({ type: 'fish', kind }, `fish-${fishItem.id}-${key}`)}
         style={{
           left: `${fishItem.x}%`,
           top: `${fishItem.y + dy}%`,
@@ -821,6 +865,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         onAnimationEnd={removes ? (event => { if (event.target === event.currentTarget) remove(); }) : undefined}
       >
         {body}
+        {onInfo && <HitArea {...hitBox} ring={infoRing === `fish-${fishItem.id}-${key}`} />}
       </div>
     );
     return fishItem.companion ? (
@@ -852,6 +897,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         moon={moon}
         skyGradient={skyGradient}
         egg={cloudEgg}
+        onInfo={onInfo}
+        infoRing={infoRing}
       />
 
       {rainAmount != null && (
@@ -908,7 +955,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       {birds.map((bird) => (
         <div
           key={bird.id}
-          className="absolute"
+          {...tappable({ type: 'bird', kind: bird.kind }, `bird-${bird.id}`)}
           style={{
             left: `${bird.x}%`,
             top: `${bird.y}%`,
@@ -930,6 +977,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             )) : (
               <SceneBird kind={bird.kind} width={bird.size} />
             )}
+            {onInfo && <HitArea cx={bird.width / 2} cy={bird.height / 2} width={bird.width} height={bird.height} ring={infoRing === `bird-${bird.id}`} />}
           </div>
         </div>
       ))}
@@ -952,7 +1000,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         return (
           <div
             key={ship.id}
-            className="absolute"
+            {...tappable({ type: 'boat', kind: ship.kind }, `boat-${ship.id}`)}
             style={{
               left: `${ship.x}%`,
               top: `${ship.y}%`,
@@ -967,6 +1015,16 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             <div style={{ transform: `translateY(-100%) scale(${boatScale(ship)})`, transformOrigin: 'bottom left' }}>
               <SceneBoat kind={ship.kind} tone={boatTone} lit={isSunDown} wake={hasBoatWake(ship.kind, windSpeedKmh)} seaWindKmh={seaWindKmh} />
             </div>
+            {/* The hull sits above the waterline `top` (item 95's hit area). */}
+            {onInfo && (
+              <HitArea
+                cx={(BOAT_WIDTH_PX * boatScale(ship)) / 2}
+                cy={-(BOAT_HEIGHT_PX * boatScale(ship)) / 2}
+                width={BOAT_WIDTH_PX * boatScale(ship)}
+                height={BOAT_HEIGHT_PX * boatScale(ship)}
+                ring={infoRing === `boat-${ship.id}`}
+              />
+            )}
           </div>
         );
       })}
