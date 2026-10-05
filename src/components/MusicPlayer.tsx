@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Slider } from "@/components/ui/slider";
 import { Music, SkipForward, Volume2, VolumeX } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useIdleHide } from '@/hooks/useIdleHide';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
 
 interface MusicPlayerProps {
@@ -20,6 +21,22 @@ const STREAMS: { name: string; url: string }[] = [
 ];
 
 const STATION_INDEX_KEY = 'radio_station_index';
+
+// Media Session (ROADMAP item 90): the lock screen and the notification shade show the
+// station, with play, pause and next. The artwork is the manifest's 'any' icons.
+const MEDIA_ARTIST = 'Sun Chaser';
+const MEDIA_ARTWORK: MediaImage[] = [
+  { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+  { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+];
+
+const setMediaActionHandler = (action: MediaSessionAction, handler: MediaSessionActionHandler | null) => {
+  try {
+    navigator.mediaSession.setActionHandler(action, handler);
+  } catch {
+    // The browser does not support this action: no control for it.
+  }
+};
 
 // Reads the last-selected station index back from localStorage, falling back to the
 // first station if nothing is stored, storage is unavailable, or the stored value is
@@ -43,58 +60,22 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const { t } = useLanguage();
   const [volume, setVolume] = useState([0.5]);
-  const [isVisible, setIsVisible] = useState(true);
   const [stationIndex, setStationIndex] = useState(loadStoredStationIndex);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const fadeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isPlayingRef = useRef(isPlaying);
   const stationIndexRef = useRef(stationIndex);
   const errorAttemptsRef = useRef(0);
   const isMobile = useIsMobile();
 
-  // Whenever fullscreen mode toggles (either direction), the player should be visible
-  // immediately; the effect below then re-arms the auto-fade timer for fullscreen.
-  // Adjusting state during render (rather than in an effect) avoids an extra commit.
-  const [prevIsFullscreen, setPrevIsFullscreen] = useState(isFullscreen);
-  if (isFullscreen !== prevIsFullscreen) {
-    setPrevIsFullscreen(isFullscreen);
-    setIsVisible(true);
-  }
-
-  // Fade out after 10 seconds, but only while in fullscreen.
-  useEffect(() => {
-    if (!isFullscreen) return;
-
-    fadeTimeoutRef.current = setTimeout(() => {
-      setIsVisible(false);
-    }, 10000);
-
-    return () => {
-      if (fadeTimeoutRef.current) {
-        clearTimeout(fadeTimeoutRef.current);
-      }
-    };
-  }, [isFullscreen]);
-
-  const handleMouseEnter = () => {
-    if (isFullscreen) {
-      setIsVisible(true);
-      // Reset the fade timer
-      if (fadeTimeoutRef.current) {
-        clearTimeout(fadeTimeoutRef.current);
-      }
-      fadeTimeoutRef.current = setTimeout(() => {
-        setIsVisible(false);
-      }, 10000);
-    }
-  };
+  // In fullscreen the player fades out: 3 s after entering, 10 s after a wake (ROADMAP item 89).
+  const { isVisible, wake: handleMouseEnter } = useIdleHide(isFullscreen);
 
   // Keyboard focus and touch also need to bring the controls back, not just mouse hover.
   const handleFocus = handleMouseEnter;
   const handleTouchStart = handleMouseEnter;
 
   // Plays the given station on the current audio element (if already playing).
-  const playStream = (index: number) => {
+  const playStream = useCallback((index: number) => {
     if (!audioRef.current) return;
     audioRef.current.src = STREAMS[index].url;
     if (isPlayingRef.current) {
@@ -105,7 +86,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
         });
       }
     }
-  };
+  }, []);
 
   useEffect(() => {
     // Create audio element with lo-fi streams
@@ -149,7 +130,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
         audioRef.current = null;
       }
     };
-  }, []);
+  }, [playStream]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -199,12 +180,40 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
     setIsPlaying(checked);
   };
 
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
     errorAttemptsRef.current = 0;
     const nextIndex = (stationIndexRef.current + 1) % STREAMS.length;
     setStationIndex(nextIndex);
     playStream(nextIndex);
-  };
+  }, [playStream]);
+
+  // Media Session (ROADMAP item 90): with it, Android keeps the radio on with the screen
+  // off or in another app.
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return;
+    setMediaActionHandler('play', () => setIsPlaying(true));
+    setMediaActionHandler('pause', () => setIsPlaying(false));
+    setMediaActionHandler('nexttrack', handleNext);
+    return () => {
+      setMediaActionHandler('play', null);
+      setMediaActionHandler('pause', null);
+      setMediaActionHandler('nexttrack', null);
+      navigator.mediaSession.metadata = null;
+      navigator.mediaSession.playbackState = 'none';
+    };
+  }, [handleNext]);
+
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return;
+    if (isPlaying) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: STREAMS[stationIndex].name,
+        artist: MEDIA_ARTIST,
+        artwork: MEDIA_ARTWORK,
+      });
+    }
+    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+  }, [isPlaying, stationIndex]);
 
   return (
     <div 

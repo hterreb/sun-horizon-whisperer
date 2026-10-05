@@ -1688,7 +1688,7 @@ Order: the fixes first (items 89–91). Item 91 measures a baseline, so items 92
 
 Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per frame on item 91's phone profile. For comparison, the clouds of item 84 added 0.25–0.30 ms.
 
-### 89. Faster fade when entering fullscreen — S
+### 89. Faster fade when entering fullscreen — S — **✅ Done**
 
 - **Feedback (2026-10-04):** "faster fade out, 10s is too much when switching to fullscreen, but ok if I activate it by clicking when already in full-screen mode".
 - **Now:** in fullscreen, `SunTracker` hides the cursor and the chrome (`showCursor`) after 10 s without a mouse move or a tap. Entering fullscreen starts the same 10 s timer. On a desktop the pointer moves a little after the click on the fullscreen button, and each move starts the 10 s again.
@@ -1698,8 +1698,9 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   3. After the first hide, a mouse move or a tap shows the chrome and hides it after 10 s, as today.
   4. Leaving fullscreen shows the chrome, as today.
 - **Done when:** a test with fake timers: enter → hidden at 3 s; a move at 2 s → hidden at 5 s; a tap after the hide → visible, hidden 10 s later. In the browser on a desktop and on a phone, the chrome fades 3 s after entering fullscreen.
+- **Built (2026-10-04):** the new hook `useIdleHide` (`src/hooks/useIdleHide.ts`) has the two constants and the rules 2–4. `SunTracker` (the cursor and the top-left buttons), `InfoPanel` and `MusicPlayer` use it. The panel and the radio had their own 10 s timers, which the spec did not name. Without the change, they faded 7 s after the rest. A move or a tap anywhere wakes the top-left buttons; the panel and the radio wake on a hover, a focus or a tap on them, as before. Tests: the three "Done when" cases for the hook and for `SunTracker`; the panel and radio tests now hide at 3 s (6 new tests, 960 in all). Lint and typecheck pass. Open: the check in the browser on a desktop and on a phone.
 
-### 90. Keep alive in the Android app: screen on, radio in the background — M
+### 90. Keep alive in the Android app: screen on, radio in the background — M — **✅ Done**
 
 - **Feedback (2026-10-04):** "keep alive in the android app". Decision: both, the screen and the background.
 - **Now:**
@@ -1712,6 +1713,11 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   3. **K3 Fast return:** save the time the app was last visible in `sessionStorage` (`last-visible`, with try/catch). When the page loads and that time is less than 30 min ago, skip the iris and use the `fade` reveal. When the system stopped the app fully, the app starts fresh, as today.
 - **Not in scope:** a "Keep screen on" switch. Add one when users ask for it; the power button still turns the screen off.
 - **Done when:** unit tests for `isInstalledApp` and for the K3 reveal choice. On an Android phone with the Play test build: the app open for 10 min without a touch → the screen stays on; the radio plays for 10 min with the screen off, and the lock screen shows the station with play, pause and next; 2 min in another app and back → no iris (this also checks that `sessionStorage` is still there after a reload by the system).
+- **Built (2026-10-04):**
+  - **K1:** `isInstalledApp()` (`src/utils/installedApp.ts`) replaces the display-mode check in `PWAInstallPrompt`, which now uses it too. It keeps the two other checks of `PWAInstallPrompt`: iOS `navigator.standalone` and an `android-app://` referrer (a page that the TWA opens). `SunTracker` calls `useWakeLock(isFullscreen || isInstalledApp())`. A desktop browser in fullscreen (F11 or the Fullscreen API) can also match `display-mode: fullscreen`. There the screen stays on and the install prompt does not show.
+  - **K2:** `MusicPlayer` sets the Media Session: the station name, "Sun Chaser" and the manifest's `any` icons (`icon-192.png`, `icon-512.png`) as metadata, `playbackState`, and the handlers `play`, `pause` and `nexttrack` (the function of the Next button). It clears them on unmount. `playStream` and `handleNext` are now `useCallback`s, so the handlers stay the same between renders.
+  - **K3:** `src/utils/fastReturn.ts`: `saveLastVisible` (on `visibilitychange` and `pagehide`), `loadLastVisible`, `isFastReturn` (less than 30 min ago, not in the future) and `getStartReveal`, the pure reveal choice. `SunTracker` reads the time once, at load.
+  - **Checked:** 14 new tests (974 in all): `isInstalledApp`, the K3 choice and storage, the Media Session on a fake session, and in `SunTracker` the wake lock in the installed app and the fade after a fast return. Lint, typecheck and build pass. Open: the phone checks of "Done when" on the Play test build.
 
 ### 91. Performance: measure, then fix the hot spots — M
 
@@ -1750,7 +1756,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   3. No visual change: compare screenshots of each scene before and after.
 - **Done when:** the baseline and the numbers after each fix are in this item. Targets, to check against the baseline: on the phone profile at least 30 % less main-thread time per second and a p95 frame time of 33 ms or less; at 1280×800 a p95 frame time of 16.7 ms or less (60 fps); a start bundle at least 25 % smaller. All tests pass, and the screenshots show no difference. The trace script stays in `scripts/`, so items 92–97 can check their frame budget.
 
-### 92. No overlaps: fish, birds and boats plan their lanes — M
+### 92. No overlaps: fish, birds and boats plan their lanes — M — **✅ Done**
 
 - **Feedback (2026-10-04):** "fish & bird collision avoidance, at the moment some fish swim right at top of each other or at boats and birds can sometimes also fly directly at each other".
 - **Now:** every fish, bird and boat crosses from left to right at its own constant speed (the `moveAcrossX` CSS animation). Its height (`y`) is random at spawn, and nothing checks the others. A faster fish catches up with a slower one at the same height and swims through it. Near fish (67–93 % of the height) cross the boat hulls (67–87 %, 94 % in fullscreen). A gull (2.5 %/s) overtakes a heron (1.6 %/s) at the same height, and other birds fly through the hovering kestrel.
@@ -1764,6 +1770,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   4. Time-travel play (item 83) changes the rate of all animations by the same factor, so the plan holds, also backwards.
   5. Item 93's warm start places its first set with `findLane` too.
 - **Done when:** unit tests for `xAt` (linear and with a rest stop) and for `findLane` (a free height, a full band, a pair). A simulation test: 30 min of spawns with the real rules and a fixed seed → no two boxes touch, and the spawn rate drops by 15 % or less. In the browser at 390×844 and 1280×800, 10 min each by day and at night: no overlaps.
+- **Built (2026-10-04):** `src/utils/scenePaths.ts`: `xAt`, `findLane` and a scene clock that runs at the play rate of item 83, so the lanes hold in fast forward and in rewind. A rewind spawn plans its whole crossing. `getRestStopMotion` also returns its curve. The spawn rules moved from the `CloudLayer` effect into the pure `spawnTick`, so the simulation test runs the same code. Each fish, bird and boat stores its path. The boat box is the hull plus the calm reflection (70 %); the box of a shark or a pod is the whole svg. When no height is free, the spawn does not occur, and the gap clock does not move on: the next 500 ms check tries again. Simulation (30 min, seed 92, live): 0 touching boxes (43–130 without the plan); 2–10 % fewer spawns. On a 1280 px screen, item 70's ×3 caps fill the band with fish: boats spawn 8–69 % less often, mostly far ones. Item 93's lower caps reduce this to 0–20 % in most runs. The browser check is still open.
 
 ### 93. A calmer sea that is full from the start — M
 

@@ -196,7 +196,8 @@ describe('InfoPanel', () => {
     const panel = container.firstChild as HTMLElement;
     expect(panel.className).toContain('opacity-100');
 
-    act(() => { vi.advanceTimersByTime(10000); });
+    // 3 s after entering fullscreen, 10 s after a wake (ROADMAP item 89).
+    act(() => { vi.advanceTimersByTime(3000); });
     expect(panel.className).toContain('opacity-0');
 
     fireEvent.focus(panel);

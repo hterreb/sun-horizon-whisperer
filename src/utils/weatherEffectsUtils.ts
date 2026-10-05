@@ -210,7 +210,8 @@ export const getWaterLimit = (base: number, viewportWidth: number): number =>
 // are in % of the width, speed in % per second. Returns the crossing time and a CSS
 // `linear()` easing for the moveAcrossX animation, so the stop stays in CSS like every
 // other glide (no per-frame state). A constant slow-down is a quadratic path, sampled
-// every 0.5 s.
+// every 0.5 s. `curve` has the easing's points as [share of the time, share of the distance],
+// for the lane plan (item 92, xAt).
 const REST_RAMP_SEC = 3;
 
 export const getRestStopMotion = (distance: number, speed: number, stopAt: number, holdSec: number) => {
@@ -230,8 +231,9 @@ export const getRestStopMotion = (distance: number, speed: number, stopAt: numbe
     points.push([goAt + u, stop + speed * u * u / (2 * REST_RAMP_SEC)]);
   }
   points.push([duration, distance]);
-  const easing = `linear(${points.map(([t, s]) => `${(s / distance).toFixed(4)} ${(t / duration * 100).toFixed(2)}%`).join(', ')})`;
-  return { duration, easing };
+  const curve = points.map(([t, s]): [number, number] => [t / duration, s / distance]);
+  const easing = `linear(${curve.map(([p, s]) => `${s.toFixed(4)} ${(p * 100).toFixed(2)}%`).join(', ')})`;
+  return { duration, easing, curve };
 };
 
 // Stars behind clouds (ROADMAP item 52): the factor for star opacity. A measured cloud
