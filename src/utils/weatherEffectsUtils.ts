@@ -154,14 +154,12 @@ export const pickNightFish = (r: number): NightFishPick => pickWeighted(NIGHT_FI
 export const pickMoonlitDayFish = (r: number): FishKind =>
   pickWeighted(FISH_WEIGHTS.filter(([kind]) => MOONLIT_DAY_FISH.includes(kind)), r);
 
-// At most five fish on screen (E4), three at night (item 65, NR1). A school or a pair is
-// one entry. Turtles and jellyfish are not fish, so they neither count nor wait for a free place.
-export const MAX_FISH = 5;
-export const MAX_NIGHT_FISH = 3;
-const NOT_FISH: FishKind[] = ['turtle', 'jellyfish'];
+// At most three fish on screen, two at night (item 93, S2; it was five and three, E4 and
+// item 65, NR1). A school or a pair is one entry. Turtles and jellyfish count too (item 93).
+export const MAX_FISH = 3;
+export const MAX_NIGHT_FISH = 2;
 
-export const canSpawnFish = (onScreen: FishKind[], next: FishKind, max = MAX_FISH): boolean =>
-  NOT_FISH.includes(next) || onScreen.filter(kind => !NOT_FISH.includes(kind)).length < max;
+export const canSpawnFish = (onScreen: FishKind[], max = MAX_FISH): boolean => onScreen.length < max;
 
 // Birds & Skies lookbook (ROADMAP item 74). The share of day spawns (sums to 100); a pair,
 // a V, a line or a flock is one spawn.
@@ -204,6 +202,14 @@ export const getWaterSpeedFactor = (viewportWidth: number): number =>
 // looks like phones side by side. Phones keep the base limit.
 export const getWaterLimit = (base: number, viewportWidth: number): number =>
   Math.round(base / getWaterSpeedFactor(viewportWidth));
+
+// The limits of the fish, boats and birds (ROADMAP item 93, S2): they grow with the width as
+// getWaterLimit, but at most to 1.5 times the phone's limit, so a wide screen is calmer. The
+// sea canvas (waves, foam) keeps getWaterLimit. `density` is getSceneDensity (S3): it scales
+// the limit, rounded, at least 1.
+export const SCENE_LIMIT_MAX_GROWTH = 1.5;
+export const getSceneLimit = (base: number, viewportWidth: number, density = 1): number =>
+  Math.max(1, Math.round(base * Math.min(SCENE_LIMIT_MAX_GROWTH, 1 / getWaterSpeedFactor(viewportWidth)) * density));
 
 // Rest stop (P8): cruise at `speed`, slow to a stop over 3 s so that it stands still
 // `stopAt` along the path, hold for `holdSec`, speed up over 3 s and cruise on. Distances

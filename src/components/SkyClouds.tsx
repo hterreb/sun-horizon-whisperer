@@ -5,7 +5,7 @@ import { getCloudDriftDirection, getCloudMoonlight } from '@/utils/cloudLayoutUt
 import { CLOUD_SHAPES, getShaftStrands } from '@/utils/cloudShapes';
 import {
   type CloudGlider, type CloudLayers, type CloudLight, type SkyCloud,
-  getCloudCentre, getCloudFill, getCloudLayers, getCloudLight, getCloudShadowBox,
+  getCloudCentre, getCloudFill, getCloudLayers, getDaySeed, getCloudLight, getCloudShadowBox,
   getCloudShadowLook, getCloudTypes, getCloudVeil, getGliderOffset, getGliderStartProgress, getLightAngle,
   getRowOpacity, getRowSpan, getSceneScale, getSkyClouds, getSkyColorAt, getTimeOfDayAltitude,
 } from '@/utils/skyCloudUtils';
@@ -178,7 +178,7 @@ const SkyClouds: React.FC<SkyCloudsProps> = ({
   const { width, height } = size;
 
   // The layout changes once a day, with the weather or with the screen, not every second.
-  const seed = `${date.toDateString()}|${Math.round(latitude * 10) / 10}|${Math.round(longitude * 10) / 10}`;
+  const seed = getDaySeed(date, latitude, longitude);
   const layers = getCloudLayers(weatherType, cloudLayers);
   const direction = getCloudDriftDirection(windDirectionDeg);
   const layoutKey = `${seed}|${weatherType}|${layers.low}|${layers.mid}|${layers.high}|${width}x${height}|${egg}|${direction}`;

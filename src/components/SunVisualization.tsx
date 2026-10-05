@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { Sun, ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp, Mountain } from 'lucide-react';
-import { type SunPosition, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors, getReflectionFade } from '../utils/sunUtils';
+import { type SunPosition, type SunTimes, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors, getReflectionFade } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
 import { getSunArcLabels, getMoonArcLabels, getTerrainArcLabels, getTerrainMoonArcLabels, type ArcLabels, type ArcLabelPoint } from '../utils/arcLabels';
 import { shortestHeadingDelta } from '../utils/compassUtils';
@@ -61,6 +61,8 @@ interface SunVisualizationProps {
   cloudLayers?: CloudLayers | null;
   // A rare lenticular or mammatus day (ROADMAP item 84, X1).
   cloudEgg?: boolean;
+  // The day's sun times: the scene's busy and quiet phases follow them (ROADMAP item 93, S3).
+  sunTimes?: SunTimes | null;
   // Live compass mode (ROADMAP item 19): the current (smoothed) device heading, or
   // null/undefined for the static 360°-across-the-screen mode. When set, azimuths are
   // mapped through a real field of view centered on this heading (getCompassScreenFraction)
@@ -542,6 +544,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   rainMmH = null,
   cloudLayers = null,
   cloudEgg = false,
+  sunTimes = null,
   compassHeading = null,
   horizonProfile = null,
   terrainSunTimes = null,
@@ -932,6 +935,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           : null}
         skyGradient={skyGradient}
         cloudEgg={cloudEgg}
+        sunTimes={sunTimes}
         onInfo={onSceneInfo}
         infoRing={infoRing}
       />
