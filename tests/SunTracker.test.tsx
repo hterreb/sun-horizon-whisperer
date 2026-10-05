@@ -789,4 +789,71 @@ describe('SunTracker', () => {
       expect(localStorage.getItem('language')).toBe('fr');
     });
   });
+
+  describe('info cards (ROADMAP item 95)', () => {
+    const RAVENSBURG = { latitude: 47.78, longitude: 9.61 };
+    const NOON = new Date('2026-09-30T11:00:00Z');
+    const advance = (ms: number) => act(() => {
+      vi.advanceTimersByTime(ms);
+    });
+    // Every fish a perch; Math.random at 0.1 passes every spawn chance.
+    const start = () => {
+      window.history.pushState({}, '', '/?fish=perch');
+      vi.setSystemTime(NOON);
+      saveManualLocation(RAVENSBURG.latitude, RAVENSBURG.longitude, 'Ravensburg');
+      render(<SunTracker />);
+      advance(300);
+    };
+    const card = () => screen.queryByTestId('scene-info-card');
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      global.fetch = vi.fn(() => Promise.reject(new Error('offline'))) as unknown as typeof fetch;
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+      window.history.pushState({}, '', '/');
+    });
+
+    it('a tap on a fish opens its card with a ring on the fish; a tap outside closes it', () => {
+      start();
+      vi.spyOn(Math, 'random').mockReturnValue(0.1);
+      for (let t = 0; t < 10; t++) advance(1000);
+      const fishHit = [...screen.getAllByTestId('scene-hit')]
+        .find(hit => hit.closest('[aria-hidden="true"]')!.querySelector('[data-testid="scene-fish"]'))!;
+      fireEvent.click(fishHit, { clientX: 150, clientY: 650 });
+      expect(screen.getByRole('dialog', { name: 'Perch' })).toHaveTextContent('Its dark stripes hide the perch among water plants.');
+      expect(fishHit.querySelector('[data-testid="scene-info-ring"]')).not.toBeNull();
+      // The fish swims on: its wrapper keeps the crossing animation.
+      expect(fishHit.closest<HTMLElement>('[aria-hidden="true"]')!.style.animation).toContain('moveAcrossX');
+
+      fireEvent.pointerDown(document.body);
+      expect(card()).toBeNull();
+      expect(screen.queryByTestId('scene-info-ring')).toBeNull();
+    });
+
+    it('the sun still counts 7 taps for the sunglasses; the first tap opens its card', () => {
+      start();
+      const sun = screen.getByRole('button', { name: 'Sun' });
+      fireEvent.click(sun);
+      expect(screen.getByRole('dialog', { name: 'Sun' })).toHaveTextContent(/Sunset in \d+ h \d+ min/);
+      expect(screen.queryByTestId('sun-sunglasses')).toBeNull();
+      // A real tap: the pointerdown closes the card, the click counts and opens it again.
+      for (let i = 0; i < 6; i++) {
+        fireEvent.pointerDown(sun);
+        fireEvent.click(sun);
+      }
+      expect(screen.getByTestId('sun-sunglasses')).toBeInTheDocument();
+      expect(screen.getAllByTestId('scene-info-card')).toHaveLength(1);
+    });
+
+    it('closes the card after 15 s', () => {
+      start();
+      fireEvent.click(screen.getByRole('button', { name: 'Sun' }));
+      expect(card()).not.toBeNull();
+      advance(15_000);
+      expect(card()).toBeNull();
+    });
+  });
 });

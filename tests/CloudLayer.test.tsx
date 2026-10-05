@@ -777,3 +777,83 @@ describe('lane planning (ROADMAP item 92)', () => {
     expect(planned.spawns).toBeGreaterThanOrEqual(0.85 * random.spawns);
   });
 });
+
+// ROADMAP item 95: a tap on a fish, a bird, a boat or a cloud asks for its info card.
+describe('CloudLayer info cards (ROADMAP item 95)', () => {
+  // A clear midday with every fish a perch and Math.random at 0: by 15 s a boat (5 s), fish
+  // and a gull (8.5 s) are out.
+  const renderScene = (props: Partial<React.ComponentProps<typeof CloudLayer>>, ms = 15000) => {
+    window.history.pushState({}, '', '/?fish=perch');
+    vi.useFakeTimers();
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      const view = render(<CloudLayer weatherType="clear" timeOfDay="midday" {...props} />);
+      act(() => { vi.advanceTimersByTime(ms); });
+      return view;
+    } finally {
+      randomSpy.mockRestore();
+      vi.useRealTimers();
+      window.history.pushState({}, '', '/');
+    }
+  };
+  const hits = (container: HTMLElement) => [...container.querySelectorAll<HTMLElement>('[data-testid="scene-hit"]')];
+
+  it('gives each fish, bird and boat a hit area of at least 44 x 44 px; a tap reports the thing and the point', () => {
+    const onInfo = vi.fn();
+    const { container } = renderScene({ onInfo });
+    expect(hits(container).length).toBeGreaterThanOrEqual(3);
+    const types = new Set<string>();
+    for (const hit of hits(container)) {
+      expect(parseFloat(hit.style.width)).toBeGreaterThanOrEqual(44);
+      expect(parseFloat(hit.style.height)).toBeGreaterThanOrEqual(44);
+      fireEvent.click(hit, { clientX: 120, clientY: 600 });
+      const [target, point] = onInfo.mock.calls.at(-1)!;
+      types.add(target.type);
+      expect(point).toEqual({ x: 120, y: 600 });
+    }
+    expect(types).toEqual(new Set(['fish', 'bird', 'boat']));
+    expect(onInfo.mock.calls.find(([target]) => target.type === 'fish')![0]).toEqual({ type: 'fish', kind: 'perch' });
+    expect(onInfo.mock.calls.find(([target]) => target.type === 'bird')![0]).toEqual({ type: 'bird', kind: 'gull' });
+  });
+
+  it('takes taps only on the moving things, which screen readers skip; the scene stays pointer-events-none', () => {
+    const { container } = renderScene({ onInfo: vi.fn() });
+    expect((container.firstChild as HTMLElement).className).toContain('pointer-events-none');
+    for (const hit of hits(container)) {
+      const wrapper = hit.closest('.pointer-events-auto')!;
+      expect(wrapper.getAttribute('aria-hidden')).toBe('true');
+      expect(wrapper.getAttribute('style')).toContain('moveAcrossX');
+    }
+  });
+
+  it('has no hit areas without onInfo', () => {
+    const { container } = renderScene({});
+    expect(container.querySelector('[data-testid="scene-hit"]')).toBeNull();
+    expect(container.querySelector('.pointer-events-auto')).toBeNull();
+  });
+
+  it('draws the ring inside the tapped thing, so its own animation moves the ring on', () => {
+    const onInfo = vi.fn();
+    const view = renderScene({ onInfo });
+    fireEvent.click(hits(view.container)[0]);
+    const ring = onInfo.mock.calls[0][2] as string;
+    expect(view.container.querySelector('[data-testid="scene-info-ring"]')).toBeNull();
+    view.rerender(<CloudLayer weatherType="clear" timeOfDay="midday" onInfo={onInfo} infoRing={ring} />);
+    const ringEl = view.container.querySelectorAll('[data-testid="scene-info-ring"]');
+    expect(ringEl).toHaveLength(1);
+    expect(ringEl[0].closest('[aria-hidden="true"]')!.getAttribute('style')).toContain('moveAcrossX');
+  });
+
+  it('a tap on a cloud reports its type and its layer', () => {
+    const onInfo = vi.fn();
+    const { container } = render(<CloudLayer weatherType="cloudy" timeOfDay="midday" onInfo={onInfo} />);
+    const cloud = container.querySelector<HTMLElement>('[data-testid="sky-cloud"]')!;
+    expect(cloud.className).toContain('pointer-events-auto');
+    fireEvent.click(cloud);
+    expect(onInfo).toHaveBeenCalledWith(
+      { type: 'cloud', cloudType: cloud.getAttribute('data-type'), band: expect.stringMatching(/^(low|mid|high)$/) },
+      expect.any(Object),
+      expect.stringMatching(/^cloud-/),
+    );
+  });
+});

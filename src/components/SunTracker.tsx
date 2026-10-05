@@ -29,6 +29,8 @@ import { fetchCurrentWeather, getWeatherAt, type WeatherData } from '../utils/we
 import { getSkyOvercastMix, getStarCloudFactor } from '@/utils/weatherEffectsUtils';
 import { getAstroEvent, parseEggOverride, METEOR_SHOWER_RATE } from '@/utils/astroEvents';
 import SunVisualization from './SunVisualization';
+import SceneInfoCard from './SceneInfoCard';
+import { getSceneInfo, type SceneInfoTarget } from '@/utils/sceneInfo';
 import InfoPanel from './InfoPanel';
 import NightStars from './NightStars';
 import Aurora from '@/components/Aurora';
@@ -682,6 +684,15 @@ const SunTracker: React.FC = () => {
     if (isNight && rollUfo()) setUfoOn(true);
   }
   const handleUfoDone = useCallback(() => setUfoOn(false), []);
+  // Info cards (ROADMAP item 95): one card at a time, for the last thing tapped in the scene.
+  // `id` mounts a new card per tap, so its 15 s timer starts again.
+  const [infoCard, setInfoCard] = useState<{ target: SceneInfoTarget; x: number; y: number; ring: string; id: number } | null>(null);
+  const infoCardCount = React.useRef(0);
+  const handleSceneInfo = useCallback((target: SceneInfoTarget, point: { x: number; y: number }, ring: string) => {
+    infoCardCount.current += 1;
+    setInfoCard({ target, ...point, ring, id: infoCardCount.current });
+  }, []);
+  const handleInfoClose = useCallback(() => setInfoCard(null), []);
   // Rare lenticular and mammatus clouds (ROADMAP item 84, X1): one day in 30 per place;
   // `?egg=lenticular` or `?egg=mammatus` forces the day.
   const [cloudEggForced] = useState(() => isCloudEggForced(window.location.search));
@@ -864,6 +875,8 @@ const SunTracker: React.FC = () => {
             fireworksTrigger={fireworksTrigger}
             sunglasses={sunglassesOn}
             onSunTap={handleSunTap}
+            onSceneInfo={handleSceneInfo}
+            infoRing={infoCard?.ring ?? null}
             calendarEvent={calendarEvent}
             playDirection={playDirection}
             sunsetCountdown={countdownSeconds === null ? null : { seconds: countdownSeconds, lineOfSight: !!countdownTarget?.lineOfSight }}
@@ -924,6 +937,27 @@ const SunTracker: React.FC = () => {
         >
           {t('time.backToNow')}
         </button>
+      )}
+      {infoCard && location.loaded && (
+        <SceneInfoCard
+          key={infoCard.id}
+          info={getSceneInfo(infoCard.target, {
+            language,
+            now: date,
+            sunPosition,
+            sunTimes: passTimes ?? sunTimes,
+            terrainSunTimes: terrainExtras.terrainSunTimes,
+            nextGoldenBlueHours,
+            moonPosition,
+            moonTimes: panelMoonTimes,
+            horizonProfile,
+            weatherType,
+            cloudLayers,
+          })}
+          x={infoCard.x}
+          y={infoCard.y}
+          onClose={handleInfoClose}
+        />
       )}
     </div>
     <PremiumDialog />
