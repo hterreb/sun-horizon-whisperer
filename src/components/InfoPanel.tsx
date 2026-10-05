@@ -6,6 +6,7 @@ import { Button } from './ui/button';
 import LineOfSightDetails from './LineOfSightDetails';
 import PremiumBadge from './PremiumBadge';
 import { usePremiumGate } from '@/hooks/usePremium';
+import { useIdleHide } from '@/hooks/useIdleHide';
 import ShareCardButton from '@/components/ShareCardButton';
 import PlaceSearch from './PlaceSearch';
 import {
@@ -205,9 +206,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   // with its min/max (today ± 1 year) taken when it opens.
   const [timePickerRange, setTimePickerRange] = useState<{ min: Date; max: Date } | null>(null);
   const [isMoonTerrainOpen, setIsMoonTerrainOpen] = useState(false);
-  const [isVisible, setIsVisible] = useState(true);
   const [hoveredTwilight, setHoveredTwilight] = useState<string | null>(null);
-  const fadeTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   // Tracks which collapsible sections the user has manually toggled, so the
   // time-of-day auto-collapse effect below only ever touches sections the user
   // hasn't taken control of themselves.
@@ -215,42 +214,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   const userToggledTwilightRef = React.useRef(false);
   const userToggledSunPositionRef = React.useRef(false);
 
-  // Whenever fullscreen mode toggles (either direction), the panel should be visible
-  // immediately; the effect below then re-arms the auto-fade timer for fullscreen.
-  // Adjusting state during render (rather than in an effect) avoids an extra commit.
-  const [prevIsFullscreen, setPrevIsFullscreen] = useState(isFullscreen);
-  if (isFullscreen !== prevIsFullscreen) {
-    setPrevIsFullscreen(isFullscreen);
-    setIsVisible(true);
-  }
-
-  // Fade out after 10 seconds, but only while in fullscreen.
-  useEffect(() => {
-    if (!isFullscreen) return;
-
-    fadeTimeoutRef.current = setTimeout(() => {
-      setIsVisible(false);
-    }, 10000);
-
-    return () => {
-      if (fadeTimeoutRef.current) {
-        clearTimeout(fadeTimeoutRef.current);
-      }
-    };
-  }, [isFullscreen]);
-
-  const handleMouseEnter = () => {
-    if (isFullscreen) {
-      setIsVisible(true);
-      // Reset the fade timer
-      if (fadeTimeoutRef.current) {
-        clearTimeout(fadeTimeoutRef.current);
-      }
-      fadeTimeoutRef.current = setTimeout(() => {
-        setIsVisible(false);
-      }, 10000);
-    }
-  };
+  // In fullscreen the panel fades out: 3 s after entering, 10 s after a wake (ROADMAP item 89).
+  const { isVisible, wake: handleMouseEnter } = useIdleHide(isFullscreen);
 
   // Keyboard focus and touch also need to bring the panel back, not just mouse hover.
   const handleFocus = handleMouseEnter;
