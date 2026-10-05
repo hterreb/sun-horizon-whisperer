@@ -1,6 +1,7 @@
 import React, { Profiler } from 'react';
 import { render, act, fireEvent } from '@testing-library/react';
-import CloudLayer, { WeatherType, createFish, createBird } from '../src/components/CloudLayer';
+import CloudLayer, { WeatherType, createFish, createBird, spawnTick, type SceneEntities, type SpawnRules } from '../src/components/CloudLayer';
+import { findLane, xAt, type ScenePath } from '../src/utils/scenePaths';
 import { FISH_WEIGHTS, NIGHT_FISH_WEIGHTS, getWaterSpeedFactor } from '../src/utils/weatherEffectsUtils';
 import type { TimeOfDay } from '../src/utils/sunUtils';
 import { DEFAULT_CLOUD_LAYERS, getCloudCentre, getGliderStartProgress, getSkyClouds } from '../src/utils/skyCloudUtils';
@@ -243,8 +244,10 @@ describe('CloudLayer', () => {
     });
 
     it('sails near boats lower in fullscreen, where the chrome fades away', () => {
+      // At night without the moon no fish swims (a roll of 0 picks a moonlit fish), so no fish
+      // lane moves the boat away from its waterline (item 92).
       const waterline = (props: Partial<React.ComponentProps<typeof CloudLayer>>) =>
-        (spawn(props, 6000).querySelector('[data-testid="scene-boat"]')?.parentElement?.parentElement as HTMLElement | null)?.style.top;
+        (spawn({ timeOfDay: 'night', ...props }, 6000).querySelector('[data-testid="scene-boat"]')?.parentElement?.parentElement as HTMLElement | null)?.style.top;
       expect(waterline({})).toBe('87%');
       expect(waterline({ isFullscreen: true })).toBe('94%');
     });
@@ -707,5 +710,70 @@ describe('CloudLayer during time-travel play (ROADMAP item 83)', () => {
     };
     expect(marked('snow', 'snowfall')).toBe(true);
     expect(marked('hail', 'hailFall')).toBe(true);
+  });
+});
+
+// ROADMAP item 92: 30 minutes of the real spawn rules (spawnTick), with a seeded random.
+describe('lane planning (ROADMAP item 92)', () => {
+  // mulberry32: the same numbers on each run.
+  const seeded = (seed: number) => () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const endOf = (p: ScenePath) => p.start + p.duration + (p.lag ?? 0);
+  // The pairs of boxes that touch at time t (no margin).
+  const touching = (list: { id: number; path?: ScenePath }[], t: number, seen: Set<string>) => {
+    const boxes = list.flatMap(e => (e.path && t >= e.path.start && t <= endOf(e.path)
+      ? [{ id: e.id, l: xAt(e.path, t - (e.path.lag ?? 0)), r: xAt(e.path, t) + e.path.width, top: e.path.y, bottom: e.path.y + e.path.height }]
+      : []));
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i];
+        const b = boxes[j];
+        if (a.l < b.r && b.l < a.r && a.top < b.bottom && b.top < a.bottom) seen.add(`${a.id}|${b.id}`);
+      }
+    }
+  };
+  // A check every 500 ms, live (the scene clock is the wall clock); a thing leaves at the end
+  // of its crossing, as on its animationend. Without a plan, each thing keeps its random pick.
+  const simulate = (rules: SpawnRules, plan: boolean) => {
+    const random = seeded(92);
+    let scene: SceneEntities = { birds: [], fish: [], ships: [], leaves: [] };
+    const last = { birds: 0, fish: 0, ships: 5000 - 55000, leaves: 0 }; // the first boat after 5 s, as at mount
+    let spawns = 0;
+    const touches = new Set<string>();
+    for (let ms = 500; ms <= 30 * 60_000; ms += 500) {
+      const t = ms / 1000;
+      const onScreen = <T extends { path?: ScenePath }>(list: T[]) => list.filter(e => !e.path || t < endOf(e.path));
+      scene = { birds: onScreen(scene.birds), fish: onScreen(scene.fish), ships: onScreen(scene.ships), leaves: [] };
+      const next = spawnTick(scene, last, rules, ms, t, random, plan ? findLane : candidate => candidate.y);
+      spawns += next.birds.length - scene.birds.length + next.fish.length - scene.fish.length + next.ships.length - scene.ships.length;
+      scene = next;
+      for (let dt = 0; dt < 0.5; dt += 0.1) {
+        touching([...scene.fish, ...scene.ships], t + dt, touches);
+        touching(scene.birds, t + dt, touches);
+      }
+    }
+    return { spawns, touches: touches.size };
+  };
+  const rules = (view: SpawnRules['view'], extra: Partial<SpawnRules> = {}): SpawnRules => ({
+    weatherType: 'clear', timeOfDay: 'midday', windSpeedKmh: 10, birdSpeedFactor: 1, showLeaves: false,
+    isFullscreen: false, moonUp: false, moonY: null, month: 10, latitude: 47.8, gapFactor: 1, rewind: false,
+    fishOverride: null, view, ...extra,
+  });
+
+  it.each([
+    { name: 'a phone by day', scene: rules({ width: 390, height: 844 }) },
+    { name: 'a desktop by day', scene: rules({ width: 1280, height: 800 }) },
+    { name: 'a phone in the evening', scene: rules({ width: 390, height: 844 }, { timeOfDay: 'evening' }) },
+    { name: 'a phone at night, with the moon', scene: rules({ width: 390, height: 844 }, { timeOfDay: 'night', moonUp: true, moonY: 30 }) },
+  ])('keeps all boxes apart on $name, with at most 15 percent fewer spawns', ({ scene }) => {
+    const planned = simulate(scene, true);
+    const random = simulate(scene, false);
+    expect(random.touches).toBeGreaterThan(0); // the check finds touches without a plan
+    expect(planned.touches).toBe(0);
+    expect(planned.spawns).toBeGreaterThanOrEqual(0.85 * random.spawns);
   });
 });

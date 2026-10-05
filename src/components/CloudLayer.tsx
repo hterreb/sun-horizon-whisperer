@@ -1,16 +1,19 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { Leaf } from 'lucide-react';
-import SceneBoat from './SceneBoat';
+import SceneBoat, { BOAT_HEIGHT_PX, BOAT_WIDTH_PX } from './SceneBoat';
 import SceneBird from './SceneBird';
 import SceneFish from './SceneFish';
-import SceneVisitor, { DOLPHIN_SPACING, VISITOR_GRID } from './SceneVisitor';
+import SceneVisitor, {
+  DOLPHIN_SPACING, VISITOR_GRID, VISITOR_VIEW_HEIGHT, SHARK_ABOVE_WATER, DOLPHINS_ABOVE_WATER,
+} from './SceneVisitor';
 import RainCanvas from './RainCanvas';
 import SkyClouds from './SkyClouds';
 import { Bat } from './sceneIcons';
 import { type TimeOfDay } from '../utils/sunUtils';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import { useScenePlaybackRate } from '@/hooks/useScenePlaybackRate';
-import { getSpawnGapFactor, type PlayDirection } from '@/utils/timeTravel';
+import { getScenePlaybackRate, getSpawnGapFactor, type PlayDirection } from '@/utils/timeTravel';
+import { findLane, getSceneTime, setSceneRate, LIVE_SCENE_CLOCK, type ScenePath } from '@/utils/scenePaths';
 import { getPrecipitationSlantPx } from '../utils/cloudLayoutUtils';
 import { type CloudLayers } from '../utils/skyCloudUtils';
 import {
@@ -19,7 +22,7 @@ import {
   pickNightFish, pickMoonlitDayFish, MAX_FISH, MAX_NIGHT_FISH, getWaterSpeedFactor, getWaterLimit, getFishOverride,
   pickBird, isBirdInSeason, MAX_BIRDS, type BirdKind,
 } from '../utils/weatherEffectsUtils';
-import { getSeaWindKmh } from '../utils/waveUtils';
+import { getSeaWindKmh, getBoatReflection } from '../utils/waveUtils';
 import { getRainMmH } from '../utils/rainUtils';
 
 // ROADMAP item 10: more than the original 6 types - fog, drizzle and hail join the
@@ -107,6 +110,7 @@ interface MovingEntity {
 interface Boat extends MovingEntity {
   kind: BoatKind;
   depth: number; // 0 = near, 1 = far: far boats are smaller, paler and slower
+  path?: ScenePath; // the lane plan (item 92), set at spawn
 }
 
 // `speed` is a near boat's rate in % of the layer width per second (ROADMAP item 40):
@@ -167,6 +171,8 @@ interface FishEntity extends MovingEntity {
   glow: boolean;
   light?: 'moon' | 'own'; // night fish (item 65): lit by the moon, or by their own light
   easing?: string; // rest stop (P8): a CSS linear() easing that holds still mid-crossing
+  curve?: [number, number][]; // the easing's points, for the lane plan (item 92)
+  path?: ScenePath; // the lane plan (item 92), set at spawn
   school?: { left: number; top: number }[]; // P5: each minnow's offset in px
   companion?: { lag: number; dy: number }; // P6: a second fish, `lag` s behind, `dy` % lower
   rolls?: number[]; // DO1 (item 85): each dolphin's roll delay in s, 2 or 3 dolphins
@@ -221,6 +227,7 @@ export const createFish = (
     dx,
     duration: rest ? rest.duration : dx / speed,
     easing: rest?.easing,
+    curve: rest?.curve,
     // Paler with distance (P3), with depth (P9 haze) and in rain (E2). FS1 (item 85): 85 % by
     // day; at night moonlit fish at 75 % and fish with their own light at 95 % (the jellyfish
     // 60 %, item 82), without the depth haze. The sea visitors at 95 %, day and night.
@@ -282,6 +289,8 @@ interface BirdEntity extends MovingEntity {
   opacity: number;
   group?: { left: number; top: number }[]; // each bird's offset in px
   easing?: string; // M8: a CSS linear() easing that hangs still mid-crossing
+  curve?: [number, number][]; // the easing's points, for the lane plan (item 92)
+  path?: ScenePath; // the lane plan (item 92), set at spawn
 }
 
 // Builds one bird, group or bat (ROADMAP item 74). `y` is the centre line. `windFactor` slows
@@ -317,9 +326,292 @@ export const createBird = (
     dx,
     duration: hover ? hover.duration : dx / speed,
     easing: hover?.easing,
+    curve: hover?.curve,
     // Bats carry their own 90 % in the icon colour (item 64); the night geese are dark at 90 %.
     opacity: kind === 'bat' ? 1 : moonY !== undefined ? 0.9 : 0.6 * (1 - 0.3 * depth),
   };
+};
+
+// Sun below the horizon: bats instead of birds, and the boats show their lights.
+const isSunDownAt = (timeOfDay: TimeOfDay): boolean =>
+  timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' ||
+  timeOfDay === 'nautical-twilight' || timeOfDay === 'civil-twilight';
+
+// A boat's drawing scale (item 73): its hull length, smaller far out.
+const boatScale = (ship: Boat): number => 1.4 * BOATS[ship.kind].scale * (1 - FAR_SHRINK * ship.depth);
+
+// The things that cross the scene, in one object: a new fish plans its lane around the boats,
+// and a new boat around the fish (ROADMAP item 92).
+export interface SceneEntities {
+  birds: BirdEntity[];
+  fish: FishEntity[];
+  ships: Boat[];
+  leaves: MovingEntity[];
+}
+
+// The wall-clock time (ms) of each group's last spawn check that passed its gap.
+export interface SpawnTimes { birds: number; fish: number; ships: number; leaves: number }
+
+// What the spawn rules read from the props, the play state and the window.
+export interface SpawnRules {
+  weatherType: WeatherType;
+  timeOfDay: TimeOfDay;
+  windSpeedKmh: number | null;
+  birdSpeedFactor: number; // strong wind slows the birds (item 10)
+  showLeaves: boolean;
+  isFullscreen: boolean;
+  moonUp: boolean; // a pool of moonlight for the moonlit night fish (item 65, NR3)
+  moonY: number | null; // the moon's height in % while it shows, for the night geese (item 74, W14)
+  month: number;
+  latitude: number;
+  gapFactor: number; // 1/8 during time-travel play (item 83)
+  rewind: boolean; // item 83: a new spawn starts at its end and swims back
+  fishOverride: FishKind | null; // `?fish=` (item 85)
+  view: { width: number; height: number }; // the scene in px
+}
+type View = SpawnRules['view'];
+
+// A thing's box for the lane plan (item 92), in % of the scene: `above` is how far the box
+// reaches above the thing's `y`. `band` is the range of `y` for its type.
+interface LaneShape {
+  width: number;
+  above: number;
+  height: number;
+  band: [number, number];
+  lag?: number;
+  curve?: [number, number][];
+}
+const percentOfWidth = (px: number, view: View) => (px / view.width) * 100;
+const percentOfHeight = (px: number, view: View) => (px / view.height) * 100;
+
+// Fish from 67 % (far) to 93 % of the height (near), ±1 % (item 71). For a shark or a pod, `y`
+// is the waterline, and the box is SceneVisitor's whole svg: the fin above, the body below.
+const FISH_BAND: [number, number] = [66, 94];
+const fishLane = (fish: FishEntity, view: View, rewind: boolean): LaneShape => {
+  if (fish.kind === 'shark' || fish.kind === 'dolphins') {
+    const unit = fish.size / VISITOR_GRID;
+    const above = fish.kind === 'shark' ? SHARK_ABOVE_WATER : DOLPHINS_ABOVE_WATER;
+    return {
+      width: percentOfWidth(fish.width, view),
+      above: percentOfHeight(above * unit, view),
+      height: percentOfHeight(VISITOR_VIEW_HEIGHT * unit, view),
+      band: FISH_BAND,
+    };
+  }
+  // A pair (P6): the second fish is `dy` % lower and `lag` s behind. A pair that spawns in
+  // rewind swims side by side (item 83).
+  const dy = fish.companion?.dy ?? 0;
+  return {
+    width: percentOfWidth(fish.width, view),
+    above: Math.max(0, -dy),
+    height: percentOfHeight(fish.height, view) + Math.abs(dy),
+    band: FISH_BAND,
+    lag: rewind ? undefined : fish.companion?.lag,
+    curve: fish.curve,
+  };
+};
+
+// Birds fly with their centre from 20 % (near) to 50 % of the height (far), ±2 %; the bats at
+// 20-50 % (item 74, M3). The night geese keep to the moon's height, ±2 %.
+const BIRD_BAND: [number, number] = [18, 52];
+const BAT_BAND: [number, number] = [20, 50];
+const birdLane = (bird: BirdEntity, view: View, band: [number, number]): LaneShape => ({
+  width: percentOfWidth(bird.width, view),
+  above: percentOfHeight(bird.height / 2, view),
+  height: percentOfHeight(bird.height, view),
+  band,
+  curve: bird.curve,
+});
+
+// A boat: the hull above the waterline `y`, and the mirror image below it at its calm height,
+// the tallest (items 73 and 79). The waterline band is 67-87 % (94 % in fullscreen).
+const BOAT_MIRROR = getBoatReflection(0).heightPercent / 100;
+const boatLane = (ship: Boat, view: View, isFullscreen: boolean): LaneShape => {
+  const hull = percentOfHeight(BOAT_HEIGHT_PX * boatScale(ship), view);
+  return {
+    width: percentOfWidth(BOAT_WIDTH_PX * boatScale(ship), view),
+    above: hull,
+    height: hull * (1 + BOAT_MIRROR),
+    band: [67, isFullscreen ? 94 : 87],
+  };
+};
+
+const pathsOf = (...groups: { path?: ScenePath }[][]): ScenePath[] =>
+  groups.flatMap(group => group.flatMap(item => (item.path ? [item.path] : [])));
+
+// One check of the spawn loop (every 500 ms): a new bird, fish, boat or leaf when its gap has
+// passed and its chance comes up, and an empty group when the weather or the time no longer
+// has it. Item 92: a new fish, bird or boat takes a free lane (findLane): fish check against
+// the fish and the boats, boats against the boats and the fish, birds against all flyers. With
+// no free lane it does not spawn, and the next check tries again. `now` is the wall clock (ms)
+// for the gaps, `sceneTime` the scene clock (s) for the lanes. The check moves `last` on and
+// returns `scene` itself when no list changes, so no render follows (P-4). The simulation test
+// runs it with a seeded `random`, and with `lane` = the random pick for the rate without plan.
+// eslint-disable-next-line react-refresh/only-export-components -- exported for the simulation test
+export const spawnTick = (
+  scene: SceneEntities, last: SpawnTimes, rules: SpawnRules, now: number, sceneTime: number,
+  random: () => number = Math.random, lane: typeof findLane = findLane,
+): SceneEntities => {
+  const { weatherType, timeOfDay, windSpeedKmh, gapFactor, month, latitude, moonY, view, rewind } = rules;
+  let { birds, fish, ships, leaves } = scene;
+  const isSunDown = isSunDownAt(timeOfDay);
+
+  // The new thing's path on the scene clock, at the free height nearest its random pick, or
+  // null. In rewind (item 83) a new thing starts at its end, so its crossing began a duration
+  // ago, and all of it is still to come.
+  const place = <T extends MovingEntity>(item: T, shape: LaneShape, others: ScenePath[]): (T & { path: ScenePath }) | null => {
+    const start = rewind ? sceneTime - item.duration : sceneTime;
+    const path: ScenePath = {
+      start, duration: item.duration, x: item.x, dx: item.dx, curve: shape.curve, lag: shape.lag,
+      width: shape.width, y: item.y - shape.above, height: shape.height,
+    };
+    const band: [number, number] = [shape.band[0] - shape.above, shape.band[1] - shape.above];
+    const y = lane({ ...path, band, view }, others, rewind ? start : sceneTime);
+    return y === null ? null : { ...item, y: y + shape.above, path: { ...path, y } };
+  };
+
+  // Fair-weather flyers: birds tuck away once it's wet, foggy or stormy. Bats fly from
+  // sunset through twilight (ROADMAP item 40); full night stays quiet (item 36).
+  const birdWeather = weatherType === 'clear' || weatherType === 'partly' ||
+                      weatherType === 'cloudy' || weatherType === 'overcast';
+  const shouldShowBirds = birdWeather && timeOfDay !== 'night';
+  // Geese also migrate at night (item 74, W14): in their months, a V crosses at the moon's height.
+  const shouldShowMoonGeese = birdWeather && timeOfDay === 'night' && moonY !== null &&
+                              isBirdInSeason('geese', month, latitude);
+  const fishWeather = weatherType === 'clear' || weatherType === 'partly' || weatherType === 'cloudy' ||
+                      weatherType === 'overcast' || weatherType === 'rain' || weatherType === 'drizzle';
+  // Night fish (ROADMAP item 65, NR2) take over in nautical twilight, where the day fish stop.
+  const nightWater = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
+  const shouldShowFish = fishWeather && !nightWater;
+  const shouldShowNightFish = fishWeather && nightWater;
+  const wetForFish = weatherType === 'rain' || weatherType === 'drizzle';
+  // A storm sends out only the big boats (pickBoat, item 73); hail has none.
+  const shouldShowShips = weatherType !== 'hail';
+
+  if (shouldShowBirds) {
+    if (now - last.birds > (BIRD_GAP_MIN_MS + random() * BIRD_GAP_RANGE_MS) * gapFactor) {
+      let noLane = false;
+      // 70 %, a third more in the hour before sunset, when the gulls fly to their roost (C2).
+      if (random() < (timeOfDay === 'evening' ? 0.93 : 0.7)) {
+        const kind = isSunDown ? 'bat' : pickBird(random(), month, latitude, timeOfDay === 'evening');
+        const next = createBird(kind, view.width, rules.birdSpeedFactor, random);
+        // At most four birds or groups (C3), per phone width (item 70). Far birds first.
+        if (birds.length < getWaterLimit(MAX_BIRDS, view.width)) {
+          const placed = place(next, birdLane(next, view, kind === 'bat' ? BAT_BAND : BIRD_BAND), pathsOf(birds));
+          if (placed) birds = [...birds, placed].sort((a, b) => b.depth - a.depth);
+          noLane = !placed;
+        }
+      }
+      if (!noLane) last.birds = now;
+    }
+  } else if (shouldShowMoonGeese) {
+    // The twilight bats fly on. One V at a time, about every four minutes.
+    if (now - last.birds > MOON_GEESE_GAP_MS * gapFactor) {
+      let noLane = false;
+      if (random() < 0.12) {
+        const next = createBird('geese', view.width, rules.birdSpeedFactor, random, moonY);
+        if (!birds.some(b => b.kind === 'geese')) {
+          const placed = place(next, birdLane(next, view, [moonY - 2, moonY + 2]), pathsOf(birds));
+          if (placed) birds = [...birds, placed];
+          noLane = !placed;
+        }
+      }
+      if (!noLane) last.birds = now;
+    }
+  } else if (birds.length > 0) {
+    birds = [];
+  }
+
+  // At the switch between day and night fish, the fish on screen swim on (item 65).
+  if (shouldShowFish || shouldShowNightFish) {
+    // A quiet night (NR1): a check every 15-25 s instead of every 5-8 s.
+    const gapMs = (shouldShowNightFish ? 15000 + random() * 10000 : 5000 + random() * 3000) * gapFactor;
+    if (now - last.fish > gapMs) {
+      let noLane = false;
+      if (random() < (wetForFish ? 0.35 : 0.7)) { // 70% chance, half of it in rain (E2)
+        let newFish: FishEntity | null = null;
+        if (shouldShowNightFish) {
+          const pick = rules.fishOverride ?? pickNightFish(random());
+          const kind = pick === 'moonlit' ? pickMoonlitDayFish(random()) : pick;
+          // Fish lit by the moon need the pool of moonlight (NR3), the sea visitors too (X5).
+          if (GLOWING_AT_NIGHT.includes(kind) || rules.moonUp) {
+            newFish = createFish(kind, false, wetForFish, view.width, random, true);
+          }
+        } else {
+          newFish = createFish(rules.fishOverride ?? pickFish(random()), isSunDown, wetForFish, view.width, random);
+        }
+        // At most five fish (E4), three at night (NR1), per phone width (item 70). Far fish
+        // first, so a near fish swims in front.
+        const limit = getWaterLimit(shouldShowNightFish ? MAX_NIGHT_FISH : MAX_FISH, view.width);
+        if (newFish && canSpawnFish(fish.map(f => f.kind), newFish.kind, limit)) {
+          const placed = place(newFish, fishLane(newFish, view, rewind), pathsOf(fish, ships));
+          if (placed) fish = [...fish, placed].sort((a, b) => b.depth - a.depth);
+          noLane = !placed;
+        }
+      }
+      if (!noLane) last.fish = now;
+    }
+  } else if (fish.length > 0) {
+    fish = [];
+  }
+
+  if (shouldShowShips) {
+    if (now - last.ships > (BOAT_GAP_MIN_MS + random() * BOAT_GAP_RANGE_MS) * gapFactor) {
+      let noLane = false;
+      if (random() < 0.9) { // 90% chance to spawn
+        const startX = -8;
+        const endX = 108;
+        // More boats far out (item 71): the square root makes 44 % of them sail in the
+        // farthest quarter, small and pale near the horizon, and fewer big ones mid-water.
+        const depth = Math.sqrt(random());
+        const kind = pickBoat(weatherType, windSpeedKmh, random());
+        const newShip: Boat = {
+          id: Date.now() + Math.random(),
+          x: startX,
+          // Far boats sit at the horizon (65%). Near ones sail down to 87%, just above the
+          // music player, or to 94% in fullscreen.
+          y: 67 + (1 - depth) * (rules.isFullscreen ? 27 : 20),
+          dx: endX - startX,
+          // Wide screens: the phone's pixels per second (item 66).
+          duration: (endX - startX) / (BOATS[kind].speed * (1 - FAR_SHRINK * depth) * getWaterSpeedFactor(view.width)),
+          kind,
+          depth,
+        };
+        // Far boats first, so a near boat always sails in front of a far one.
+        if (ships.length < getWaterLimit(MAX_BOATS, view.width)) {
+          const placed = place(newShip, boatLane(newShip, view, rules.isFullscreen), pathsOf(ships, fish));
+          if (placed) ships = [...ships, placed].sort((a, b) => b.depth - a.depth);
+          noLane = !placed;
+        }
+      }
+      if (!noLane) last.ships = now;
+    }
+  } else if (ships.length > 0) {
+    ships = [];
+  }
+
+  if (rules.showLeaves) {
+    if (now - last.leaves > (4000 + random() * 4000) * gapFactor) {
+      if (random() < 0.6) { // 60% chance to spawn
+        const startX = -5;
+        const endX = 105;
+        leaves = [...leaves, {
+          id: Date.now() + Math.random(),
+          x: startX,
+          y: 40 + random() * 40,
+          dx: endX - startX,
+          duration: (endX - startX) / LEAF_RATE_PERCENT_PER_SEC,
+        }];
+      }
+      last.leaves = now;
+    }
+  } else if (leaves.length > 0) {
+    leaves = [];
+  }
+
+  return birds === scene.birds && fish === scene.fish && ships === scene.ships && leaves === scene.leaves
+    ? scene
+    : { birds, fish, ships, leaves };
 };
 
 // Deterministic pseudo-random value in [0, 1), seeded by an integer. Lets raindrop/
@@ -352,16 +644,24 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   skyGradient = null,
   cloudEgg = false,
 }) => {
-  const [birds, setBirds] = useState<BirdEntity[]>([]);
-  const [fish, setFish] = useState<FishEntity[]>([]);
-  const [ships, setShips] = useState<Boat[]>([]);
-  const [leaves, setLeaves] = useState<MovingEntity[]>([]);
+  // The things that cross the scene. The state renders them; the ref has the latest lists at
+  // once, so the spawn loop plans each new lane around all of them (item 92), also around one
+  // that spawned in the same check.
+  const [entities, setEntities] = useState<SceneEntities>({ birds: [], fish: [], ships: [], leaves: [] });
+  const entitiesRef = useRef(entities);
+  const updateEntities = useCallback((change: (prev: SceneEntities) => SceneEntities) => {
+    const next = change(entitiesRef.current);
+    if (next === entitiesRef.current) return;
+    entitiesRef.current = next;
+    setEntities(next);
+  }, []);
+  const { birds, fish, ships, leaves } = entities;
 
   // Spawn-timing refs (not movement — movement is CSS now). Seeded with a placeholder
   // and set to the real mount time in an effect (Date.now() is impure, so it can't be
   // called during render); the 500ms spawn-check loop below doesn't start reading these
   // until after that effect has run.
-  const lastSpawnTimeRef = useRef({ birds: 0, fish: 0, ships: 0, leaves: 0 });
+  const lastSpawnTimeRef = useRef<SpawnTimes>({ birds: 0, fish: 0, ships: 0, leaves: 0 });
   useEffect(() => {
     const now = Date.now();
     lastSpawnTimeRef.current = { birds: now, fish: now, ships: now - BOAT_GAP_MIN_MS + 5000, leaves: now };
@@ -369,6 +669,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   const prefersReducedMotion = usePrefersReducedMotion();
   const sceneRef = useRef<HTMLDivElement>(null);
   useScenePlaybackRate(sceneRef, playDirection);
+  // The scene clock (item 92) follows the play rate of the scene's animations (item 83), so the
+  // lanes hold during time-travel play.
+  const sceneClockRef = useRef(LIVE_SCENE_CLOCK);
+  useEffect(() => {
+    sceneClockRef.current = setSceneRate(sceneClockRef.current, Date.now(), getScenePlaybackRate(playDirection));
+  }, [playDirection]);
   // During play the spawn gaps shrink by the play factor (item 83), so the scene does not empty.
   const gapFactor = getSpawnGapFactor(playDirection);
   // Test override (item 85): `?fish=shark` makes every fish spawn a shark.
@@ -414,11 +720,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     return newSnowflakes;
   }, [weatherType]);
 
-  // Sun below the horizon: bats instead of birds, and the boats show their lights.
-  const isSunDown = timeOfDay === 'night' ||
-                    timeOfDay === 'astronomical-twilight' ||
-                    timeOfDay === 'nautical-twilight' ||
-                    timeOfDay === 'civil-twilight';
+  const isSunDown = isSunDownAt(timeOfDay);
   const boatTone = getBoatTone(timeOfDay);
   const seaWindKmh = getSeaWindKmh(windSpeedKmh, weatherType); // the boats' reflection (item 79, X2)
   // The line leaves keep the old ship tone.
@@ -436,152 +738,32 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   const poolMask = `linear-gradient(to right, transparent ${poolX - 20}%, #000 ${poolX - 9}%, #000 ${poolX + 9}%, transparent ${poolX + 20}%)`;
 
   // Spawn loop: periodically checks whether a new bird/fish/ship/leaf is due, and
-  // clears each group when the weather/time no longer supports it. This is the only
-  // place that calls `setBirds`/`setFish`/`setShips`/`setLeaves` — once per spawn or
-  // clear, never per animation frame. Movement itself happens via the CSS animation
-  // applied to each entity below (see the `moveAcrossX` keyframes), driven by
-  // `onAnimationEnd` for off-screen removal.
+  // clears each group when the weather/time no longer supports it (spawnTick). This is the
+  // only place that adds entities — once per spawn or clear, never per animation frame.
+  // Movement itself happens via the CSS animation applied to each entity below (see the
+  // `moveAcrossX` keyframes), driven by `onAnimationEnd` for off-screen removal.
   useEffect(() => {
     // Reduced motion: skip spawning birds, fish, ships and leaves entirely (static sky).
     if (prefersReducedMotion) return;
-
-    // Fair-weather flyers: birds tuck away once it's wet, foggy or stormy. Bats fly from
-    // sunset through twilight (ROADMAP item 40); full night stays quiet (item 36).
-    const birdWeather = weatherType === 'clear' || weatherType === 'partly' ||
-                        weatherType === 'cloudy' || weatherType === 'overcast';
-    const shouldShowBirds = birdWeather && timeOfDay !== 'night';
-    // Geese also migrate at night (item 74, W14): in their months, a V crosses at the moon's height.
-    const shouldShowMoonGeese = birdWeather && timeOfDay === 'night' && moonY !== null &&
-                                isBirdInSeason('geese', month, latitude);
-    const fishWeather = weatherType === 'clear' || weatherType === 'partly' || weatherType === 'cloudy' ||
-                        weatherType === 'overcast' || weatherType === 'rain' || weatherType === 'drizzle';
-    // Night fish (ROADMAP item 65, NR2) take over in nautical twilight, where the day fish stop.
-    const nightWater = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
-    const shouldShowFish = fishWeather && !nightWater;
-    const shouldShowNightFish = fishWeather && nightWater;
-    const wetForFish = weatherType === 'rain' || weatherType === 'drizzle';
-    // A storm sends out only the big boats (pickBoat, item 73); hail has none.
-    const shouldShowShips = weatherType !== 'hail';
-
-    const spawnTick = () => {
-      const currentTime = Date.now();
-
-      if (shouldShowBirds) {
-        if (currentTime - lastSpawnTimeRef.current.birds > (BIRD_GAP_MIN_MS + Math.random() * BIRD_GAP_RANGE_MS) * gapFactor) {
-          // 70 %, a third more in the hour before sunset, when the gulls fly to their roost (C2).
-          if (Math.random() < (timeOfDay === 'evening' ? 0.93 : 0.7)) {
-            const kind = isSunDown ? 'bat' : pickBird(Math.random(), month, latitude, timeOfDay === 'evening');
-            const next = createBird(kind, window.innerWidth, effects.birdSpeedFactor);
-            // At most four birds or groups (C3), per phone width (item 70). Far birds first.
-            const limit = getWaterLimit(MAX_BIRDS, window.innerWidth);
-            setBirds(prev => (prev.length >= limit ? prev : [...prev, next].sort((a, b) => b.depth - a.depth)));
-          }
-          lastSpawnTimeRef.current.birds = currentTime;
-        }
-      } else if (shouldShowMoonGeese) {
-        // The twilight bats fly on. One V at a time, about every four minutes.
-        if (currentTime - lastSpawnTimeRef.current.birds > MOON_GEESE_GAP_MS * gapFactor) {
-          if (Math.random() < 0.12) {
-            const next = createBird('geese', window.innerWidth, effects.birdSpeedFactor, Math.random, moonY);
-            setBirds(prev => (prev.some(b => b.kind === 'geese') ? prev : [...prev, next]));
-          }
-          lastSpawnTimeRef.current.birds = currentTime;
-        }
-      } else {
-        setBirds(prev => (prev.length > 0 ? [] : prev));
-      }
-
-      // At the switch between day and night fish, the fish on screen swim on (item 65).
-      if (shouldShowFish || shouldShowNightFish) {
-        // A quiet night (NR1): a check every 15-25 s instead of every 5-8 s.
-        const gapMs = (shouldShowNightFish ? 15000 + Math.random() * 10000 : 5000 + Math.random() * 3000) * gapFactor;
-        if (currentTime - lastSpawnTimeRef.current.fish > gapMs) {
-          if (Math.random() < (wetForFish ? 0.35 : 0.7)) { // 70% chance, half of it in rain (E2)
-            let newFish: FishEntity | null = null;
-            if (shouldShowNightFish) {
-              const pick = fishOverride ?? pickNightFish(Math.random());
-              const kind = pick === 'moonlit' ? pickMoonlitDayFish(Math.random()) : pick;
-              // Fish lit by the moon need the pool of moonlight (NR3), the sea visitors too (X5).
-              if (GLOWING_AT_NIGHT.includes(kind) || moonUp) {
-                newFish = createFish(kind, false, wetForFish, window.innerWidth, Math.random, true);
-              }
-            } else {
-              newFish = createFish(fishOverride ?? pickFish(Math.random()), isSunDown, wetForFish, window.innerWidth);
-            }
-            if (newFish) {
-              const next = newFish;
-              // At most five fish (E4), three at night (NR1), per phone width (item 70). Far fish
-              // first, so a near fish swims in front.
-              const limit = getWaterLimit(shouldShowNightFish ? MAX_NIGHT_FISH : MAX_FISH, window.innerWidth);
-              setFish(prev => (canSpawnFish(prev.map(f => f.kind), next.kind, limit)
-                ? [...prev, next].sort((a, b) => b.depth - a.depth)
-                : prev));
-            }
-          }
-          lastSpawnTimeRef.current.fish = currentTime;
-        }
-      } else {
-        setFish(prev => (prev.length > 0 ? [] : prev));
-      }
-
-      if (shouldShowShips) {
-        if (currentTime - lastSpawnTimeRef.current.ships > (BOAT_GAP_MIN_MS + Math.random() * BOAT_GAP_RANGE_MS) * gapFactor) {
-          if (Math.random() < 0.9) { // 90% chance to spawn
-            const startX = -8;
-            const endX = 108;
-            // More boats far out (item 71): the square root makes 44 % of them sail in the
-            // farthest quarter, small and pale near the horizon, and fewer big ones mid-water.
-            const depth = Math.sqrt(Math.random());
-            const kind = pickBoat(weatherType, windSpeedKmh, Math.random());
-            const newShip: Boat = {
-              id: Date.now() + Math.random(),
-              x: startX,
-              // Far boats sit at the horizon (65%). Near ones sail down to 87%, just above the
-              // music player, or to 94% in fullscreen.
-              y: 67 + (1 - depth) * (isFullscreen ? 27 : 20),
-              dx: endX - startX,
-              // Wide screens: the phone's pixels per second (item 66).
-              duration: (endX - startX) / (BOATS[kind].speed * (1 - FAR_SHRINK * depth) * getWaterSpeedFactor(window.innerWidth)),
-              kind,
-              depth,
-            };
-            // Far boats first, so a near boat always sails in front of a far one.
-            const boatLimit = getWaterLimit(MAX_BOATS, window.innerWidth);
-            setShips(prev => (prev.length >= boatLimit ? prev : [...prev, newShip].sort((a, b) => b.depth - a.depth)));
-          }
-          lastSpawnTimeRef.current.ships = currentTime;
-        }
-      } else {
-        setShips(prev => (prev.length > 0 ? [] : prev));
-      }
-
-      if (effects.showLeaves) {
-        if (currentTime - lastSpawnTimeRef.current.leaves > (4000 + Math.random() * 4000) * gapFactor) {
-          if (Math.random() < 0.6) { // 60% chance to spawn
-            const startX = -5;
-            const endX = 105;
-            const newLeaf: MovingEntity = {
-              id: Date.now() + Math.random(),
-              x: startX,
-              y: 40 + Math.random() * 40,
-              dx: endX - startX,
-              duration: (endX - startX) / LEAF_RATE_PERCENT_PER_SEC,
-            };
-            setLeaves(prev => [...prev, newLeaf]);
-          }
-          lastSpawnTimeRef.current.leaves = currentTime;
-        }
-      } else {
-        setLeaves(prev => (prev.length > 0 ? [] : prev));
-      }
+    const rules: Omit<SpawnRules, 'view'> = {
+      weatherType, timeOfDay, windSpeedKmh, isFullscreen, moonUp, moonY, month, latitude, gapFactor, fishOverride,
+      birdSpeedFactor: effects.birdSpeedFactor,
+      showLeaves: effects.showLeaves,
+      rewind: playDirection < 0,
     };
 
-    const intervalId = setInterval(spawnTick, 500 * gapFactor);
+    const spawnCheck = () => {
+      const now = Date.now();
+      const view = { width: window.innerWidth, height: window.innerHeight };
+      updateEntities(prev => spawnTick(prev, lastSpawnTimeRef.current, { ...rules, view }, now, getSceneTime(sceneClockRef.current, now)));
+    };
+
+    const intervalId = setInterval(spawnCheck, 500 * gapFactor);
 
     return () => {
       clearInterval(intervalId);
     };
-  }, [weatherType, windSpeedKmh, timeOfDay, prefersReducedMotion, isSunDown, isFullscreen, effects.showLeaves, effects.birdSpeedFactor, moonUp, month, latitude, moonY, gapFactor, fishOverride]);
+  }, [weatherType, windSpeedKmh, timeOfDay, prefersReducedMotion, isFullscreen, effects.showLeaves, effects.birdSpeedFactor, moonUp, month, latitude, moonY, gapFactor, playDirection, fishOverride, updateEntities]);
 
   // One fish, or a pair (P6): the companion swims `lag` s behind and leaves last, so its
   // onAnimationEnd removes the pair. FS1 silhouettes (item 85) by SceneFish; night fish
@@ -593,7 +775,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     const halo = fishItem.light === 'own' && (kind === 'jellyfish' || kind === 'squid')
       ? `drop-shadow(0 0 ${kind === 'jellyfish' ? 2 : 3}px hsl(var(--scene-fish-${kind === 'jellyfish' ? 'jellyfish-glow' : 'squid'})))`
       : undefined;
-    const remove = () => setFish(prev => prev.filter(f => f.id !== fishItem.id));
+    const remove = () => updateEntities(prev => ({ ...prev, fish: prev.fish.filter(f => f.id !== fishItem.id) }));
     const body = kind === 'shark' || kind === 'dolphins' ? (
       <SceneVisitor
         kind={kind}
@@ -617,7 +799,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     ) : (
       <SceneFish kind={kind} light={fishItem.light} size={fishItem.size} glow={fishItem.glow} />
     );
-    const swimmer = (key: string, lag: number, dy: number, onEnd?: () => void) => (
+    const swimmer = (key: string, lag: number, dy: number, removes: boolean) => (
       <div
         key={key}
         className="absolute"
@@ -636,7 +818,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         }}
         // Only the crossing's own end: the dolphins' roll (item 85) is an animation inside, and
         // its animationend bubbles up here (e.g. when a play rate runs it backwards).
-        onAnimationEnd={onEnd && (event => { if (event.target === event.currentTarget) onEnd(); })}
+        onAnimationEnd={removes ? (event => { if (event.target === event.currentTarget) remove(); }) : undefined}
       >
         {body}
       </div>
@@ -644,10 +826,10 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     return fishItem.companion ? (
       <React.Fragment key={fishItem.id}>
         {/* In rewind the lead leaves last (item 83). */}
-        {swimmer('lead', 0, 0, playDirection < 0 ? remove : undefined)}
-        {swimmer('companion', fishItem.companion.lag, fishItem.companion.dy, playDirection < 0 ? undefined : remove)}
+        {swimmer('lead', 0, 0, playDirection < 0)}
+        {swimmer('companion', fishItem.companion.lag, fishItem.companion.dy, playDirection >= 0)}
       </React.Fragment>
-    ) : swimmer(String(fishItem.id), 0, 0, remove);
+    ) : swimmer(String(fishItem.id), 0, 0, true);
   };
 
   return (
@@ -738,7 +920,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             // Hang in the wind (M8), set only with a stop, as for the fish.
             ...(bird.easing && { animationTimingFunction: bird.easing }),
           }}
-          onAnimationEnd={() => setBirds(prev => prev.filter(b => b.id !== bird.id))}
+          onAnimationEnd={() => updateEntities(prev => ({ ...prev, birds: prev.birds.filter(b => b.id !== bird.id) }))}
         >
           <div className="relative" style={{ width: bird.width, height: bird.height, transform: 'translateY(-50%)' }}>
             {bird.kind === 'bat' ? (
@@ -766,7 +948,6 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
 
       {/* Boats (ROADMAP item 36), drawn in soft light (item 73) */}
       {ships.map((ship) => {
-        const { scale } = BOATS[ship.kind];
         const nearness = 1 - FAR_SHRINK * ship.depth;
         return (
           <div
@@ -780,10 +961,10 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
               ['--dx' as string]: `${ship.dx}vw`,
               animation: `moveAcrossX ${ship.duration}s linear forwards`,
             }}
-            onAnimationEnd={() => setShips(prev => prev.filter(s => s.id !== ship.id))}
+            onAnimationEnd={() => updateEntities(prev => ({ ...prev, ships: prev.ships.filter(s => s.id !== ship.id) }))}
           >
             {/* Scale from the bottom-left corner, then lift by the boat's height, so `top` is the waterline. */}
-            <div style={{ transform: `translateY(-100%) scale(${1.4 * scale * nearness})`, transformOrigin: 'bottom left' }}>
+            <div style={{ transform: `translateY(-100%) scale(${boatScale(ship)})`, transformOrigin: 'bottom left' }}>
               <SceneBoat kind={ship.kind} tone={boatTone} lit={isSunDown} wake={hasBoatWake(ship.kind, windSpeedKmh)} seaWindKmh={seaWindKmh} />
             </div>
           </div>
@@ -802,7 +983,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             ['--dx' as string]: `${leaf.dx}vw`,
             animation: `moveAcrossX ${leaf.duration}s linear forwards`,
           }}
-          onAnimationEnd={() => setLeaves(prev => prev.filter(l => l.id !== leaf.id))}
+          onAnimationEnd={() => updateEntities(prev => ({ ...prev, leaves: prev.leaves.filter(l => l.id !== leaf.id) }))}
         >
           <Leaf size={18} className={`transition-colors duration-1000 ${lineInk}`} data-testid="scene-leaf" />
         </div>
