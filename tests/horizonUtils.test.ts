@@ -2,6 +2,7 @@ import {
   elevationAngleDeg,
   computeHorizonProfile,
   horizonAngleAt,
+  ridgeAt,
   getTerrainSunTimes,
   getTerrainMoonTimes,
   type HorizonProfile,
@@ -73,6 +74,26 @@ describe('horizonUtils', () => {
       expect(first).toBeLessThan(0);
     });
 
+    it('stores the distance and the height of the ridge point that gives each angle (ROADMAP item 95)', () => {
+      // A single 100 m wall ring at 800-1300 m: the nearest sample on the wall gives the angle.
+      const profile = computeHorizonProfile(0, 0, EYE_HEIGHT, wallSampler);
+      expect(profile.ridgeDistances).toHaveLength(360);
+      expect(profile.ridgeHeights).toHaveLength(360);
+      for (let az = 0; az < 360; az += 45) {
+        const ridge = ridgeAt(profile, az)!;
+        expect(ridge.height).toBe(100);
+        expect(ridge.distance).toBeGreaterThanOrEqual(800);
+        expect(ridge.distance).toBeLessThan(900);
+        // The stored point gives the stored angle.
+        expect(elevationAngleDeg(ridge.height - EYE_HEIGHT, ridge.distance)).toBeCloseTo(profile.angles[az], 1);
+      }
+    });
+
+    it('stores no ridge point where the sampler has no data', () => {
+      const profile = computeHorizonProfile(0, 0, EYE_HEIGHT, () => null);
+      expect(ridgeAt(profile, 90)).toBeNull();
+    });
+
     it('ignores DEM noise within 200 m of the observer (a pixel beside a summit)', () => {
       // A 10 m bump 50-150 m away would read as ~9° at 50 m; beyond it the terrain drops away.
       const summitSampler: ElevationSampler = (lat, lon) => {
@@ -89,6 +110,19 @@ describe('horizonUtils', () => {
       const start = performance.now();
       computeHorizonProfile(47.4, 10.9, EYE_HEIGHT, sampler);
       expect(performance.now() - start).toBeLessThan(200);
+    });
+  });
+
+  describe('ridgeAt', () => {
+    it('reads the nearest whole degree, wraps at 360° and is null without ridge data', () => {
+      const profile: HorizonProfile = {
+        ...flatProfile(0),
+        ridgeDistances: Array.from({ length: 360 }, (_, i) => i * 10),
+        ridgeHeights: Array.from({ length: 360 }, (_, i) => 1000 + i),
+      };
+      expect(ridgeAt(profile, 10.4)).toEqual({ distance: 100, height: 1010 });
+      expect(ridgeAt(profile, 359.6)).toEqual({ distance: 0, height: 1000 });
+      expect(ridgeAt(flatProfile(0), 10)).toBeNull();
     });
   });
 
