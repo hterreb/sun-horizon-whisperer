@@ -33,6 +33,8 @@ export default defineConfig(({ mode }) => {
         cleanupOutdatedCaches: true,
         skipWaiting: true,
         clientsClaim: true,
+        // The static privacy page (public/privacy/) must not get the SPA shell.
+        navigateFallbackDenylist: [/^\/privacy/],
         // Notification tap handler for the sunset reminder (ROADMAP item 69).
         importScripts: ['sw-notification-click.js'],
         runtimeCaching: [
