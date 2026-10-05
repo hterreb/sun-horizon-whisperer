@@ -5,7 +5,7 @@
 > P3 = redesign and Google Play release, Version 2.0 = a livelier, smarter sky (items 89–97). An ongoing easter-egg batch and a backlog follow.
 > Each item has Why, Spec, Done when, Size (S = hours to 1 day, M = days, L = 1+ weeks) and dependencies.
 
-Status: last updated 2026-10-04. Done: items 1–15, 17–44, 47–88 (item 14: the Play-app code, with `PREMIUM_ENFORCED` off until item 16), item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: item 16 (with it: turn on `PREMIUM_ENFORCED`, and check with a licence tester that a purchase is still there after 3 days, see item 14 "Acknowledge"; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), [Version 2.0](#version-20--a-livelier-smarter-sky) (items 89–97, specced 2026-10-04; item 94 needs a lookbook first), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
+Status: last updated 2026-10-04. Done: items 1–15, 17–44, 47–88 (item 14: the Play-app code, with `PREMIUM_ENFORCED` off until item 16), item 46 rolled back (marked **✅ Done** in the heading; items 1–13, 15 and 17–30 re-verified on 2026-09-28, see [Verification](#verification-2026-09-28)). Easter eggs: all built (the whale in item 62). Open: item 16 and item 101 (YouTube channel and the store preview video) (with item 16: turn on `PREMIUM_ENFORCED`, and check with a licence tester that a purchase is still there after 3 days, see item 14 "Acknowledge"; item 67 step 7, the store listing and privacy policy in five languages, moves to item 16), a native-speaker review of the de/es/it/fr texts (item 67), [Version 2.0](#version-20--a-livelier-smarter-sky) (items 89–97, specced 2026-10-04; item 94 needs a lookbook first), the device and dashboard checks listed under Verification (status 2026-10-01). [AUDIT.md](AUDIT.md) has no open findings.
 
 ## Verification (2026-09-28)
 
@@ -1734,6 +1734,17 @@ Three Sentry feedback reports, all on release `d79d115` (the current `main`), fr
      - To do (code): `host` in `~/sun-chaser-android/twa-manifest.json` to `sun-chaser.app`, a new AAB (version 2) as an update to the closed test, the Play app signing SHA-256 in `assetlinks.json`, `vercel.json` to a permanent redirect to `sun-chaser.app` (then delete its headers and `tests/headers.test.ts`), the privacy policy URL in the Play Console, Cloudflare as the host in the privacy policy. Do this before the production release: the host is in the store app.
   2. **Contact e-mail and address service.** The privacy page shows the private gmail address now. Replace it with `hello@sun-chaser.app` (Cloudflare Email Routing to the private inbox). An alias alone is not enough for the GDPR (Art. 13 needs the controller's identity), so the name stays. Before Premium goes on sale: book an address service (a "ladungsfähige Anschrift", about €5–15 per month), so the home address does not appear in the Play listing, the privacy policy or an imprint.
   3. **Closed test with 12 testers for 14 days.** Production access needs at least 12 testers who opt in and stay opted in for 14 days in a row. Start as early as possible: a new AAB during the test does not restart the 14 days. Track "Alpha", the same AAB, an e-mail list with 12 or more Google accounts (plus spares), and a feedback address. After 14 days, apply for production access in the Console (review about 7 days).
+
+### 101. YouTube account and the store preview video — S
+
+- **Why:** the Play store listing takes its preview video only as a YouTube link. The 30 s ad (`store/preview-video/`) is ready but has no place to be published.
+- **Depends on:** item 16 (the store listing).
+- **Spec:**
+  1. Make a new YouTube channel for Sun Chaser. Use a brand account, not a personal channel, so no personal name is shown.
+  2. Upload `sun-chaser-ad.mp4` (1080×1920, 30 s). Make it public or unlisted, embeddable, not age-restricted, and with ads off. Use the title "Sun Chaser" and use `store/preview-video/cover.jpg` as the thumbnail.
+  3. Put the clean video URL (`https://www.youtube.com/watch?v=<id>`) in the "Preview video" field of the Play store listing.
+  4. If YouTube raises a Content ID claim on the music, dispute it with the Mixkit track page and `store/preview-video/AUDIO-LICENSES.md`.
+- **Done when:** the video plays on the Play store listing, with no ads and no open claim.
 
 ---
 
