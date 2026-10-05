@@ -1799,7 +1799,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Depends on:** item 92.
 - **Done when:** the lookbook is built and the picks are in this item. Then the spec, the build and the tests.
 
-### 95. Info cards: tap anything in the scene — L
+### 95. Info cards: tap anything in the scene — L — **✅ Done**
 
 - **Feedback (2026-10-04):** "clickable elements, get infos when you click on a boat, fish, bird, plane, satellite, cloud, the sun, the moon, the terrain". Free.
 - **Now:** the scene layer (`CloudLayer`) is `pointer-events-none`. Only the sun is a button: 7 taps give it sunglasses (hidden egg). The fish are 7–60 px wide, many smaller than a finger.
@@ -1819,6 +1819,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   5. **Accessibility:** the sun, the moon and the terrain are buttons with an `aria-label` and work with the keyboard. The moving things are pointer-only and `aria-hidden`.
   6. With `prefers-reduced-motion` there are no moving things, so only the sun, moon, cloud and terrain cards.
 - **Done when:** unit tests for the card content per type and for the ridge distance and height. Component tests: a tap on a fish opens its card; a tap outside closes it; the sun still counts 7 taps. In the browser at 390×844: each type can be tapped, the card stays inside the screen, and the frame budget holds (item 91).
+- **Built (2026-10-05):** `src/utils/sceneInfo.ts` returns the card rows per type as dictionary keys and formatted values; `SceneInfoCard` shows them. SunTracker keeps one card and passes `onSceneInfo` and the ring id down through `SunVisualization` to `CloudLayer` and `SkyClouds`. In `CloudLayer` only the render changed: each fish, bird and boat wrapper gets `pointer-events-auto`, `aria-hidden` and a hit area of at least 44 × 44 px with the ring inside. A cloud takes taps on its own box; its ring is a sibling in the glider, outside the blur. The sun keeps its egg count; the moon is a button of at least 44 px; the terrain path is a button (`role="button"`, Enter and Space pick the highest ridge on screen). `computeHorizonProfile` stores `ridgeDistances` and `ridgeHeights`; the cache key is now `v2`, so an old profile loads again once. Differences from the spec: the bird season is a word (all year, spring and summer, migration, autumn, at dusk), not months, so it holds in both hemispheres. A moonlit fish outside the moon pool is not visible but takes taps. With an overcast deck, a tap in the sky opens a cloud card, so only Escape, the timer or a tap on the sea closes the card. The browser check at 390×844 is still open.
 
 ### 96. Planes with contrails; live flight radar — L — Premium (the live radar)
 
