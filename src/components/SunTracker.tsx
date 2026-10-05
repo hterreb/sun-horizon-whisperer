@@ -29,6 +29,8 @@ import { fetchCurrentWeather, getWeatherAt, type WeatherData } from '../utils/we
 import { getSkyOvercastMix, getStarCloudFactor } from '@/utils/weatherEffectsUtils';
 import { getAstroEvent, parseEggOverride, METEOR_SHOWER_RATE } from '@/utils/astroEvents';
 import SunVisualization from './SunVisualization';
+import SceneInfoCard from './SceneInfoCard';
+import { getSceneInfo, type SceneInfoTarget } from '@/utils/sceneInfo';
 import InfoPanel from './InfoPanel';
 import NightStars from './NightStars';
 import Aurora from '@/components/Aurora';
@@ -42,6 +44,7 @@ import { type WeatherType } from './CloudLayer';
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useWakeLock } from '@/hooks/useWakeLock';
+import { useIdleHide } from '@/hooks/useIdleHide';
 import { useCompassHeading } from '@/hooks/useCompassHeading';
 import { useHorizonProfile } from '@/hooks/useHorizonProfile';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
@@ -63,6 +66,8 @@ import { PLAY_SPEED, PLAY_TICK_MS, clampTimeOffset } from '@/utils/timeTravel';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
 import { DISCO_MS, KONAMI_SEQUENCE, SUNGLASSES_MS, advanceKonami, getEggOverride, registerSunTap, rollUfo } from '@/utils/hiddenEggs';
 import { isCloudEggDay, isCloudEggForced } from '@/utils/skyCloudUtils';
+import { isInstalledApp } from '@/utils/installedApp';
+import { getStartReveal, isFastReturn, loadLastVisible, saveLastVisible } from '@/utils/fastReturn';
 import DiscoSky from './DiscoSky';
 import Ufo from './Ufo';
 import { loadTemperatureUnit, saveTemperatureUnit, type TemperatureUnit } from '@/utils/temperatureUnit';
@@ -89,8 +94,8 @@ const clampEyeHeight = (value: number): number =>
 
 // The scene's side of the loading hand-off (ROADMAP item 39). While loading, the scene
 // is clipped to nothing so the loading screen underneath shows; it then opens through
-// a circle from the mark ('iris'), or fades in ('fade': reduced motion, or a location
-// known within FAST_START_MS).
+// a circle from the mark ('iris'), or fades in ('fade': reduced motion, a location
+// known within FAST_START_MS, or a fast return, item 90; see getStartReveal).
 type Reveal = 'loading' | 'iris' | 'fade' | 'done';
 const REVEAL_CLASS: Record<Reveal, string> = {
   loading: '[clip-path:circle(0_at_50%_36%)]',
@@ -175,7 +180,7 @@ const SunTracker: React.FC = () => {
     document.documentElement.lang = language;
   }, [language]);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showCursor, setShowCursor] = useState(true);
+  const { isVisible: showCursor, wake: wakeCursor } = useIdleHide(isFullscreen);
   const isMobile = useIsMobile();
 
   // Loading screen hand-off (ROADMAP item 39): the top-left buttons and the radio
@@ -183,12 +188,23 @@ const SunTracker: React.FC = () => {
   const prefersReducedMotion = usePrefersReducedMotion();
   const [reveal, setReveal] = useState<Reveal>(() => (location.loaded ? 'fade' : 'loading'));
   const [isSlowStart, setIsSlowStart] = useState(false);
+  // Fast return (ROADMAP item 90): read once, before this page saves a new time.
+  const [fastReturn] = useState(() => isFastReturn(loadLastVisible(), Date.now()));
   useEffect(() => {
     const timeoutId = setTimeout(() => setIsSlowStart(true), FAST_START_MS);
     return () => clearTimeout(timeoutId);
   }, []);
+  useEffect(() => {
+    const save = () => saveLastVisible();
+    document.addEventListener('visibilitychange', save);
+    window.addEventListener('pagehide', save);
+    return () => {
+      document.removeEventListener('visibilitychange', save);
+      window.removeEventListener('pagehide', save);
+    };
+  }, []);
   if (location.loaded && reveal === 'loading') {
-    setReveal(isSlowStart && !prefersReducedMotion ? 'iris' : 'fade');
+    setReveal(getStartReveal(isSlowStart, prefersReducedMotion, fastReturn));
   }
   useEffect(() => {
     if (reveal !== 'iris' && reveal !== 'fade') return;
@@ -199,10 +215,9 @@ const SunTracker: React.FC = () => {
   // request (or its timeout) can't replace that choice.
   const locationChosenRef = React.useRef(false);
 
-  const cursorTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
-
-  // Use wake lock when in fullscreen mode
-  useWakeLock(isFullscreen);
+  // Keep the screen on in fullscreen, and always in the installed app (ROADMAP item 90):
+  // the Play app is fullscreen through its display mode, where `isFullscreen` stays false.
+  useWakeLock(isFullscreen || isInstalledApp());
 
   // Live compass mode (ROADMAP item 8, field-of-view mapping in item 19): the raw
   // (smoothed) heading is handed straight down to SunVisualization, which does its own
@@ -242,47 +257,21 @@ const SunTracker: React.FC = () => {
     enableCompass();
   }, [enableCompass, t]);
 
-  // Whenever fullscreen mode toggles (either direction), the cursor should be shown
-  // immediately; the effect below then re-arms the auto-hide timer for fullscreen.
-  // Adjusting state during render (rather than in an effect) avoids an extra commit.
-  const [prevIsFullscreenForCursor, setPrevIsFullscreenForCursor] = useState(isFullscreen);
-  if (isFullscreen !== prevIsFullscreenForCursor) {
-    setPrevIsFullscreenForCursor(isFullscreen);
-    setShowCursor(true);
-  }
-
-  // Hide the cursor after 10 seconds of no movement, but only while in fullscreen.
+  // In fullscreen, a mouse move shows the cursor again and restarts the idle timer
+  // (useIdleHide: 3 s after entering, 10 s after a wake, ROADMAP item 89).
   useEffect(() => {
     if (!isFullscreen) return;
 
-    cursorTimeoutRef.current = setTimeout(() => {
-      setShowCursor(false);
-    }, 10000);
-
-    // Add mouse move listener to show cursor and reset timer
-    const handleMouseMove = () => {
-      setShowCursor(true);
-      if (cursorTimeoutRef.current) {
-        clearTimeout(cursorTimeoutRef.current);
-      }
-      cursorTimeoutRef.current = setTimeout(() => {
-        setShowCursor(false);
-      }, 10000);
-    };
-
     // A tap should bring the cursor (and the fullscreen/compass toggles, which fade
     // together with it - ROADMAP item 18) back too; mobile taps don't fire mousemove.
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('touchstart', handleMouseMove);
+    document.addEventListener('mousemove', wakeCursor);
+    document.addEventListener('touchstart', wakeCursor);
 
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('touchstart', handleMouseMove);
-      if (cursorTimeoutRef.current) {
-        clearTimeout(cursorTimeoutRef.current);
-      }
+      document.removeEventListener('mousemove', wakeCursor);
+      document.removeEventListener('touchstart', wakeCursor);
     };
-  }, [isFullscreen]);
+  }, [isFullscreen, wakeCursor]);
 
   // Update time every second for smooth clock display, every PLAY_TICK_MS during play.
   useEffect(() => {
@@ -682,6 +671,15 @@ const SunTracker: React.FC = () => {
     if (isNight && rollUfo()) setUfoOn(true);
   }
   const handleUfoDone = useCallback(() => setUfoOn(false), []);
+  // Info cards (ROADMAP item 95): one card at a time, for the last thing tapped in the scene.
+  // `id` mounts a new card per tap, so its 15 s timer starts again.
+  const [infoCard, setInfoCard] = useState<{ target: SceneInfoTarget; x: number; y: number; ring: string; id: number } | null>(null);
+  const infoCardCount = React.useRef(0);
+  const handleSceneInfo = useCallback((target: SceneInfoTarget, point: { x: number; y: number }, ring: string) => {
+    infoCardCount.current += 1;
+    setInfoCard({ target, ...point, ring, id: infoCardCount.current });
+  }, []);
+  const handleInfoClose = useCallback(() => setInfoCard(null), []);
   // Rare lenticular and mammatus clouds (ROADMAP item 84, X1): one day in 30 per place;
   // `?egg=lenticular` or `?egg=mammatus` forces the day.
   const [cloudEggForced] = useState(() => isCloudEggForced(window.location.search));
@@ -856,6 +854,7 @@ const SunTracker: React.FC = () => {
             rainMmH={rainMmH}
             cloudLayers={cloudLayers}
             cloudEgg={cloudEgg}
+            sunTimes={sunTimes}
             windDirectionDeg={weatherData?.windDirectionDeg ?? null}
             compassHeading={activeCompassHeading}
             horizonProfile={horizonProfile}
@@ -867,6 +866,8 @@ const SunTracker: React.FC = () => {
             fireworksTrigger={fireworksTrigger}
             sunglasses={sunglassesOn}
             onSunTap={handleSunTap}
+            onSceneInfo={handleSceneInfo}
+            infoRing={infoCard?.ring ?? null}
             calendarEvent={calendarEvent}
             playDirection={playDirection}
             sunsetCountdown={countdownSeconds === null ? null : { seconds: countdownSeconds, lineOfSight: !!countdownTarget?.lineOfSight }}
@@ -927,6 +928,27 @@ const SunTracker: React.FC = () => {
         >
           {t('time.backToNow')}
         </button>
+      )}
+      {infoCard && location.loaded && (
+        <SceneInfoCard
+          key={infoCard.id}
+          info={getSceneInfo(infoCard.target, {
+            language,
+            now: date,
+            sunPosition,
+            sunTimes: passTimes ?? sunTimes,
+            terrainSunTimes: terrainExtras.terrainSunTimes,
+            nextGoldenBlueHours,
+            moonPosition,
+            moonTimes: panelMoonTimes,
+            horizonProfile,
+            weatherType,
+            cloudLayers,
+          })}
+          x={infoCard.x}
+          y={infoCard.y}
+          onClose={handleInfoClose}
+        />
       )}
     </div>
     <PremiumDialog />

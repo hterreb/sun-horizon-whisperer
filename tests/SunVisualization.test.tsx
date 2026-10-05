@@ -16,6 +16,7 @@ import SunVisualization, {
   buildTerrainSegments,
   avoidCollapsedPanel,
   formatSunAltitude,
+  getAzimuthAtFraction,
 } from '../src/components/SunVisualization';
 import type { HorizonProfile } from '../src/utils/horizonUtils';
 import { getSunTimes, formatTime, getWaterColors } from '../src/utils/sunUtils';
@@ -1133,6 +1134,62 @@ describe('SunVisualization sunglasses egg', () => {
     expect(screen.queryByTestId('sun-sunglasses')).toBeNull();
     rerender(<SunVisualization {...props} sunglasses />);
     expect(screen.getByTestId('sun-sunglasses')).toBeInTheDocument();
+  });
+});
+
+describe('SunVisualization info cards (ROADMAP item 95)', () => {
+  beforeEach(() => {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { value: 800, configurable: true });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { value: 600, configurable: true });
+  });
+
+  const profile: HorizonProfile = { angles: Array.from({ length: 360 }, (_, i) => (i === 100 ? 9 : 3)), observerElevation: 0, eyeHeight: 1.7 };
+  const props = {
+    sunPosition: { azimuth: 180, altitude: 40 },
+    moonPosition: { azimuth: 120, altitude: 30, phase: 0.5, illumination: 1, visible: true },
+    sunPath: [],
+    moonPath: [],
+    timeOfDay: 'night' as const,
+    weatherType: 'clear' as const,
+    latitude: 51,
+    horizonProfile: profile,
+  };
+
+  it('maps a screen fraction back to the azimuth, in both hemispheres and in compass mode', () => {
+    expect(getAzimuthAtFraction(getAzimuthScreenFraction(250, 51), 51)).toBeCloseTo(250);
+    expect(getAzimuthAtFraction(getAzimuthScreenFraction(250, -33), -33)).toBeCloseTo(250);
+    expect(getAzimuthAtFraction(getCompassScreenFraction(10, 350).fraction, 51, 350)).toBeCloseTo(10);
+  });
+
+  it('opens the sun card with each tap, beside the egg count', () => {
+    const onSunTap = vi.fn();
+    const onSceneInfo = vi.fn();
+    render(<SunVisualization {...props} timeOfDay="midday" onSunTap={onSunTap} onSceneInfo={onSceneInfo} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Sun' }), { detail: 1, clientX: 400, clientY: 100 });
+    expect(onSunTap).toHaveBeenCalledTimes(1);
+    expect(onSceneInfo).toHaveBeenCalledWith({ type: 'sun' }, { x: 400, y: 100 }, 'sun');
+  });
+
+  it('makes the moon a button of at least 44 px that opens its card, also from the keyboard', () => {
+    const onSceneInfo = vi.fn();
+    render(<SunVisualization {...props} onSceneInfo={onSceneInfo} />);
+    const moon = screen.getByRole('button', { name: 'Moon' });
+    expect(moon.className).toContain('min-w-11');
+    expect(moon.className).toContain('min-h-11');
+    fireEvent.click(moon); // a keyboard click: no point, so the centre of the button
+    expect(onSceneInfo).toHaveBeenCalledWith({ type: 'moon' }, expect.objectContaining({ x: expect.any(Number) }), 'moon');
+  });
+
+  it('makes the terrain a button: a tap reads the azimuth under it, Enter picks the highest ridge', () => {
+    const onSceneInfo = vi.fn();
+    render(<SunVisualization {...props} onSceneInfo={onSceneInfo} />);
+    const terrain = screen.getByRole('button', { name: 'Terrain' });
+    expect(terrain.getAttribute('tabindex')).toBe('0');
+    fireEvent.click(terrain, { clientX: 400, clientY: 380 }); // the middle of 800 px: 180°
+    expect(onSceneInfo.mock.calls[0][0]).toEqual({ type: 'terrain', azimuth: 180 });
+    expect(onSceneInfo.mock.calls[0][1]).toEqual({ x: 400, y: 380 });
+    fireEvent.keyDown(terrain, { key: 'Enter' });
+    expect(onSceneInfo.mock.calls[1][0].azimuth).toBeCloseTo(100);
   });
 });
 

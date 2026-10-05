@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Download, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
+import { isInstalledApp } from '@/utils/installedApp';
 import { type MessageKey } from '@/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
 
@@ -20,9 +21,7 @@ const PWAInstallPrompt: React.FC = () => {
   // Both are plain reads of the current browser environment, so they're derived
   // during render instead of synced into state via an effect.
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
-                     (window.navigator as Navigator & { standalone?: boolean }).standalone ||
-                     document.referrer.includes('android-app://');
+  const isStandalone = isInstalledApp();
 
   useEffect(() => {
     if (isStandalone) {

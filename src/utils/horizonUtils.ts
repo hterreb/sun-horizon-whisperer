@@ -10,6 +10,11 @@ export interface HorizonProfile {
   angles: number[]; // length 360; horizon elevation angle in degrees for azimuth i°
   observerElevation: number; // terrain height at the observer, m
   eyeHeight: number; // m above ground
+  // The ridge point that gives each angle (ROADMAP item 95): its distance from the observer
+  // and its terrain height above sea level, both in whole m; null where no terrain data was
+  // found. Optional, so a hand-made test profile can leave them out.
+  ridgeDistances?: (number | null)[];
+  ridgeHeights?: (number | null)[];
 }
 
 // Returns the terrain elevation at (lat, lon) in metres, or null when no tile data
@@ -92,9 +97,12 @@ export const computeHorizonProfile = (
   const observerElevation = sample(lat, lon) ?? 0;
   const distances = logSpacedDistances();
   const angles: number[] = new Array(360);
+  const ridgeDistances: (number | null)[] = new Array(360);
+  const ridgeHeights: (number | null)[] = new Array(360);
 
   for (let az = 0; az < 360; az++) {
     let maxAngle = -Infinity;
+    let ridge: { distance: number; height: number } | null = null;
     let sawData = false;
 
     for (const distanceM of distances) {
@@ -105,7 +113,10 @@ export const computeHorizonProfile = (
 
       const heightDiffM = elevation - observerElevation - eyeHeight;
       const angle = elevationAngleDeg(heightDiffM, distanceM);
-      if (angle > maxAngle) maxAngle = angle;
+      if (angle > maxAngle) {
+        maxAngle = angle;
+        ridge = { distance: distanceM, height: elevation };
+      }
     }
 
     // No terrain data anywhere along this azimuth (e.g. a gap in the fetched tiles):
@@ -113,9 +124,11 @@ export const computeHorizonProfile = (
     // distance, rather than an arbitrary sentinel that would make the sun/moon search
     // treat the sky as wide open in that direction.
     angles[az] = sawData ? maxAngle : elevationAngleDeg(-eyeHeight, distances[0]);
+    ridgeDistances[az] = ridge ? Math.round(ridge.distance) : null;
+    ridgeHeights[az] = ridge ? Math.round(ridge.height) : null;
   }
 
-  return { angles, observerElevation, eyeHeight };
+  return { angles, observerElevation, eyeHeight, ridgeDistances, ridgeHeights };
 };
 
 // Linear interpolation between the two nearest whole-degree azimuth samples, wrapping
@@ -128,6 +141,15 @@ export const horizonAngleAt = (profile: HorizonProfile, azimuthDeg: number): num
   const a0 = profile.angles[i0];
   const a1 = profile.angles[i1];
   return a0 + (a1 - a0) * frac;
+};
+
+// The ridge point at the nearest whole-degree azimuth (ROADMAP item 95): its distance (m)
+// and its height above sea level (m), or null without ridge data.
+export const ridgeAt = (profile: HorizonProfile, azimuthDeg: number): { distance: number; height: number } | null => {
+  const i = Math.round(((azimuthDeg % 360) + 360) % 360) % 360;
+  const distance = profile.ridgeDistances?.[i];
+  const height = profile.ridgeHeights?.[i];
+  return distance == null || height == null ? null : { distance, height };
 };
 
 // Bennett (1982) atmospheric refraction, evaluated at the apparent altitude the body

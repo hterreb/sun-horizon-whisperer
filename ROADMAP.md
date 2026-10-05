@@ -1745,7 +1745,7 @@ Order: the fixes first (items 89–91). Item 91 measures a baseline, so items 92
 
 Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per frame on item 91's phone profile. For comparison, the clouds of item 84 added 0.25–0.30 ms.
 
-### 89. Faster fade when entering fullscreen — S
+### 89. Faster fade when entering fullscreen — S — **✅ Done**
 
 - **Feedback (2026-10-04):** "faster fade out, 10s is too much when switching to fullscreen, but ok if I activate it by clicking when already in full-screen mode".
 - **Now:** in fullscreen, `SunTracker` hides the cursor and the chrome (`showCursor`) after 10 s without a mouse move or a tap. Entering fullscreen starts the same 10 s timer. On a desktop the pointer moves a little after the click on the fullscreen button, and each move starts the 10 s again.
@@ -1755,8 +1755,9 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   3. After the first hide, a mouse move or a tap shows the chrome and hides it after 10 s, as today.
   4. Leaving fullscreen shows the chrome, as today.
 - **Done when:** a test with fake timers: enter → hidden at 3 s; a move at 2 s → hidden at 5 s; a tap after the hide → visible, hidden 10 s later. In the browser on a desktop and on a phone, the chrome fades 3 s after entering fullscreen.
+- **Built (2026-10-04):** the new hook `useIdleHide` (`src/hooks/useIdleHide.ts`) has the two constants and the rules 2–4. `SunTracker` (the cursor and the top-left buttons), `InfoPanel` and `MusicPlayer` use it. The panel and the radio had their own 10 s timers, which the spec did not name. Without the change, they faded 7 s after the rest. A move or a tap anywhere wakes the top-left buttons; the panel and the radio wake on a hover, a focus or a tap on them, as before. Tests: the three "Done when" cases for the hook and for `SunTracker`; the panel and radio tests now hide at 3 s (6 new tests, 960 in all). Lint and typecheck pass. Open: the check in the browser on a desktop and on a phone.
 
-### 90. Keep alive in the Android app: screen on, radio in the background — M
+### 90. Keep alive in the Android app: screen on, radio in the background — M — **✅ Done**
 
 - **Feedback (2026-10-04):** "keep alive in the android app". Decision: both, the screen and the background.
 - **Now:**
@@ -1769,6 +1770,11 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   3. **K3 Fast return:** save the time the app was last visible in `sessionStorage` (`last-visible`, with try/catch). When the page loads and that time is less than 30 min ago, skip the iris and use the `fade` reveal. When the system stopped the app fully, the app starts fresh, as today.
 - **Not in scope:** a "Keep screen on" switch. Add one when users ask for it; the power button still turns the screen off.
 - **Done when:** unit tests for `isInstalledApp` and for the K3 reveal choice. On an Android phone with the Play test build: the app open for 10 min without a touch → the screen stays on; the radio plays for 10 min with the screen off, and the lock screen shows the station with play, pause and next; 2 min in another app and back → no iris (this also checks that `sessionStorage` is still there after a reload by the system).
+- **Built (2026-10-04):**
+  - **K1:** `isInstalledApp()` (`src/utils/installedApp.ts`) replaces the display-mode check in `PWAInstallPrompt`, which now uses it too. It keeps the two other checks of `PWAInstallPrompt`: iOS `navigator.standalone` and an `android-app://` referrer (a page that the TWA opens). `SunTracker` calls `useWakeLock(isFullscreen || isInstalledApp())`. A desktop browser in fullscreen (F11 or the Fullscreen API) can also match `display-mode: fullscreen`. There the screen stays on and the install prompt does not show.
+  - **K2:** `MusicPlayer` sets the Media Session: the station name, "Sun Chaser" and the manifest's `any` icons (`icon-192.png`, `icon-512.png`) as metadata, `playbackState`, and the handlers `play`, `pause` and `nexttrack` (the function of the Next button). It clears them on unmount. `playStream` and `handleNext` are now `useCallback`s, so the handlers stay the same between renders.
+  - **K3:** `src/utils/fastReturn.ts`: `saveLastVisible` (on `visibilitychange` and `pagehide`), `loadLastVisible`, `isFastReturn` (less than 30 min ago, not in the future) and `getStartReveal`, the pure reveal choice. `SunTracker` reads the time once, at load.
+  - **Checked:** 14 new tests (974 in all): `isInstalledApp`, the K3 choice and storage, the Media Session on a fake session, and in `SunTracker` the wake lock in the installed app and the fade after a fast return. Lint, typecheck and build pass. Open: the phone checks of "Done when" on the Play test build.
 
 ### 91. Performance: measure, then fix the hot spots — M
 
@@ -1779,6 +1785,23 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   - **H3 Filters on moving things:** the jellyfish and squid halos (`drop-shadow`), the boat lights, the shark's blurred shadow and others are filters on moving elements. They repaint on every frame.
   - **H4 Canvas loops:** `SeaCanvas` (about 30 fps), `RainCanvas` and `NightStars` draw at up to 2× device pixels.
   - **H5 One large bundle:** the last local build has one JS chunk of 695 KB (before gzip). The easter eggs, the share card and the place search load at start.
+- **Baseline (2026-10-05, main d79d115):** `npm run perf:trace -- --runs 2`, headless Chrome 154 on an Apple Silicon Mac. Each value is the median of 2 runs of 60 s, because other jobs used the CPU at the same time. Script and Render (style + layout) and Main busy come from CDP `Performance.getMetrics`; Paint (PrePaint + Layerize on the main thread) and Off-main (compositor, viz and GPU threads) come from the trace. Values are ms per second. Phone = 390×844 @3x with 4× CPU throttle; desktop = 1280×800 @1x.
+
+  | Profile | Scene | Script | Render | Paint | Off-main | Main busy | Frame p95 ms | Frame max ms | Long tasks/min | Heap MB |
+  |---|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
+  | phone | day | 19 | 19 | 9 | 100 | 92 | 16.8 | 225 | 0 | 7.2 |
+  | phone | night | 100 | 12 | 8 | 135 | 176 | 16.8 | 17 | 0 | 10.2 |
+  | phone | rain | 45 | 25 | 11 | 117 | 138 | 16.7 | 100 | 0 | 7.7 |
+  | phone | fullscreen | 20 | 19 | 8 | 38 | 91 | 16.7 | 33 | 0 | 7.2 |
+  | desktop | day | 9 | 7 | 3 | 146 | 38 | 16.8 | 17 | 0 | 7.4 |
+  | desktop | night | 32 | 3 | 3 | 172 | 57 | 16.8 | 25 | 0 | 8.5 |
+  | desktop | rain | 27 | 9 | 5 | 191 | 70 | 16.7 | 17 | 0 | 8.4 |
+  | desktop | fullscreen | 11 | 8 | 4 | 73 | 48 | 16.8 | 17 | 0 | 7.7 |
+
+  - All scenes run at 60 FPS, and the p95 frame time already meets the targets. Headless Chrome does not wait for the GPU, so the GPU cost shows in Off-main and not in the frame times.
+  - Start bundle (`npm run build`): `index` JS 581.34 kB (190.11 kB gzip) + `workbox-window` 5.65 kB (2.20 kB gzip) = 586.99 kB (192.31 kB gzip). The share card (`modern-screenshot`, 22.22 kB) already loads later. CSS: 56.08 kB (11.24 kB gzip).
+  - **Hot spots (CPU profile, phone):** at night, the `NightStars` frame loop takes 73 ms/s of 176 ms/s. It sets `fillStyle` and `shadowBlur` for each star on every frame (60 fps), and `fill` and the GC add 18 ms/s more. By day, JS is small (about 16 ms/s): `SeaCanvas` (`drawImage`, `drawMirror`) 9 ms/s, React and the clock (`formatTime`) 4 ms/s. The glass is the largest cost by day: when fullscreen hides it, Off-main falls from 100 to 38 ms/s (phone) and from 146 to 73 ms/s (desktop).
+  - **Order by expected gain:** H2 (glass blur), then the `NightStars` loop (new; draw the stars to a cached layer and twinkle fewer of them, or at a lower rate), then H4 (`SeaCanvas`), H1 and H3. H5 changes only the start time.
 - **Spec:**
   1. **Measure first.** A script `scripts/perf-trace.mjs` (Playwright with the Chrome DevTools Protocol) opens fixed scenes with a stubbed forecast and a fixed clock: Ravensburg, clear by day with fish, boats and birds; at night with stars; in rain; in fullscreen idle. It runs each scene for 60 s at 390×844 with 4× CPU throttle (the phone profile) and at 1280×800 without throttle. It writes per second: scripting, rendering and painting time, the p95 frame time, long tasks and the JS heap. Run it on `main` and write the baseline into this item.
   2. **Fix the hypotheses in order, one commit each, and measure after each.** Keep a fix only when it gives a gain:
@@ -1790,7 +1813,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   3. No visual change: compare screenshots of each scene before and after.
 - **Done when:** the baseline and the numbers after each fix are in this item. Targets, to check against the baseline: on the phone profile at least 30 % less main-thread time per second and a p95 frame time of 33 ms or less; at 1280×800 a p95 frame time of 16.7 ms or less (60 fps); a start bundle at least 25 % smaller. All tests pass, and the screenshots show no difference. The trace script stays in `scripts/`, so items 92–97 can check their frame budget.
 
-### 92. No overlaps: fish, birds and boats plan their lanes — M
+### 92. No overlaps: fish, birds and boats plan their lanes — M — **✅ Done**
 
 - **Feedback (2026-10-04):** "fish & bird collision avoidance, at the moment some fish swim right at top of each other or at boats and birds can sometimes also fly directly at each other".
 - **Now:** every fish, bird and boat crosses from left to right at its own constant speed (the `moveAcrossX` CSS animation). Its height (`y`) is random at spawn, and nothing checks the others. A faster fish catches up with a slower one at the same height and swims through it. Near fish (67–93 % of the height) cross the boat hulls (67–87 %, 94 % in fullscreen). A gull (2.5 %/s) overtakes a heron (1.6 %/s) at the same height, and other birds fly through the hovering kestrel.
@@ -1804,8 +1827,10 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   4. Time-travel play (item 83) changes the rate of all animations by the same factor, so the plan holds, also backwards.
   5. Item 93's warm start places its first set with `findLane` too.
 - **Done when:** unit tests for `xAt` (linear and with a rest stop) and for `findLane` (a free height, a full band, a pair). A simulation test: 30 min of spawns with the real rules and a fixed seed → no two boxes touch, and the spawn rate drops by 15 % or less. In the browser at 390×844 and 1280×800, 10 min each by day and at night: no overlaps.
+- **Built (2026-10-04):** `src/utils/scenePaths.ts`: `xAt`, `findLane` and a scene clock that runs at the play rate of item 83, so the lanes hold in fast forward and in rewind. A rewind spawn plans its whole crossing. `getRestStopMotion` also returns its curve. The spawn rules moved from the `CloudLayer` effect into the pure `spawnTick`, so the simulation test runs the same code. Each fish, bird and boat stores its path. The boat box is the hull plus the calm reflection (70 %); the box of a shark or a pod is the whole svg. When no height is free, the spawn does not occur, and the gap clock does not move on: the next 500 ms check tries again. Simulation (30 min, seed 92, live): 0 touching boxes (43–130 without the plan); 2–10 % fewer spawns. On a 1280 px screen, item 70's ×3 caps fill the band with fish: boats spawn 8–69 % less often, mostly far ones. Item 93's lower caps reduce this to 0–20 % in most runs. The browser check is still open.
+- **Boats have the right of way (2026-10-05):** feedback: "i dont want 69% less boats, the fish should avoid the boats not the other way round". A boat takes a lane clear of the fish when there is one, else any lane clear of the other boats. The fish never stop a boat; new fish plan around it. Simulation (30 min): no fewer boats than without the plan; at most 3 fish meet a boat (fish that swam when a boat took a full band). Browser check at 1280×800 (2026-10-05): no overlaps of birds, of fish or of boats.
 
-### 93. A calmer sea that is full from the start — M
+### 93. A calmer sea that is full from the start — M — **✅ Done**
 
 - **Feedback (2026-10-04):** "sea is a bit crowded now, maybe too many fish, and it takes a while until it fills up, pitch some ideas how to circumnavigate".
 - **Now:** a phone shows at most 5 fish (3 at night), 3 boats and 4 birds. Turtles and jellyfish do not count against the fish limit. `getWaterLimit` grows the limits with the width (item 70): ×3 at 1280 px, so 15 fish, 9 boats and 12 birds. Everything enters at the left edge: the first fish comes after 5–8 s, the first boat after 5 s, and on a desktop it takes 4–5 min until animals are spread over the whole width.
@@ -1824,6 +1849,13 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Not picked:** S4 (a density setting) and S5 (both directions).
 - **Depends on:** item 92.
 - **Done when:** unit tests for the caps, the width growth and `getSceneDensity` (the curve, the lull range, the same value for the same seed). A simulation test: 1 s after load the sea has at least 60 % of its target; over a simulated day the mean number on screen follows the curve. In the browser at 390×844 and 1280×800: the sea is full at load and quieter than today.
+- **Built (2026-10-05):**
+  - **S2:** `MAX_FISH` 3, `MAX_NIGHT_FISH` 2, `MAX_BOATS` 2, `MAX_BIRDS` 4. `canSpawnFish` counts each fish, turtles and jellyfish included. The new `getSceneLimit` (`weatherEffectsUtils.ts`) grows the limits with the width up to ×1.5 (1280 px: 5 fish, 3 boats, 6 birds) and multiplies them by the density (rounded, at least 1). `getWaterLimit` stays for the waves and the foam of the sea canvas, so the water does not change.
+  - **S3:** `getSceneDensity` (`src/utils/sceneDensity.ts`): the curve (1 within 30 min of sunrise and sunset, 0.7 by day, 0.5 at night; polar day 0.7, polar night 0.5) times 1 − 0.4 × a lull. The lull is a seeded value per 10-minute step with straight lines between the steps. The seed is `getDaySeed` (the day and the place rounded to 0.1°), which `SkyClouds` now uses too. `SunTracker` passes the sun times through `SunVisualization` to `CloudLayer`; without them the density is 1. The density multiplies the limits and the spawn chances of fish, boats and birds. Nothing is removed when it goes down.
+  - **S1:** in `spawnTick`, a group (birds, fish, boats) that did not show at the last check fills to its limit at once: at load, and when the weather or the time lets it back (for example the fish after a storm). Each one gets a progress p of 0.1–0.9, a path that started p × duration ago, a height from `findLane`, and `animation-delay` −p × duration. CSS applies the rest-stop easing to the progress, so a resting fish starts on its curve. `CloudLayer` runs one check at mount, so the scene is full before the first 500 ms tick.
+  - **Fade-in (follow-up):** at load the scene's reveal covers the warm start. A group that starts later (after a storm, at dawn) fades in: each warm-started animal gets a second CSS animation, `sceneFadeIn` (opacity 0 to its own opacity, 2 s, ease-out). The crossing keeps its speed and delay. Only the end of `moveAcrossX` removes a fish, bird or boat (`endsCrossing`), so the fade's `animationend` does not.
+  - **Time-travel play (item 83):** no warm start during play; the 8× shorter gaps fill the scene. A rewind warm start is not needed and would not work: the playback hook starts each new animation at its end, which would overwrite the negative delay, and a rewind spawn must plan its whole crossing from its end. When play stops, the groups that show keep what they have.
+- **Checked:** 18 new tests (988 in all), lint and typecheck pass. Item 70's and item 65's limit tests now expect the new limits. The tests of the spawn loop pass `warmStart={false}`, so the scene starts empty as before. Simulation, seeds 1–10, live, density 1: 1 s after load the sea has 100 % of its target (390 px: 3 fish and 2 boats; 1280 px: 5 and 3; at night 2 and 2, 3 and 3). Over a simulated day (Friedrichshafen, 2026-10-05, phone) fish and boats on screen: 3.7 at sunrise and sunset, 2.4 by day, 1.3 at night; the hourly mean follows the density (r = 0.98). Item 92's simulation with the new limits (30 min, seeds 1–10): boats spawn −5 to 9 % less often with the lane plan at 390 px, and −15 to 18 % at 1280 px (item 92: 8–69 %). A negative value is more boats with the plan. The browser check is still open.
 
 ### 94. Shark hunt — M — lookbook first
 
@@ -1842,7 +1874,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Depends on:** item 92.
 - **Done when:** the lookbook is built and the picks are in this item. Then the spec, the build and the tests.
 
-### 95. Info cards: tap anything in the scene — L
+### 95. Info cards: tap anything in the scene — L — **✅ Done**
 
 - **Feedback (2026-10-04):** "clickable elements, get infos when you click on a boat, fish, bird, plane, satellite, cloud, the sun, the moon, the terrain". Free.
 - **Now:** the scene layer (`CloudLayer`) is `pointer-events-none`. Only the sun is a button: 7 taps give it sunglasses (hidden egg). The fish are 7–60 px wide, many smaller than a finger.
@@ -1862,6 +1894,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   5. **Accessibility:** the sun, the moon and the terrain are buttons with an `aria-label` and work with the keyboard. The moving things are pointer-only and `aria-hidden`.
   6. With `prefers-reduced-motion` there are no moving things, so only the sun, moon, cloud and terrain cards.
 - **Done when:** unit tests for the card content per type and for the ridge distance and height. Component tests: a tap on a fish opens its card; a tap outside closes it; the sun still counts 7 taps. In the browser at 390×844: each type can be tapped, the card stays inside the screen, and the frame budget holds (item 91).
+- **Built (2026-10-05):** `src/utils/sceneInfo.ts` returns the card rows per type as dictionary keys and formatted values; `SceneInfoCard` shows them. SunTracker keeps one card and passes `onSceneInfo` and the ring id down through `SunVisualization` to `CloudLayer` and `SkyClouds`. In `CloudLayer` only the render changed: each fish, bird and boat wrapper gets `pointer-events-auto`, `aria-hidden` and a hit area of at least 44 × 44 px with the ring inside. A cloud takes taps on its own box; its ring is a sibling in the glider, outside the blur. The sun keeps its egg count; the moon is a button of at least 44 px; the terrain path is a button (`role="button"`, Enter and Space pick the highest ridge on screen). `computeHorizonProfile` stores `ridgeDistances` and `ridgeHeights`; the cache key is now `v2`, so an old profile loads again once. Differences from the spec: the bird season is a word (all year, spring and summer, migration, autumn, at dusk), not months, so it holds in both hemispheres. A moonlit fish outside the moon pool is not visible but takes taps. With an overcast deck, a tap in the sky opens a cloud card, so only Escape, the timer or a tap on the sea closes the card. The browser check at 390×844 is still open.
 
 ### 96. Planes with contrails; live flight radar — L — Premium (the live radar)
 

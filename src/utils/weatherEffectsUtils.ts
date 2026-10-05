@@ -154,14 +154,12 @@ export const pickNightFish = (r: number): NightFishPick => pickWeighted(NIGHT_FI
 export const pickMoonlitDayFish = (r: number): FishKind =>
   pickWeighted(FISH_WEIGHTS.filter(([kind]) => MOONLIT_DAY_FISH.includes(kind)), r);
 
-// At most five fish on screen (E4), three at night (item 65, NR1). A school or a pair is
-// one entry. Turtles and jellyfish are not fish, so they neither count nor wait for a free place.
-export const MAX_FISH = 5;
-export const MAX_NIGHT_FISH = 3;
-const NOT_FISH: FishKind[] = ['turtle', 'jellyfish'];
+// At most three fish on screen, two at night (item 93, S2; it was five and three, E4 and
+// item 65, NR1). A school or a pair is one entry. Turtles and jellyfish count too (item 93).
+export const MAX_FISH = 3;
+export const MAX_NIGHT_FISH = 2;
 
-export const canSpawnFish = (onScreen: FishKind[], next: FishKind, max = MAX_FISH): boolean =>
-  NOT_FISH.includes(next) || onScreen.filter(kind => !NOT_FISH.includes(kind)).length < max;
+export const canSpawnFish = (onScreen: FishKind[], max = MAX_FISH): boolean => onScreen.length < max;
 
 // Birds & Skies lookbook (ROADMAP item 74). The share of day spawns (sums to 100); a pair,
 // a V, a line or a flock is one spawn.
@@ -205,12 +203,21 @@ export const getWaterSpeedFactor = (viewportWidth: number): number =>
 export const getWaterLimit = (base: number, viewportWidth: number): number =>
   Math.round(base / getWaterSpeedFactor(viewportWidth));
 
+// The limits of the fish, boats and birds (ROADMAP item 93, S2): they grow with the width as
+// getWaterLimit, but at most to 1.5 times the phone's limit, so a wide screen is calmer. The
+// sea canvas (waves, foam) keeps getWaterLimit. `density` is getSceneDensity (S3): it scales
+// the limit, rounded, at least 1.
+export const SCENE_LIMIT_MAX_GROWTH = 1.5;
+export const getSceneLimit = (base: number, viewportWidth: number, density = 1): number =>
+  Math.max(1, Math.round(base * Math.min(SCENE_LIMIT_MAX_GROWTH, 1 / getWaterSpeedFactor(viewportWidth)) * density));
+
 // Rest stop (P8): cruise at `speed`, slow to a stop over 3 s so that it stands still
 // `stopAt` along the path, hold for `holdSec`, speed up over 3 s and cruise on. Distances
 // are in % of the width, speed in % per second. Returns the crossing time and a CSS
 // `linear()` easing for the moveAcrossX animation, so the stop stays in CSS like every
 // other glide (no per-frame state). A constant slow-down is a quadratic path, sampled
-// every 0.5 s.
+// every 0.5 s. `curve` has the easing's points as [share of the time, share of the distance],
+// for the lane plan (item 92, xAt).
 const REST_RAMP_SEC = 3;
 
 export const getRestStopMotion = (distance: number, speed: number, stopAt: number, holdSec: number) => {
@@ -230,8 +237,9 @@ export const getRestStopMotion = (distance: number, speed: number, stopAt: numbe
     points.push([goAt + u, stop + speed * u * u / (2 * REST_RAMP_SEC)]);
   }
   points.push([duration, distance]);
-  const easing = `linear(${points.map(([t, s]) => `${(s / distance).toFixed(4)} ${(t / duration * 100).toFixed(2)}%`).join(', ')})`;
-  return { duration, easing };
+  const curve = points.map(([t, s]): [number, number] => [t / duration, s / distance]);
+  const easing = `linear(${curve.map(([p, s]) => `${s.toFixed(4)} ${(p * 100).toFixed(2)}%`).join(', ')})`;
+  return { duration, easing, curve };
 };
 
 // Stars behind clouds (ROADMAP item 52): the factor for star opacity. A measured cloud

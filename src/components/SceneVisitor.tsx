@@ -9,7 +9,7 @@ import { useId, type CSSProperties, type ReactNode } from 'react';
 export const VISITOR_GRID = 48; // one animal's width in grid units
 export const DOLPHIN_SPACING = 34; // grid units from one dolphin to the next in the pod
 const VIEW_TOP = -2;
-const VIEW_HEIGHT = 34;
+export const VISITOR_VIEW_HEIGHT = 34; // the svg's height in grid units
 
 const SHARK = {
   WL: 10.6,
@@ -34,6 +34,10 @@ const DOLPHIN = {
   eye: [35, 12.4],
   mouth: 'M41.8 14.1c-1.4.4-3 .4-4.4 0',
 };
+
+// How far the svg reaches above the waterline, in grid units (the lane plan of item 92).
+export const SHARK_ABOVE_WATER = SHARK.WL - VIEW_TOP;
+export const DOLPHINS_ABOVE_WATER = DOLPHIN.WL - VIEW_TOP;
 
 // The pod's fixed formation, the leader in front: each dolphin's [x, y] offset in grid units.
 const POD: Record<number, [number, number][]> = {
@@ -122,8 +126,8 @@ const SceneVisitor = ({ kind, tone, width, rolls = [0, 1.5] }: SceneVisitorProps
   const shadow = body(c.shadow, c.shadow);
   const svg = {
     width,
-    height: (VIEW_HEIGHT * width) / gridWidth,
-    viewBox: `0 ${VIEW_TOP} ${gridWidth} ${VIEW_HEIGHT}`,
+    height: (VISITOR_VIEW_HEIGHT * width) / gridWidth,
+    viewBox: `0 ${VIEW_TOP} ${gridWidth} ${VISITOR_VIEW_HEIGHT}`,
     'aria-hidden': true,
     // Lift the svg so the waterline sits at the top of the swimmer's box (its `y`).
     style: { display: 'block', marginTop: -(animal.WL - VIEW_TOP) * unit },

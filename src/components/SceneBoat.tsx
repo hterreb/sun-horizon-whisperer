@@ -9,7 +9,8 @@ import { getBoatReflection, UNKNOWN_SEA_WIND_KMH } from '../utils/waveUtils';
 const W = 64;
 const H = 37;
 // Drawn this wide, then scaled by CloudLayer, like the 48 px line icons before.
-const BOAT_WIDTH_PX = 48;
+export const BOAT_WIDTH_PX = 48;
+export const BOAT_HEIGHT_PX = (BOAT_WIDTH_PX * H) / W;
 
 type Role = 'line' | 'hull' | 'stripe' | 'cabin' | 'roof' | 'sail' | 'jib' | 'funnel' | 'cap' | 'flag'
   | 'window' | 'rower' | 'cargo-1' | 'cargo-2' | 'cargo-3' | 'cargo-4';
@@ -109,7 +110,7 @@ interface SceneBoatProps {
 const SceneBoat = ({ kind, tone, lit, wake, seaWindKmh = UNKNOWN_SEA_WIND_KMH }: SceneBoatProps) => {
   const id = useId().replace(/:/g, '');
   const boat = FLEET[kind];
-  const height = (BOAT_WIDTH_PX * H) / W;
+  const height = BOAT_HEIGHT_PX;
   // At dawn and in the evening the sails catch the peach light.
   const sail = tone === 'sun' ? [c('sun'), c('sun-deep')] : [c('white'), c('shade')];
   const gradients: [string, string, string, string][] = [

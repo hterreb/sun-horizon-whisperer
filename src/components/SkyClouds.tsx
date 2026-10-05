@@ -1,11 +1,11 @@
 import React, { memo, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { type WeatherType } from './CloudLayer';
+import { type SceneInfoHandler, type WeatherType } from './CloudLayer';
 import { type TimeOfDay, getBackgroundGradient, getWaterColors } from '@/utils/sunUtils';
 import { getCloudDriftDirection, getCloudMoonlight } from '@/utils/cloudLayoutUtils';
 import { CLOUD_SHAPES, getShaftStrands } from '@/utils/cloudShapes';
 import {
   type CloudGlider, type CloudLayers, type CloudLight, type SkyCloud,
-  getCloudCentre, getCloudFill, getCloudLayers, getCloudLight, getCloudShadowBox,
+  getCloudCentre, getCloudFill, getCloudLayers, getDaySeed, getCloudLight, getCloudShadowBox,
   getCloudShadowLook, getCloudTypes, getCloudVeil, getGliderOffset, getGliderStartProgress, getLightAngle,
   getRowOpacity, getRowSpan, getSceneScale, getSkyClouds, getSkyColorAt, getTimeOfDayAltitude,
 } from '@/utils/skyCloudUtils';
@@ -32,6 +32,9 @@ interface SkyCloudsProps {
   moon: { x: number; y: number; r?: number; light?: number } | null;
   skyGradient: string | null;
   egg: boolean; // an X1 day
+  // Info cards (ROADMAP item 95): a tap on a cloud, and the ring id of the open card.
+  onInfo?: SceneInfoHandler;
+  infoRing?: string | null;
 }
 
 // Blur of the soft edge (C4): 2.6 px at the cloud's own size, less for the thin high clouds.
@@ -53,12 +56,15 @@ interface CloudSvgProps {
   liningY?: number;
   liningR?: number;
   moonGlow: number;
+  onInfo?: SceneInfoHandler; // item 95: only the clouds of the shown layout take taps
+  ringId: string;
 }
 
 // One cloud. Memoized on plain values, so the once-a-second tick only redraws a cloud
 // whose light direction or silver lining changed.
 const CloudSvg = memo(function CloudSvg({
   cloud, gradId, weather, light, angle, skyGradient, height, width, rowLeft, liningX, liningY, liningR, moonGlow,
+  onInfo, ringId,
 }: CloudSvgProps) {
   const shape = CLOUD_SHAPES[cloud.type][cloud.variant];
   const span = rowLeft === undefined ? null : getRowSpan(rowLeft, cloud.scale, width, angle);
@@ -66,7 +72,8 @@ const CloudSvg = memo(function CloudSvg({
   const size = { width: 120 * cloud.scale, height: 60 * cloud.scale };
   return (
     <div
-      className="absolute"
+      className={onInfo ? 'absolute pointer-events-auto cursor-pointer' : 'absolute'}
+      onClick={onInfo && (event => onInfo({ type: 'cloud', cloudType: cloud.type, band: cloud.band }, { x: event.clientX, y: event.clientY }, ringId))}
       style={{
         left: cloud.x,
         top: cloud.y - 30 * cloud.scale,
@@ -158,6 +165,7 @@ interface Layout {
 
 const SkyClouds: React.FC<SkyCloudsProps> = ({
   weatherType, timeOfDay, date, latitude, longitude, cloudLayers, windDirectionDeg, sun, moon, skyGradient, egg,
+  onInfo, infoRing = null,
 }) => {
   const reduced = usePrefersReducedMotion();
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
@@ -170,7 +178,7 @@ const SkyClouds: React.FC<SkyCloudsProps> = ({
   const { width, height } = size;
 
   // The layout changes once a day, with the weather or with the screen, not every second.
-  const seed = `${date.toDateString()}|${Math.round(latitude * 10) / 10}|${Math.round(longitude * 10) / 10}`;
+  const seed = getDaySeed(date, latitude, longitude);
   const layers = getCloudLayers(weatherType, cloudLayers);
   const direction = getCloudDriftDirection(windDirectionDeg);
   const layoutKey = `${seed}|${weatherType}|${layers.low}|${layers.mid}|${layers.high}|${width}x${height}|${egg}|${direction}`;
@@ -280,23 +288,35 @@ const SkyClouds: React.FC<SkyCloudsProps> = ({
               const lining = moonPx && moonPx.r > 0 ? getCloudMoonlight({ ...centre, scale: cloud.scale }, moonPx) : null;
               // D1: a row is lit as one, toward the light seen from the screen's middle.
               const lit = row(glider) ? { x: width / 2, y: cloud.y } : centre;
+              const ringId = `cloud-${glider.id}-${j}`;
               return (
-                <CloudSvg
-                  key={j}
-                  cloud={cloud}
-                  gradId={`${uid}-${glider.id}-${j}`}
-                  weather={weather}
-                  light={light}
-                  angle={getLightAngle(lit, source)}
-                  skyGradient={sky}
-                  height={height}
-                  width={width}
-                  rowLeft={row(glider) ? Math.round(centre.x - 60 * cloud.scale) : undefined}
-                  liningX={lining ? quantize(lining.cx, LINING_STEP) : undefined}
-                  liningY={lining ? quantize(lining.cy, LINING_STEP) : undefined}
-                  liningR={lining ? quantize(lining.r, LINING_STEP) : undefined}
-                  moonGlow={moonGlow}
-                />
+                <React.Fragment key={j}>
+                  <CloudSvg
+                    cloud={cloud}
+                    gradId={`${uid}-${glider.id}-${j}`}
+                    weather={weather}
+                    light={light}
+                    angle={getLightAngle(lit, source)}
+                    skyGradient={sky}
+                    height={height}
+                    width={width}
+                    rowLeft={row(glider) ? Math.round(centre.x - 60 * cloud.scale) : undefined}
+                    liningX={lining ? quantize(lining.cx, LINING_STEP) : undefined}
+                    liningY={lining ? quantize(lining.cy, LINING_STEP) : undefined}
+                    liningR={lining ? quantize(lining.r, LINING_STEP) : undefined}
+                    moonGlow={moonGlow}
+                    onInfo={out ? undefined : onInfo}
+                    ringId={ringId}
+                  />
+                  {/* Item 95: the ring of the open card, outside the cloud's blur; the glide moves it. */}
+                  {!out && infoRing === ringId && (
+                    <span
+                      className="absolute rounded-full border border-white/70"
+                      style={{ left: cloud.x, top: cloud.y - 30 * cloud.scale, width: 120 * cloud.scale, height: 60 * cloud.scale }}
+                      data-testid="scene-info-ring"
+                    />
+                  )}
+                </React.Fragment>
               );
             })}
           </div>

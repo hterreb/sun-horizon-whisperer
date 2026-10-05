@@ -1,0 +1,69 @@
+<!doctype html>
+<!-- Privacy policy for the Play listing and the web app. Static, so it works without JS and outside the SPA (App.tsx serves only "/"). -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sun Chaser — Privacy Policy</title>
+  <meta name="description" content="How Sun Chaser handles your data: no accounts, no ads, no tracking.">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <style>
+    :root { color-scheme: light dark; --bg: #fff; --fg: #1a1a1f; --muted: #5b5b66; --accent: #c2410c; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #0f1016; --fg: #e8e8ee; --muted: #a0a0ad; --accent: #fb923c; } }
+    body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 system-ui, -apple-system, sans-serif; }
+    main { max-width: 42rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
+    h1 { font-size: 1.75rem; margin: 0 0 .25rem; }
+    h2 { font-size: 1.1rem; margin: 2rem 0 .5rem; }
+    p, li { margin: .5rem 0; }
+    .muted { color: var(--muted); }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Sun Chaser — Privacy Policy</h1>
+  <p class="muted">Last updated: 5 October 2026</p>
+
+  <p>Sun Chaser is made by Lutz Berreth (contact: <a href="mailto:lutz.berreth@gmail.com">lutz.berreth@gmail.com</a>). This policy applies to the Sun Chaser app on Google Play and to the web app at <a href="https://sun-chaser.vercel.app">sun-chaser.vercel.app</a>.</p>
+  <p><strong>Summary:</strong> Sun Chaser has no accounts, no ads and no tracking. We do not sell data.</p>
+
+  <h2>1. Location</h2>
+  <p>With your permission, the app reads your device location to calculate the sun and moon position. This calculation happens on your device. To get the weather and the name of your place, the app sends your coordinates, rounded to about 1 km, to:</p>
+  <ul>
+    <li><a href="https://open-meteo.com">Open-Meteo</a>: weather and forecast</li>
+    <li><a href="https://www.bigdatacloud.com">BigDataCloud</a>: place name</li>
+  </ul>
+  <p>For the line of sight to the horizon, the app downloads elevation tiles from Amazon Web Services (Mapzen Terrain Tiles). The tile names show your area to about 10 km.</p>
+  <p>You can deny location access and enter a place by hand instead.</p>
+
+  <h2>2. Place search</h2>
+  <p>When you search for a place, the text you type is sent to the Open-Meteo geocoding service to find matching places.</p>
+
+  <h2>3. Error reports and feedback</h2>
+  <p>The app uses <a href="https://sentry.io">Sentry</a> to report crashes and errors. A report contains technical data (app version, browser or device type, the error). It contains no name, no e-mail and no coordinates. If you send feedback in the app, the message is sent to Sentry without your name or e-mail.</p>
+
+  <h2>4. Radio</h2>
+  <p>If you turn on the radio, the audio is streamed from third-party internet radio stations. Like any web server, they receive your IP address.</p>
+
+  <h2>5. Data stored on your device</h2>
+  <p>The app saves your settings (language, temperature unit, manual location, compass) and caches weather and terrain data on your device. You can delete this data by clearing the app's storage or by uninstalling the app.</p>
+
+  <h2>6. Purchases</h2>
+  <p>In-app purchases are processed by Google Play. We do not receive your payment details.</p>
+
+  <h2>7. Legal basis and retention</h2>
+  <p>We process data to provide the app's functions (Art. 6(1)(b) GDPR) and to find and fix errors (legitimate interest, Art. 6(1)(f) GDPR). Sentry deletes error reports after at most 90 days. We do not create user profiles.</p>
+
+  <h2>8. Your rights</h2>
+  <p>Under the GDPR you have the right to access, correction, deletion, restriction and objection, and the right to complain to a data protection authority. Contact: <a href="mailto:lutz.berreth@gmail.com">lutz.berreth@gmail.com</a></p>
+
+  <h2>9. Children</h2>
+  <p>Sun Chaser is not directed at children under 13.</p>
+
+  <h2>10. Changes</h2>
+  <p>We will update this page when the app changes how it handles data.</p>
+
+  <p><a href="/">← Back to Sun Chaser</a></p>
+</main>
+</body>
+</html>

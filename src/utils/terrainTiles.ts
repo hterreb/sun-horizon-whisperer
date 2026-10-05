@@ -228,7 +228,9 @@ export const createElevationSampler = (
   };
 };
 
-const CACHE_KEY_PREFIX = 'terrain_horizon_profile_v1_';
+// v2 (ROADMAP item 95): the profile also holds the ridge distances and heights. A v1 entry
+// has none, so it is not read, and the profile loads again once.
+const CACHE_KEY_PREFIX = 'terrain_horizon_profile_v2_';
 
 const cacheKeyFor = (lat: number, lon: number, eyeHeight: number): string =>
   `${CACHE_KEY_PREFIX}${lat.toFixed(3)}_${lon.toFixed(3)}_${eyeHeight.toFixed(1)}`;
@@ -246,7 +248,9 @@ const getCachedProfile = (lat: number, lon: number, eyeHeight: number): HorizonP
     const raw = localStorage.getItem(cacheKeyFor(lat, lon, eyeHeight));
     if (!raw) return null;
     const entry: CachedProfileEntry = JSON.parse(raw);
-    if (!entry?.profile || !Array.isArray(entry.profile.angles) || entry.profile.angles.length !== 360) {
+    const complete = (list: unknown) => Array.isArray(list) && list.length === 360;
+    if (!entry?.profile || !complete(entry.profile.angles) ||
+        !complete(entry.profile.ridgeDistances) || !complete(entry.profile.ridgeHeights)) {
       return null;
     }
     return entry.profile;

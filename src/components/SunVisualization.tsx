@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { Sun, ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp, Mountain } from 'lucide-react';
-import { type SunPosition, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors, getReflectionFade } from '../utils/sunUtils';
+import { type SunPosition, type SunTimes, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors, getReflectionFade } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
 import { getSunArcLabels, getMoonArcLabels, getTerrainArcLabels, getTerrainMoonArcLabels, type ArcLabels, type ArcLabelPoint } from '../utils/arcLabels';
 import { shortestHeadingDelta } from '../utils/compassUtils';
 import { type HorizonProfile, horizonAngleAt } from '../utils/horizonUtils';
-import CloudLayer, { type WeatherType } from './CloudLayer';
+import CloudLayer, { type SceneInfoHandler, type WeatherType } from './CloudLayer';
 import Fireworks from './Fireworks';
 import SunSunglasses from './SunSunglasses';
 import CalendarEggs from './CalendarEggs';
@@ -61,6 +61,8 @@ interface SunVisualizationProps {
   cloudLayers?: CloudLayers | null;
   // A rare lenticular or mammatus day (ROADMAP item 84, X1).
   cloudEgg?: boolean;
+  // The day's sun times: the scene's busy and quiet phases follow them (ROADMAP item 93, S3).
+  sunTimes?: SunTimes | null;
   // Live compass mode (ROADMAP item 19): the current (smoothed) device heading, or
   // null/undefined for the static 360°-across-the-screen mode. When set, azimuths are
   // mapped through a real field of view centered on this heading (getCompassScreenFraction)
@@ -90,6 +92,9 @@ interface SunVisualizationProps {
   // Hidden sunglasses egg: the sun wears sunglasses; tapping the sun reports each tap to SunTracker.
   sunglasses?: boolean;
   onSunTap?: () => void;
+  // Info cards (ROADMAP item 95): a tap on anything in the scene, and the ring id of the open card.
+  onSceneInfo?: SceneInfoHandler;
+  infoRing?: string | null;
   // Today's calendar easter egg from SunTracker (utils/calendarEvents), or null.
   calendarEvent?: CalendarEvent | null;
   // Time-travel play from SunTracker (ROADMAP item 83): the scene follows it.
@@ -145,6 +150,24 @@ const resolveAzimuth = (
   compassHeading === null || compassHeading === undefined
     ? { fraction: getAzimuthScreenFraction(azimuth, latitude), visible: true }
     : getCompassScreenFraction(azimuth, compassHeading);
+
+// The inverse of resolveAzimuth (ROADMAP item 95): the azimuth at a screen fraction, for a
+// tap on the terrain.
+// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
+export const getAzimuthAtFraction = (fraction: number, latitude: number, compassHeading?: number | null): number => {
+  const azimuth = compassHeading === null || compassHeading === undefined
+    ? fraction * 360 + (latitude < 0 ? 180 : 0)
+    : compassHeading + (fraction - 0.5) * COMPASS_FOV_DEG;
+  return ((azimuth % 360) + 360) % 360;
+};
+
+// The tapped point of a click (ROADMAP item 95); a keyboard click has none, so the centre of
+// the element.
+const tapPoint = (event: React.MouseEvent<Element>): { x: number; y: number } => {
+  if (event.detail > 0) return { x: event.clientX, y: event.clientY };
+  const box = event.currentTarget.getBoundingClientRect();
+  return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+};
 
 // The 8 cardinal/intercardinal directions shown as static horizon labels (ROADMAP
 // item 8), always in clockwise order from North.
@@ -521,6 +544,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   rainMmH = null,
   cloudLayers = null,
   cloudEgg = false,
+  sunTimes = null,
   compassHeading = null,
   horizonProfile = null,
   terrainSunTimes = null,
@@ -532,6 +556,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   astroEvent = null,
   sunglasses = false,
   onSunTap,
+  onSceneInfo,
+  infoRing = null,
   calendarEvent = null,
   playDirection = 0
 }) => {
@@ -604,6 +630,29 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     const segments = buildTerrainSegments(horizonProfile, width, height, latitude, compassHeading);
     return buildTerrainFillPath(segments, horizonY);
   }, [horizonProfile, containerDimensions, latitude, compassHeading]);
+
+  // Info cards (item 95): the terrain's card for the azimuth at screen x (px in the container).
+  const openTerrainInfo = (x: number, point: { x: number; y: number }) => {
+    const { width } = containerDimensions;
+    if (width === 0) return;
+    onSceneInfo?.({ type: 'terrain', azimuth: getAzimuthAtFraction(x / width, latitude, compassHeading) }, point, 'terrain');
+  };
+  const handleTerrainTap = (event: React.MouseEvent<SVGPathElement>) => {
+    const box = containerRef.current?.getBoundingClientRect();
+    openTerrainInfo(event.clientX - (box?.left ?? 0), { x: event.clientX, y: event.clientY });
+  };
+  const handleTerrainKey = (event: React.KeyboardEvent<SVGPathElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    const { width, height } = containerDimensions;
+    if (!horizonProfile || width === 0) return;
+    const ridge = buildTerrainSegments(horizonProfile, width, height, latitude, compassHeading)
+      .flat()
+      .reduce<{ x: number; y: number } | null>((top, p) => (!top || p.y < top.y ? p : top), null);
+    if (!ridge) return;
+    const box = containerRef.current?.getBoundingClientRect();
+    openTerrainInfo(ridge.x, { x: (box?.left ?? 0) + ridge.x, y: (box?.top ?? 0) + ridge.y });
+  };
 
   const getSunPosition = () =>
     getScreenPosition(sunPosition.altitude, sunPosition.azimuth, containerDimensions.width, containerDimensions.height, latitude, compassHeading);
@@ -886,6 +935,9 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           : null}
         skyGradient={skyGradient}
         cloudEgg={cloudEgg}
+        sunTimes={sunTimes}
+        onInfo={onSceneInfo}
+        infoRing={infoRing}
       />
       <WeatherEffects
         weatherType={weatherType}
@@ -947,7 +999,11 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         <button
           type="button"
           aria-label={t('scene.sun')}
-          onClick={onSunTap}
+          // Each tap counts for the sunglasses egg; the first one also opens the sun's card (item 95).
+          onClick={event => {
+            onSunTap?.();
+            onSceneInfo?.({ type: 'sun' }, tapPoint(event), 'sun');
+          }}
           data-testid="sun-dot"
           className={`absolute rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 ${compassActive ? '' : 'transition-transform duration-1000'} ${getSunColor()} ${getGlowIntensity()} animate-glow`}
           style={{
@@ -1007,8 +1063,12 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       )}
 
       {isMoonDiscShown && (
-        <div
-          className={`absolute ${compassActive ? '' : 'transition-all duration-1000'}`}
+        // A button for the moon's info card (ROADMAP item 95), at least 44 px wide.
+        <button
+          type="button"
+          aria-label={t('scene.moon')}
+          onClick={event => onSceneInfo?.({ type: 'moon' }, tapPoint(event), 'moon')}
+          className={`absolute flex min-h-11 min-w-11 items-center justify-center rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 ${compassActive ? '' : 'transition-all duration-1000'}`}
           style={{
             left: `${moonX}px`,
             top: `${moonY}px`,
@@ -1029,7 +1089,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
               <MoonTint kind={astroEvent.kind} strength={astroEvent.strength} radius={moonRadius - 0.5} />
             )}
           </svg>
-        </div>
+        </button>
       )}
 
       <CalendarEggs
@@ -1054,9 +1114,17 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           // stars and a sun behind the ridge showed through. Drawn *before*
           // the sea (ROADMAP item 27), so the sea's wave crests sit on top of the
           // ridge's base instead of being covered by it.
+          // A button for the terrain's info card (item 95): a tap reads the azimuth under it; the
+          // keyboard picks the highest ridge on screen.
           <path
             d={terrainFillPath}
             fill={getRidgeColor()}
+            role="button"
+            tabIndex={0}
+            aria-label={t('scene.terrain')}
+            className="pointer-events-auto cursor-pointer focus-visible:outline-2 focus-visible:outline-white/70"
+            onClick={handleTerrainTap}
+            onKeyDown={handleTerrainKey}
             data-testid="terrain-silhouette"
           />
         )}

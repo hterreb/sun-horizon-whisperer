@@ -176,8 +176,13 @@ export interface SkyLayoutInput {
   direction: 1 | -1; // downwind: 1 drifts to the right
 }
 
+// The layout seed: the day and the place, rounded to 0.1°, so the sky stays the same all day.
+// The scene density (item 93) uses it too.
+export const getDaySeed = (date: Date, latitude: number, longitude: number): string =>
+  `${date.toDateString()}|${Math.round(latitude * 10) / 10}|${Math.round(longitude * 10) / 10}`;
+
 // FNV-1a and mulberry32, as the old cloud layout (item 10).
-const hashSeed = (input: string): number => {
+export const hashSeed = (input: string): number => {
   let hash = 0x811c9dc5;
   for (let i = 0; i < input.length; i++) {
     hash ^= input.charCodeAt(i);
@@ -185,7 +190,7 @@ const hashSeed = (input: string): number => {
   }
   return hash >>> 0;
 };
-const mulberry32 = (seed: number) => {
+export const mulberry32 = (seed: number) => {
   let a = seed;
   return (): number => {
     a = (a + 0x6d2b79f5) | 0;

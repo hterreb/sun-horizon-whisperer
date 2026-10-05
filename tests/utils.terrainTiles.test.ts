@@ -101,13 +101,15 @@ describe('terrainTiles', () => {
     const LON = 10.987;
     const EYE_HEIGHT = 1.7;
 
-    const cacheKey = `terrain_horizon_profile_v1_${LAT.toFixed(3)}_${LON.toFixed(3)}_${EYE_HEIGHT.toFixed(1)}`;
+    const cacheKey = `terrain_horizon_profile_v2_${LAT.toFixed(3)}_${LON.toFixed(3)}_${EYE_HEIGHT.toFixed(1)}`;
 
     it('returns the cached profile without fetching when one is stored', async () => {
       const cachedProfile: HorizonProfile = {
         angles: new Array(360).fill(-0.04),
         observerElevation: 500,
         eyeHeight: EYE_HEIGHT,
+        ridgeDistances: new Array(360).fill(200),
+        ridgeHeights: new Array(360).fill(500),
       };
       localStorage.setItem(cacheKey, JSON.stringify({ profile: cachedProfile, timestamp: Date.now() }));
 
@@ -174,6 +176,19 @@ describe('terrainTiles', () => {
         expect(second).toEqual(profile);
         expect((fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.length).toBe(fetchCallCount);
       });
+    });
+
+    it('does not read an old v1 entry without ridge data (ROADMAP item 95): it loads again', async () => {
+      const oldKey = cacheKey.replace('_v2_', '_v1_');
+      const oldProfile = { angles: new Array(360).fill(-0.04), observerElevation: 500, eyeHeight: EYE_HEIGHT };
+      localStorage.setItem(oldKey, JSON.stringify({ profile: oldProfile, timestamp: Date.now() }));
+      localStorage.setItem(cacheKey, JSON.stringify({ profile: oldProfile, timestamp: Date.now() }));
+      global.fetch = vi.fn(async () => {
+        throw new Error('network down');
+      }) as unknown as typeof fetch;
+
+      await expect(loadHorizonProfile(LAT, LON, EYE_HEIGHT)).rejects.toThrow();
+      expect(fetch).toHaveBeenCalled();
     });
 
     it('throws when every tile fails to load', async () => {
