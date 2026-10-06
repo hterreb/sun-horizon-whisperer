@@ -211,6 +211,10 @@ const VISITORS: FishKind[] = ['shark', 'dolphins'];
 const GLOWING_AT_NIGHT: FishKind[] = ['lanternfish', 'anglerfish', 'squid', 'jellyfish'];
 // P5: a minnow school's fixed formation, in minnow widths x 1.15, the leader in front.
 const SCHOOL_FORMATION: [number, number][] = [[0, 0], [-1.4, -0.9], [-1.6, 0.9], [-2.9, -0.1], [-3.1, 1.6], [-4.2, -1.1], [-4.5, 0.7]];
+// P6 (item 104): a pair keeps at least 1.5 fish widths of water between the lead's tail and
+// the second fish's nose, and the second fish swims at least 0.6 fish heights lower or higher.
+const PAIR_GAP = 1.5;
+const PAIR_DY = 0.6;
 
 interface FishEntity extends MovingEntity {
   kind: FishKind;
@@ -241,6 +245,7 @@ interface FishEntity extends MovingEntity {
 export const createFish = (
   kind: FishKind, sunDown: boolean, wet: boolean, viewportWidth: number, random = Math.random, night = false,
   atDepth?: number, // item 94: a shark's prey swims at the shark's depth
+  viewportHeight = window.innerHeight, // item 104: for the pair's minimum `dy`
 ): FishEntity => {
   const spec = FISH[kind];
   const light = night ? (GLOWING_AT_NIGHT.includes(kind) ? 'own' : 'moon') : undefined;
@@ -293,7 +298,13 @@ export const createFish = (
       (1 - 0.3 * depth) * (light ? 1 : 1 - 0.4 * spec.haze) * (wet ? 0.75 : 1),
     glow: sunDown && !night && !visitor && spec.pattern !== 'school' && random() < 0.35, // E1
     companion: spec.pattern === 'companions' && random() < 0.35 // P6
-      ? { lag: 2 + random() * 2, dy: (random() - 0.5) * 2.8 }
+      ? {
+          // Item 104: the lead swims `speed` % of the width per s, so after the first part of `lag`
+          // it is PAIR_GAP + 1 widths ahead: PAIR_GAP widths of water between the two fish.
+          lag: ((PAIR_GAP + 1) * (width / viewportWidth) * 100) / speed + random() * 2,
+          // Lower or higher by PAIR_DY heights (in % of the height, like `y`) plus 0-1.4 %.
+          dy: ((side: number) => Math.sign(side || 1) * (PAIR_DY * (height / viewportHeight) * 100 + Math.abs(side) * 2.8))(random() - 0.5),
+        }
       : undefined,
   };
 };
@@ -755,10 +766,10 @@ export const spawnTick = (
         const kind = pick === 'moonlit' ? pickMoonlitDayFish(random()) : pick;
         // Fish lit by the moon need the pool of moonlight (NR3), the sea visitors too (X5).
         if (GLOWING_AT_NIGHT.includes(kind) || rules.moonUp) {
-          newFish = createFish(kind, false, wetForFish, view.width, random, true);
+          newFish = createFish(kind, false, wetForFish, view.width, random, true, undefined, view.height);
         }
       } else {
-        newFish = createFish(rules.fishOverride ?? pickFish(random()), isSunDown, wetForFish, view.width, random);
+        newFish = createFish(rules.fishOverride ?? pickFish(random()), isSunDown, wetForFish, view.width, random, false, undefined, view.height);
       }
       if (!newFish) return undefined;
       const others = pathsOf(fish, ships);
