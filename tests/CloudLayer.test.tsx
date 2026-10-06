@@ -764,26 +764,27 @@ describe('lane planning (ROADMAP item 92)', () => {
   // of its crossing, as on its animationend. Without a plan, each thing keeps its random pick.
   const simulate = (rules: SpawnRules, plan: boolean) => {
     const random = seeded(92);
-    let scene: SceneEntities = { birds: [], fish: [], ships: [], leaves: [] };
-    const last = { birds: 0, fish: 0, ships: 5000 - 55000, leaves: 0 }; // the first boat after 5 s, as at mount
+    let scene: SceneEntities = { birds: [], fish: [], ships: [], leaves: [], planes: [] };
+    const last: SpawnTimes = { birds: 0, fish: 0, ships: 5000 - 55000, leaves: 0, planes: 0 }; // the first boat after 5 s, as at mount
     let spawns = 0;
     let boatSpawns = 0;
-    const touches = new Set<string>(); // fish-fish, boat-boat, bird-bird
+    const touches = new Set<string>(); // fish-fish, boat-boat, bird-bird (and planes, item 96)
     const water = new Set<string>(); // all water pairs, fish-boat included
     const dives = new Set<string>(); // item 94: the fish that dive under a boat
     for (let ms = 500; ms <= 30 * 60_000; ms += 500) {
       const t = ms / 1000;
       const onScreen = <T extends { path?: ScenePath }>(list: T[]) => list.filter(e => !e.path || t < endOf(e.path));
-      scene = { birds: onScreen(scene.birds), fish: onScreen(scene.fish), ships: onScreen(scene.ships), leaves: [] };
+      scene = { birds: onScreen(scene.birds), fish: onScreen(scene.fish), ships: onScreen(scene.ships), leaves: [], planes: onScreen(scene.planes) };
       const next = spawnTick(scene, last, rules, ms, t, random, plan ? findLane : candidate => candidate.y);
-      spawns += next.birds.length - scene.birds.length + next.fish.length - scene.fish.length + next.ships.length - scene.ships.length;
+      spawns += next.birds.length - scene.birds.length + next.fish.length - scene.fish.length + next.ships.length - scene.ships.length +
+        next.planes.length - scene.planes.length;
       boatSpawns += next.ships.length - scene.ships.length;
       scene = next;
       scene.fish.forEach(f => { if (f.dive !== undefined) dives.add(String(f.id)); });
       for (let dt = 0; dt < 0.5; dt += 0.1) {
         touching(scene.fish, t + dt, touches);
         touching(scene.ships, t + dt, touches);
-        touching(scene.birds, t + dt, touches);
+        touching([...scene.birds, ...scene.planes], t + dt, touches);
         touching([...scene.fish, ...scene.ships], t + dt, water);
       }
     }
@@ -826,7 +827,7 @@ describe('a calmer sea that is full from the start (ROADMAP item 93)', () => {
   const phone = { width: 390, height: 844 };
   const desktop = { width: 1280, height: 800 };
   const endOf = (p: ScenePath) => p.start + p.duration + (p.lag ?? 0);
-  const empty = (): SceneEntities => ({ birds: [], fish: [], ships: [], leaves: [] });
+  const empty = (): SceneEntities => ({ birds: [], fish: [], ships: [], leaves: [], planes: [] });
   // A check every 500 ms from `fromMs` on; a thing leaves at the end of its crossing.
   const run = (
     scene: SceneEntities, last: SpawnTimes, rulesAt: (ms: number) => SpawnRules, fromMs: number, toMs: number,
@@ -835,13 +836,13 @@ describe('a calmer sea that is full from the start (ROADMAP item 93)', () => {
     for (let ms = fromMs; ms <= toMs; ms += 500) {
       const t = ms / 1000;
       const onScreen = <T extends { path?: ScenePath }>(list: T[]) => list.filter(e => !e.path || t < endOf(e.path));
-      scene = { birds: onScreen(scene.birds), fish: onScreen(scene.fish), ships: onScreen(scene.ships), leaves: [] };
+      scene = { birds: onScreen(scene.birds), fish: onScreen(scene.fish), ships: onScreen(scene.ships), leaves: [], planes: onScreen(scene.planes) };
       scene = spawnTick(scene, last, rulesAt(ms), ms, t, random);
       onTick?.(scene, ms);
     }
     return scene;
   };
-  const freshTimes = (): SpawnTimes => ({ birds: 0, fish: 0, ships: 5000 - 55000, leaves: 0 });
+  const freshTimes = (): SpawnTimes => ({ birds: 0, fish: 0, ships: 5000 - 55000, leaves: 0, planes: 0 });
   const seaTarget = (r: SpawnRules) =>
     getSceneLimit(r.timeOfDay === 'night' ? MAX_NIGHT_FISH : MAX_FISH, r.view.width, r.density) + getSceneLimit(2, r.view.width, r.density);
 
@@ -1084,8 +1085,8 @@ describe('the shark hunt (ROADMAP item 94)', () => {
   });
   // One check with a fish due (the groups show already, so no warm start).
   const firstShark = (extra: Partial<SpawnRules>, seed: number) => {
-    const last: SpawnTimes = { birds: 1e9, fish: 0, ships: 1e9, leaves: 1e9, shown: { birds: true, fish: true, ships: true } };
-    const scene = spawnTick({ birds: [], fish: [], ships: [], leaves: [] }, last, rules(extra), 60_000, 60, mulberry32(seed));
+    const last: SpawnTimes = { birds: 1e9, fish: 0, ships: 1e9, leaves: 1e9, planes: 1e9, shown: { birds: true, fish: true, ships: true } };
+    const scene = spawnTick({ birds: [], fish: [], ships: [], leaves: [], planes: [] }, last, rules(extra), 60_000, 60, mulberry32(seed));
     return { scene, last, shark: scene.fish.find(f => f.kind === 'shark') };
   };
 
@@ -1147,10 +1148,10 @@ describe('the shark hunt (ROADMAP item 94)', () => {
     const fish = { ...createFish('carp', false, false, 390, mulberry32(1)), id: 7 };
     // A slow fish whose box covers the whole water: no boat lane is clear of it.
     const path: ScenePath = { start: 0, duration: 1000, x: 30, dx: 75, width: 5, y: 0, height: 100 };
-    const last = (): SpawnTimes => ({ birds: 1e9, fish: 1e9, ships: 0, leaves: 1e9, shown: { birds: true, fish: true, ships: true } });
+    const last = (): SpawnTimes => ({ birds: 1e9, fish: 1e9, ships: 0, leaves: 1e9, planes: 1e9, shown: { birds: true, fish: true, ships: true } });
     const lane = (candidate: { y: number }, others: readonly ScenePath[]) => (others.length ? null : candidate.y);
     const tick = (extra: Partial<SpawnRules>) => spawnTick(
-      { birds: [], fish: [{ ...fish, path }], ships: [], leaves: [] }, last(), rules({ fishOverride: null, ...extra }),
+      { birds: [], fish: [{ ...fish, path }], ships: [], leaves: [], planes: [] }, last(), rules({ fishOverride: null, ...extra }),
       200_000, 10, () => 0.3, lane,
     );
     const scene = tick({});
@@ -1208,7 +1209,8 @@ describe('the shark hunt (ROADMAP item 94)', () => {
   it('H3: the minnows move around the shark and back; no fish is eaten', () => {
     hunt('H3', container => {
       advance(700);
-      expect(hunted(container)).toHaveLength(0);
+      // No fish fades into a shark. (A fish that dives under a boat fades to 30 % and swims on.)
+      expect(hunted(container).filter(fish => fish.getAttribute('style')?.includes('sceneHuntFade'))).toHaveLength(0);
       const moving = [...container.querySelectorAll<HTMLElement>('[data-testid="scene-fish"]')]
         .filter(minnow => minnow.getAttribute('style')?.includes('sceneHuntShift'));
       expect(moving.length).toBeGreaterThanOrEqual(4);
@@ -1235,5 +1237,144 @@ describe('the shark hunt (ROADMAP item 94)', () => {
       expect(hunted(container)).toHaveLength(0);
       expect(container.querySelectorAll('[data-testid="hunt-fx"]')).toHaveLength(0);
     });
+  });
+});
+
+// ROADMAP item 96: planes and contrails (the free part), with the real spawn rules.
+describe('planes and contrails (ROADMAP item 96)', () => {
+  const phone = { width: 390, height: 844 };
+  const rules = (extra: Partial<SpawnRules> = {}): SpawnRules => ({
+    weatherType: 'clear', timeOfDay: 'midday', windSpeedKmh: 10, birdSpeedFactor: 1, showLeaves: false,
+    isFullscreen: false, moonUp: false, moonY: null, month: 10, latitude: 47.8, gapFactor: 1, rewind: false,
+    fishOverride: null, density: 1, view: phone, contrail: 'medium', ...extra,
+  });
+  const empty = (): SceneEntities => ({ birds: [], fish: [], ships: [], leaves: [], planes: [] });
+  // Only the planes: the other groups wait far in the future.
+  const times = (): SpawnTimes => ({ birds: 1e12, fish: 1e12, ships: 1e12, leaves: 1e12, planes: 0, shown: { birds: true, fish: true, ships: true } });
+  const firstPlaneAt = (extra: Partial<SpawnRules>, seed: number) => {
+    const last = times();
+    const random = mulberry32(seed);
+    let scene = empty();
+    for (let ms = 500; ms <= 10 * 60_000; ms += 500) {
+      scene = spawnTick(scene, last, rules(extra), ms, ms / 1000, random);
+      if (scene.planes.length > 0) return { ms, plane: scene.planes[0] };
+    }
+    return null;
+  };
+
+  it('sends a plane about every 3-6 min, high and far at 0.3-0.6 %/s, with the contrail of the forecast', () => {
+    for (let seed = 1; seed <= 10; seed++) {
+      const first = firstPlaneAt({}, seed)!;
+      expect(first.ms).toBeGreaterThan(180_000);
+      expect(first.ms).toBeLessThanOrEqual(360_500);
+      const { plane } = first;
+      expect(plane.y).toBeGreaterThanOrEqual(8);
+      expect(plane.y).toBeLessThanOrEqual(30);
+      const speed = plane.dx / plane.duration;
+      expect(speed).toBeGreaterThanOrEqual(0.3 * getWaterSpeedFactor(phone.width) - 1e-9);
+      expect(speed).toBeLessThanOrEqual(0.6 * getWaterSpeedFactor(phone.width) + 1e-9);
+      expect(plane.contrail).toBe('medium');
+      expect(plane.lifeSec).toBe(60);
+      expect(plane.trailLength).toBeCloseTo(speed * 60);
+      expect(plane.lights).toBeUndefined(); // by day the silhouette
+      expect(plane.path).toBeDefined(); // a lane, planned with the birds
+    }
+  });
+
+  it('shows no planes in fog, overcast, rain or a storm, and takes them away when the sky closes', () => {
+    for (const weatherType of ['fog', 'overcast', 'rain', 'storm'] as WeatherType[]) {
+      expect(firstPlaneAt({ weatherType }, 1)).toBeNull();
+    }
+    const { plane } = firstPlaneAt({}, 1)!;
+    const scene = spawnTick({ ...empty(), planes: [plane] }, times(), rules({ weatherType: 'overcast' }), 1000, 1, mulberry32(1));
+    expect(scene.planes).toHaveLength(0);
+  });
+
+  it('shows only the lights at night: a red or a green wing light', () => {
+    const { plane } = firstPlaneAt({ timeOfDay: 'night' }, 3)!;
+    expect(['red', 'green']).toContain(plane.lights);
+  });
+
+  it('takes the override contrail every 20 s; without the upper air, no contrail', () => {
+    const overridden = firstPlaneAt({ planeOverride: 'persistent' }, 4)!;
+    expect(overridden.ms).toBe(20_500);
+    expect(overridden.plane.contrail).toBe('persistent');
+    expect(overridden.plane.lifeSec).toBeGreaterThanOrEqual(300);
+    expect(overridden.plane.lifeSec).toBeLessThanOrEqual(600);
+    expect(firstPlaneAt({ contrail: undefined }, 4)!.plane.contrail).toBe('none');
+  });
+
+  it('counts a plane with a persistent trail only while it crosses', () => {
+    const { plane } = firstPlaneAt({ planeOverride: 'persistent' }, 5)!;
+    const crossed = { ...plane, path: { ...plane.path!, start: -1000 } }; // its crossing ended, its trail still fades
+    const last = { ...times(), planeGap: 0 };
+    const scene = spawnTick({ ...empty(), planes: [crossed, { ...crossed, id: 2 }] }, last, rules(), 1000, 1, mulberry32(5));
+    expect(scene.planes).toHaveLength(3);
+  });
+
+  // The component, with `?plane=…`: a plane every 20 s.
+  const planeScene = (search: string, props: Partial<React.ComponentProps<typeof CloudLayer>> = {}) => {
+    vi.useFakeTimers();
+    const randomSpy = vi.spyOn(Math, 'random').mockImplementation(mulberry32(96));
+    window.history.pushState({}, '', `/${search}`);
+    try {
+      const view = render(<CloudLayer warmStart={false} weatherType="clear" timeOfDay="midday" {...props} />);
+      act(() => { vi.advanceTimersByTime(21_000); });
+      return view;
+    } finally {
+      window.history.pushState({}, '', '/');
+      randomSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  };
+  const wrapperOf = (container: HTMLElement) =>
+    container.querySelector('[data-testid="scene-plane"]')!.closest<HTMLElement>('[style*="moveAcrossX"]')!;
+
+  it('draws a short or medium trail that moves with the plane, and removes the plane at the end of its crossing', () => {
+    const { container } = planeScene('?plane=medium');
+    expect(container.querySelectorAll('[data-testid="scene-plane"]')).toHaveLength(1);
+    const trail = container.querySelector<HTMLElement>('[data-testid="plane-trail"]')!;
+    expect(wrapperOf(container).contains(trail)).toBe(true); // the same animation moves it
+    expect(trail.style.background).toContain('linear-gradient');
+    expect(container.querySelectorAll('[data-testid="plane-trail-piece"]')).toHaveLength(0);
+    endAnimation(wrapperOf(container), 'moveAcrossX');
+    expect(container.querySelectorAll('[data-testid="scene-plane"]')).toHaveLength(0);
+  });
+
+  it('draws a persistent trail in pieces that grow with the plane and stay; the last fade removes the plane', () => {
+    const { container } = planeScene('?plane=persistent');
+    const pieces = [...container.querySelectorAll<HTMLElement>('[data-testid="plane-trail-piece"]')];
+    expect(pieces).toHaveLength(12);
+    const wrapper = wrapperOf(container);
+    const crossing = parseFloat(wrapper.style.animation.split(' ')[1]);
+    // Each piece grows while the plane passes it (a twelfth of the crossing), then spreads and fades.
+    const grow = pieces[11].parentElement!.style.animation;
+    expect(grow).toMatch(/^planeTrailGrow /);
+    expect(parseFloat(grow.split(' ')[1])).toBeCloseTo(crossing / 12);
+    expect(parseFloat(grow.split(' ')[3])).toBeCloseTo((crossing * 11) / 12);
+    expect(pieces[0].style.animation).toMatch(/^planeTrailSpread \d+(\.\d+)?s linear 0s both$/);
+    endAnimation(wrapper, 'moveAcrossX');
+    expect(container.querySelectorAll('[data-testid="plane-trail-piece"]')).toHaveLength(12); // the trail stays
+    endAnimation(pieces[0], 'planeTrailSpread');
+    expect(container.querySelectorAll('[data-testid="plane-trail-piece"]')).toHaveLength(12);
+    endAnimation(pieces[11], 'planeTrailSpread');
+    expect(container.querySelectorAll('[data-testid="plane-trail-piece"]')).toHaveLength(0);
+  });
+
+  it('shows only the lights at night, the strobe once every 2 s', () => {
+    const { container } = planeScene('?plane=none', { timeOfDay: 'night' });
+    expect(container.querySelectorAll('[data-testid="plane-wing-light"]')).toHaveLength(1);
+    expect(container.querySelector<HTMLElement>('[data-testid="plane-strobe"]')!.style.animation).toBe('planeStrobe 2s linear infinite');
+    expect(container.querySelector('[data-testid="scene-plane"] path')).toBeNull();
+    expect(container.querySelector('[data-testid="plane-trail"]')).toBeNull();
+  });
+
+  it('opens the card on a tap, with the contrail kind', () => {
+    const onInfo = vi.fn();
+    const { container } = planeScene('?plane=short', { onInfo });
+    const hit = wrapperOf(container).querySelector<HTMLElement>('[data-testid="scene-hit"]')!;
+    expect(parseFloat(hit.style.width)).toBeGreaterThanOrEqual(44);
+    fireEvent.click(hit, { clientX: 50, clientY: 80 });
+    expect(onInfo).toHaveBeenCalledWith({ type: 'plane', contrail: 'short' }, { x: 50, y: 80 }, expect.stringMatching(/^plane-/));
   });
 });

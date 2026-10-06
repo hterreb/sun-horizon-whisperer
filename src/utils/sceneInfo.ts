@@ -12,11 +12,13 @@ import { horizonAngleAt, ridgeAt, type HorizonProfile } from './horizonUtils';
 import { getCloudLayers, type CloudBand, type CloudLayers, type CloudType } from './skyCloudUtils';
 import { type BirdKind, type BoatKind, type FishKind } from './weatherEffectsUtils';
 import { type WeatherType } from '@/components/CloudLayer';
+import { type ContrailKind } from './planes';
 
 export type SceneInfoTarget =
   | { type: 'fish'; kind: FishKind }
   | { type: 'bird'; kind: BirdKind | 'bat' }
   | { type: 'boat'; kind: BoatKind }
+  | { type: 'plane'; contrail: ContrailKind }
   | { type: 'cloud'; cloudType: CloudType; band: CloudBand }
   | { type: 'sun' }
   | { type: 'moon' }
@@ -102,6 +104,11 @@ const BOATS: Record<BoatKind, { name: MessageKey; fact: MessageKey }> = {
   freighter: { name: 'boat.freighter', fact: 'boatFact.freighter' },
 };
 
+// Item 96: the contrail that the plane leaves in the upper air of the forecast.
+const CONTRAILS: Record<ContrailKind, MessageKey> = {
+  none: 'contrail.none', short: 'contrail.short', medium: 'contrail.medium', persistent: 'contrail.persistent',
+};
+
 const CLOUDS: Record<CloudType, MessageKey> = {
   Ci: 'cloud.Ci', Cs: 'cloud.Cs', Ac: 'cloud.Ac', As: 'cloud.As', Cu: 'cloud.Cu', Sc: 'cloud.Sc',
   St: 'cloud.St', Ns: 'cloud.Ns', Cb: 'cloud.Cb', Len: 'cloud.Len', Mam: 'cloud.Mam',
@@ -178,6 +185,15 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
       const boat = BOATS[target.kind];
       return { title: boat.name, lines: [{ value: { key: boat.fact } }] };
     }
+    case 'plane':
+      return {
+        title: 'plane.airliner',
+        lines: [
+          { value: { key: 'planeFact.airliner' } },
+          { label: 'info.altitude', value: { key: 'info.cruiseAltitude' } },
+          { label: 'info.contrail', value: { key: CONTRAILS[target.contrail] } },
+        ],
+      };
     case 'cloud': {
       const cover = getCloudLayers(ctx.weatherType, ctx.cloudLayers)[target.band];
       return {

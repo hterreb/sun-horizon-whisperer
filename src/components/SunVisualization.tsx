@@ -26,6 +26,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { formatNumber, type MessageKey } from '@/i18n';
 import { type Language } from '@/utils/language';
 import { type PlayDirection } from '@/utils/timeTravel';
+import { type ContrailKind } from '@/utils/planes';
 
 // A fixed fallback seed date for callers that don't pass one (e.g. existing tests) -
 // a stable constant, not `new Date()`, so it never changes identity across renders.
@@ -59,6 +60,8 @@ interface SunVisualizationProps {
   rainMmH?: number | null;
   // The current hour's cover per layer (ROADMAP item 84, C1); null: the weather type's own.
   cloudLayers?: CloudLayers | null;
+  // The planes' contrails from the forecast's upper air (ROADMAP item 96).
+  contrail?: ContrailKind;
   // A rare lenticular or mammatus day (ROADMAP item 84, X1).
   cloudEgg?: boolean;
   // The day's sun times: the scene's busy and quiet phases follow them (ROADMAP item 93, S3).
@@ -543,6 +546,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   windDirectionDeg = null,
   rainMmH = null,
   cloudLayers = null,
+  contrail = 'none',
   cloudEgg = false,
   sunTimes = null,
   compassHeading = null,
@@ -921,6 +925,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         latitude={latitude}
         longitude={longitude}
         cloudLayers={cloudLayers}
+        contrail={contrail}
         windSpeedKmh={windSpeedKmh}
         windDirectionDeg={windDirectionDeg}
         rainMmH={rainMmH}
