@@ -1992,7 +1992,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Depends on:** item 92; item 95 for the card.
 - **Done when:** unit tests for `getContrail`, the bearing and the elevation angle (known places), the dead reckoning, and the rounding of the place. In the browser with a stubbed feed: the planes show at the right direction and height, also in compass mode, and hide behind the terrain. With the real feed in Ravensburg: the directions match a flight-radar website within about 2°. The frame budget holds (item 91).
 
-### 97. Satellites at night; satellite tracking — L — Premium (the tracking)
+### 97. Satellites at night; satellite tracking — L — Premium (the tracking) — **✅ Done**
 
 - **Feedback (2026-10-04):** "satellites in the night, with satellite tracking". Decision: the tracking is Premium.
 - **Background:** a satellite is visible only when it is dark on the ground and the satellite is still in sunlight. That is mostly in the 1–2 h after dusk and before dawn. A satellite fades out when it enters the Earth's shadow.
@@ -2010,6 +2010,33 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   8. CSP: add `celestrak.org` to `connect-src`.
 - **Depends on:** item 95 for the card.
 - **Done when:** unit tests for the shadow test, the visibility rule and the pass search (against a known ISS pass from heavens-above.com, within 1 min and 2°). In the browser with a fixed clock on the evening of a known ISS pass: the ISS crosses at the right time and in the right direction, and fades into the shadow. The frame budget holds (item 91).
+- **Source check (2026-10-06):**
+  - **Endpoint:** `https://celestrak.org/NORAD/elements/gp.php?GROUP=<group>&FORMAT=json` returns OMM JSON. `stations`: 23 records (the docked modules POISK and NAUKA repeat the ISS orbit under their own ids). `visual`: 156. `last-30-days`: 170, 80 of them Starlink. About 145 kB in all.
+  - **CORS:** open. With `Origin: https://sun-chaser.vercel.app` the answer has `access-control-allow-origin: *`. No proxy is needed, also after the move to Cloudflare Pages.
+  - **Usage rules** (CelesTrak, "Why am I getting blocked"): CelesTrak checks for new GP data once every 2 h, so a client must not ask more often. On any answer other than HTTP 200 a client must stop: a 403 or 404 does not change on a repeat. More than 50 errors (301, 403 or 404) from one IP address in 2 h put the address in the firewall. Each browser has its own address, so one fetch per group per day is far below the limits.
+  - **satellite.js:** MIT. 7.1.0 reads OMM (`json2satrec`), but its index also loads its WebAssembly build, which has a top-level `await` that the Vite build cannot bundle. 6.0.2 (MIT, OMM through `json2satrec`, no WebAssembly) builds, so the app uses 6.0.2.
+  - **Reference passes:** heavens-above.com, ISS over Sydney, elements of 5 Oct 2026 (the same element set as the CelesTrak fixture). Ravensburg has only one visible pass in the next 10 days (15 Oct, 17° high), too far from the epoch for a test.
+- **Built (2026-10-06):**
+  - `satelliteData.ts`: one fetch per group, at most once in 24 h, cached in `localStorage` (`satellite-gp`) with only the fields SGP4 and the card need, one record per id and per orbit. After an error (not 200, or no network) the next try waits 2 h and the old data stays.
+  - `satelliteUtils.ts` (pure; satellite.js comes in as an argument, so the start chunk does not load it):
+    - Free dots: `getDotGapMs` (none with the sun at −6° or higher; a gap of 2–4 min in the 2 h after dusk and before dawn, 6–12 min in the middle of the night), `makeDotPath` (a straight line across the sky band, 0.1–0.3 %/s, one dot in three fades out over 8 s between 35 % and 70 % of its way), `isSatelliteWeather` (clear or partly cloudy).
+    - Tracking: `sunDirectionEcf` (the sun's azimuth and altitude from `sunUtils` as an Earth-fixed vector), `isInEarthShadow` (cylinder with the WGS 84 radius), `isSatelliteVisible` (above 10°, sun below −6°, in sunlight), the magnitude from the distance (ISS −1.8, others +3 at 1000 km) and the dot opacity from it (0.25–1), `getSkySatellites` (the visible ones, and for 6 s the ones that stop being visible, so they fade), `getCandidateSatellites` (all every 30 s; each second only the ones above −12°), `findNextPass` (20 s steps, bisection to 1 s, the top in 5 s steps), `getSatelliteDetails` and `getSatelliteCard`, and the reminder (`isPassReminderDue`, `getPassReminderText`).
+  - `useSatelliteTracking` (in `SunTracker`): the dynamic `import('satellite.js')` and the data load only while the tracking is on; the sky once per second of the app clock (time travel moves the satellites), nothing while the sun is above −6°, and nothing more than 3 days from the data's epoch. The next ISS pass every 5 min while the reminder is on. `useSatellitePassReminder`: item 69's notification (`showReminderNotification`, now shared with the sunset reminder) 10 min before the pass, once per pass.
+  - `Satellites.tsx`, first in `SunVisualization` (behind the clouds and everything else). Tracked satellites: a 44 px tap target with a 5 px dot for the ISS (soft glow) and 3 px for the others, the place by the sun and moon mapping (compass field of view included), hidden behind the terrain (`horizonAngleAt`). A transform transition of 1 s, linear (100 ms during play; none in compass mode or with reduced motion), and a 5 s opacity fade. Free dots: Web Animations on transform and opacity, so the compositor moves them; they follow item 83's play rate and spawn-gap factor; none with reduced motion. The layer's opacity is the stars' cloud factor (item 52).
+  - Card: "Satellite", the name, the altitude (km), the speed (km/s), "Into Earth's shadow" (in N min, now, or —) and the next pass (the time, with the weekday when it is not today).
+  - Panel: a "Satellite tracking" switch with the gold plus, above the language row, through `requirePremium`; saved as `satellite-tracking`, on by default. The Premium dialog text lists satellite tracking.
+  - CSP: `https://celestrak.org` in `connect-src` of `vercel.json` and `public/_headers`. 10 new texts in 5 languages.
+- **Deviations:**
+  - satellite.js 6.0.2, not 7.x (see the source check).
+  - The ISS reminder has no switch of its own: it comes while the sunset reminder (item 69) is on, which holds the notification permission, and the tracking is on.
+  - The free dots stop while the tracking shows real satellites, and come back when it has no data (off, loading, failed, or a time more than 3 days from the data).
+  - The "clear or partly cloudy" rule is for the free dots only; the tracked satellites are dimmed by the cloud factor alone.
+  - At the sun's −6° the tracked satellites go at once (no fade).
+- **Checked:**
+  - 51 new tests (1141 in all); lint, typecheck and build pass. The pass search against heavens-above (ISS, Sydney): start within 8 s, top and end within 8 s, the highest elevation within 1.7°, the start and end directions right, for 4 passes: a full pass (6 Oct 18:43 UTC), one that starts out of the Earth's shadow at 41° (7 Oct 17:59), one that starts out of the shadow at 24° (6 Oct 17:10), and one that ends in the shadow at 23° (7 Oct 09:47).
+  - In Chrome at 390 × 844 (built app, CelesTrak answered from the fixture data, clock set to Sydney 7 Oct 09:45:50 UTC): the ISS appears at 09:46:27 near the NW label at 10°, climbs about 1 px/s, and fades out at 09:47:53 at 23° (the Earth's shadow); 4 other satellites in the sky. Three requests to CelesTrak, one per group, and no console errors from the app.
+  - Bundle: the start chunk 645.9 → 658.9 kB (gzip 213.3 → 218.2 kB: the app code and the texts); satellite.js is a separate 24.1 kB chunk (gzip 11.8 kB), loaded only with the tracking on.
+  - Frame budget (`npm run perf:trace -- --scenes night --profiles phone --runs 2`; CelesTrak blocked there, so the free dots): main busy 174 → 187 ms/s (+0.22 ms per frame), script 78 → 82 ms/s, 60 fps, frame p95 16.7 → 16.8 ms. One frame of 67 ms in one run (the one-time load of the satellite.js chunk). Tracking on with 10 satellites in the sky (Ravensburg 6 Oct 20:30, 4× CPU, own script, 2 runs each): main busy about +23 ms/s (+0.38 ms per frame), within the 0.5 ms budget; noisy (the off runs differ by 29 ms/s).
 
 ---
 
