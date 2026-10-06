@@ -12,6 +12,7 @@ import { horizonAngleAt, ridgeAt, type HorizonProfile } from './horizonUtils';
 import { getCloudLayers, type CloudBand, type CloudLayers, type CloudType } from './skyCloudUtils';
 import { type BirdKind, type BoatKind, type FishKind } from './weatherEffectsUtils';
 import { type WeatherType } from '@/components/CloudLayer';
+import { type SatelliteCard } from './satelliteUtils';
 
 export type SceneInfoTarget =
   | { type: 'fish'; kind: FishKind }
@@ -20,7 +21,8 @@ export type SceneInfoTarget =
   | { type: 'cloud'; cloudType: CloudType; band: CloudBand }
   | { type: 'sun' }
   | { type: 'moon' }
-  | { type: 'terrain'; azimuth: number };
+  | { type: 'terrain'; azimuth: number }
+  | { type: 'satellite'; id: number; name: string };
 
 // A text from the dictionary; a var can be another dictionary text.
 export interface InfoText {
@@ -51,6 +53,8 @@ export interface SceneInfoContext {
   horizonProfile: HorizonProfile | null;
   weatherType: WeatherType;
   cloudLayers: CloudLayers | null;
+  // The tracked satellite's card values (item 97), for a satellite card only.
+  satellite?: SatelliteCard | null;
 }
 
 const FISH: Record<FishKind, { name: MessageKey; fact: MessageKey }> = {
@@ -154,6 +158,33 @@ const nextSunEvent = ({ now, sunTimes, terrainSunTimes }: SceneInfoContext): Inf
   return { value: { key: next.key, vars: { time: durationText(next.time.getTime() - now.getTime()) } } };
 };
 
+// "05:43" today, else "Wed 05:43".
+const dayTime = (time: Date, now: Date, language: Language): string =>
+  time.toDateString() === now.toDateString()
+    ? formatTime(time, language)
+    : `${new Intl.DateTimeFormat(language, { weekday: 'short' }).format(time)} ${formatTime(time, language)}`;
+
+// The satellite card (item 97): the name, the height, the speed, the time until it enters the
+// Earth's shadow ("now" when it is in the shadow) and the next pass.
+const satelliteLines = (name: string, ctx: SceneInfoContext): InfoLine[] => {
+  const { language, now } = ctx;
+  const details = ctx.satellite?.details ?? null;
+  const pass = ctx.satellite?.nextPass ?? null;
+  const shadow: InfoText | string = !details ? '—'
+    : !details.sunlit ? { key: 'info.now' }
+    : details.shadowInMs === null ? '—'
+    : { key: 'info.inTime', vars: { time: durationText(details.shadowInMs) } };
+  return [
+    { value: name },
+    ...(details ? [
+      { label: 'info.altitude' as const, value: { key: 'info.km' as const, vars: { value: formatNumber(language, Math.round(details.heightKm), 0) } } },
+      { label: 'info.speed' as const, value: { key: 'info.kmPerSecond' as const, vars: { value: formatNumber(language, details.speedKmS, 1) } } },
+    ] : []),
+    { label: 'info.toShadow', value: shadow },
+    { label: 'info.nextPass', value: pass ? dayTime(pass.start, now, language) : '—' },
+  ];
+};
+
 const goldenHour = ({ now, nextGoldenBlueHours, language }: SceneInfoContext): InfoText | string => {
   const window = nextGoldenBlueHours?.golden;
   if (!window) return '—';
@@ -232,6 +263,8 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
         ],
       };
     }
+    case 'satellite':
+      return { title: 'scene.satellite', lines: satelliteLines(target.name, ctx) };
   }
 };
 

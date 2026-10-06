@@ -51,6 +51,8 @@ import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { useSunsetCountdown, primeCountdownAudio } from '@/hooks/useSunsetCountdown';
 import { useSunsetReminder, requestReminderPermission, getNotificationPermission } from '@/hooks/useSunsetReminder';
 import { SUNSET_REMINDER_MIN } from '@/utils/sunsetReminder';
+import { useSatelliteTracking, useSatellitePassReminder } from '@/hooks/useSatelliteTracking';
+import { getSatelliteCard } from '@/utils/satelliteUtils';
 import { loadManualLocation, saveManualLocation, clearManualLocation } from '../utils/manualLocation';
 import {
   hasSeenCompassCalibrationHint,
@@ -83,6 +85,9 @@ const EYE_HEIGHT_STORAGE_KEY = 'eye-height-m';
 const SUNSET_COUNTDOWN_STORAGE_KEY = 'sunset-countdown';
 // Sunset reminder toggle (ROADMAP item 69), off by default.
 const SUNSET_REMINDER_STORAGE_KEY = 'sunset-reminder';
+// Satellite tracking toggle (ROADMAP item 97), on by default (Premium in the Play app).
+const SATELLITE_TRACKING_STORAGE_KEY = 'satellite-tracking';
+const SATELLITE_CARD_STEP_MS = 10_000;
 const DEFAULT_EYE_HEIGHT_M = 1.7;
 // Manual weather's strong-wind switch (ROADMAP item 73): above the 40 km/h strong-wind line.
 const MANUAL_STRONG_WIND_KMH = 50;
@@ -755,6 +760,45 @@ const SunTracker: React.FC = () => {
   }, [isReminderOn, t]);
   useSunsetReminder(countdownTarget?.time ?? null, isReminderOn && !isTimePreview, language);
 
+  // Satellite tracking (ROADMAP item 97): on by default; Premium in the Play app (item 45).
+  // It sends no place: the CelesTrak data is global. The ISS pass reminder uses the sunset
+  // reminder's switch and notification permission (item 69).
+  const [isSatelliteTrackingSaved, setIsSatelliteTrackingSaved] = useState(() => {
+    try {
+      return localStorage.getItem(SATELLITE_TRACKING_STORAGE_KEY) !== 'off';
+    } catch {
+      return true;
+    }
+  });
+  const isSatelliteTrackingOn = isSatelliteTrackingSaved && !premium.isLocked;
+  const handleSatelliteTrackingToggle = useCallback(() => {
+    const next = !isSatelliteTrackingOn;
+    setIsSatelliteTrackingSaved(next);
+    try {
+      localStorage.setItem(SATELLITE_TRACKING_STORAGE_KEY, next ? 'on' : 'off');
+    } catch (error) {
+      console.error('Error saving satellite tracking:', error);
+    }
+  }, [isSatelliteTrackingOn]);
+  const isPassReminderOn = isSatelliteTrackingOn && isReminderOn && !isTimePreview;
+  const satelliteTracking = useSatelliteTracking(
+    isSatelliteTrackingOn && location.loaded,
+    date,
+    location.latitude,
+    location.longitude,
+    sunPosition.altitude,
+    isPassReminderOn
+  );
+  useSatellitePassReminder(satelliteTracking.issPass, isPassReminderOn, language);
+  // The open card of a tracked satellite, updated every 10 s.
+  const cardSatelliteId = infoCard?.target.type === 'satellite' ? infoCard.target.id : null;
+  const satelliteCardStep = Math.floor(date.getTime() / SATELLITE_CARD_STEP_MS);
+  const satelliteCard = useMemo(() => {
+    const sat = satelliteTracking.satellites.find((s) => s.id === cardSatelliteId);
+    if (!sat || !satelliteTracking.lib) return null;
+    return getSatelliteCard(satelliteTracking.lib, sat, new Date(satelliteCardStep * SATELLITE_CARD_STEP_MS), location);
+  }, [cardSatelliteId, satelliteCardStep, satelliteTracking.lib, satelliteTracking.satellites, location]);
+
   // A manually picked weather ignores the real cloud cover: the sky, the stars and
   // the moon then follow the weather type alone (ROADMAP items 50, 52, 57).
   const cloudCover = useRealWeather ? weatherData?.cloudCoverPercent ?? null : null;
@@ -870,6 +914,7 @@ const SunTracker: React.FC = () => {
             infoRing={infoCard?.ring ?? null}
             calendarEvent={calendarEvent}
             playDirection={playDirection}
+            satellites={satelliteTracking.sky}
             sunsetCountdown={countdownSeconds === null ? null : { seconds: countdownSeconds, lineOfSight: !!countdownTarget?.lineOfSight }}
           />
           <InfoPanel
@@ -913,6 +958,8 @@ const SunTracker: React.FC = () => {
             horizonProfile={horizonProfile}
             isSunsetReminderOn={isReminderOn}
             onSunsetReminderToggle={notificationPermission === 'unsupported' ? undefined : handleReminderToggle}
+            isSatelliteTrackingOn={isSatelliteTrackingOn}
+            onSatelliteTrackingToggle={handleSatelliteTrackingToggle}
           />
         </>
       )}
@@ -944,6 +991,7 @@ const SunTracker: React.FC = () => {
             horizonProfile,
             weatherType,
             cloudLayers,
+            satellite: satelliteCard,
           })}
           x={infoCard.x}
           y={infoCard.y}

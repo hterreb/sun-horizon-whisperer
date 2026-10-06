@@ -6,6 +6,7 @@ import {
 } from '@/utils/sceneInfo';
 import { FISH_WEIGHTS, BIRD_WEIGHTS, type FishKind } from '@/utils/weatherEffectsUtils';
 import { type HorizonProfile } from '@/utils/horizonUtils';
+import { formatTime } from '@/utils/sunUtils';
 
 // ROADMAP item 95: the info card's content per type, read in English and German.
 const en: Translate = (key, vars) => translate('en', key, vars);
@@ -132,6 +133,28 @@ describe('sceneInfo (ROADMAP item 95)', () => {
     ]);
     // An old profile without ridge data: the direction and the angle only.
     expect(card({ type: 'terrain', azimuth: 10 }, { horizonProfile: { ...profile, ridgeDistances: undefined } })).toHaveLength(3);
+  });
+
+  it('gives a tracked satellite its name, height, speed, time to the shadow and next pass (item 97)', () => {
+    const pass = {
+      start: at('2026-10-05T12:30:00Z'), end: at('2026-10-05T12:35:00Z'), startAzimuth: 270, startElevation: 10,
+      endAzimuth: 135, endElevation: 10, maxElevation: 54, maxAt: at('2026-10-05T12:32:00Z'), inProgress: false,
+    };
+    const satellite = { details: { heightKm: 418.4, speedKmS: 7.66, sunlit: true, shadowInMs: 3 * 60_000 }, nextPass: pass };
+    expect(card({ type: 'satellite', id: 25544, name: 'ISS (ZARYA)' }, { satellite })).toEqual([
+      'Satellite', 'ISS (ZARYA)', 'Altitude: 418 km', 'Speed: 7.7 km/s', "Into Earth's shadow: in 3 min",
+      `Next pass: ${formatTime(pass.start, 'en')}`,
+    ]);
+    // In the shadow now, and the next pass on another day.
+    const tomorrow = { ...pass, start: at('2026-10-07T12:30:00Z') };
+    const shadowed = card({ type: 'satellite', id: 1, name: 'SL-8 R/B' }, {
+      language: 'de',
+      satellite: { details: { ...satellite.details, sunlit: false, shadowInMs: null }, nextPass: tomorrow },
+    }, de);
+    expect(shadowed).toContain('In den Erdschatten: jetzt');
+    expect(shadowed[shadowed.length - 1]).toBe(`Nächster Überflug: ${new Intl.DateTimeFormat('de', { weekday: 'short' }).format(tomorrow.start)} ${formatTime(tomorrow.start, 'de')}`);
+    // Without the values (no data yet): the name and dashes.
+    expect(card({ type: 'satellite', id: 1, name: 'X' })).toEqual(['Satellite', 'X', "Into Earth's shadow: —", 'Next pass: —']);
   });
 });
 

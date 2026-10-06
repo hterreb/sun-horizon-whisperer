@@ -15,11 +15,12 @@ export const requestReminderPermission = async (): Promise<boolean> => {
   return (await Notification.requestPermission()) === 'granted';
 };
 
-// Shows the reminder with the service worker (a tap opens or focuses the app, see
-// public/sw-notification-click.js), else with a page notification.
-const showSunsetReminder = async (sunset: Date, language: Language) => {
+// Shows a reminder with the service worker (a tap opens or focuses the app, see
+// public/sw-notification-click.js), else with a page notification. Also used by the ISS
+// pass reminder (item 97).
+export const showReminderNotification = async (body: string, tag: string) => {
   const title = 'Sun Chaser';
-  const options: NotificationOptions = { body: getReminderText(sunset, language), icon: '/icon-192.png', tag: 'sunset-reminder' };
+  const options: NotificationOptions = { body, icon: '/icon-192.png', tag };
   try {
     const registration = await navigator.serviceWorker?.getRegistration();
     if (registration) {
@@ -32,7 +33,7 @@ const showSunsetReminder = async (sunset: Date, language: Language) => {
       notification.close();
     };
   } catch (error) {
-    console.error('Error showing sunset reminder:', error);
+    console.error('Error showing a reminder:', error);
   }
 };
 
@@ -51,7 +52,7 @@ export const useSunsetReminder = (sunset: Date | null, active: boolean, language
     const check = () => {
       if (!isReminderDue(new Date(), target, shownKeyRef.current)) return;
       shownKeyRef.current = getReminderKey(target);
-      void showSunsetReminder(target, language);
+      void showReminderNotification(getReminderText(target, language), 'sunset-reminder');
     };
     const reminderMs = getReminderTime(target)!.getTime();
     const timeout = setTimeout(check, Math.max(0, reminderMs - Date.now()));

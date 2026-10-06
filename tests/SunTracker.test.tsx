@@ -33,6 +33,11 @@ vi.mock('@/hooks/use-toast', () => ({
 }));
 import { toast } from '@/hooks/use-toast';
 
+// Satellite tracking (ROADMAP item 97): no CelesTrak data unless a test gives it.
+vi.mock('../src/utils/satelliteData', () => ({ loadSatelliteData: vi.fn(async () => null) }));
+import { loadSatelliteData, type GpRecord } from '../src/utils/satelliteData';
+import issFixture from './fixtures/iss-omm-2026-10-05.json';
+
 describe('SunTracker', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -954,6 +959,57 @@ describe('SunTracker', () => {
       expect(card()).not.toBeNull();
       advance(15_000);
       expect(card()).toBeNull();
+    });
+  });
+  describe('satellites (ROADMAP item 97)', () => {
+    const SYDNEY = issFixture.reference.observer;
+    // The top of a known ISS pass (heavens-above, see the fixture).
+    const PASS_TOP = new Date(issFixture.reference.passes[0].max);
+    const flush = () => act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+
+    beforeEach(async () => {
+      // Loaded once here, so the app's dynamic import() resolves at once under fake timers.
+      await import('satellite.js');
+      vi.useFakeTimers();
+      vi.setSystemTime(PASS_TOP);
+      global.fetch = vi.fn(() => Promise.reject(new Error('offline'))) as unknown as typeof fetch;
+      saveManualLocation(SYDNEY.latitude, SYDNEY.longitude, 'Sydney');
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+      vi.mocked(loadSatelliteData).mockReset();
+      vi.mocked(loadSatelliteData).mockResolvedValue(null);
+    });
+
+    it('tracks by default: the ISS crosses the sky and has a card', async () => {
+      vi.mocked(loadSatelliteData).mockResolvedValue([issFixture.omm as unknown as GpRecord]);
+      // jsdom lays nothing out: give the scene a phone size, so the ISS gets a place on it.
+      vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(390);
+      vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(844);
+      render(<SunTracker />);
+      for (let i = 0; i < 3; i++) await flush();
+      expect(visProps.current?.satellites).toEqual([expect.objectContaining({ id: 25544, visible: true })]);
+      fireEvent.click(screen.getByRole('button', { name: 'ISS (ZARYA)' }));
+      const dialog = screen.getByRole('dialog', { name: 'Satellite' });
+      expect(dialog).toHaveTextContent('ISS (ZARYA)');
+      expect(dialog).toHaveTextContent(/Altitude\s*4\d\d km/);
+      expect(dialog).toHaveTextContent(/Speed\s*7\.\d km\/s/);
+      expect(dialog).toHaveTextContent('Next pass');
+    });
+
+    it('the switch turns the tracking off and saves it; then the decorative dots come back', async () => {
+      render(<SunTracker />);
+      await flush();
+      const toggle = screen.getByRole('switch', { name: 'Satellite tracking' });
+      expect(toggle).toHaveAttribute('aria-checked', 'true');
+      fireEvent.click(toggle);
+      expect(localStorage.getItem('satellite-tracking')).toBe('off');
+      expect(screen.getByRole('switch', { name: 'Satellite tracking' })).toHaveAttribute('aria-checked', 'false');
+      expect(visProps.current?.satellites).toBeNull();
+      expect(loadSatelliteData).toHaveBeenCalledTimes(1);
     });
   });
 });

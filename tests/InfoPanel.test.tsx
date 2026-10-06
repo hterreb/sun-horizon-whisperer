@@ -851,6 +851,30 @@ describe('InfoPanel: line of sight as an icon at the sun and moon rows (ROADMAP 
       expect(screen.queryByLabelText('Latitude')).not.toBeInTheDocument();
     });
 
+    it('has a satellite tracking switch with the gold plus (item 97), gated while locked', () => {
+      const value = premiumValue({});
+      const onToggle = vi.fn();
+      const { rerender } = render(
+        <PremiumContext.Provider value={value}>
+          <InfoPanel {...defaultProps} isSatelliteTrackingOn={false} onSatelliteTrackingToggle={onToggle} />
+        </PremiumContext.Provider>
+      );
+      const toggle = screen.getByRole('switch', { name: 'Satellite tracking' });
+      expect(toggle).toHaveAttribute('aria-checked', 'false');
+      expect(toggle.parentElement?.querySelector('[data-testid="premium-badge"]')).toBeInTheDocument();
+      fireEvent.click(toggle);
+      expect(value.requirePremium).toHaveBeenCalledWith(onToggle);
+      // Unlocked (the web, or after the purchase): the switch shows the state and toggles.
+      rerender(
+        <PremiumContext.Provider value={premiumValue({ isPremium: true, isLocked: false, requirePremium: (action) => action?.() })}>
+          <InfoPanel {...defaultProps} isSatelliteTrackingOn onSatelliteTrackingToggle={onToggle} />
+        </PremiumContext.Provider>
+      );
+      fireEvent.click(screen.getByRole('switch', { name: 'Satellite tracking' }));
+      expect(onToggle).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('switch', { name: 'Satellite tracking' })).toHaveAttribute('aria-checked', 'true');
+    });
+
     it('after a Play purchase the gold plus is gone and the score shows', () => {
       render(
         <PremiumContext.Provider value={premiumValue({ isPremium: true, isLocked: false })}>

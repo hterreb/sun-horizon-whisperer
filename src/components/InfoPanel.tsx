@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Wind, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward, Bell, BellRing, AlarmClock, AlarmClockCheck } from 'lucide-react';
+import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Wind, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward, Bell, BellRing, AlarmClock, AlarmClockCheck, Satellite } from 'lucide-react';
 import { isFeedbackAvailable, openFeedbackForm } from '@/utils/feedback';
 import { ScrollArea } from './ui/scroll-area';
+import { Switch } from './ui/switch';
 import { Button } from './ui/button';
 import LineOfSightDetails from './LineOfSightDetails';
 import PremiumBadge from './PremiumBadge';
@@ -133,6 +134,9 @@ interface InfoPanelProps {
   // passed when the browser has no Notification API.
   isSunsetReminderOn?: boolean;
   onSunsetReminderToggle?: () => void;
+  // Satellite tracking (ROADMAP item 97): the switch with the gold plus.
+  isSatelliteTrackingOn?: boolean;
+  onSatelliteTrackingToggle?: () => void;
 }
 
 const InfoPanel: React.FC<InfoPanelProps> = ({
@@ -176,6 +180,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   horizonProfile = null,
   isSunsetReminderOn = false,
   onSunsetReminderToggle,
+  isSatelliteTrackingOn = false,
+  onSatelliteTrackingToggle,
 }) => {
   const { t, language, setLanguage } = useLanguage();
   // Premium gate (ROADMAP item 14): every gold-plus control goes through requirePremium.
@@ -1194,6 +1200,22 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Satellite tracking (ROADMAP item 97): Premium in the Play app. */}
+          {onSatelliteTrackingToggle && (
+            <div className="mt-6 pt-4 border-t border-white/20 flex items-center justify-between gap-2" title={t('satellite.trackingHint')}>
+              <span className="text-caption opacity-80 inline-flex items-center gap-1">
+                <Satellite size={14} className="mr-1" />
+                {t('satellite.tracking')}
+                <PremiumBadge />
+              </span>
+              <Switch
+                checked={isSatelliteTrackingOn}
+                onCheckedChange={() => requirePremium(onSatelliteTrackingToggle)}
+                aria-label={t('satellite.tracking')}
+              />
+            </div>
+          )}
 
           {/* Language (ROADMAP item 67): the same segmented style as the °C/°F toggle. */}
           <div className="mt-6 pt-4 border-t border-white/20 flex items-center justify-between gap-2">
