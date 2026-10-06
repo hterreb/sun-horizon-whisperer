@@ -2096,6 +2096,13 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Built:** `SCENE_LIMIT_MAX_GROWTH` 2.5 (it was 1.5). `MAX_FISH` 5, `MAX_NIGHT_FISH` 3, `MAX_BOATS` 3, `MAX_BIRDS` 5. A lane change (item 102) keeps its old lane (`hold`) in the lane plan, and a boat that meets a fish on its old lane before the change makes it dive.
 - **Checked:** the limit tests updated, all tests pass. Simulation (30 min, seeds 1–5, mean on screen, 1512 px, density 0.55): birds 2.7 → 5.9, fish 2.9 → 6.8, boats 1.6 → 2.7. Phone at 0.55: birds 1.5 → 2.0, fish 1.8 → 2.8, boats 0.6 → 0.9. Boats still refill slowly (gap 55–115 s); not changed.
 
+### 104. More space between pair fish — S — [SUN-CHASER-Z](https://ainabler.sentry.io/issues/SUN-CHASER-Z) — **✅ Done**
+
+- **Feedback (2026-10-06):** "two fish that swim close together are a bit too close and should have a little more space inbetween them".
+- **Cause:** the second fish of a pair (P6) swam a fixed 2–4 s behind the lead and 0–1.4 % lower or higher. A fish swims slowly (0.4–1.2 % of the width per s, item 66). A near classic fish (20 px) on a phone moves 4.5 px per s, so after 2 s it was only 9 px ahead: the two fish touched or overlapped, and `dy` could be 0.
+- **Built:** `createFish` gets the lag from the fish's width and speed: at least `(PAIR_GAP + 1)` widths divided by the speed, plus 0–2 s. `PAIR_GAP` is 1.5, so 1.5 fish widths of water stay between the lead's tail and the second fish's nose. `dy` is at least `PAIR_DY` (0.6) fish heights, plus 0–1.4 %, with a random sign. `createFish` takes the scene height for this. The speeds and the paths do not change. The lane plan gets the new `lag` and `dy` as before (`fishLane`), so it keeps the whole pair free.
+- **Checked:** 1 new test: for a phone and a 1290 px screen and 6 random values, the gap is at least 1.5 widths and `|dy|` at least 0.6 heights. The P6 render test updated. Example: a near classic fish on a phone now swims about 11 s behind (50 px of water), at least 1.4 % lower or higher. The box simulation's boat check (item 92) now allows 15 % fewer boats, like the spawn check: with seeds 1–12 it failed in 10 of 12 runs before this change too, because both runs share one random stream. All tests pass.
+
 ---
 
 ## Ongoing — Easter eggs and special events (S each, pick any time)
