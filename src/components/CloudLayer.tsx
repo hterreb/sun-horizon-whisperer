@@ -33,7 +33,7 @@ import {
 import {
   getWeatherEffects, pickBoat, hasBoatWake, getBoatTone, type BoatKind,
   pickFish, canSpawnFish, getRestStopMotion, type FishKind,
-  pickNightFish, pickMoonlitDayFish, MAX_FISH, MAX_NIGHT_FISH, getWaterSpeedFactor, getSceneLimit, getFishOverride,
+  pickNightFish, pickMoonlitDayFish, isNightWater, MAX_FISH, MAX_NIGHT_FISH, getWaterSpeedFactor, getSceneLimit, getFishOverride,
   pickBird, isBirdInSeason, MAX_BIRDS, type BirdKind,
 } from '../utils/weatherEffectsUtils';
 import { getSeaWindKmh, getBoatReflection } from '../utils/waveUtils';
@@ -653,7 +653,7 @@ export const spawnTick = (
   const fishWeather = weatherType === 'clear' || weatherType === 'partly' || weatherType === 'cloudy' ||
                       weatherType === 'overcast' || weatherType === 'rain' || weatherType === 'drizzle';
   // Night fish (ROADMAP item 65, NR2) take over in nautical twilight, where the day fish stop.
-  const nightWater = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
+  const nightWater = isNightWater(timeOfDay);
   const shouldShowFish = fishWeather && !nightWater;
   const shouldShowNightFish = fishWeather && nightWater;
   const wetForFish = weatherType === 'rain' || weatherType === 'drizzle';
