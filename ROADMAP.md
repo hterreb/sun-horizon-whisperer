@@ -1830,6 +1830,31 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
      - H5: `React.lazy` for the easter eggs, the share card and the place search.
   3. No visual change: compare screenshots of each scene before and after.
 - **Done when:** the baseline and the numbers after each fix are in this item. Targets, to check against the baseline: on the phone profile at least 30 % less main-thread time per second and a p95 frame time of 33 ms or less; at 1280×800 a p95 frame time of 16.7 ms or less (60 fps); a start bundle at least 25 % smaller. All tests pass, and the screenshots show no difference. The trace script stays in `scripts/`, so items 92–97 can check their frame budget.
+- **New reference (2026-10-06, main f092dfc + the `--screenshots` flag):** items 92–95 merged after the baseline. Same setup, median of 2 runs of 60 s. The machine was quieter than on 2026-10-05, so the phone values are lower than the baseline for the same code; compare a fix only with runs on the same day.
+
+  | Profile | Scene | Script | Render | Paint | Off-main | Main busy | Frame p95 ms | Frame max ms | Long tasks/min | Heap MB |
+  |---|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
+  | phone | day | 15 | 9 | 5 | 72 | 59 | 16.8 | 17 | 0 | 8.8 |
+  | phone | night | 71 | 5 | 4 | 92 | 114 | 16.8 | 17 | 0 | 7.6 |
+  | phone | rain | 25 | 8 | 6 | 73 | 70 | 16.8 | 17 | 0 | 8.5 |
+  | phone | fullscreen | 11 | 4 | 2 | 19 | 38 | 16.7 | 17 | 0 | 6.4 |
+  | desktop | day | 15 | 14 | 6 | 239 | 69 | 16.7 | 17 | 0 | 8.4 |
+  | desktop | night | 53 | 5 | 4 | 259 | 92 | 16.8 | 17 | 0 | 12.5 |
+  | desktop | rain | 38 | 15 | 8 | 255 | 103 | 16.7 | 17 | 0 | 9.1 |
+  | desktop | fullscreen | 18 | 17 | 8 | 131 | 82 | 16.7 | 17 | 0 | 6.7 |
+
+  - Start bundle: `index` JS 643.20 kB (212.21 kB gzip) + `workbox-window` 5.65 kB (2.20 kB gzip) = 648.85 kB (214.41 kB gzip), 62 kB more than the baseline. CSS: 57.00 kB (11.36 kB gzip).
+  - **Frame budget of items 92–95:** the baseline build (d79d115) and main (f092dfc), back to back, 2 rounds each (main-thread ms/s, then ms per frame at 60 fps): phone day 39 → 34 (−0.08 ms), phone night 106 → 106 (0), desktop day 59 → 77 (+0.30 ms), desktop night 92 → 91 (0). The desktop-day value of main was 61 and 62 in two later sessions with the same day code, so the +0.30 ms is mostly noise. All within the 0.5 ms budget.
+  - **Noise:** between two runs of the same build, main busy varies by up to ±5 ms/s on the phone and ±15 ms/s on the desktop; desktop off-main varies by up to ±90 ms/s. A fix counts only when it beats that.
+- **Fixes (2026-10-06), each an A/B against main, back to back, 2 rounds (ms/s, median):**
+  - **H2 glass blur (dropped, Lutz's decision 2026-10-06: "Keep as is"):** the blur radius changes the look, so Lutz decided. Phone day off-main: 56 (12 px, now) → 46 (4 px) → 18 (no blur, the glass colour at 0.65 instead of 0.45). Desktop day off-main: 196 → 186 → 125. Main busy does not change (phone 37 → 35 → 33). Fullscreen idle does not change (the chrome is hidden, and a hidden glass costs nothing already). The screenshots (phone and desktop, day; `--screenshots`) went to Lutz with the question. Without blur the panel and the buttons are darker and show no frost over the fish and the waves.
+  - **NightStars sprite atlas (dropped):** each star drawn once to an atlas, then `drawImage` with `globalAlpha` (the same pixels: mean alpha difference 0.5 of 255). Script falls from 65 to 35 ms/s on the phone, but the canvas work moves out of script, and main busy stays the same (phone 104 → 104, desktop 92 → 108). Copying only the star's own square did not help either. A build that draws no stars has 31 ms/s at night on the phone: the 300 draw calls per frame cost about 73 ms/s, whatever the draw call.
+  - **NightStars twinkle at 30 fps (kept, Lutz's decision 2026-10-06: "Yes, 30 fps twinkle"):** the stars draw on every second frame; a shooting star still draws at 60 fps. Phone night main busy 104 → 71 (−32 %), desktop 92 → 72 (−22 %); off-main 86 → 73 and 252 → 207. A still frame looks the same; the twinkle moves in 30 steps per second instead of 60. With the atlas added, 30 fps gives no more gain (phone 73), so only the frame skip is in. Two new tests drive the loop at 60 Hz: 30 drawn frames per second, and every frame while a shooting star flies.
+  - **H4 SeaCanvas at 1× device pixels and 20 fps in fullscreen idle (dropped):** phone day main busy 37 → 34, fullscreen 35 → 32; off-main 56 → 54 and 18 → 18. Within the noise, and the sea is softer on a 3× screen.
+  - **H1 `React.memo` on `CloudLayer` (dropped):** the date to the minute and the object props memoized in `SunVisualization`. Phone day main busy 34 → 34, desktop 62 → 60: within the noise. The sun and moon positions already change only every 30 s (`sunStepKey`), so the 1 s render is small.
+  - **H3 filters on moving things (not tried):** without the glass, phone day off-main is 18 ms/s and main busy 33 ms/s; the profile shows no filter hot spot.
+  - **H5 `React.lazy` (dropped):** the easter eggs (`LunarDragon` 11.4 kB, `TemperatureIceberg` 5.4 kB, `CalendarEggs` 3.5 kB, `MidnightGhost`, `Fireworks`, `Ufo`, `DiscoSky`, `SunSunglasses`), the share card (6.5 kB) and the place search (2.7 kB) are about 36 kB of the 643 kB `index` chunk (6 %), less than the 10 % threshold. Larger parts: `react-dom` 129 kB and the five languages 79 kB (the four not shown are 64 kB, 10 %: loading only the shown language would reach the threshold).
+  - **Against "Done when":** p95 frame time ≤ 33 ms on the phone and 16.7–16.8 ms on the desktop: met. 30 % less main-thread time on the phone: met at night only (104 → 71 ms/s, −32 %); open by day, in rain and in fullscreen, where no kept fix gives a gain beyond the noise (the glass blur, the largest day cost, stays as is). Start bundle 25 % smaller: open; a possible later step is loading only the shown language (the four others are 64 kB, 10 % of the `index` chunk). Screenshots: the 30 fps twinkle shows the same still frame.
 
 ### 92. No overlaps: fish, birds and boats plan their lanes — M — **✅ Done**
 
@@ -1919,6 +1944,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   - **Deviations:** (1) the lookbook said "xAt finds a small fish" on screen. No fish on screen can meet a new shark (step 3), so the prey is planned and spawned with its shark. (2) The prey can be one fish above the fish limit. (3) No veering pair in H2: item 92's lanes already keep the other fish apart, and a veer would change their planned paths. (4) H4 and the dive have no blur and no darkening (step 5). (5) A dolphin pod or a shark can dive under a boat too: the item 92 simulation found a pod that met a boat. (6) The bubbles and the ripple scale with the shark (grid units), not the lookbook's fixed px.
   - **Item 92 follow-up:** the item 92 simulation now counts a fish–boat meeting only when the fish does not dive: 0 in all four scenes (it was "at most 3").
   - **Checked:** 31 new tests (1,074 in all); lint and typecheck pass. Test: `?fish=shark&hunt=H1` (… `H4`): every spawn a hunting shark with its prey; a far shark meets its prey after up to 6 min. The browser check (frame budget of item 91, the look at 390×844) is still open.
+- **Decision (2026-10-06):** the shark share stays at 1 in 200 fish ("the shark-share is fine i want this to be a rare occurance"). A phone sees about 1 hunt per 10 h of daylight.
 
 ### 95. Info cards: tap anything in the scene — L — **✅ Done**
 

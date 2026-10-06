@@ -5,6 +5,7 @@
 // Prints a markdown table and writes JSON to scripts/perf-results/ (gitignored).
 // Usage: npm run perf:trace -- [--seconds 60] [--runs 1] [--scenes day,night,rain,fullscreen]
 //          [--profiles phone,desktop] [--warmup 20] [--build] [--url URL] [--cpu-profile] [--headed]
+//          [--screenshots DIR]
 //
 // Sources of the numbers:
 // - Scripting, rendering (style + layout), main-thread busy time and JS heap: deltas of
@@ -33,6 +34,10 @@
 //
 // --cpu-profile records a CDP CPU profile in each run and serves an unminified build, so
 // that function names stay readable. It prints the top 10 functions and modules by self time.
+//
+// --screenshots DIR saves a PNG of each scene after its measured window (so it does not
+// change the numbers), named <profile>-<scene>-run<N>.png, to compare the look before and
+// after a change.
 import { spawn, execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import net from 'node:net';
@@ -74,7 +79,7 @@ const TRACE_CATEGORIES = ['devtools.timeline', 'toplevel']; // the disabled-by-d
 const parseArgs = (argv) => {
   const opts = {
     seconds: 60, warmup: 20, runs: 1, scenes: Object.keys(SCENES), profiles: Object.keys(PROFILES),
-    url: null, build: false, cpuProfile: false, headed: false, out: path.join(ROOT, 'scripts/perf-results'),
+    url: null, build: false, cpuProfile: false, headed: false, screenshots: null, out: path.join(ROOT, 'scripts/perf-results'),
   };
   for (let i = 0; i < argv.length; i++) {
     const [flag, inline] = argv[i].split('=', 2);
@@ -90,6 +95,7 @@ const parseArgs = (argv) => {
       case '--build': opts.build = true; break;
       case '--cpu-profile': opts.cpuProfile = true; break;
       case '--headed': opts.headed = true; break;
+      case '--screenshots': opts.screenshots = path.resolve(value()); break;
       default: throw new Error(`Unknown option ${argv[i]} (see the summary at the top of scripts/perf-trace.mjs)`);
     }
   }
@@ -414,7 +420,7 @@ const percentile = (values, p) => {
 
 const metricsOf = async (cdp) => Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map((m) => [m.name, m.value]));
 
-const measureScene = async (browser, browserCdp, appUrl, opts, profileName, sceneName) => {
+const measureScene = async (browser, browserCdp, appUrl, opts, profileName, sceneName, runIndex) => {
   const profile = PROFILES[profileName];
   const scene = SCENES[sceneName];
   const appOrigin = new URL(appUrl).origin;
@@ -483,6 +489,10 @@ const measureScene = async (browser, browserCdp, appUrl, opts, profileName, scen
       return { samples, pageStats, cpu, seconds: samples.at(-1).Timestamp - samples[0].Timestamp };
     });
     const checkEnd = await page.evaluate(sceneCheck);
+    if (opts.screenshots) {
+      mkdirSync(opts.screenshots, { recursive: true });
+      await page.screenshot({ path: path.join(opts.screenshots, `${profileName}-${sceneName}-run${runIndex}.png`) });
+    }
 
     const { samples, seconds } = result;
     const first = samples[0];
@@ -610,7 +620,7 @@ const main = async () => {
       for (const profileName of opts.profiles) {
         for (const sceneName of opts.scenes) {
           process.stdout.write(`run ${i}/${opts.runs}: ${profileName}/${sceneName} (${opts.seconds} s) … `);
-          const r = await measureScene(browser, browserCdp, app.url, opts, profileName, sceneName);
+          const r = await measureScene(browser, browserCdp, app.url, opts, profileName, sceneName, i);
           r.run = i;
           runs.push(r);
           const e = r.check.end;

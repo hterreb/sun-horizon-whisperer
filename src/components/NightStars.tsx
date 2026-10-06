@@ -34,6 +34,9 @@ const createStars = (width: number, height: number): Star[] =>
     brightness: Math.random(),
   }));
 
+// 30 fps, less 2 ms of slack, so a 60 Hz display draws on every second frame.
+const TWINKLE_FRAME_MS = 1000 / 30 - 2;
+
 const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition, weatherType = 'clear', cloudCoverPercent = null, shootingStarRate = 0.001 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const starsRef = useRef<Star[]>([]);
@@ -111,7 +114,26 @@ const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition, weathe
     }> = [];
 
     let animationFrameId: number;
-    const animate = () => {
+    let lastDraw = -Infinity;
+    const animate = (now = performance.now()) => {
+      // Occasionally create shooting stars (full night only, not in twilight)
+      if (timeOfDay === 'night' && Math.random() < shootingStarRate) {
+        shootingStars.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height * 0.3,
+          vx: (Math.random() - 0.5) * 8,
+          vy: Math.random() * 3 + 2,
+          life: 0,
+          maxLife: 30 + Math.random() * 20
+        });
+      }
+      // The stars twinkle slowly, so they draw at 30 fps (ROADMAP item 91); a frame
+      // with a shooting star always draws, so it keeps flying at 60 fps.
+      if (shootingStars.length === 0 && now - lastDraw < TWINKLE_FRAME_MS) {
+        animationFrameId = requestAnimationFrame(animate);
+        return;
+      }
+      lastDraw = now;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       const time = Date.now();
@@ -133,18 +155,6 @@ const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition, weathe
         ctx.fill();
         ctx.shadowBlur = 0;
       });
-
-      // Occasionally create shooting stars (full night only, not in twilight)
-      if (timeOfDay === 'night' && Math.random() < shootingStarRate) {
-        shootingStars.push({
-          x: Math.random() * canvas.width,
-          y: Math.random() * canvas.height * 0.3,
-          vx: (Math.random() - 0.5) * 8,
-          vy: Math.random() * 3 + 2,
-          life: 0,
-          maxLife: 30 + Math.random() * 20
-        });
-      }
 
       // Draw and update shooting stars
       shootingStars = shootingStars.filter(star => {
