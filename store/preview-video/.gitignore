@@ -1,0 +1,5 @@
+# Generated or third-party files: frame captures, renders, and Mixkit audio (licence forbids redistribution).
+frames/
+stills/
+audio/
+*.mp4

@@ -1,0 +1,338 @@
+<!doctype html>
+<!--
+  Sun Chaser · 30 s vertical ad (1080x1920, 30 fps).
+  All footage is the real app, captured frame by frame (frames/<shot>/NNNNN.jpg, see cap.mjs + shots.mjs).
+  Everything here is a pure function of time: window.renderAt(t) draws second t and resolves when
+  the images are decoded, so render.mjs can step it frame by frame. Opened normally, it plays in a loop.
+  Timeline is locked to Mixkit "Follow My Voice" (165 BPM) started at 6.49 s: the drop lands at 6.6 s.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sun Chaser Ad</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Instrument+Serif:ital@0;1&family=Shrikhand&display=block" rel="stylesheet">
+<style>
+  :root { --ink: #fff8ee; --gold: #ffd27a; --peach: #fec6a1; --night: #1a1f2c; --sky: #7dd3fc; }
+  html, body { margin: 0; background: #000; }
+  body { display: grid; place-items: center; min-height: 100vh; overflow: hidden; }
+  #stage { position: relative; width: 1080px; height: 1920px; overflow: hidden; background: #0d0f14;
+    font-family: 'Bricolage Grotesque', system-ui, sans-serif; color: var(--ink); transform-origin: center; }
+  #rig, .abs { position: absolute; inset: 0; }
+  img.full { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  #amb { position: absolute; left: -12%; top: -12%; width: 124%; height: 124%; object-fit: cover;
+    filter: blur(56px) saturate(1.35) brightness(.6); }
+  #phoneWrap { position: absolute; left: 244px; top: 520px; width: 592px; height: 1244px; }
+  #phone { position: absolute; inset: 0; border-radius: 90px;
+    background: linear-gradient(155deg, #4a4e59 0%, #15171c 30%, #0b0c0f 75%, #2b2e36 100%);
+    box-shadow: 0 90px 160px rgba(0,0,0,.55), 0 30px 60px rgba(0,0,0,.35), inset 0 0 0 2px rgba(255,255,255,.09); }
+  #screen { position: absolute; left: 16px; top: 16px; width: 560px; height: 1212px; border-radius: 74px; overflow: hidden; background: #000; }
+  #screen img { width: 100%; height: 100%; display: block; }
+  #glare { position: absolute; inset: 0; background: linear-gradient(118deg, rgba(255,255,255,.13) 0%, rgba(255,255,255,0) 30%); }
+  #punch { position: absolute; left: 50%; top: 22px; width: 24px; height: 24px; margin-left: -12px; border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #2a2f3a, #040406 60%); }
+  .key { position: absolute; right: -6px; width: 6px; border-radius: 0 4px 4px 0; background: linear-gradient(90deg, #1b1d22, #3a3d46); }
+  #loupe { position: absolute; overflow: hidden; border-radius: 22px; transform-origin: center;
+    box-shadow: 0 40px 80px rgba(0,0,0,.5), 0 0 0 3px rgba(255,210,122,.95); }
+  #loupe img { position: absolute; width: 560px; height: 1212px; }
+  #ring { position: absolute; border-radius: 999px; border: 5px solid var(--gold);
+    box-shadow: 0 0 30px rgba(255,210,122,.8), inset 0 0 18px rgba(255,210,122,.5); }
+  .t { position: absolute; left: 0; width: 1080px; text-align: center; white-space: nowrap; line-height: 1;
+    text-shadow: 0 8px 40px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.25); }
+  .mask { display: inline-block; overflow: hidden; padding: .12em .1em .18em; margin: -.12em -.1em -.18em; }
+  .mask > span { display: inline-block; }
+  .w { display: inline-block; }
+  .grot { font-weight: 800; letter-spacing: -.035em; }
+  .serif { font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400; letter-spacing: -.01em; }
+  .label { font-weight: 600; font-size: 38px; letter-spacing: .3em; text-transform: uppercase; opacity: .92; }
+  #clock { font-weight: 800; font-size: 200px; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+  #end { position: absolute; inset: 0; }
+  #rays { position: absolute; left: 540px; top: 840px; width: 2400px; height: 2400px; margin: -1200px 0 0 -1200px;
+    background: repeating-conic-gradient(rgba(255,236,190,.22) 0deg 6deg, rgba(255,236,190,0) 6deg 18deg);
+    -webkit-mask: radial-gradient(circle, #000 0%, rgba(0,0,0,.6) 25%, transparent 55%); mask: radial-gradient(circle, #000 0%, rgba(0,0,0,.6) 25%, transparent 55%); }
+  #logo { position: absolute; left: 320px; top: 620px; width: 440px; height: 440px;
+    filter: drop-shadow(0 30px 50px rgba(0,0,0,.35)); }
+  #word { font-family: 'Shrikhand', serif; font-size: 156px; letter-spacing: -.01em; }
+  #leak { position: absolute; width: 1800px; height: 1800px; border-radius: 50%; mix-blend-mode: screen;
+    background: radial-gradient(circle, rgba(255,190,110,.95) 0%, rgba(255,110,70,.55) 28%, rgba(255,80,60,0) 62%); }
+  #flash { background: #fff; }
+  #grain { mix-blend-mode: overlay; opacity: .16; background-size: 256px 256px; }
+  #vig { background: radial-gradient(ellipse 75% 60% at 50% 48%, transparent 55%, rgba(0,0,0,.45) 100%); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="rig">
+    <img id="full" class="full" alt="">
+    <img id="amb" alt="">
+    <div id="phoneWrap">
+      <div id="phone">
+        <div class="key" style="top:250px;height:110px"></div>
+        <div class="key" style="top:400px;height:170px"></div>
+        <div id="screen"><img id="scr" alt=""><div id="glare" class="abs"></div></div>
+      </div>
+    </div>
+    <div id="loupe"><img id="loupeImg" alt=""></div>
+    <div id="ring"></div>
+    <div id="texts"></div>
+    <div id="end">
+      <div id="rays"></div>
+      <img id="logo" src="../../public/logo-badge.svg" alt="Sun Chaser badge">
+    </div>
+  </div>
+  <div id="leak"></div>
+  <div id="flash" class="abs"></div>
+  <div id="grain" class="abs"></div>
+  <div id="vig" class="abs"></div>
+</div>
+<script>
+// ---------- time grid (165 BPM, drop at 6.6 s) ----------
+const FPS = 30, TOTAL = 30;
+const P = 60 / 165, DROP = 6.6, B = (n) => DROP + n * P;
+const S = { phone: B(-11), lapse: DROP, terrain: B(14), weather: B(23), golden: B(31), brk: B(39), mont: B(43), end: B(55) };
+const WEATHER = ['rain', 'storm', 'snow', 'fog'];
+const EGGS = ['aurora', 'fireworks', 'eclipse', 'sunglasses', 'ufo', 'disco'];
+// App UI positions (CSS px in the 390x844 app viewport, from measure.mjs) → stage px.
+const SX = (x) => 260 + x * 560 / 390, SY = (y) => 536 + y * 560 / 390;
+const LOUPE = { phone: { x: 100, y: 340, w: 282, h: 94 }, golden: { x: 100, y: 474, w: 282, h: 112 } };
+const CHIP = { x: 248, y: 370, w: 62, h: 22 }; // ⛰ 16:53 line-of-sight sunset chip, Hong Kong
+
+// ---------- easing ----------
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const prog = (t, a, d) => clamp((t - a) / d);
+const expoOut = (u) => (u >= 1 ? 1 : 1 - Math.pow(2, -10 * u));
+const backOut = (u, s = 1.7) => 1 + (s + 1) * Math.pow(u - 1, 3) + s * Math.pow(u - 1, 2);
+const easeIn = (u) => u * u * u;
+const inOut = (u) => (u < .5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
+const pad = (n) => String(n).padStart(2, '0');
+const frame = (shot, i, n) => `frames/${shot}/${String(clamp(Math.floor(i), 0, n - 1)).padStart(5, '0')}.jpg`;
+
+// ---------- text cues ----------
+// kind: slam (scale+blur punch per word), rise (masked slide up), fade.
+const T = [];
+const cue = (o) => T.push(o);
+cue({ s: .05, e: S.phone - .1, y: 175, cls: 'label', kind: 'fade', html: 'Santorini, Greece' });
+cue({ s: B(-18), e: S.phone, y: 330, size: 210, cls: 'grot', kind: 'slam', html: 'STOP', out: 'zoom' });
+cue({ s: B(-16), e: S.phone, y: 545, size: 186, cls: 'grot', kind: 'slam', html: 'MISSING', out: 'zoom' });
+cue({ s: B(-14), e: S.phone, y: 740, size: 270, cls: 'serif', kind: 'slam', html: 'sunsets.', color: 'var(--gold)', out: 'zoom' });
+cue({ s: S.phone + .2, e: B(-3), y: 215, size: 96, cls: 'grot', kind: 'rise', html: 'Know the exact' });
+cue({ s: S.phone + .32, e: B(-3), y: 320, size: 128, cls: 'serif', kind: 'rise', html: 'minute.', color: 'var(--gold)' });
+cue({ s: B(-3), e: DROP, y: 268, size: 132, cls: 'serif', kind: 'rise', html: 'Now watch this.', out: 'cut' });
+cue({ s: DROP + .05, e: S.terrain - .1, y: 175, cls: 'label', kind: 'fade', html: 'Fast-forward the sky' });
+cue({ s: S.terrain + .12, e: B(16.6), y: 210, size: 100, cls: 'grot', kind: 'rise', html: 'Mountains' });
+cue({ s: S.terrain + .24, e: B(16.6), y: 318, size: 100, cls: 'grot', kind: 'rise', html: 'in the way?' });
+cue({ s: B(17), e: S.weather, y: 230, size: 176, cls: 'serif', kind: 'slam', html: 'It knows.', color: 'var(--gold)', out: 'cut' });
+cue({ s: B(17.6), e: S.weather, y: 440, cls: 'label', kind: 'fade', html: 'Hong Kong · 16:53', out: 'cut' });
+cue({ s: S.weather + .04, e: S.golden - .08, y: 175, cls: 'label', kind: 'fade', html: 'Live weather, in the sky' });
+[['Rain.', 'London'], ['Storm.', 'Miami'], ['Snow.', 'New York'], ['Fog.', 'San Francisco']].forEach(([w, city], i) => {
+  cue({ s: S.weather + 2 * i * P, e: S.weather + 2 * (i + 1) * P, y: 270, size: 196, cls: 'grot', kind: 'slam', html: w, out: 'cut' });
+  cue({ s: S.weather + 2 * i * P + .08, e: S.weather + 2 * (i + 1) * P, y: 490, cls: 'label', kind: 'fade', html: city, out: 'cut' });
+});
+cue({ s: S.golden + .05, e: S.brk - .3, y: 140, cls: 'label', kind: 'fade', html: 'Paris' });
+cue({ s: S.golden + .1, e: S.brk - .3, y: 215, size: 96, cls: 'grot', kind: 'rise', html: 'Golden hour.' });
+cue({ s: S.golden + .45, e: S.brk - .3, y: 330, size: 128, cls: 'serif', kind: 'rise', html: 'Blue hour.', color: 'var(--sky)' });
+cue({ s: S.brk + .25, e: S.mont - .08, y: 620, size: 132, cls: 'serif', kind: 'fade', html: '…or just watch.', fadeIn: .6 });
+cue({ s: S.mont + .02, e: S.end - .05, y: 175, cls: 'label', kind: 'fade', html: 'Hidden in the sky', out: 'cut' });
+[['Auroras', '#7cffb2', 'Tromsø'], ['Fireworks', '#ff7ad9', 'Sydney'], ['Eclipses', '#ffd27a', 'Tokyo'], ['Easter eggs', '#fde047', 'Los Angeles'], ['UFOs?', '#7de7ff', 'Roswell'], ['Disco.', '#ff5ce1', 'Ibiza']].forEach(([w, c, city], i) => {
+  const y = w === 'UFOs?' ? 640 : 260, s = S.mont + 2 * i * P, e = S.mont + 2 * (i + 1) * P;
+  cue({ s, e, y, size: 176, cls: 'grot', kind: 'slam', html: w, glow: c, out: 'cut' });
+  cue({ s: s + .08, e, y: y + 215, cls: 'label', kind: 'fade', html: city, out: 'cut' });
+});
+cue({ s: S.end + .42, e: 99, y: 1130, cls: '', kind: 'rise', html: 'Sun Chaser', id: 'word' });
+
+const texts = document.getElementById('texts');
+for (const c of T) {
+  const el = document.createElement('div');
+  el.className = 't ' + c.cls;
+  if (c.id) el.id = c.id;
+  el.style.top = c.y + 'px';
+  if (c.size) el.style.fontSize = c.size + 'px';
+  if (c.weight) el.style.fontWeight = c.weight;
+  if (c.color) el.style.color = c.color;
+  if (c.glow) el.style.textShadow = `0 0 40px ${c.glow}, 0 0 90px ${c.glow}, 0 8px 30px rgba(0,0,0,.4)`;
+  el.innerHTML = c.kind === 'rise' ? `<span class="mask"><span>${c.html}</span></span>` : `<span class="w">${c.html}</span>`;
+  texts.append(el);
+  c.el = el; c.inner = c.kind === 'rise' ? el.querySelector('.mask > span') : el.firstElementChild;
+}
+
+function drawText(c, t) {
+  const on = t >= c.s && t < c.e;
+  c.el.style.display = on ? '' : 'none';
+  if (!on) return;
+  let op = 1, tf = '', blur = 0, inner = '';
+  const u = t - c.s;
+  if (c.kind === 'slam') {
+    const k = expoOut(prog(t, c.s, .34));
+    tf = `scale(${1 + .6 * (1 - k)})`; blur = 18 * (1 - k); op = prog(t, c.s, .06);
+  } else if (c.kind === 'rise') {
+    inner = `translateY(${110 * (1 - expoOut(prog(t, c.s, .55)))}%)`;
+  } else {
+    const k = expoOut(prog(t, c.s, c.fadeIn ?? .3));
+    op = k; tf = `translateY(${24 * (1 - k)}px)`;
+  }
+  const left = c.e - t;
+  if (c.out === 'zoom' && left < .3) { const k = easeIn(1 - left / .3); tf += ` scale(${1 + .5 * k})`; blur += 22 * k; op *= 1 - k; }
+  else if (!c.out && left < .2) { const k = 1 - left / .2; op *= 1 - k; tf += ` translateY(${-30 * k}px)`; }
+  c.el.style.opacity = op;
+  c.el.style.filter = blur > .2 ? `blur(${blur}px)` : 'none';
+  c.inner.style.transform = c.kind === 'rise' ? inner : tf;
+}
+
+// ---------- elements ----------
+const $ = (id) => document.getElementById(id);
+const full = $('full'), amb = $('amb'), scr = $('scr'), wrap = $('phoneWrap'), loupe = $('loupe'), loupeImg = $('loupeImg');
+const ring = $('ring'), rig = $('rig'), leak = $('leak'), flash = $('flash'), grain = $('grain'), end = $('end');
+const clockEl = document.createElement('div');
+clockEl.id = 'clock'; clockEl.className = 't'; clockEl.style.top = '240px';
+texts.append(clockEl);
+
+// Film grain: one noise tile, shifted every frame.
+{
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d'), d = g.createImageData(256, 256);
+  let s = 7; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < d.data.length; i += 4) { const v = 128 + (rnd() - .5) * 200; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 255; }
+  g.putImageData(d, 0, 0); grain.style.backgroundImage = `url(${c.toDataURL()})`;
+}
+
+const pending = [];
+function setSrc(img, src) {
+  if (!src) { img.style.visibility = 'hidden'; return; }
+  img.style.visibility = 'visible';
+  if (img.getAttribute('src') !== src) { img.src = src; pending.push(img.decode().catch(() => {})); }
+}
+
+// Decaying shakes and flashes at hits.
+const HITS = [[B(-18), 5], [B(-16), 5], [B(-14), 7], [DROP, 18], [S.mont, 9], [S.end, 7]];
+function shake(t) {
+  let x = 0, y = 0;
+  for (const [h, a] of HITS) if (t >= h && t < h + .5) { const k = a * Math.exp(-(t - h) * 9); x += k * Math.sin((t - h) * 83); y += k * Math.cos((t - h) * 71); }
+  return [x, y];
+}
+const FLASHES = [[DROP, .85, .22], [S.weather, .25, .12], [S.mont, .6, .18], [S.end, .7, .3], [S.brk, .3, .45]];
+const beatPulse = (t) => { const n = Math.floor((t - DROP) / P); const since = t - (DROP + n * P); return Math.exp(-since * 9); };
+
+// ---------- main ----------
+window.renderAt = async function renderAt(t) {
+  pending.length = 0;
+  const inPhone = (t >= S.phone && t < S.brk);
+  let fullSrc = null, scrSrc = null, phoneTf = '', phoneBlur = 0, fullTf = 'none', fullFilter = 'none';
+
+  // Full-bleed layer
+  if (t < S.phone) { fullSrc = frame('hook', t * FPS, 80); fullTf = `scale(${1 + .07 * t / S.phone})`; }
+  else if (t >= S.brk && t < S.mont) { const u = t - S.brk; fullSrc = frame('calm', u * FPS, 54); fullTf = `scale(${1 + .14 * (1 - expoOut(prog(u, 0, .7))) + .02 * u})`; }
+  else if (t >= S.mont && t < S.end) {
+    const i = Math.floor((t - S.mont) / (2 * P)), u = t - S.mont - i * 2 * P;
+    const ufo = EGGS[i] === 'ufo'; // the UFO is small, top left: start later in its flight and punch in toward it
+    fullSrc = frame(EGGS[i], (ufo ? 22 : 2) + u * FPS, ufo ? 60 : 24);
+    full.style.transformOrigin = ufo ? '8% 18%' : '50% 50%';
+    fullTf = `scale(${(ufo ? 1.3 : 1) + .16 * (1 - expoOut(prog(u, 0, .4)))})`;
+  } else if (t >= S.end) { fullSrc = frame('hook', 79, 80); fullTf = 'scale(1.12)'; fullFilter = 'blur(26px) brightness(.62) saturate(1.2)'; }
+
+  // Phone screen
+  if (inPhone) {
+    if (t < S.lapse) scrSrc = frame('phonein', (t - S.phone) * FPS, 126);
+    else if (t < S.terrain) scrSrc = frame('timelapse', (t - S.lapse) * FPS, 142);
+    else if (t < S.weather) scrSrc = frame('terrain', (t - S.terrain) * FPS, 100);
+    else if (t < S.golden) { const i = Math.floor((t - S.weather) / (2 * P)); scrSrc = frame(WEATHER[i], 6 + (t - S.weather - i * 2 * P) * FPS, 30); }
+    else scrSrc = frame('golden', (t - S.golden) * FPS, 80);
+
+    // Phone motion: fly-in, beat pulse, whips, punch-ins, zoom-through.
+    let x = 0, y = 0, rx = 0, ry = 0, s = 1;
+    const fi = prog(t, S.phone, .75);
+    y += 1300 * (1 - expoOut(fi)); rx += 28 * (1 - expoOut(fi)); s *= .92 + .08 * backOut(fi, 1.2);
+    if (t > B(-3) && t < DROP) s *= 1 + .05 * inOut(prog(t, B(-3), DROP - B(-3)));
+    if ((t >= DROP && t < S.brk)) s *= 1 + .014 * beatPulse(t);
+    for (const [h, k] of [[DROP, .07], [S.weather, .04], [S.weather + 2 * P, .04], [S.weather + 4 * P, .04], [S.weather + 6 * P, .04]])
+      if (t >= h && t < h + .4) s *= 1 + k * (1 - expoOut(prog(t, h, .4)));
+    for (const h of [S.terrain, S.golden]) {
+      if (t > h - .14 && t < h) { const k = easeIn(prog(t, h - .14, .14)); x -= 1300 * k; phoneBlur = 30 * k; ry = 14 * k; }
+      if (t >= h && t < h + .3) { const k = 1 - expoOut(prog(t, h, .3)); x += 1300 * k; phoneBlur = 30 * k; ry = -14 * k; }
+    }
+    if (t > S.brk - .32) { const k = easeIn(prog(t, S.brk - .32, .32)); s *= 1 + 1.6 * k; phoneBlur = 14 * k; }
+    phoneTf = `translate(${x}px,${y}px) perspective(2400px) rotateX(${rx}deg) rotateY(${ry}deg) scale(${s})`;
+  }
+
+  setSrc(full, fullSrc); setSrc(scr, scrSrc); setSrc(amb, inPhone ? scrSrc : null);
+  full.style.transform = fullTf; full.style.filter = fullFilter;
+  wrap.style.display = inPhone ? '' : 'none';
+  wrap.style.transform = phoneTf;
+  wrap.style.filter = phoneBlur > .3 ? `blur(${phoneBlur}px)` : 'none';
+
+  // Loupe: lift a real UI row out of the screen.
+  const lp = t >= S.phone + 1.75 && t < B(-3) ? ['phone', S.phone + 1.75, B(-3)] : t >= S.golden + .95 && t < S.brk - .3 ? ['golden', S.golden + .95, S.brk - .3] : null;
+  loupe.style.display = lp ? '' : 'none';
+  if (lp) {
+    const [key, a, e] = lp, r = LOUPE[key], k = backOut(prog(t, a, .45), 1.4), out = 1 - prog(t, e - .18, .18);
+    loupe.style.left = SX(r.x) + 'px'; loupe.style.top = SY(r.y) + 'px';
+    loupe.style.width = r.w * 560 / 390 + 'px'; loupe.style.height = r.h * 560 / 390 + 'px';
+    loupeImg.style.left = -SX(r.x) + 260 + 'px'; loupeImg.style.top = -SY(r.y) + 536 + 'px';
+    setSrc(loupeImg, scrSrc);
+    const cx = 540 - (SX(r.x) + r.w * 560 / 390 / 2);
+    loupe.style.transform = `translate(${cx * k}px, ${-60 * k}px) scale(${1 + .75 * k})`;
+    loupe.style.opacity = Math.min(prog(t, a, .08), out);
+  }
+
+  // Ring on the line-of-sight chip.
+  const ro = t >= B(17) && t < S.weather;
+  ring.style.display = ro ? '' : 'none';
+  if (ro) {
+    const k = expoOut(prog(t, B(17), .5)), pulse = 1 + .06 * Math.sin((t - B(17)) * 9);
+    const w = SX(CHIP.w) - 260 + 34, h = SY(CHIP.h) - 536 + 26;
+    ring.style.left = SX(CHIP.x) - 17 + 'px'; ring.style.top = SY(CHIP.y) - 13 + 'px';
+    ring.style.width = w + 'px'; ring.style.height = h + 'px';
+    ring.style.transform = `scale(${(2.2 - 1.2 * k) * pulse})`; ring.style.opacity = k;
+  }
+
+  // Time-lapse clock: app time = 18:20 + 600 × (frame + 4) × 110 ms (shots.mjs, cap.mjs).
+  const co = t >= DROP && t < S.terrain - .1;
+  clockEl.style.display = co ? '' : 'none';
+  if (co) {
+    const i = clamp(Math.floor((t - DROP) * FPS), 0, 141), sec = 18 * 3600 + 20 * 60 + 66 * (i + 4);
+    clockEl.textContent = `${Math.floor(sec / 3600)}:${pad(Math.floor(sec / 60) % 60)}`;
+    const k = expoOut(prog(t, DROP, .35));
+    clockEl.style.transform = `scale(${1.5 - .5 * k})`; clockEl.style.opacity = k;
+    clockEl.style.filter = k < .98 ? `blur(${14 * (1 - k)}px)` : 'none';
+  }
+
+  for (const c of T) drawText(c, t);
+
+  // End card
+  end.style.display = t >= S.end ? '' : 'none';
+  if (t >= S.end) {
+    const u = t - S.end, k = backOut(prog(u, .02, .55), 2.2);
+    $('logo').style.transform = `scale(${2.4 - 1.4 * k}) rotate(${-24 * (1 - k)}deg)`;
+    $('logo').style.opacity = prog(u, .02, .1);
+    $('rays').style.transform = `rotate(${u * 9}deg) scale(${.6 + .4 * expoOut(prog(u, 0, 1))})`;
+    $('rays').style.opacity = expoOut(prog(u, .1, .8));
+  }
+
+  // Global: shake, light leak, flashes, grain.
+  const [sx, sy] = shake(t);
+  rig.style.transform = `translate(${sx}px, ${sy}px)`;
+  let lk = 0, lx = 0;
+  for (const [h, d, a] of [[DROP - .1, .9, 1], [S.brk - .1, 1.2, .55], [S.end - .05, 1.1, .8], [S.phone - .1, .6, .45]]) {
+    if (t >= h && t < h + d) { const u = (t - h) / d; lk = Math.max(lk, a * Math.sin(Math.PI * u)); lx = -900 + 1900 * u; }
+  }
+  leak.style.opacity = lk; leak.style.transform = `translate(${lx}px, ${-200}px)`;
+  let fl = 0;
+  for (const [h, a, d] of FLASHES) if (t >= h && t < h + d) fl = Math.max(fl, a * (1 - (t - h) / d));
+  flash.style.opacity = fl;
+  const f = Math.floor(t * FPS);
+  grain.style.backgroundPosition = `${(f * 73) % 256}px ${(f * 151) % 256}px`;
+
+  await Promise.all(pending);
+};
+
+// Preview: loop in real time and fit the window (render.mjs sets ?rec and drives renderAt itself).
+if (!location.search.includes('rec')) {
+  const fit = () => { $('stage').style.transform = `scale(${Math.min(innerWidth / 1080, innerHeight / 1920)})`; };
+  fit(); addEventListener('resize', fit);
+  const t0 = performance.now();
+  const loop = () => { renderAt(((performance.now() - t0) / 1000) % TOTAL); requestAnimationFrame(loop); };
+  document.fonts.ready.then(loop);
+}
+window.__ready = true;
+</script>
+</body>
+</html>
