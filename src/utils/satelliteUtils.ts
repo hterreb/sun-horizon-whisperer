@@ -209,35 +209,49 @@ export interface SkySatellite extends SatelliteLook {
   opacity: number;
 }
 
+// Around the sun's -6° the scene does not cut the satellites off: they fade in and out by
+// opacity while the sun crosses this band, about 1 min at mid latitudes (Lutz, 2026-10-06).
+export const TWILIGHT_FADE: [number, number] = [-6.1, -5.9];
+// 1 with the sun below the band, 0 above it, linear in between.
+export const getTwilightFade = (sunAltitude: number): number =>
+  Math.min(1, Math.max(0, (TWILIGHT_FADE[1] - sunAltitude) / (TWILIGHT_FADE[1] - TWILIGHT_FADE[0])));
+
 // A satellite that was visible FADE_MS ago stays in the list (not visible), so the scene can
 // fade it out: into the Earth's shadow, or below 10°.
 export const FADE_MS = 6000;
 
+// The visibility rule for the scene: in the twilight band the sun part of the rule becomes
+// the fade (the opacity), so a satellite does not vanish at the sun's -6°.
+const isShownInScene = (look: SatelliteLook, sunAltitude: number): boolean =>
+  isSatelliteVisible({ elevation: look.elevation, sunAltitude: getTwilightFade(sunAltitude) > 0 ? SUN_MAX_ALTITUDE - 1 : sunAltitude, sunlit: look.sunlit });
+
 // The satellites the scene shows at `date`: the visible ones, and the ones fading out (with
-// `visible` false). Empty while the sun is above -6° (nothing is computed then).
+// `visible` false). The opacity includes the twilight fade. Empty while the sun is above the
+// twilight band (nothing is computed then).
 export const getSkySatellites = (lib: SatelliteLib, satellites: TrackedSatellite[], date: Date, observer: Observer): SkySatellite[] => {
   const snap = snapshot(date, observer);
-  if (snap.sunAltitude >= SUN_MAX_ALTITUDE) return [];
+  const fade = getTwilightFade(snap.sunAltitude);
+  if (fade === 0) return [];
   const before = new Date(date.getTime() - FADE_MS);
   let snapBefore: Snapshot | null = null;
   const wasVisible = (sat: TrackedSatellite): boolean => {
     snapBefore ??= snapshot(before, observer);
     const look = lookAtSatellite(lib, sat.satrec, before, observer, snapBefore.sunDirection);
-    return !!look && isSatelliteVisible({ elevation: look.elevation, sunAltitude: snapBefore.sunAltitude, sunlit: look.sunlit });
+    return !!look && isShownInScene(look, snapBefore.sunAltitude);
   };
   const result: SkySatellite[] = [];
   for (const sat of satellites) {
     if (!isNearEpoch(sat, date)) continue;
     const look = lookAtSatellite(lib, sat.satrec, date, observer, snap.sunDirection);
     if (!look || look.elevation <= 0) continue;
-    const visible = isSatelliteVisible({ elevation: look.elevation, sunAltitude: snap.sunAltitude, sunlit: look.sunlit });
+    const visible = isShownInScene(look, snap.sunAltitude);
     if (!visible && !wasVisible(sat)) continue;
     result.push({
       ...look,
       id: sat.id,
       name: sat.name,
       visible,
-      opacity: getSatelliteOpacity(getSatelliteMagnitude(sat.id, look.rangeKm)),
+      opacity: getSatelliteOpacity(getSatelliteMagnitude(sat.id, look.rangeKm)) * fade,
     });
   }
   return result;

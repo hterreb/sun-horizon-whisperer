@@ -27,7 +27,7 @@ import { formatNumber, type MessageKey } from '@/i18n';
 import { type Language } from '@/utils/language';
 import { PLAY_TICK_MS, type PlayDirection } from '@/utils/timeTravel';
 import Satellites, { type SatelliteDot } from './Satellites';
-import { ISS_NORAD_ID, getDotGapMs, isSatelliteWeather, type SkySatellite } from '@/utils/satelliteUtils';
+import { ISS_NORAD_ID, getDotGapMs, getTwilightFade, isSatelliteWeather, type SkySatellite } from '@/utils/satelliteUtils';
 import { type ContrailKind } from '@/utils/planes';
 
 // A fixed fallback seed date for callers that don't pass one (e.g. existing tests) -
@@ -943,6 +943,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         tracked={satelliteDots}
         gapMs={isSatelliteWeather(weatherType) ? getDotGapMs(date, sunPosition.altitude, sunTimes) : null}
         cloudFactor={getStarCloudFactor(weatherType, cloudCoverPercent)}
+        twilight={getTwilightFade(sunPosition.altitude)}
         stepMs={compassActive ? 0 : playDirection !== 0 ? PLAY_TICK_MS : 1000}
         playDirection={playDirection}
         onInfo={onSceneInfo}

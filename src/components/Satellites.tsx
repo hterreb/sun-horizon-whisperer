@@ -31,6 +31,9 @@ interface SatellitesProps {
   gapMs: [number, number] | null;
   // The stars' cloud factor (item 52).
   cloudFactor: number;
+  // The twilight fade of the decorative dots around the sun's -6° (0-1, getTwilightFade);
+  // the tracked dots have it in their own opacity.
+  twilight?: number;
   // The time between two places of a tracked dot (the clock tick), and no transition in compass mode.
   stepMs: number;
   playDirection?: PlayDirection;
@@ -41,6 +44,8 @@ interface SatellitesProps {
 const HIT_PX = 44;
 // A tracked dot fades out over this time (getSkySatellites keeps it FADE_MS = 6 s).
 const FADE_OUT_MS = 5000;
+// The decorative dots fade in and out over about 1 min around the sun's -6° (Lutz, 2026-10-06).
+const TWILIGHT_TRANSITION_MS = 60_000;
 // The time a dot takes to fade into the Earth's shadow.
 const SHADOW_FADE_MS = 8000;
 
@@ -75,7 +80,7 @@ const DecorDot: React.FC<{ decor: Decor; width: number; height: number; onDone: 
 };
 
 const Satellites: React.FC<SatellitesProps> = ({
-  width, height, tracked, gapMs, cloudFactor, stepMs, playDirection = 0, onInfo, infoRing = null,
+  width, height, tracked, gapMs, cloudFactor, twilight = 1, stepMs, playDirection = 0, onInfo, infoRing = null,
 }) => {
   const { t } = useLanguage();
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -104,8 +109,9 @@ const Satellites: React.FC<SatellitesProps> = ({
     timer = setTimeout(spawn, gap * gapFactor);
     return () => clearTimeout(timer);
   }, [showDecor, gapMin, gapMax, gapFactor]);
-  // The dots leave when the night ends or the tracking takes over.
-  if (!showDecor && decors.length > 0) setDecors([]);
+  // The dots leave when the tracking takes over. When the night ends or clouds come, no new
+  // dot comes, and the ones on the way fade out with the layer and finish their crossing.
+  if ((tracked !== null || prefersReducedMotion) && decors.length > 0) setDecors([]);
   const removeDecor = React.useCallback((id: number) => setDecors((list) => list.filter((d) => d.id !== id)), []);
 
   if (!tracked && decors.length === 0) return null;
@@ -122,9 +128,14 @@ const Satellites: React.FC<SatellitesProps> = ({
       style={{ opacity: cloudFactor }}
       data-testid="satellites"
     >
-      {decors.map((decor) => (
-        <DecorDot key={decor.id} decor={decor} width={width} height={height} onDone={removeDecor} />
-      ))}
+      {decors.length > 0 && (
+        // The sun's altitude comes in 30 s steps: a 1 min transition fades the dots smoothly.
+        <div className="absolute inset-0" style={{ opacity: twilight, transition: `opacity ${TWILIGHT_TRANSITION_MS}ms linear` }} data-testid="satellite-decor-layer">
+          {decors.map((decor) => (
+            <DecorDot key={decor.id} decor={decor} width={width} height={height} onDone={removeDecor} />
+          ))}
+        </div>
+      )}
       {tracked?.map((dot) => {
         const ring = `satellite-${dot.id}`;
         const size = dot.iss ? 5 : 3;

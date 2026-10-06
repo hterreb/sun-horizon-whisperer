@@ -18,6 +18,7 @@ import {
   getSatelliteMagnitude,
   getSatelliteOpacity,
   getSkySatellites,
+  getTwilightFade,
   isInEarthShadow,
   isPassReminderDue,
   isSatelliteVisible,
@@ -216,6 +217,16 @@ describe('getSatelliteDetails', () => {
     const details = getSatelliteDetails(satellite, iss.satrec, new Date(Date.parse(refFromShadow.start) - MIN), sydney)!;
     expect(details.sunlit).toBe(false);
     expect(details.shadowInMs).toBeNull();
+  });
+});
+
+describe('getTwilightFade (Lutz, 2026-10-06: no cut-off at -6°)', () => {
+  it('fades linearly over the band around -6°, about 1 min of the sun\'s motion', () => {
+    expect(getTwilightFade(-6.2)).toBe(1);
+    expect(getTwilightFade(-6.1)).toBe(1);
+    expect(getTwilightFade(-6)).toBeCloseTo(0.5);
+    expect(getTwilightFade(-5.9)).toBe(0);
+    expect(getTwilightFade(5)).toBe(0);
   });
 });
 

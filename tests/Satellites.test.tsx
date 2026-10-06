@@ -77,6 +77,25 @@ describe('Satellites (ROADMAP item 97)', () => {
     expect(screen.getAllByTestId('satellite-decor')).toHaveLength(2);
   });
 
+  it('fades the decorative dots out over 1 min at the sun\'s -6°, without a cut-off', () => {
+    vi.useFakeTimers();
+    const { rerender } = render(<Satellites {...base} tracked={null} gapMs={[120_000, 240_000]} twilight={1} />);
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(screen.getAllByTestId('satellite-decor')).toHaveLength(1);
+    // Dawn: no new dots, the one on its way stays and fades with the layer.
+    rerender(<Satellites {...base} tracked={null} gapMs={null} twilight={0} />);
+    const layer = screen.getByTestId('satellite-decor-layer');
+    expect(layer.style.opacity).toBe('0');
+    expect(layer.style.transition).toBe('opacity 60000ms linear');
+    expect(screen.getAllByTestId('satellite-decor')).toHaveLength(1);
+    act(() => {
+      vi.advanceTimersByTime(600_000);
+    });
+    expect(screen.getAllByTestId('satellite-decor')).toHaveLength(1);
+  });
+
   it('sends no decorative dots by day, behind full clouds or while tracking', () => {
     vi.useFakeTimers();
     const { rerender } = render(<Satellites {...base} tracked={null} gapMs={null} />);

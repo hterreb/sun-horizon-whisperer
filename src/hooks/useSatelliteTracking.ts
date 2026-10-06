@@ -3,7 +3,7 @@ import { loadSatelliteData, type GpRecord } from '@/utils/satelliteData';
 import {
   CANDIDATE_STEP_MS,
   ISS_NORAD_ID,
-  SUN_MAX_ALTITUDE,
+  TWILIGHT_FADE,
   findNextPass,
   getCandidateSatellites,
   getPassReminderKey,
@@ -39,7 +39,7 @@ export interface SatelliteTracking {
 // Satellite tracking (ROADMAP item 97, Premium): loads satellite.js with a dynamic import()
 // and the CelesTrak data only when `enabled`, then gives the sky once per second of `date`
 // (the app clock, so time travel moves the satellites too). Nothing is computed while the
-// sun is above -6°.
+// sun is above the twilight band around -6°.
 export const useSatelliteTracking = (
   enabled: boolean,
   date: Date,
@@ -82,7 +82,9 @@ export const useSatelliteTracking = (
 
   const second = Math.floor(date.getTime() / 1000);
   const hasData = enabled && satellites.length > 0 && isNearEpoch(satellites[0], date);
-  const isDark = sunAltitude < SUN_MAX_ALTITUDE;
+  // `sunAltitude` comes in 30 s steps; the margin keeps the computation on for the whole
+  // twilight fade (getSkySatellites checks the sun each second).
+  const isDark = sunAltitude < TWILIGHT_FADE[1] + 0.2;
   // All satellites every 30 s, then each second only the ones that can be in the sky.
   const candidateStep = Math.floor(date.getTime() / CANDIDATE_STEP_MS);
   const candidates = useMemo(
