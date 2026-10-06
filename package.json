@@ -32,6 +32,7 @@
     "modern-screenshot": "^4.7.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "satellite.js": "^6.0.2",
     "suncalc": "^1.9.0",
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7",

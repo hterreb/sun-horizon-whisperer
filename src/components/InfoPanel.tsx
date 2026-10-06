@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Wind, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward, Bell, BellRing, AlarmClock, AlarmClockCheck } from 'lucide-react';
+import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Wind, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward, Bell, BellRing, AlarmClock, AlarmClockCheck, Satellite } from 'lucide-react';
 import { isFeedbackAvailable, openFeedbackForm } from '@/utils/feedback';
 import { ScrollArea } from './ui/scroll-area';
+import { Switch } from './ui/switch';
 import { Button } from './ui/button';
 import LineOfSightDetails from './LineOfSightDetails';
 import PremiumBadge from './PremiumBadge';
@@ -30,6 +31,7 @@ import { type WeatherType } from './CloudLayer';
 import { getTimeTravelRange, toDateTimeLocalValue } from '@/utils/timeTravel';
 import { formatTemperature, type TemperatureUnit } from '@/utils/temperatureUnit';
 import { SUNSET_REMINDER_MIN } from '@/utils/sunsetReminder';
+import { PASS_REMINDER_MIN } from '@/utils/satelliteUtils';
 import { LANGUAGES, LANGUAGE_NAMES, type Language } from '@/utils/language';
 import { formatNumber, translate, type MessageKey } from '@/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -133,6 +135,13 @@ interface InfoPanelProps {
   // passed when the browser has no Notification API.
   isSunsetReminderOn?: boolean;
   onSunsetReminderToggle?: () => void;
+  // Satellite tracking (ROADMAP item 97): the switch with the gold plus.
+  isSatelliteTrackingOn?: boolean;
+  onSatelliteTrackingToggle?: () => void;
+  // "ISS passes" (ROADMAP item 97): the reminder toggle next to the sunset reminder, with the
+  // gold plus. Not passed when the browser has no Notification API.
+  isIssReminderOn?: boolean;
+  onIssReminderToggle?: () => void;
 }
 
 const InfoPanel: React.FC<InfoPanelProps> = ({
@@ -176,6 +185,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   horizonProfile = null,
   isSunsetReminderOn = false,
   onSunsetReminderToggle,
+  isSatelliteTrackingOn = false,
+  onSatelliteTrackingToggle,
+  isIssReminderOn = false,
+  onIssReminderToggle,
 }) => {
   const { t, language, setLanguage } = useLanguage();
   // Premium gate (ROADMAP item 14): every gold-plus control goes through requirePremium.
@@ -778,6 +791,19 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                     {isSunsetReminderOn ? <AlarmClockCheck size={14} /> : <AlarmClock size={14} />}
                   </button>
                 )}
+                {onIssReminderToggle && (
+                  <button
+                    type="button"
+                    onClick={() => requirePremium(onIssReminderToggle)}
+                    className={`${INLINE_ICON_TOGGLE} relative ml-1 ${isIssReminderOn ? 'bg-white/20' : ''}`}
+                    aria-label={t('issReminder.label')}
+                    title={t('issReminder.toggle', { minutes: PASS_REMINDER_MIN })}
+                    aria-pressed={isIssReminderOn}
+                  >
+                    <Satellite size={14} />
+                    <PremiumBadge className="absolute -right-1 -top-1 h-2.5 w-2.5" />
+                  </button>
+                )}
                 {!polarSunLabel && shownSunset && (
                   <ShareCardButton
                     className={INLINE_ICON_TOGGLE}
@@ -1194,6 +1220,22 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Satellite tracking (ROADMAP item 97): Premium in the Play app. */}
+          {onSatelliteTrackingToggle && (
+            <div className="mt-6 pt-4 border-t border-white/20 flex items-center justify-between gap-2" title={t('satellite.trackingHint')}>
+              <span className="text-caption opacity-80 inline-flex items-center gap-1">
+                <Satellite size={14} className="mr-1" />
+                {t('satellite.tracking')}
+                <PremiumBadge />
+              </span>
+              <Switch
+                checked={isSatelliteTrackingOn}
+                onCheckedChange={() => requirePremium(onSatelliteTrackingToggle)}
+                aria-label={t('satellite.tracking')}
+              />
+            </div>
+          )}
 
           {/* Language (ROADMAP item 67): the same segmented style as the °C/°F toggle. */}
           <div className="mt-6 pt-4 border-t border-white/20 flex items-center justify-between gap-2">
