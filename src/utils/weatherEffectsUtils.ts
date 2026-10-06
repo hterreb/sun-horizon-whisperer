@@ -154,10 +154,11 @@ export const pickNightFish = (r: number): NightFishPick => pickWeighted(NIGHT_FI
 export const pickMoonlitDayFish = (r: number): FishKind =>
   pickWeighted(FISH_WEIGHTS.filter(([kind]) => MOONLIT_DAY_FISH.includes(kind)), r);
 
-// At most three fish on screen, two at night (item 93, S2; it was five and three, E4 and
-// item 65, NR1). A school or a pair is one entry. Turtles and jellyfish count too (item 93).
-export const MAX_FISH = 3;
-export const MAX_NIGHT_FISH = 2;
+// At most four fish on screen, 2.5 at night (item 102: between item 93's three and two and the
+// five and three of E4 and item 65, NR1). getSceneLimit rounds the base times the width and the
+// density. A school or a pair is one entry. Turtles and jellyfish count too (item 93).
+export const MAX_FISH = 4;
+export const MAX_NIGHT_FISH = 2.5;
 
 export const canSpawnFish = (onScreen: FishKind[], max = MAX_FISH): boolean => onScreen.length < max;
 

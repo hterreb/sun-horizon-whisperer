@@ -16,7 +16,7 @@ import SolarEclipse from '@/components/SolarEclipse';
 import GreenFlash from '@/components/GreenFlash';
 import MoonTint from '@/components/MoonTint';
 import { type AstroEvent } from '@/utils/astroEvents';
-import { getSunVisibility, getMoonCloudFactor, getMoonLook } from '@/utils/weatherEffectsUtils';
+import { getSunVisibility, getMoonCloudFactor, getMoonLook, getStarCloudFactor } from '@/utils/weatherEffectsUtils';
 import { getSeaWindKmh, getReflectionBars } from '@/utils/waveUtils';
 import { getCloudDriftDirection } from '@/utils/cloudLayoutUtils';
 import { type CloudLayers } from '@/utils/skyCloudUtils';
@@ -25,7 +25,9 @@ import { getRainMmH, getRainMistOpacity } from '@/utils/rainUtils';
 import { useLanguage } from '@/hooks/useLanguage';
 import { formatNumber, type MessageKey } from '@/i18n';
 import { type Language } from '@/utils/language';
-import { type PlayDirection } from '@/utils/timeTravel';
+import { PLAY_TICK_MS, type PlayDirection } from '@/utils/timeTravel';
+import Satellites, { type SatelliteDot } from './Satellites';
+import { ISS_NORAD_ID, getDotGapMs, getTwilightFade, isSatelliteWeather, type SkySatellite } from '@/utils/satelliteUtils';
 import { getTrailColour, isPlaneWeather, showsPlaneLights, type ContrailKind } from '@/utils/planes';
 import LivePlanes from './LivePlanes';
 import { type LivePlanesState } from '@/hooks/useLivePlanes';
@@ -107,6 +109,9 @@ interface SunVisualizationProps {
   calendarEvent?: CalendarEvent | null;
   // Time-travel play from SunTracker (ROADMAP item 83): the scene follows it.
   playDirection?: PlayDirection;
+  // Satellite tracking (ROADMAP item 97): the tracked satellites in the sky, or null for
+  // the free decorative dots.
+  satellites?: SkySatellite[] | null;
 }
 
 // Maps an azimuth (0-360°, 0 = North) to a horizontal screen fraction (0-1), for the
@@ -569,7 +574,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   onSceneInfo,
   infoRing = null,
   calendarEvent = null,
-  playDirection = 0
+  playDirection = 0,
+  satellites = null
 }) => {
   const { t, language } = useLanguage();
   // Compass mode (ROADMAP item 19): a real field of view centered on the heading,
@@ -932,8 +938,33 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   }), [sceneWidth, sceneHeight, latitude, compassHeading]);
   const showLivePlanes = !!livePlanes && sceneWidth > 0 && isPlaneWeather(weatherType);
 
+  // Satellites (ROADMAP item 97): azimuth -> x and elevation -> y as for the sun and moon
+  // (compass field of view included); a tracked satellite behind the terrain is hidden.
+  const satelliteDots = useMemo((): SatelliteDot[] | null => {
+    if (!satellites) return null;
+    const { width, height } = containerDimensions;
+    return satellites.flatMap((sat) => {
+      const point = getArcScreenPosition(sat.elevation, sat.azimuth, width, height, latitude, compassHeading);
+      if (!point) return [];
+      const behindTerrain = !!horizonProfile && sat.elevation <= horizonAngleAt(horizonProfile, sat.azimuth);
+      return [{ id: sat.id, name: sat.name, x: point.x, y: point.y, opacity: sat.opacity, shown: sat.visible && !behindTerrain, iss: sat.id === ISS_NORAD_ID }];
+    });
+  }, [satellites, containerDimensions, latitude, compassHeading, horizonProfile]);
+
   return (
     <div ref={containerRef} className="w-full h-dvh relative overflow-hidden" data-testid="sun-visualization">
+      <Satellites
+        width={containerDimensions.width}
+        height={containerDimensions.height}
+        tracked={satelliteDots}
+        gapMs={isSatelliteWeather(weatherType) ? getDotGapMs(date, sunPosition.altitude, sunTimes) : null}
+        cloudFactor={getStarCloudFactor(weatherType, cloudCoverPercent)}
+        twilight={getTwilightFade(sunPosition.altitude)}
+        stepMs={compassActive ? 0 : playDirection !== 0 ? PLAY_TICK_MS : 1000}
+        playDirection={playDirection}
+        onInfo={onSceneInfo}
+        infoRing={infoRing}
+      />
       {showLivePlanes && (
         <LivePlanes
           state={livePlanes}

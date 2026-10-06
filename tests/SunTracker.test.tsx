@@ -33,6 +33,11 @@ vi.mock('@/hooks/use-toast', () => ({
 }));
 import { toast } from '@/hooks/use-toast';
 
+// Satellite tracking (ROADMAP item 97): no CelesTrak data unless a test gives it.
+vi.mock('../src/utils/satelliteData', () => ({ loadSatelliteData: vi.fn(async () => null) }));
+import { loadSatelliteData, type GpRecord } from '../src/utils/satelliteData';
+import issFixture from './fixtures/iss-omm-2026-10-05.json';
+
 describe('SunTracker', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -954,6 +959,124 @@ describe('SunTracker', () => {
       expect(card()).not.toBeNull();
       advance(15_000);
       expect(card()).toBeNull();
+    });
+  });
+  describe('satellites (ROADMAP item 97)', () => {
+    const SYDNEY = issFixture.reference.observer;
+    // The top of a known ISS pass (heavens-above, see the fixture).
+    const PASS_TOP = new Date(issFixture.reference.passes[0].max);
+    const flush = () => act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+
+    beforeEach(async () => {
+      // Loaded once here, so the app's dynamic import() resolves at once under fake timers.
+      await import('satellite.js');
+      vi.useFakeTimers();
+      vi.setSystemTime(PASS_TOP);
+      global.fetch = vi.fn(() => Promise.reject(new Error('offline'))) as unknown as typeof fetch;
+      saveManualLocation(SYDNEY.latitude, SYDNEY.longitude, 'Sydney');
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+      vi.mocked(loadSatelliteData).mockReset();
+      vi.mocked(loadSatelliteData).mockResolvedValue(null);
+    });
+
+    it('tracks by default: the ISS crosses the sky and has a card', async () => {
+      vi.mocked(loadSatelliteData).mockResolvedValue([issFixture.omm as unknown as GpRecord]);
+      // jsdom lays nothing out: give the scene a phone size, so the ISS gets a place on it.
+      vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(390);
+      vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(844);
+      render(<SunTracker />);
+      for (let i = 0; i < 3; i++) await flush();
+      expect(visProps.current?.satellites).toEqual([expect.objectContaining({ id: 25544, visible: true })]);
+      fireEvent.click(screen.getByRole('button', { name: 'ISS (ZARYA)' }));
+      const dialog = screen.getByRole('dialog', { name: 'Satellite' });
+      expect(dialog).toHaveTextContent('ISS (ZARYA)');
+      expect(dialog).toHaveTextContent(/Altitude\s*4\d\d km/);
+      expect(dialog).toHaveTextContent(/Speed\s*7\.\d km\/s/);
+      expect(dialog).toHaveTextContent('Next pass');
+    });
+
+    it('the switch turns the tracking off and saves it; then the decorative dots come back', async () => {
+      render(<SunTracker />);
+      await flush();
+      const toggle = screen.getByRole('switch', { name: 'Satellite tracking' });
+      expect(toggle).toHaveAttribute('aria-checked', 'true');
+      fireEvent.click(toggle);
+      expect(localStorage.getItem('satellite-tracking')).toBe('off');
+      expect(screen.getByRole('switch', { name: 'Satellite tracking' })).toHaveAttribute('aria-checked', 'false');
+      expect(visProps.current?.satellites).toBeNull();
+      expect(loadSatelliteData).toHaveBeenCalledTimes(1);
+    });
+
+    describe('ISS passes (Lutz, 2026-10-06)', () => {
+      const shown: string[] = [];
+      class FakeNotification {
+        static permission: NotificationPermission = 'default';
+        static answer: NotificationPermission = 'granted';
+        static requestPermission = async () => (FakeNotification.permission = FakeNotification.answer);
+        onclick: (() => void) | null = null;
+        constructor(_title: string, options: NotificationOptions) {
+          shown.push(options.body ?? '');
+        }
+        close() {}
+      }
+      const name = 'ISS passes';
+      // 12 min before the evening pass of 7 Oct (09:46:27 UTC, NW, up to 23°).
+      const BEFORE_PASS = new Date('2026-10-07T09:34:30Z');
+
+      beforeEach(() => {
+        shown.length = 0;
+        FakeNotification.permission = 'default';
+        FakeNotification.answer = 'granted';
+        vi.stubGlobal('Notification', FakeNotification);
+        vi.setSystemTime(BEFORE_PASS);
+        vi.mocked(loadSatelliteData).mockResolvedValue([issFixture.omm as unknown as GpRecord]);
+      });
+      afterEach(() => {
+        vi.unstubAllGlobals();
+      });
+
+      it('is off by default; on, it reminds 10 min before a visible ISS pass, also with the tracking off', async () => {
+        localStorage.setItem('satellite-tracking', 'off');
+        render(<SunTracker />);
+        await flush();
+        const button = screen.getByRole('button', { name });
+        expect(button).toHaveAttribute('aria-pressed', 'false');
+        expect(button.querySelector('[data-testid="premium-badge"]')).toBeInTheDocument();
+        expect(loadSatelliteData).not.toHaveBeenCalled();
+        fireEvent.click(button);
+        for (let i = 0; i < 3; i++) await flush();
+        expect(screen.getByRole('button', { name })).toHaveAttribute('aria-pressed', 'true');
+        expect(localStorage.getItem('iss-pass-reminder')).toBe('on');
+        expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'ISS pass reminder on' }));
+        expect(loadSatelliteData).toHaveBeenCalled();
+        // No satellites in the sky with the tracking off.
+        expect(visProps.current?.satellites).toBeNull();
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(3 * 60_000);
+        });
+        expect(shown).toHaveLength(1);
+        expect(shown[0]).toMatch(/^ISS visible at \d{2}:\d{2}, from NW to NW, up to 23°$/);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(10 * 60_000);
+        });
+        expect(shown).toHaveLength(1);
+        // 13 min of 1 s ticks re-render SunTracker 780 times: slow on the CI runner.
+      }, 30_000);
+
+      it('stays off with a hint when the permission is denied', async () => {
+        FakeNotification.answer = 'denied';
+        render(<SunTracker />);
+        await flush();
+        fireEvent.click(screen.getByRole('button', { name }));
+        await flush();
+        expect(screen.getByRole('button', { name })).toHaveAttribute('aria-pressed', 'false');
+        expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Notifications are blocked' }));
+      });
     });
   });
 });
