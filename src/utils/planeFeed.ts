@@ -6,6 +6,9 @@
 // The upstream: adsb.lol (ODbL, attribution "Data: adsb.lol"). The radius is in nautical
 // miles: 54 nm = 100 km.
 export const ADSB_LOL_POINT = 'https://api.adsb.lol/v2/point';
+// adsb.lol answers 403 "User-Agent too generic; include valid contact info" without one
+// (checked 2026-10-06). The privacy page has the contact.
+export const UPSTREAM_USER_AGENT = 'SunChaser/2.0 (+https://sun-chaser.vercel.app/privacy)';
 export const RADAR_RADIUS_NM = 54;
 export const UPSTREAM_TIMEOUT_MS = 6000;
 // The edge cache holds one answer per 0.1° cell for 15 s (one poll), and may serve it 15 s
@@ -109,7 +112,7 @@ export const handlePlanesRequest = async (
   const upstream = `${ADSB_LOL_POINT}/${place.lat.toFixed(1)}/${place.lon.toFixed(1)}/${RADAR_RADIUS_NM}`;
   try {
     const response = await fetchFn(upstream, {
-      headers: { Accept: 'application/json' },
+      headers: { Accept: 'application/json', 'User-Agent': UPSTREAM_USER_AGENT },
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (!response.ok) return json(502, null, 'no-store');

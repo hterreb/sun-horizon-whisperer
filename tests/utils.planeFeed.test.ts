@@ -59,6 +59,9 @@ describe('handlePlanesRequest', () => {
     const fetchFn = ok({ now: 1000, ac: [upstreamAircraft] });
     const response = await handlePlanesRequest(request('?lat=47.781&lon=9.612'), fetchFn);
     expect((fetchFn as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe('https://api.adsb.lol/v2/point/47.8/9.6/54');
+    // adsb.lol answers 403 to a generic User-Agent: the request names the app and a contact.
+    const init = (fetchFn as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1] as RequestInit;
+    expect((init.headers as Record<string, string>)['User-Agent']).toMatch(/^SunChaser\/.+\(\+https:\/\//);
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe(PLANES_CACHE_CONTROL);
     expect(PLANES_CACHE_CONTROL).toContain('s-maxage=15');
