@@ -10,7 +10,12 @@ import { GLASS_SURFACE } from '@/utils/glassChrome';
 
 interface MusicPlayerProps {
   isFullscreen?: boolean;
+  // True during the sunset countdown sound (item 108): the radio plays at DUCK_FACTOR
+  // of the slider volume. The slider value does not change.
+  duck?: boolean;
 }
+
+const DUCK_FACTOR = 0.3;
 
 // Lo-fi hip hop radio streams
 const STREAMS: { name: string; url: string }[] = [
@@ -56,7 +61,7 @@ const loadStoredStationIndex = (): number => {
   }
 };
 
-const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
+const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false, duck = false }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const { t } = useLanguage();
   const [volume, setVolume] = useState([0.5]);
@@ -134,9 +139,9 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false }) => {
 
   useEffect(() => {
     if (audioRef.current) {
-      audioRef.current.volume = volume[0];
+      audioRef.current.volume = volume[0] * (duck ? DUCK_FACTOR : 1);
     }
-  }, [volume]);
+  }, [volume, duck]);
 
   useEffect(() => {
     isPlayingRef.current = isPlaying;

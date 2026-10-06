@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { Sun, ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp, Mountain } from 'lucide-react';
+import { Sun, ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp, Mountain, BellOff } from 'lucide-react';
 import { type SunPosition, type SunTimes, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors, getReflectionFade } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
 import { getSunArcLabels, getMoonArcLabels, getTerrainArcLabels, getTerrainMoonArcLabels, type ArcLabels, type ArcLabelPoint } from '../utils/arcLabels';
@@ -90,6 +90,9 @@ interface SunVisualizationProps {
   terrainMoonTimes?: { rise: Date | null; set: Date | null } | null;
   // Sunset countdown (ROADMAP item 43): the seconds left, shown in the altitude pill.
   sunsetCountdown?: { seconds: number; lineOfSight: boolean } | null;
+  // Set while the countdown sound is off (item 108): the pill shows a muted bell and a
+  // tap on it turns the sound on.
+  onCountdownSoundOn?: () => void;
   // Fade the cardinal labels out together with the top-left buttons while idle in
   // fullscreen (ROADMAP item 29); both default to their non-fullscreen values so
   // existing callers/tests that don't pass them keep the labels always visible.
@@ -565,6 +568,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   terrainSunTimes = null,
   terrainMoonTimes = null,
   sunsetCountdown = null,
+  onCountdownSoundOn,
   isFullscreen = false,
   showCursor = true,
   fireworksTrigger = 0,
@@ -1402,7 +1406,19 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           className="absolute z-9 left-1/2 transform -translate-x-1/2 bottom-1/3 -translate-y-12
                      bg-black/50 text-white px-3 py-1 rounded-full text-sm"
         >
-          {sunsetCountdown ? (
+          {sunsetCountdown && onCountdownSoundOn ? (
+            <button
+              type="button"
+              onClick={onCountdownSoundOn}
+              aria-label={t('scene.countdownSoundOn')}
+              className="flex items-center gap-1 tabular-nums cursor-pointer"
+            >
+              <BellOff size={12} />
+              {sunsetCountdown.lineOfSight && <Mountain size={12} />}
+              {t('scene.countdown', { seconds: sunsetCountdown.seconds })}
+              {sunsetCountdown.lineOfSight && <PremiumBadge className="absolute -right-1 -top-1 h-2.5 w-2.5" />}
+            </button>
+          ) : sunsetCountdown ? (
             <span className="flex items-center gap-1 tabular-nums">
               {sunsetCountdown.lineOfSight && <Mountain size={12} />}
               {t('scene.countdown', { seconds: sunsetCountdown.seconds })}

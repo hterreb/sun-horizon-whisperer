@@ -68,6 +68,18 @@ describe('MusicPlayer', () => {
     // Check for visibility state
   });
 
+  it('ducks to 30 % of the slider volume during the countdown sound, then comes back (item 108)', () => {
+    const instances = stubAudioConstructor();
+    const { rerender } = render(<MusicPlayer />);
+    const audioEl = instances[0];
+    expect(audioEl.volume).toBeCloseTo(0.5, 6);
+    rerender(<MusicPlayer duck />);
+    expect(audioEl.volume).toBeCloseTo(0.15, 6);
+    expect(screen.getByRole('slider')).toHaveAttribute('aria-valuenow', '0.5');
+    rerender(<MusicPlayer duck={false} />);
+    expect(audioEl.volume).toBeCloseTo(0.5, 6);
+  });
+
   it('tries fallback streams if one fails', () => {
     const instances = stubAudioConstructor();
     render(<MusicPlayer />);

@@ -217,6 +217,7 @@ export const de: Record<keyof typeof en, string> = {
   // Scene
   'scene.sun': "Sonne",
   'scene.countdown': "Sonnenuntergang in {seconds} s",
+  'scene.countdownSoundOn': "Countdown-Ton einschalten",
   'scene.moonInfo': "Mond: {altitude}° | {illumination}",
   'direction.n': "N",
   'direction.ne': "NO",
