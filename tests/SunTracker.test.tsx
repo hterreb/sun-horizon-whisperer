@@ -1065,13 +1065,14 @@ describe('SunTracker', () => {
           await vi.advanceTimersByTimeAsync(10 * 60_000);
         });
         expect(shown).toHaveLength(1);
-      });
+        // 13 min of 1 s ticks re-render SunTracker 780 times: slow on the CI runner.
+      }, 30_000);
 
       it('stays off with a hint when the permission is denied', async () => {
         FakeNotification.answer = 'denied';
         render(<SunTracker />);
         await flush();
-        fireEvent.click(screen.getByRole('button', { name }));
+        fireEvent.click(await screen.findByRole('button', { name }));
         await flush();
         expect(screen.getByRole('button', { name })).toHaveAttribute('aria-pressed', 'false');
         expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Notifications are blocked' }));
