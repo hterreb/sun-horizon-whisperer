@@ -2089,6 +2089,13 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Built:** `MAX_FISH` 4 (item 93: 3, before: 5), `MAX_NIGHT_FISH` 2.5 (2 / 3), `MAX_BOATS` 2.5 (2 / 3). `getSceneLimit` rounds the base times the width and the density. The density stays as it is. A fish that meets a boat on its fallback lane changes to a free lane (`findLane` from 4 s before the meeting, a 3 s `sceneLaneShift`), else it dives (the H4 fade). Live, a new fish with no free lane spawns anyway at its pick and dodges the first thing it meets in the same way. A hunting shark and its prey keep their lane. During time-travel play nothing changes.
 - **Checked:** 2 new tests, the limit tests and the box simulations (items 92 and 93) updated: a fish that changes lane counts on its old lane until the change, a diving fish has no box after its dive. Simulation (30 min, seeds 1–5, mean on screen): phone at density 0.7, fish 1.9 → 2.8 and boats 0.6 → 1.1; 1280 px at density 0.7, fish 3.0 → 3.9 and boats 1.7 → 2.3. Birds unchanged.
 
+### 103. A fuller scene on wide screens — S — **✅ Done**
+
+- **Feedback (2026-10-06):** "on my macbook i have 1 fish 1 boat and three birds". Then: "please fix A and raise the limit once more".
+- **Cause:** at 1512 px the limits grew only to 1.5× a phone's (item 93), for 3.5 phones of width. At density 0.55: 3 fish, 2 boats, 3 birds over the whole width, each taking 5–10 min to cross (item 66).
+- **Built:** `SCENE_LIMIT_MAX_GROWTH` 2.5 (it was 1.5). `MAX_FISH` 5, `MAX_NIGHT_FISH` 3, `MAX_BOATS` 3, `MAX_BIRDS` 5. A lane change (item 102) keeps its old lane (`hold`) in the lane plan, and a boat that meets a fish on its old lane before the change makes it dive.
+- **Checked:** the limit tests updated, all tests pass. Simulation (30 min, seeds 1–5, mean on screen, 1512 px, density 0.55): birds 2.7 → 5.9, fish 2.9 → 6.8, boats 1.6 → 2.7. Phone at 0.55: birds 1.5 → 2.0, fish 1.8 → 2.8, boats 0.6 → 0.9. Boats still refill slowly (gap 55–115 s); not changed.
+
 ---
 
 ## Ongoing — Easter eggs and special events (S each, pick any time)

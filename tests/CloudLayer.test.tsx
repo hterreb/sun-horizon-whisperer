@@ -223,8 +223,8 @@ describe('CloudLayer', () => {
       expect(container.querySelectorAll('[data-testid="scene-boat"]').length).toBe(2);
     });
 
-    it('never has more than 3 boats out at once on a phone (ROADMAP items 40, 93 and 102)', () => {
-      // Spawns at ~5, 60, 115 and 170 s; no boat finishes its crossing in the test. The limit 2.5 rounds to 3.
+    it('never has more than 3 boats out at once on a phone (ROADMAP items 40, 93, 102 and 103)', () => {
+      // Spawns at ~5, 60, 115 and 170 s; no boat finishes its crossing in the test.
       const container = atWidth(390, () => spawn({}, 180000));
       expect(container.querySelectorAll('[data-testid="scene-boat"]').length).toBe(3);
     });
@@ -241,10 +241,10 @@ describe('CloudLayer', () => {
       expect(wrapper.style.top).toBe('77%');
     });
 
-    it('lets more boats out on a wide screen, at most 1.5x (ROADMAP items 70 and 93)', () => {
-      // 1290 px is three phones wide, but the limit grows only to 1.5 x 2.5 = 3.75, so 4: all four spawns stay.
-      const container = atWidth(1290, () => spawn({}, 180000));
-      expect(container.querySelectorAll('[data-testid="scene-boat"]').length).toBe(4);
+    it('lets more boats out on a wide screen, at most 2.5x (ROADMAP items 70, 93 and 103)', () => {
+      // 1290 px is three phones wide, but the limit grows only to 2.5 x 3 = 7.5, so 8: eight of the nine spawns stay.
+      const container = atWidth(1290, () => spawn({}, 500000));
+      expect(container.querySelectorAll('[data-testid="scene-boat"]').length).toBe(8);
     });
 
     it('sails each boat type at its own speed (ROADMAP item 40)', () => {
@@ -408,15 +408,15 @@ describe('CloudLayer', () => {
       expect((desktop.dx / desktop.duration) * 1290).toBeCloseTo(1.15 * 430, 5);
     });
 
-    it('keeps at most four fish on screen on a phone (E4, ROADMAP items 93 and 102)', () => {
+    it('keeps at most five fish on screen on a phone (E4, ROADMAP items 93, 102 and 103)', () => {
       // A classic fish pair every 5.5 s; none finishes its crossing in the test.
       const container = atWidth(390, () => spawnFish({}, 40000));
-      expect(container.querySelectorAll('[data-testid="scene-fish"]').length).toBe(8); // 4 pairs
+      expect(container.querySelectorAll('[data-testid="scene-fish"]').length).toBe(10); // 5 pairs
     });
 
-    it('allows 1.5x the fish on a wide screen (ROADMAP items 70 and 93)', () => {
-      // 1290 px: up to 1.5 x 4 = 6 fish; of the seven pairs from 40 s, six stay.
-      expect(atWidth(1290, () => spawnFish({}, 40000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(12);
+    it('allows 2.5x the fish on a wide screen (ROADMAP items 70, 93 and 103)', () => {
+      // 1290 px: up to 2.5 x 5 = 12.5, so 13 fish; all seven pairs from 40 s stay.
+      expect(atWidth(1290, () => spawnFish({}, 40000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(14);
     });
   });
 
@@ -454,12 +454,12 @@ describe('CloudLayer', () => {
       expect(container.querySelectorAll('[data-testid="fish-light"]').length).toBe(5);
     });
 
-    it('keeps the night quiet: a check every 15-25 s, at most three fish (NR1, ROADMAP items 93 and 102)', () => {
+    it('keeps the night quiet: a check every 15-25 s, at most three fish (NR1, ROADMAP items 93, 102 and 103)', () => {
       expect(spawnNight({ moonlight: moon }, 14000).querySelector('[data-testid="scene-fish"]')).toBeNull();
-      // A moonlit classic pair every 15.5 s; six tries in 100 s, three pairs stay on a phone (2.5 rounds to 3).
+      // A moonlit classic pair every 15.5 s; six tries in 100 s, three pairs stay on a phone.
       expect(atWidth(390, () => spawnNight({ moonlight: moon }, 100000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(6);
-      // Three phones wide: up to 1.5 x 2.5 = 3.75, so 4 pairs (items 70, 93 and 102).
-      expect(atWidth(1290, () => spawnNight({ moonlight: moon }, 100000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(8);
+      // Three phones wide: up to 2.5 x 3 = 7.5, so 8 pairs; all six tries stay (items 70, 93 and 103).
+      expect(atWidth(1290, () => spawnNight({ moonlight: moon }, 100000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(12);
     });
   });
 
@@ -632,12 +632,12 @@ describe('CloudLayer', () => {
       expect(createBird('gull', 390, 1, always(0.5)).easing).toBeUndefined();
     });
 
-    it('keeps at most four birds or groups in the sky, more on wide screens (C3)', () => {
+    it('keeps at most five birds or groups in the sky, more on wide screens (C3, ROADMAP item 103)', () => {
       // A roll of 0 sends a gull every 8.5 s. jsdom never ends the animations, so they stay.
       expect(spawnBirds({}, 8000).querySelector('[data-testid="scene-bird"]')).toBeNull();
-      expect(atWidth(390, () => spawnBirds({}, 120000)).querySelectorAll('[data-testid="scene-bird"]').length).toBe(4);
-      // At most 1.5x on a wide screen (item 93).
-      expect(atWidth(1290, () => spawnBirds({}, 120000)).querySelectorAll('[data-testid="scene-bird"]').length).toBe(6);
+      expect(atWidth(390, () => spawnBirds({}, 120000)).querySelectorAll('[data-testid="scene-bird"]').length).toBe(5);
+      // At most 2.5x on a wide screen (items 93 and 103): 12.5, so 13 of the 14 gulls.
+      expect(atWidth(1290, () => spawnBirds({}, 120000)).querySelectorAll('[data-testid="scene-bird"]').length).toBe(13);
     });
 
     it('crosses the moon with a V of geese at night, in the migration months only (W14)', () => {
@@ -962,9 +962,9 @@ describe('a calmer sea that is full from the start (ROADMAP item 93)', () => {
     const random = mulberry32(7);
     const last = freshTimes();
     let sea = run(empty(), last, () => rules(desktop), 500, 500, random);
-    expect(sea.fish).toHaveLength(6);
+    expect(sea.fish).toHaveLength(13);
     sea = run(sea, last, () => rules(desktop, { density: 0.3 }), 1000, 1000, random);
-    expect(sea.fish).toHaveLength(6);
+    expect(sea.fish).toHaveLength(13);
   });
 
   it('follows the busy and quiet phases over a simulated day', () => {

@@ -136,7 +136,7 @@ const BOAT_GAP_MIN_MS = 55000;
 const BOAT_GAP_RANGE_MS = 60000;
 // Item 102: a fish that meets a thing swims to a free lane over this time.
 const LANE_SHIFT_SEC = 3;
-const MAX_BOATS = 2.5; // item 102: between item 93's 2 and the 3 before; getSceneLimit rounds
+const MAX_BOATS = 3; // item 103 (item 102: 2.5, item 93: 2)
 // A bird check every 8-12 s (ROADMAP item 74, C3; it was 3-5 s at twice the speed). At night
 // the geese across the moon (W14) get a check every 30 s.
 const BIRD_GAP_MIN_MS = 8000;
@@ -230,6 +230,7 @@ interface FishEntity extends MovingEntity {
   hunt?: HuntPlan; // a hunting shark (item 94): its prey and the hunt's timeline
   dive?: number; // item 94: the scene time when the fish dives under a boat (the H4 fade)
   shift?: { at: number; dy: number }; // item 102: at the scene time `at` it swims `dy` px up or down to a free lane
+  hold?: ScenePath; // item 103: the old lane of a lane change, kept free for the rest of the crossing
   shifted?: boolean; // item 102: the lane change has started
   hunted?: PreyHunt; // item 94: the hunt that plays on this fish
 }
@@ -551,8 +552,8 @@ const boatLane = (ship: Boat, view: View, isFullscreen: boolean): LaneShape => {
   };
 };
 
-const pathsOf = (...groups: { path?: ScenePath }[][]): ScenePath[] =>
-  groups.flatMap(group => group.flatMap(item => (item.path ? [item.path] : [])));
+const pathsOf = (...groups: { path?: ScenePath; hold?: ScenePath }[][]): ScenePath[] =>
+  groups.flatMap(group => group.flatMap(item => (item.path ? [item.path, ...(item.hold ? [item.hold] : [])] : [])));
 
 // One check of the spawn loop (every 500 ms): a new bird, fish, boat or leaf when its gap has
 // passed and its chance comes up, and an empty group when the weather or the time no longer
@@ -597,7 +598,8 @@ export const spawnTick = (
       const band: [number, number] = [shape.band[0] - shape.above, shape.band[1] - shape.above];
       const y = lane({ ...f.path, band, view }, others, from);
       if (y !== null && y !== f.path.y) {
-        return { ...f, path: { ...f.path, y }, shift: { at: from, dy: ((y - f.path.y) * view.height) / 100 } };
+        // `path` is the new lane; until the change the fish is on its old one (`hold`).
+        return { ...f, path: { ...f.path, y }, hold: f.path, shift: { at: from, dy: ((y - f.path.y) * view.height) / 100 } };
       }
     }
     return { ...f, dive: Math.min(f.dive ?? Infinity, Math.max(sceneTime, at - 2)) };
@@ -648,7 +650,7 @@ export const spawnTick = (
   const shouldShowShips = weatherType !== 'hail';
 
   if (shouldShowBirds) {
-    // At most four birds or groups (C3), 1.5x on wide screens (items 70 and 93). Far birds first.
+    // At most five birds or groups (C3, item 103), 2.5x on wide screens (items 70 and 103). Far birds first.
     const limit = getSceneLimit(MAX_BIRDS, view.width, density);
     const makeBird = (progress: number) => {
       const kind = isSunDown ? 'bat' : pickBird(random(), month, latitude, timeOfDay === 'evening');
@@ -694,7 +696,7 @@ export const spawnTick = (
 
   // At the switch between day and night fish, the fish on screen swim on (item 65).
   if (shouldShowFish || shouldShowNightFish) {
-    // At most three fish, two at night (item 93), 1.5x on wide screens. Far fish first, so a
+    // At most five fish, three at night (item 103), 2.5x on wide screens. Far fish first, so a
     // near fish swims in front.
     const limit = getSceneLimit(shouldShowNightFish ? MAX_NIGHT_FISH : MAX_FISH, view.width, density);
     // Item 94: a hunting shark. At its spawn the plan picks a meeting point, then for each
@@ -803,7 +805,7 @@ export const spawnTick = (
   }
 
   if (shouldShowShips) {
-    // At most two boats (item 93), 1.5x on wide screens. Far boats first, so a near boat
+    // At most three boats (item 103), 2.5x on wide screens. Far boats first, so a near boat
     // always sails in front of a far one.
     const limit = getSceneLimit(MAX_BOATS, view.width, density);
     const makeShip = (progress: number) => {
@@ -835,8 +837,12 @@ export const spawnTick = (
       // Each fish that the boat on this lane meets changes lane or dives (items 94 and 102).
       if (placed && live) {
         for (const f of fish) {
-          const at = f.path && firstMeeting(placed.path, f.path, sceneTime);
-          if (!f.path || at === null || at === undefined) continue;
+          if (!f.path) continue;
+          // A fish with a lane change is on its old lane (`hold`) until the change is done.
+          const old = f.hold && f.shift ? firstMeeting(placed.path, f.hold, sceneTime) : null;
+          const times = [firstMeeting(placed.path, f.path, sceneTime), old !== null && old < f.shift!.at + LANE_SHIFT_SEC ? old : null];
+          const at = Math.min(...times.map(m => m ?? Infinity));
+          if (at === Infinity) continue;
           const others = [placed.path, ...pathsOf(ships, fish.filter(g => g !== f))];
           const dodged = dodge({ ...f, path: f.path }, at, others);
           fish = fish.map(g => (g === f ? dodged : g));
