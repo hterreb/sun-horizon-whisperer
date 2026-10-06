@@ -24,11 +24,11 @@ import {
 import ScenePlane, { PLANE_ASPECT, PLANE_TRAIL_X, PLANE_TRAIL_Y } from './ScenePlane';
 import {
   CONTRAIL_LOOK, MAX_PLANES, PLANE_BAND, PLANE_GAP_MIN_MS, PLANE_GAP_RANGE_MS, PLANE_OVERRIDE_GAP_MS, PLANE_WIDTH_PX, TRAIL_PX,
-  getPlaneLook, getPlaneOverride, getTrailLength, getTrailPieces, isPlaneWeather, showsPlaneLights, type ContrailKind,
+  getPlaneLook, getPlaneOverride, getTrailColour, getTrailLength, getTrailPieces, isPlaneWeather, showsPlaneLights, type ContrailKind,
 } from '@/utils/planes';
 import { getPrecipitationSlantPx } from '../utils/cloudLayoutUtils';
 import {
-  type CloudLayers, getDaySeed, getCloudColors, getCloudLight, getTimeOfDayAltitude, rgba,
+  type CloudLayers, getDaySeed, getTimeOfDayAltitude,
 } from '../utils/skyCloudUtils';
 import {
   getWeatherEffects, pickBoat, hasBoatWake, getBoatTone, type BoatKind,
@@ -69,6 +69,8 @@ interface CloudLayerProps {
   cloudLayers?: CloudLayers | null;
   // The planes' contrails from the forecast's upper air (ROADMAP item 96).
   contrail?: ContrailKind;
+  // The live radar is on (item 96, Premium): its planes replace the decorative ones.
+  livePlanes?: boolean;
   windSpeedKmh?: number | null;
   windDirectionDeg?: number | null;
   // The forecast rain amount in mm/h (ROADMAP item 77, X1); null: the type's middle value.
@@ -110,7 +112,7 @@ const HIT_PX = 44;
 // An invisible hit area of at least HIT_PX x HIT_PX around a thing's box (`width` x `height` px,
 // centred at `cx`, `cy` in its wrapper), with the ring when the thing's card is open. A child
 // of the wrapper, so the wrapper's CSS animation moves the ring too.
-const HitArea: React.FC<{ cx: number; cy: number; width: number; height: number; ring: boolean }> = ({ cx, cy, width, height, ring }) => {
+export const HitArea: React.FC<{ cx: number; cy: number; width: number; height: number; ring: boolean }> = ({ cx, cy, width, height, ring }) => {
   const w = Math.max(HIT_PX, width);
   const h = Math.max(HIT_PX, height);
   return (
@@ -466,6 +468,7 @@ export interface SpawnRules {
   huntOverride?: HuntVariant | null; // `?hunt=` (item 94)
   contrail?: ContrailKind; // the planes' contrail from the forecast (item 96); none without
   planeOverride?: ContrailKind | null; // `?plane=` (item 96): a plane every 20 s with this contrail
+  livePlanes?: boolean; // item 96: the live radar's planes replace the decorative ones
 }
 type View = SpawnRules['view'];
 
@@ -858,7 +861,7 @@ export const spawnTick = (
   // the other planes. None when the sky is hidden (fog, a deck, rain, a storm). The gap is
   // rolled once per plane; with no free lane, the next check tries again. A plane with a
   // persistent trail stays in the list until its trail fades, but counts only while it crosses.
-  if (isPlaneWeather(weatherType)) {
+  if (isPlaneWeather(weatherType) && !rules.livePlanes) {
     last.planeGap ??= rules.planeOverride ? PLANE_OVERRIDE_GAP_MS : PLANE_GAP_MIN_MS + random() * PLANE_GAP_RANGE_MS;
     if (now - last.planes > last.planeGap * gapFactor) {
       const crossing = planes.filter(p => p.path && p.path.start <= sceneTime && sceneTime <= p.path.start + p.path.duration);
@@ -924,6 +927,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   longitude = 0,
   cloudLayers = null,
   contrail = 'none',
+  livePlanes = false,
   windSpeedKmh = null,
   windDirectionDeg = null,
   rainMmH = null,
@@ -987,6 +991,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   // does not restart the spawn loop.
   const contrailRef = useRef(contrail);
   useEffect(() => { contrailRef.current = contrail; }, [contrail]);
+  const livePlanesRef = useRef(livePlanes);
+  useEffect(() => { livePlanesRef.current = livePlanes; }, [livePlanes]);
   // Busy and quiet phases (item 93, S3). In a ref, so the spawn loop does not restart each
   // time the date ticks.
   const density = sunTimes ? getSceneDensity(date, sunTimes, getDaySeed(date, latitude, longitude)) : 1;
@@ -1061,7 +1067,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   useEffect(() => {
     // Reduced motion: skip spawning birds, fish, ships and leaves entirely (static sky).
     if (prefersReducedMotion) return;
-    const rules: Omit<SpawnRules, 'view' | 'density' | 'poolX' | 'contrail'> = {
+    const rules: Omit<SpawnRules, 'view' | 'density' | 'poolX' | 'contrail' | 'livePlanes'> = {
       weatherType, timeOfDay, windSpeedKmh, isFullscreen, moonUp, moonY, month, latitude, gapFactor, fishOverride, huntOverride, planeOverride,
       birdSpeedFactor: effects.birdSpeedFactor,
       showLeaves: effects.showLeaves,
@@ -1072,7 +1078,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       const now = Date.now();
       const view = { width: window.innerWidth, height: window.innerHeight };
       updateEntities(prev => spawnTick(
-        prev, lastSpawnTimeRef.current, { ...rules, view, density: densityRef.current, poolX: poolXRef.current, contrail: contrailRef.current }, now, getSceneTime(sceneClockRef.current, now),
+        prev, lastSpawnTimeRef.current, { ...rules, view, density: densityRef.current, poolX: poolXRef.current, contrail: contrailRef.current, livePlanes: livePlanesRef.current }, now, getSceneTime(sceneClockRef.current, now),
       ));
     };
 
@@ -1234,7 +1240,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   // clock as its crossing), then spread to a band and fade. Only transform and opacity move.
   const lightAltitude = sun ? Math.round(sun.altitude * 2) / 2 : getTimeOfDayAltitude(timeOfDay);
   const trailColour = useMemo(
-    () => rgba(getCloudColors('Ci', 'high', weatherType, getCloudLight(lightAltitude)).lit, 0.8),
+    () => getTrailColour(weatherType, lightAltitude),
     [weatherType, lightAltitude],
   );
   const renderPlane = (plane: PlaneEntity) => {

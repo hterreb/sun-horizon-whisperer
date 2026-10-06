@@ -27,6 +27,7 @@ import {
 } from '../utils/moonUtils';
 import { fetchCurrentWeather, getUpperAirAt, getWeatherAt, type WeatherData } from '../utils/weatherUtils';
 import { getContrail } from '@/utils/planes';
+import { useLivePlanes, type LivePlanesState } from '@/hooks/useLivePlanes';
 import { getSkyOvercastMix, getStarCloudFactor } from '@/utils/weatherEffectsUtils';
 import { getAstroEvent, parseEggOverride, METEOR_SHOWER_RATE } from '@/utils/astroEvents';
 import SunVisualization from './SunVisualization';
@@ -116,6 +117,9 @@ const loadStoredEyeHeight = (): number => {
   }
 };
 
+// The live radar before its first answer (item 96).
+const NO_LIVE_PLANES: LivePlanesState = { feed: { now: 0, aircraft: [] }, receivedAt: 0 };
+
 const SunTracker: React.FC = () => {
   const [date, setDate] = useState<Date>(new Date());
   // A manually chosen location (set via InfoPanel's "Change location" form) takes
@@ -177,6 +181,10 @@ const SunTracker: React.FC = () => {
   // Line of sight is off while Premium is locked.
   const premium = usePremium(language);
   const isLineOfSightOn = !premium.isLocked;
+  // The live radar (ROADMAP item 96): off by default, as it sends the rounded place to adsb.lol
+  // (through our proxy). Premium in the Play app; only live, not during time travel, where the
+  // scene shows another time and the decorative planes fly.
+  const [isLivePlanesOn, setLivePlanesOn] = useState(false);
   useEffect(() => {
     document.documentElement.lang = language;
   }, [language]);
@@ -767,6 +775,10 @@ const SunTracker: React.FC = () => {
   // manual weather has no upper air, so no contrails.
   const upperAir = useRealWeather ? getUpperAirAt(weatherData?.hourly ?? null, date) : null;
   const contrail = getContrail(upperAir?.tempC, upperAir?.rhPercent);
+  const isLiveRadarActive = isLivePlanesOn && location.loaded && !premium.isLocked && !isTimePreview;
+  const liveFeed = useLivePlanes(isLiveRadarActive, location.latitude, location.longitude);
+  // While the radar is on and its first answer is on the way, no plane shows.
+  const livePlanes: LivePlanesState | null = isLiveRadarActive ? liveFeed ?? NO_LIVE_PLANES : null;
 
   const skyGradient = useMemo(() => {
     // Clouds dim the sky (ROADMAP item 50): mix toward grey per weather type, scaled
@@ -859,6 +871,7 @@ const SunTracker: React.FC = () => {
             rainMmH={rainMmH}
             cloudLayers={cloudLayers}
             contrail={contrail}
+            livePlanes={livePlanes}
             cloudEgg={cloudEgg}
             sunTimes={sunTimes}
             windDirectionDeg={weatherData?.windDirectionDeg ?? null}
@@ -919,6 +932,8 @@ const SunTracker: React.FC = () => {
             horizonProfile={horizonProfile}
             isSunsetReminderOn={isReminderOn}
             onSunsetReminderToggle={notificationPermission === 'unsupported' ? undefined : handleReminderToggle}
+            isLivePlanesOn={isLivePlanesOn}
+            onLivePlanesToggle={setLivePlanesOn}
           />
         </>
       )}

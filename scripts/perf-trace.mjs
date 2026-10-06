@@ -5,7 +5,7 @@
 // Prints a markdown table and writes JSON to scripts/perf-results/ (gitignored).
 // Usage: npm run perf:trace -- [--seconds 60] [--runs 1] [--scenes day,night,rain,fullscreen]
 //          [--profiles phone,desktop] [--warmup 20] [--build] [--url URL] [--cpu-profile] [--headed]
-//          [--screenshots DIR]
+//          [--screenshots DIR] [--live-planes N]
 //
 // Sources of the numbers:
 // - Scripting, rendering (style + layout), main-thread busy time and JS heap: deltas of
@@ -34,6 +34,9 @@
 //
 // --cpu-profile records a CDP CPU profile in each run and serves an unminified build, so
 // that function names stay readable. It prints the top 10 functions and modules by self time.
+//
+// --live-planes N turns on the live radar (ROADMAP item 96) through the panel's switch and
+// answers /api/planes with N aircraft around the place (a fixed set, 20-100 km, 9-12 km high).
 //
 // --screenshots DIR saves a PNG of each scene after its measured window (so it does not
 // change the numbers), named <profile>-<scene>-run<N>.png, to compare the look before and
@@ -79,7 +82,7 @@ const TRACE_CATEGORIES = ['devtools.timeline', 'toplevel']; // the disabled-by-d
 const parseArgs = (argv) => {
   const opts = {
     seconds: 60, warmup: 20, runs: 1, scenes: Object.keys(SCENES), profiles: Object.keys(PROFILES),
-    url: null, build: false, cpuProfile: false, headed: false, screenshots: null, out: path.join(ROOT, 'scripts/perf-results'),
+    url: null, livePlanes: 0, build: false, cpuProfile: false, headed: false, screenshots: null, out: path.join(ROOT, 'scripts/perf-results'),
   };
   for (let i = 0; i < argv.length; i++) {
     const [flag, inline] = argv[i].split('=', 2);
@@ -96,6 +99,7 @@ const parseArgs = (argv) => {
       case '--cpu-profile': opts.cpuProfile = true; break;
       case '--headed': opts.headed = true; break;
       case '--screenshots': opts.screenshots = path.resolve(value()); break;
+      case '--live-planes': opts.livePlanes = Number(value()); break;
       default: throw new Error(`Unknown option ${argv[i]} (see the summary at the top of scripts/perf-trace.mjs)`);
     }
   }
@@ -199,6 +203,22 @@ const stubFor = (url, scene) => {
   return null; // radio streams and anything unknown: aborted
 };
 
+// The live radar's answer (item 96): `count` aircraft around the place, the same on each run.
+const liveFeed = (count, nowMs) => ({
+  now: nowMs,
+  aircraft: Array.from({ length: count }, (_, i) => {
+    const bearing = (i * 137.5) % 360; // spread around the observer
+    const km = 20 + ((i * 37) % 81);
+    return {
+      hex: (0xa00000 + i).toString(16), callsign: `DLH${100 + i}`, type: 'A320', altM: 9000 + ((i * 53) % 3000),
+      speedKt: 420 + (i % 7) * 10, track: (i * 71) % 360,
+      lat: PLACE.latitude + (km / 111.2) * Math.cos((bearing * Math.PI) / 180),
+      lon: PLACE.longitude + (km / (111.2 * Math.cos((PLACE.latitude * Math.PI) / 180))) * Math.sin((bearing * Math.PI) / 180),
+      ageSec: 1,
+    };
+  }),
+});
+
 // ---------- page instrumentation (runs in the page before the app) ----------
 
 const pageInit = ({ startMs, seed }) => {
@@ -270,6 +290,7 @@ const sceneCheck = () => {
     boats: count('scene-boat'),
     birds: count('scene-bird') + count('scene-bat'),
     rainCanvas: count('rain-canvas'),
+    livePlanes: count('live-plane'),
     canvases: document.querySelectorAll('canvas').length,
     runningAnimations: document.getAnimations().filter((a) => a.playState === 'running').length,
     fullscreenElement: !!document.fullscreenElement,
@@ -437,9 +458,15 @@ const measureScene = async (browser, browserCdp, appUrl, opts, profileName, scen
     reducedMotion: 'no-preference',
   });
   const network = { stubbed: {}, blocked: [] };
+  const contextStart = Date.now();
   await context.route('**/*', (route) => {
     const url = new URL(route.request().url());
-    if (url.origin === appOrigin) return route.continue();
+    if (url.origin === appOrigin) {
+      if (opts.livePlanes > 0 && url.pathname === '/api/planes') {
+        return route.fulfill(json(liveFeed(opts.livePlanes, Date.parse(scene.start) + (Date.now() - contextStart))));
+      }
+      return route.continue();
+    }
     const stub = stubFor(url, sceneName);
     if (!stub) {
       network.blocked.push(url.href);
@@ -459,6 +486,16 @@ const measureScene = async (browser, browserCdp, appUrl, opts, profileName, scen
     // TopLeftButtons render when the start reveal is done.
     const fullscreenButton = page.getByRole('button', { name: 'Enter fullscreen' });
     await fullscreenButton.waitFor({ timeout: 60_000 });
+
+    if (opts.livePlanes > 0) {
+      // The panel starts collapsed on a phone: open it, turn on the switch, close it again.
+      const tap = (locator) => (profile.hasTouch ? locator.tap() : locator.click());
+      const expand = page.getByRole('button', { name: 'Expand info panel' });
+      const collapsed = (await expand.count()) > 0;
+      if (collapsed) await tap(expand);
+      await tap(page.getByRole('switch', { name: 'Live planes' }));
+      if (collapsed) await tap(page.getByRole('button', { name: 'Collapse info panel' }));
+    }
 
     let fullscreen = null;
     if (scene.fullscreen) {
@@ -624,7 +661,7 @@ const main = async () => {
           r.run = i;
           runs.push(r);
           const e = r.check.end;
-          console.log(`fish ${e.fish}, boats ${e.boats}, birds ${e.birds}, rain ${e.rainCanvas}, animations ${e.runningAnimations}, ` +
+          console.log(`fish ${e.fish}, boats ${e.boats}, birds ${e.birds}, live planes ${e.livePlanes}, rain ${e.rainCanvas}, animations ${e.runningAnimations}, ` +
             `clock ${r.check.start.clockText ?? '–'} → ${e.clockText ?? '–'}${r.fullscreen ? `, fullscreen ${r.fullscreen}` : ''}`);
           for (const w of warnings(r)) console.warn(`  WARNING: ${w}`);
         }

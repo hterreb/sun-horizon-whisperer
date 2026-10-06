@@ -4,6 +4,12 @@
 
 import { type WeatherType } from '@/components/CloudLayer';
 import { type TimeOfDay } from './sunUtils';
+import { getCloudColors, getCloudLight, rgba } from './skyCloudUtils';
+
+// The trail takes the light of the high clouds (item 84): white by day, gold and pink at
+// sunset, dim at night. `sunAltitude` in degrees, rounded by the caller so it changes rarely.
+export const getTrailColour = (weather: WeatherType, sunAltitude: number): string =>
+  rgba(getCloudColors('Ci', 'high', weather, getCloudLight(sunAltitude)).lit, 0.8);
 
 export type ContrailKind = 'none' | 'short' | 'medium' | 'persistent';
 

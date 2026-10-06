@@ -26,7 +26,10 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { formatNumber, type MessageKey } from '@/i18n';
 import { type Language } from '@/utils/language';
 import { type PlayDirection } from '@/utils/timeTravel';
-import { type ContrailKind } from '@/utils/planes';
+import { getTrailColour, isPlaneWeather, showsPlaneLights, type ContrailKind } from '@/utils/planes';
+import LivePlanes from './LivePlanes';
+import { type LivePlanesState } from '@/hooks/useLivePlanes';
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 
 // A fixed fallback seed date for callers that don't pass one (e.g. existing tests) -
 // a stable constant, not `new Date()`, so it never changes identity across renders.
@@ -62,6 +65,8 @@ interface SunVisualizationProps {
   cloudLayers?: CloudLayers | null;
   // The planes' contrails from the forecast's upper air (ROADMAP item 96).
   contrail?: ContrailKind;
+  // The live radar's feed while it is on (ROADMAP item 96, Premium); null: the decorative planes.
+  livePlanes?: LivePlanesState | null;
   // A rare lenticular or mammatus day (ROADMAP item 84, X1).
   cloudEgg?: boolean;
   // The day's sun times: the scene's busy and quiet phases follow them (ROADMAP item 93, S3).
@@ -547,6 +552,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   rainMmH = null,
   cloudLayers = null,
   contrail = 'none',
+  livePlanes = null,
   cloudEgg = false,
   sunTimes = null,
   compassHeading = null,
@@ -916,9 +922,39 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     return fraction > 0.5 ? 'right' : 'left';
   }, [compassActive, moonAltitudeVisible, sunAltitudeVisible, moonPosition.azimuth, sunPosition.azimuth, compassHeading]);
 
+  // The live radar (item 96): the aircraft at their direction and elevation angle, with the
+  // sun's mapping (compass mode included). None where the sky is hidden, as the decorative ones.
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const { width: sceneWidth, height: sceneHeight } = containerDimensions;
+  const projectSky = useMemo(() => (altitude: number, azimuth: number) => ({
+    x: sceneWidth * resolveAzimuth(azimuth, latitude, compassHeading).fraction,
+    y: altitudeToY(altitude, sceneHeight),
+  }), [sceneWidth, sceneHeight, latitude, compassHeading]);
+  const showLivePlanes = !!livePlanes && sceneWidth > 0 && isPlaneWeather(weatherType);
+
   return (
     <div ref={containerRef} className="w-full h-dvh relative overflow-hidden" data-testid="sun-visualization">
+      {showLivePlanes && (
+        <LivePlanes
+          state={livePlanes}
+          observer={{
+            lat: latitude,
+            lon: longitude,
+            elevationM: (horizonProfile?.observerElevation ?? 0) + (horizonProfile?.eyeHeight ?? 1.7),
+          }}
+          project={projectSky}
+          width={sceneWidth}
+          profile={horizonProfile}
+          lights={showsPlaneLights(timeOfDay)}
+          contrail={contrail}
+          trailColour={getTrailColour(weatherType, Math.round(sunPosition.altitude * 2) / 2)}
+          reducedMotion={prefersReducedMotion}
+          onInfo={onSceneInfo}
+          infoRing={infoRing}
+        />
+      )}
       <CloudLayer
+        livePlanes={!!livePlanes}
         timeOfDay={timeOfDay}
         weatherType={weatherType}
         date={date}
