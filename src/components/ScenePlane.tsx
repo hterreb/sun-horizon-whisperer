@@ -18,9 +18,12 @@ const BODY = [
 interface ScenePlaneProps {
   width: number; // px
   lights?: 'red' | 'green';
+  // The live radar (item 96) flashes the strobe from its own clock: true shows it, false hides
+  // it, no CSS animation. Without it, the strobe flashes by itself once every 2 s.
+  strobeOn?: boolean;
 }
 
-const ScenePlane = ({ width, lights }: ScenePlaneProps) => (
+const ScenePlane = ({ width, lights, strobeOn }: ScenePlaneProps) => (
   <svg width={width} height={width * PLANE_ASPECT} viewBox="0 0 40 12" className="block overflow-visible" data-testid="scene-plane">
     {lights ? (
       <>
@@ -30,7 +33,7 @@ const ScenePlane = ({ width, lights }: ScenePlaneProps) => (
           cy={4.4}
           r={1.3}
           fill="hsl(var(--scene-plane-strobe))"
-          style={{ animation: 'planeStrobe 2s linear infinite' }}
+          style={strobeOn === undefined ? { animation: 'planeStrobe 2s linear infinite' } : { opacity: strobeOn ? 1 : 0 }}
           data-testid="plane-strobe"
         />
       </>

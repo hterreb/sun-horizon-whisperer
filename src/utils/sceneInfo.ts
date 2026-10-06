@@ -20,6 +20,7 @@ export type SceneInfoTarget =
   | { type: 'bird'; kind: BirdKind | 'bat' }
   | { type: 'boat'; kind: BoatKind }
   | { type: 'plane'; contrail: ContrailKind }
+  | { type: 'livePlane'; callsign: string | null; airline: string | null; aircraftType: string | null; altM: number; speedKt: number }
   | { type: 'cloud'; cloudType: CloudType; band: CloudBand }
   | { type: 'sun' }
   | { type: 'moon' }
@@ -223,6 +224,20 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
           { value: { key: 'planeFact.airliner' } },
           { label: 'info.altitude', value: { key: 'info.cruiseAltitude' } },
           { label: 'info.contrail', value: { key: CONTRAILS[target.contrail] } },
+        ],
+      };
+    case 'livePlane':
+      // Item 96 (Premium): an aircraft of the live feed. adsb.lol has no airline and no route:
+      // the airline comes from the callsign (liveRadar), and the feed has no routes today.
+      return {
+        title: 'plane.live',
+        lines: [
+          { label: 'info.callsign', value: target.callsign ?? '—' },
+          { label: 'info.airline', value: target.airline ?? '—' },
+          { label: 'info.aircraftType', value: target.aircraftType ?? '—' },
+          { label: 'info.altitude', value: { key: 'info.km', vars: { value: formatNumber(language, target.altM / 1000, 1) } } },
+          { label: 'info.speed', value: { key: 'info.kmh', vars: { value: formatNumber(language, Math.round(target.speedKt * 1.852), 0) } } },
+          { value: { key: 'info.dataAdsbLol' } },
         ],
       };
     case 'cloud': {

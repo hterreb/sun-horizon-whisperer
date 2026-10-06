@@ -83,6 +83,16 @@ describe('sceneInfo (ROADMAP item 95)', () => {
     ]);
   });
 
+  it('gives a live plane its callsign, airline, type, altitude, speed and the data source (item 96)', () => {
+    const target: SceneInfoTarget = { type: 'livePlane', callsign: 'DLH4KL', airline: 'Lufthansa', aircraftType: 'A320', altM: 11_674, speedKt: 477 };
+    expect(card(target)).toEqual([
+      'Live plane', 'Callsign: DLH4KL', 'Airline: Lufthansa', 'Aircraft type: A320', 'Altitude: 11.7 km', 'Speed: 883 km/h',
+      'Data: adsb.lol (ODbL)',
+    ]);
+    expect(card({ ...target, callsign: null, airline: null, aircraftType: null })[1]).toBe('Callsign: —');
+    expect(card(target, { language: 'de' }, de)[4]).toBe('Höhe: 11,7 km');
+  });
+
   it("gives a cloud its type, its layer and the forecast cover of that layer (item 84)", () => {
     expect(card({ type: 'cloud', cloudType: 'Ci', band: 'high' })).toEqual(['Cirrus', 'Layer: High', 'Cover: 70%']);
     const german = card({ type: 'cloud', cloudType: 'Cu', band: 'low' }, { language: 'de' }, de);

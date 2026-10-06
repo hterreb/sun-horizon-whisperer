@@ -1336,6 +1336,13 @@ describe('planes and contrails (ROADMAP item 96)', () => {
     expect(scene.planes).toHaveLength(0);
   });
 
+  it('sends no decorative plane while the live radar is on, and takes the ones on screen away (item 96)', () => {
+    expect(firstPlaneAt({ livePlanes: true }, 1)).toBeNull();
+    const { plane } = firstPlaneAt({}, 1)!;
+    const scene = spawnTick({ ...empty(), planes: [plane] }, times(), rules({ livePlanes: true }), 1000, 1, mulberry32(1));
+    expect(scene.planes).toHaveLength(0);
+  });
+
   it('shows only the lights at night: a red or a green wing light', () => {
     const { plane } = firstPlaneAt({ timeOfDay: 'night' }, 3)!;
     expect(['red', 'green']).toContain(plane.lights);

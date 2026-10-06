@@ -142,6 +142,9 @@ interface InfoPanelProps {
   // gold plus. Not passed when the browser has no Notification API.
   isIssReminderOn?: boolean;
   onIssReminderToggle?: () => void;
+  // The live radar (ROADMAP item 96, Premium): the "Live planes" switch, off by default.
+  isLivePlanesOn?: boolean;
+  onLivePlanesToggle?: (on: boolean) => void;
 }
 
 const InfoPanel: React.FC<InfoPanelProps> = ({
@@ -189,6 +192,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   onSatelliteTrackingToggle,
   isIssReminderOn = false,
   onIssReminderToggle,
+  isLivePlanesOn = false,
+  onLivePlanesToggle,
 }) => {
   const { t, language, setLanguage } = useLanguage();
   // Premium gate (ROADMAP item 14): every gold-plus control goes through requirePremium.
@@ -651,6 +656,23 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Live planes (ROADMAP item 96): the live flight radar, Premium in the Play app. */}
+          {onLivePlanesToggle && (
+            <div className="mb-4 pt-2 border-t border-white/20">
+              <div className="flex items-center justify-between gap-2">
+                <label htmlFor="live-planes" className={`${SECTION_HEADING} inline-flex items-center gap-1`}>
+                  {t('radar.livePlanes')}<PremiumBadge />
+                </label>
+                <Switch
+                  id="live-planes"
+                  checked={isLivePlanesOn}
+                  onCheckedChange={on => (on ? requirePremium(() => onLivePlanesToggle(true)) : onLivePlanesToggle(false))}
+                />
+              </div>
+              <p className="text-caption opacity-60 mt-1">{t('radar.hint')}</p>
+            </div>
+          )}
 
           {/* Manual Weather Selector - only show when not using real weather */}
           {!useRealWeather && (

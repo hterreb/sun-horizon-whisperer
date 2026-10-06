@@ -913,6 +913,31 @@ describe('InfoPanel: line of sight as an icon at the sun and moon rows (ROADMAP 
       expect(screen.queryByTestId('premium-badge')).not.toBeInTheDocument();
       expect(screen.getByText('7/10')).toBeInTheDocument();
     });
+
+    it('turns the live planes on through requirePremium, off at once (ROADMAP item 96)', () => {
+      const locked = premiumValue({});
+      const onLivePlanesToggle = vi.fn();
+      const { unmount } = render(
+        <PremiumContext.Provider value={locked}>
+          <InfoPanel {...defaultProps} weatherData={weatherData} isLivePlanesOn={false} onLivePlanesToggle={onLivePlanesToggle} />
+        </PremiumContext.Provider>
+      );
+      const toggle = screen.getByRole('switch', { name: /live planes/i });
+      expect(toggle).toHaveAttribute('aria-checked', 'false'); // off by default
+      expect(screen.getByText(/rounded to about 11 km, to adsb\.lol/)).toBeInTheDocument();
+      fireEvent.click(toggle);
+      expect(locked.requirePremium).toHaveBeenCalledTimes(1);
+      expect(onLivePlanesToggle).not.toHaveBeenCalled();
+      unmount();
+      const open = premiumValue({ isPremium: true, isLocked: false, requirePremium: action => action?.() });
+      render(
+        <PremiumContext.Provider value={open}>
+          <InfoPanel {...defaultProps} weatherData={weatherData} isLivePlanesOn onLivePlanesToggle={onLivePlanesToggle} />
+        </PremiumContext.Provider>
+      );
+      fireEvent.click(screen.getByRole('switch', { name: /live planes/i }));
+      expect(onLivePlanesToggle).toHaveBeenCalledWith(false);
+    });
   });
 });
 

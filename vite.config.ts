@@ -1,9 +1,28 @@
 
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig, loadEnv, type Connect, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { VitePWA } from 'vite-plugin-pwa';
 import { sentryVitePlugin } from '@sentry/vite-plugin';
+import { handlePlanesRequest } from './src/utils/planeFeed';
+
+// The live radar's proxy (ROADMAP item 96) in `npm run dev` and `vite preview`: the same
+// handler as the Vercel Edge function api/planes.ts.
+const planesApi = (): Plugin => {
+  const serve: Connect.NextHandleFunction = (req, res, next) => {
+    if (!req.url?.startsWith('/api/planes')) return next();
+    handlePlanesRequest(new Request(`http://localhost${req.url}`, { method: req.method })).then(async response => {
+      res.statusCode = response.status;
+      response.headers.forEach((value, key) => res.setHeader(key, value));
+      res.end(await response.text());
+    }, next);
+  };
+  return {
+    name: 'planes-api',
+    configureServer: server => { server.middlewares.use(serve); },
+    configurePreviewServer: server => { server.middlewares.use(serve); },
+  };
+};
 
 // Source maps go to Sentry only in CI builds that have SENTRY_AUTH_TOKEN (ROADMAP
 // item 21). The maps are deleted after upload, so they are never served. The token
@@ -26,6 +45,7 @@ export default defineConfig(({ mode }) => {
   },
   plugins: [
     react(),
+    planesApi(),
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {

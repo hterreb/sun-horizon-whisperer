@@ -27,6 +27,7 @@ import {
 } from '../utils/moonUtils';
 import { fetchCurrentWeather, getUpperAirAt, getWeatherAt, type WeatherData } from '../utils/weatherUtils';
 import { getContrail } from '@/utils/planes';
+import { useLivePlanes, type LivePlanesState } from '@/hooks/useLivePlanes';
 import { getSkyOvercastMix, getStarCloudFactor } from '@/utils/weatherEffectsUtils';
 import { getAstroEvent, parseEggOverride, METEOR_SHOWER_RATE } from '@/utils/astroEvents';
 import SunVisualization from './SunVisualization';
@@ -90,6 +91,8 @@ const SUNSET_REMINDER_STORAGE_KEY = 'sunset-reminder';
 const SATELLITE_TRACKING_STORAGE_KEY = 'satellite-tracking';
 // "ISS passes" reminder toggle (ROADMAP item 97), off by default.
 const ISS_REMINDER_STORAGE_KEY = 'iss-pass-reminder';
+// The live radar's switch (ROADMAP item 96): saved, off by default (Lutz, 2026-10-06).
+const LIVE_PLANES_STORAGE_KEY = 'live-planes';
 const SATELLITE_CARD_STEP_MS = 10_000;
 const DEFAULT_EYE_HEIGHT_M = 1.7;
 // Manual weather's strong-wind switch (ROADMAP item 73): above the 40 km/h strong-wind line.
@@ -122,6 +125,9 @@ const loadStoredEyeHeight = (): number => {
     return DEFAULT_EYE_HEIGHT_M;
   }
 };
+
+// The live radar before its first answer (item 96).
+const NO_LIVE_PLANES: LivePlanesState = { feed: { now: 0, aircraft: [] }, receivedAt: 0 };
 
 const SunTracker: React.FC = () => {
   const [date, setDate] = useState<Date>(new Date());
@@ -184,6 +190,24 @@ const SunTracker: React.FC = () => {
   // Line of sight is off while Premium is locked.
   const premium = usePremium(language);
   const isLineOfSightOn = !premium.isLocked;
+  // The live radar (ROADMAP item 96): off by default, as it sends the rounded place to adsb.lol
+  // (through our proxy); the choice is saved. Premium in the Play app; only live, not during time travel, where the
+  // scene shows another time and the decorative planes fly.
+  const [isLivePlanesOn, setLivePlanesOn] = useState(() => {
+    try {
+      return localStorage.getItem(LIVE_PLANES_STORAGE_KEY) === 'on';
+    } catch {
+      return false;
+    }
+  });
+  const handleLivePlanesToggle = useCallback((on: boolean) => {
+    setLivePlanesOn(on);
+    try {
+      localStorage.setItem(LIVE_PLANES_STORAGE_KEY, on ? 'on' : 'off');
+    } catch (error) {
+      console.error('Error saving live planes:', error);
+    }
+  }, []);
   useEffect(() => {
     document.documentElement.lang = language;
   }, [language]);
@@ -848,6 +872,10 @@ const SunTracker: React.FC = () => {
   // manual weather has no upper air, so no contrails.
   const upperAir = useRealWeather ? getUpperAirAt(weatherData?.hourly ?? null, date) : null;
   const contrail = getContrail(upperAir?.tempC, upperAir?.rhPercent);
+  const isLiveRadarActive = isLivePlanesOn && location.loaded && !premium.isLocked && !isTimePreview;
+  const liveFeed = useLivePlanes(isLiveRadarActive, location.latitude, location.longitude);
+  // While the radar is on and its first answer is on the way, no plane shows.
+  const livePlanes: LivePlanesState | null = isLiveRadarActive ? liveFeed ?? NO_LIVE_PLANES : null;
 
   const skyGradient = useMemo(() => {
     // Clouds dim the sky (ROADMAP item 50): mix toward grey per weather type, scaled
@@ -940,6 +968,7 @@ const SunTracker: React.FC = () => {
             rainMmH={rainMmH}
             cloudLayers={cloudLayers}
             contrail={contrail}
+            livePlanes={livePlanes}
             cloudEgg={cloudEgg}
             sunTimes={sunTimes}
             windDirectionDeg={weatherData?.windDirectionDeg ?? null}
@@ -1005,6 +1034,8 @@ const SunTracker: React.FC = () => {
             onSatelliteTrackingToggle={handleSatelliteTrackingToggle}
             isIssReminderOn={isIssReminderOn}
             onIssReminderToggle={notificationPermission === 'unsupported' ? undefined : handleIssReminderToggle}
+            isLivePlanesOn={isLivePlanesOn}
+            onLivePlanesToggle={handleLivePlanesToggle}
           />
         </>
       )}
