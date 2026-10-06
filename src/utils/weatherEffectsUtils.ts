@@ -154,11 +154,11 @@ export const pickNightFish = (r: number): NightFishPick => pickWeighted(NIGHT_FI
 export const pickMoonlitDayFish = (r: number): FishKind =>
   pickWeighted(FISH_WEIGHTS.filter(([kind]) => MOONLIT_DAY_FISH.includes(kind)), r);
 
-// At most four fish on screen, 2.5 at night (item 102: between item 93's three and two and the
-// five and three of E4 and item 65, NR1). getSceneLimit rounds the base times the width and the
-// density. A school or a pair is one entry. Turtles and jellyfish count too (item 93).
-export const MAX_FISH = 4;
-export const MAX_NIGHT_FISH = 2.5;
+// At most five fish on screen, three at night (item 103; item 102: 4 and 2.5, item 93: 3 and 2).
+// getSceneLimit rounds the base times the width and the density. A school or a pair is one
+// entry. Turtles and jellyfish count too (item 93).
+export const MAX_FISH = 5;
+export const MAX_NIGHT_FISH = 3;
 
 export const canSpawnFish = (onScreen: FishKind[], max = MAX_FISH): boolean => onScreen.length < max;
 
@@ -187,8 +187,8 @@ export const pickBird = (r: number, month: number, latitude: number, evening: bo
   pickWeighted(BIRD_WEIGHTS.filter(([kind]) =>
     isBirdInSeason(kind, month, latitude) && (kind !== 'starlings' || evening)), r);
 
-// At most four birds or groups in the sky (C3), per phone width like the fish (item 70).
-export const MAX_BIRDS = 4;
+// At most five birds or groups in the sky (item 103; C3: four), per phone width like the fish (item 70).
+export const MAX_BIRDS = 5;
 
 // Calm water on wide screens (ROADMAP item 66). Fish and boat speeds are a share of the
 // width per second, so on a desktop they move 3-5x more pixels per second than on a phone.
@@ -205,10 +205,10 @@ export const getWaterLimit = (base: number, viewportWidth: number): number =>
   Math.round(base / getWaterSpeedFactor(viewportWidth));
 
 // The limits of the fish, boats and birds (ROADMAP item 93, S2): they grow with the width as
-// getWaterLimit, but at most to 1.5 times the phone's limit, so a wide screen is calmer. The
+// getWaterLimit, but at most to 2.5 times the phone's limit (item 103; item 93: 1.5), so a wide screen is calmer. The
 // sea canvas (waves, foam) keeps getWaterLimit. `density` is getSceneDensity (S3): it scales
 // the limit, rounded, at least 1.
-export const SCENE_LIMIT_MAX_GROWTH = 1.5;
+export const SCENE_LIMIT_MAX_GROWTH = 2.5;
 export const getSceneLimit = (base: number, viewportWidth: number, density = 1): number =>
   Math.max(1, Math.round(base * Math.min(SCENE_LIMIT_MAX_GROWTH, 1 / getWaterSpeedFactor(viewportWidth)) * density));
 
