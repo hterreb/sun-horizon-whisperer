@@ -91,6 +91,8 @@ const SUNSET_REMINDER_STORAGE_KEY = 'sunset-reminder';
 const SATELLITE_TRACKING_STORAGE_KEY = 'satellite-tracking';
 // "ISS passes" reminder toggle (ROADMAP item 97), off by default.
 const ISS_REMINDER_STORAGE_KEY = 'iss-pass-reminder';
+// The live radar's switch (ROADMAP item 96): saved, off by default (Lutz, 2026-10-06).
+const LIVE_PLANES_STORAGE_KEY = 'live-planes';
 const SATELLITE_CARD_STEP_MS = 10_000;
 const DEFAULT_EYE_HEIGHT_M = 1.7;
 // Manual weather's strong-wind switch (ROADMAP item 73): above the 40 km/h strong-wind line.
@@ -189,9 +191,23 @@ const SunTracker: React.FC = () => {
   const premium = usePremium(language);
   const isLineOfSightOn = !premium.isLocked;
   // The live radar (ROADMAP item 96): off by default, as it sends the rounded place to adsb.lol
-  // (through our proxy). Premium in the Play app; only live, not during time travel, where the
+  // (through our proxy); the choice is saved. Premium in the Play app; only live, not during time travel, where the
   // scene shows another time and the decorative planes fly.
-  const [isLivePlanesOn, setLivePlanesOn] = useState(false);
+  const [isLivePlanesOn, setLivePlanesOn] = useState(() => {
+    try {
+      return localStorage.getItem(LIVE_PLANES_STORAGE_KEY) === 'on';
+    } catch {
+      return false;
+    }
+  });
+  const handleLivePlanesToggle = useCallback((on: boolean) => {
+    setLivePlanesOn(on);
+    try {
+      localStorage.setItem(LIVE_PLANES_STORAGE_KEY, on ? 'on' : 'off');
+    } catch (error) {
+      console.error('Error saving live planes:', error);
+    }
+  }, []);
   useEffect(() => {
     document.documentElement.lang = language;
   }, [language]);
@@ -1019,7 +1035,7 @@ const SunTracker: React.FC = () => {
             isIssReminderOn={isIssReminderOn}
             onIssReminderToggle={notificationPermission === 'unsupported' ? undefined : handleIssReminderToggle}
             isLivePlanesOn={isLivePlanesOn}
-            onLivePlanesToggle={setLivePlanesOn}
+            onLivePlanesToggle={handleLivePlanesToggle}
           />
         </>
       )}

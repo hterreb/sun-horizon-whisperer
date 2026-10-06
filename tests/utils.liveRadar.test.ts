@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  AIRLINE_COUNT, deadReckon, distanceAndBearing, getAircraftView, getAirlineName, getLiveContrail, getLivePlaneWidth,
+  AIRLINE_COUNT, MAX_LIVE_PLANES, deadReckon, distanceAndBearing, getAircraftView, getAirlineName, getLiveContrail, getLivePlaneWidth, pickNearestVisible, slantDistanceM,
   isAircraftVisible, planeFeedUrl,
 } from '@/utils/liveRadar';
 import { type LiveAircraft } from '@/utils/planeFeed';
@@ -85,6 +85,33 @@ describe('isAircraftVisible', () => {
     expect(isAircraftVisible({ azimuth: 10, elevation: 1, distanceM: 1 }, null)).toBe(true);
     expect(isAircraftVisible({ azimuth: 10, elevation: 4, distanceM: 1 }, flatProfile(5))).toBe(false);
     expect(isAircraftVisible({ azimuth: 10, elevation: 6, distanceM: 1 }, flatProfile(5))).toBe(true);
+  });
+});
+
+describe('pickNearestVisible (Lutz, 2026-10-06: the 12 nearest)', () => {
+  const item = (distanceKm: number, elevation: number, altM = 10_000, azimuth = 180) =>
+    ({ ac: { altM }, view: { azimuth, elevation, distanceM: distanceKm * 1000 }, id: `${distanceKm}-${altM}` });
+
+  it('keeps the 12 nearest by slant distance', () => {
+    expect(MAX_LIVE_PLANES).toBe(12);
+    const items = Array.from({ length: 20 }, (_, i) => item(100 - i * 4, 5));
+    const picked = pickNearestVisible(items, 450, null);
+    expect(picked).toHaveLength(12);
+    expect(picked.map(p => p.view.distanceM / 1000)).toEqual([24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68]);
+  });
+
+  it('measures the slant distance with the height: a high plane overhead is farther than a low one beside it', () => {
+    expect(slantDistanceM({ azimuth: 0, elevation: 80, distanceM: 2_000 }, 11_450, 450)).toBeCloseTo(Math.hypot(2_000, 11_000));
+    const picked = pickNearestVisible([item(2, 80, 11_450), item(8, 30, 3_000)], 450, null, 1);
+    expect(picked[0].id).toBe('8-3000');
+  });
+
+  it('picks only among the visible ones: one below 1° or behind the terrain leaves its place to the next', () => {
+    const ridge: HorizonProfile = { ...flatProfile(0), angles: Array.from({ length: 360 }, (_, az) => (az === 90 ? 20 : 0)) };
+    const items = [item(10, 0.5), item(12, 15, 10_000, 90), ...Array.from({ length: 12 }, (_, i) => item(20 + i, 5))];
+    const picked = pickNearestVisible(items, 450, ridge);
+    expect(picked).toHaveLength(12);
+    expect(picked.map(p => p.view.distanceM / 1000)).toEqual(Array.from({ length: 12 }, (_, i) => 20 + i));
   });
 });
 

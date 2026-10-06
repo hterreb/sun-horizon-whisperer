@@ -4,7 +4,7 @@ import { HitArea, type SceneInfoHandler } from './CloudLayer';
 import { type LivePlanesState } from '@/hooks/useLivePlanes';
 import { type LiveAircraft } from '@/utils/planeFeed';
 import {
-  LIVE_MAX_AGE_MS, getAircraftView, getAirlineName, getLiveContrail, getLivePlaneWidth, isAircraftVisible, type Observer,
+  LIVE_MAX_AGE_MS, getAircraftView, getAirlineName, getLiveContrail, getLivePlaneWidth, pickNearestVisible, type Observer,
 } from '@/utils/liveRadar';
 import { CONTRAIL_LOOK, TRAIL_PX, PLANE_WIDTH_PX, type ContrailKind } from '@/utils/planes';
 import { type HorizonProfile } from '@/utils/horizonUtils';
@@ -123,11 +123,12 @@ const LivePlanes: React.FC<LivePlanesProps> = ({
   const lag = Math.min(30, Math.max(0, (receivedAt - feed.now) / 1000));
   // Never further than the oldest answer the feed keeps (a minute).
   const sec = lag + (reducedMotion ? 0 : Math.min(LIVE_MAX_AGE_MS, Math.max(0, now - receivedAt)) / 1000);
+  // The 12 nearest aircraft by slant distance among the visible ones (Lutz, 2026-10-06).
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none" data-testid="live-planes">
-      {feed.aircraft.map(ac => {
-        const view = getAircraftView(observer, ac, sec);
-        if (!isAircraftVisible(view, profile)) return null;
+      {pickNearestVisible(
+        feed.aircraft.map(ac => ({ ac, view: getAircraftView(observer, ac, sec) })), observer.elevationM, profile,
+      ).map(({ ac, view }) => {
         const p = project(view.elevation, view.azimuth);
         if (p.x < -50 || p.x > width + 50) return null; // outside the compass field of view
         // The way across the screen: where it is 1 s later.

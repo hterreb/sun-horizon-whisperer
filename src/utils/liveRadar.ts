@@ -77,6 +77,26 @@ export const getAircraftView = (observer: Observer, ac: LiveAircraft, sec: numbe
 export const isAircraftVisible = (view: SkyView, profile: HorizonProfile | null): boolean =>
   view.elevation >= MIN_ELEVATION_DEG && (!profile || view.elevation > horizonAngleAt(profile, view.azimuth));
 
+// The radar shows at most this many aircraft (Lutz, 2026-10-06: "the 12 nearest"); 60 read as
+// a swarm.
+export const MAX_LIVE_PLANES = 12;
+
+// The straight-line distance from the eye to the aircraft (m): along the ground and up.
+export const slantDistanceM = (view: SkyView, altM: number, observerElevationM: number): number =>
+  Math.hypot(view.distanceM, altM - observerElevationM);
+
+// The aircraft that pass the visibility rules (1° or more, not behind the terrain), nearest
+// first by slant distance, at most `max`.
+export const pickNearestVisible = <T extends { ac: Pick<LiveAircraft, 'altM'>; view: SkyView }>(
+  items: T[], observerElevationM: number, profile: HorizonProfile | null, max = MAX_LIVE_PLANES,
+): T[] =>
+  items
+    .filter(item => isAircraftVisible(item.view, profile))
+    .map(item => ({ item, slant: slantDistanceM(item.view, item.ac.altM, observerElevationM) }))
+    .sort((a, b) => a.slant - b.slant)
+    .slice(0, max)
+    .map(({ item }) => item);
+
 // The contrail rule of the free part, for each aircraft above 8 km.
 export const getLiveContrail = (altM: number, forecast: ContrailKind): ContrailKind =>
   altM > CONTRAIL_MIN_ALT_M ? forecast : 'none';

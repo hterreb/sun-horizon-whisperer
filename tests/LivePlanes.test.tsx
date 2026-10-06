@@ -155,4 +155,25 @@ describe('LivePlanes (ROADMAP item 96)', () => {
       { x: 10, y: 20 }, 'live-a1b2c3',
     );
   });
+
+  it('shows the 12 nearest of the visible aircraft (Lutz, 2026-10-06)', () => {
+    // 20 aircraft due south at 30-87 km, all at 10 km.
+    const many = Array.from({ length: 20 }, (_, i) => ({
+      ...south, hex: (0xb00000 + i).toString(16), lat: PLACE.lat - (30 + i * 3) / KM_PER_DEG,
+    }));
+    const first = renderScene({ livePlanes: feed(many) });
+    const ys = (container: HTMLElement) =>
+      [...container.querySelectorAll<HTMLElement>('[data-testid="live-plane"]')].map(plane => start(plane).y);
+    // All due south, the same height: the nearest are the highest on the screen.
+    const all = ys(first.container);
+    expect(all).toHaveLength(12);
+    // The lowest one shown is the 12th nearest, at 63 km.
+    const yAt = (km: number) => 390 - Math.sin(Math.atan((10_000 - 1.7 - ((km * 1000) ** 2 / (2 * 6_371_000)) * 0.87) / (km * 1000))) * 360;
+    expect(Math.max(...all)).toBeCloseTo(yAt(63), 0);
+    expect(Math.min(...all)).toBeCloseTo(yAt(30), 0);
+    first.unmount();
+    // The nearest flies at 400 m, below 1°: the 13th takes its place, so 12 still show.
+    const { container } = renderScene({ livePlanes: feed([{ ...many[0], altM: 400 }, ...many.slice(1)]) });
+    expect(ys(container)).toHaveLength(12);
+  });
 });

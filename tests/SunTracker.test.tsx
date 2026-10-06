@@ -1079,4 +1079,43 @@ describe('SunTracker', () => {
       });
     });
   });
+
+  describe('live planes (ROADMAP item 96)', () => {
+    const radarCalls = () => vi.mocked(global.fetch).mock.calls.filter(([url]) => String(url).startsWith('/api/planes'));
+    beforeEach(() => {
+      saveManualLocation(47.781, 9.612, 'Ravensburg');
+      global.fetch = vi.fn(async (url: RequestInfo | URL) => (String(url).startsWith('/api/planes')
+        ? new Response(JSON.stringify({ now: 1, aircraft: [] }), { status: 200 })
+        : Promise.reject(new Error('offline')))) as unknown as typeof fetch;
+    });
+
+    it('is off by default; the switch saves its setting as live-planes, and the next start keeps it', async () => {
+      const first = render(<SunTracker />);
+      const toggle = await screen.findByRole('switch', { name: 'Live planes' });
+      expect(toggle).toHaveAttribute('aria-checked', 'false');
+      expect(radarCalls()).toHaveLength(0);
+      fireEvent.click(toggle);
+      expect(localStorage.getItem('live-planes')).toBe('on');
+      await waitFor(() => expect(radarCalls()[0]?.[0]).toBe('/api/planes?lat=47.8&lon=9.6'));
+      first.unmount();
+
+      render(<SunTracker />);
+      const again = await screen.findByRole('switch', { name: 'Live planes' });
+      expect(again).toHaveAttribute('aria-checked', 'true');
+      fireEvent.click(again);
+      expect(localStorage.getItem('live-planes')).toBe('off');
+      expect(screen.getByRole('switch', { name: 'Live planes' })).toHaveAttribute('aria-checked', 'false');
+    });
+
+    it('starts off when the storage cannot be read', async () => {
+      localStorage.setItem('live-planes', 'on');
+      const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
+      try {
+        render(<SunTracker />);
+        expect(await screen.findByRole('switch', { name: 'Live planes' })).toHaveAttribute('aria-checked', 'false');
+      } finally {
+        getItem.mockRestore();
+      }
+    });
+  });
 });
