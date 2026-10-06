@@ -34,7 +34,7 @@
     <li><a href="https://www.bigdatacloud.com">BigDataCloud</a>: place name</li>
   </ul>
   <p>For the line of sight to the horizon, the app downloads elevation tiles from Amazon Web Services (Mapzen Terrain Tiles). The tile names show your area to about 10 km.</p>
-  <p>If you turn on "Live planes" (off by default), the app asks for the aircraft near you every 15 seconds while it is open. It sends your place, rounded to about 11 km, to our server (sun-chaser.vercel.app), which forwards it to <a href="https://adsb.lol">adsb.lol</a> (open flight data, licensed under the <a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>). Like any web server, they receive your IP address. Our server does not store your place; our host (Vercel) keeps request logs for a short time.</p>
+  <p>If you turn on "Live planes" (off by default), the app asks for the aircraft near you every 15 seconds while it is open. It sends your place, rounded to about 11 km, to our server (sun-chaser.vercel.app), which forwards it to <a href="https://adsb.lol">adsb.lol</a> (open flight data, licensed under the <a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>). Like any web server, they receive your IP address. Our server does not store your place; our host (Vercel) keeps request logs for a short time. When you tap a plane, the app asks our server for its route: it sends the plane's callsign and your rounded place, and our server sends only the callsign on to adsb.lol.</p>
   <p>You can deny location access and enter a place by hand instead.</p>
 
   <h2>2. Place search</h2>

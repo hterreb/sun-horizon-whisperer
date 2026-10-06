@@ -119,14 +119,24 @@ describe('sceneInfo (ROADMAP item 95)', () => {
     ]);
   });
 
-  it('gives a live plane its callsign, airline, type, altitude, speed and the data source (item 96)', () => {
+  it('gives a live plane its callsign, airline, type, altitude and speed (item 96)', () => {
     const target: SceneInfoTarget = { type: 'livePlane', callsign: 'DLH4KL', airline: 'Lufthansa', aircraftType: 'A320', altM: 11_674, speedKt: 477 };
     expect(card(target)).toEqual([
       'Live plane', 'Callsign: DLH4KL', 'Airline: Lufthansa', 'Aircraft type: A320', 'Altitude: 11.7 km', 'Speed: 883 km/h',
-      'Data: adsb.lol (ODbL)',
     ]);
     expect(card({ ...target, callsign: null, airline: null, aircraftType: null })[1]).toBe('Callsign: —');
     expect(card(target, { language: 'de' }, de)[4]).toBe('Höhe: 11,7 km');
+  });
+
+  it('adds the route once the proxy has it, with the places when they are short (item 111)', () => {
+    const target: SceneInfoTarget = { type: 'livePlane', callsign: 'ELY326', airline: 'El Al', aircraftType: 'B738', altM: 11_000, speedKt: 450 };
+    const route = { from: { code: 'CDG', name: 'Paris' }, to: { code: 'TLV', name: 'Tel Aviv' } };
+    expect(card(target, { route }).at(-1)).toBe('Route: Paris (CDG) → Tel Aviv (TLV)');
+    expect(card(target, { route }, de).at(-1)).toBe('Route: Paris (CDG) → Tel Aviv (TLV)');
+    const long = { ...route, to: { code: 'CFU', name: 'Kerkyra Island' } };
+    expect(card(target, { route: long }).at(-1)).toBe('Route: CDG → CFU');
+    expect(card(target, { route: { ...route, from: { code: 'LFPG', name: null } } }).at(-1)).toBe('Route: LFPG → TLV');
+    expect(card(target, { route: null })).toHaveLength(6);
   });
 
   it("gives a cloud its type, its layer and the forecast cover of that layer (item 84)", () => {

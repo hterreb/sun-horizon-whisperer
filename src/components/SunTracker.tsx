@@ -28,6 +28,7 @@ import {
 import { fetchCurrentWeather, getUpperAirAt, getWeatherAt, type WeatherData } from '../utils/weatherUtils';
 import { getContrail } from '@/utils/planes';
 import { useLivePlanes, type LivePlanesState } from '@/hooks/useLivePlanes';
+import { useLiveRoute } from '@/hooks/useLiveRoute';
 import { getSkyOvercastMix, getStarCloudFactor } from '@/utils/weatherEffectsUtils';
 import { getAstroEvent, parseEggOverride, METEOR_SHOWER_RATE } from '@/utils/astroEvents';
 import SunVisualization from './SunVisualization';
@@ -876,6 +877,9 @@ const SunTracker: React.FC = () => {
   const liveFeed = useLivePlanes(isLiveRadarActive, location.latitude, location.longitude);
   // While the radar is on and its first answer is on the way, no plane shows.
   const livePlanes: LivePlanesState | null = isLiveRadarActive ? liveFeed ?? NO_LIVE_PLANES : null;
+  // A live plane's card asks for its route once (item 111).
+  const liveRouteCallsign = infoCard?.target.type === 'livePlane' ? infoCard.target.callsign : null;
+  const liveRoute = useLiveRoute(liveRouteCallsign, location.latitude, location.longitude);
 
   const skyGradient = useMemo(() => {
     // Clouds dim the sky (ROADMAP item 50): mix toward grey per weather type, scaled
@@ -1069,6 +1073,7 @@ const SunTracker: React.FC = () => {
             weatherType,
             cloudLayers,
             satellite: satelliteCard,
+            route: liveRoute,
           })}
           x={infoCard.x}
           y={infoCard.y}
