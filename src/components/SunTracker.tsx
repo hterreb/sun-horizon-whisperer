@@ -25,7 +25,8 @@ import {
   type MoonPosition,
   type MoonTimes
 } from '../utils/moonUtils';
-import { fetchCurrentWeather, getWeatherAt, type WeatherData } from '../utils/weatherUtils';
+import { fetchCurrentWeather, getUpperAirAt, getWeatherAt, type WeatherData } from '../utils/weatherUtils';
+import { getContrail } from '@/utils/planes';
 import { getSkyOvercastMix, getStarCloudFactor } from '@/utils/weatherEffectsUtils';
 import { getAstroEvent, parseEggOverride, METEOR_SHOWER_RATE } from '@/utils/astroEvents';
 import SunVisualization from './SunVisualization';
@@ -806,6 +807,10 @@ const SunTracker: React.FC = () => {
   const rainMmH = useRealWeather ? weatherData?.precipitationMmH ?? null : null;
   // The cover per layer for the cloud types (ROADMAP item 84); manual weather uses the type's own.
   const cloudLayers = useRealWeather ? weatherData?.cloudLayers ?? null : null;
+  // The planes' contrails (ROADMAP item 96) from the forecast's upper air at the scene's time;
+  // manual weather has no upper air, so no contrails.
+  const upperAir = useRealWeather ? getUpperAirAt(weatherData?.hourly ?? null, date) : null;
+  const contrail = getContrail(upperAir?.tempC, upperAir?.rhPercent);
 
   const skyGradient = useMemo(() => {
     // Clouds dim the sky (ROADMAP item 50): mix toward grey per weather type, scaled
@@ -897,6 +902,7 @@ const SunTracker: React.FC = () => {
             windSpeedKmh={useRealWeather ? weatherData?.windSpeedKmh ?? null : manualWindy ? MANUAL_STRONG_WIND_KMH : 0}
             rainMmH={rainMmH}
             cloudLayers={cloudLayers}
+            contrail={contrail}
             cloudEgg={cloudEgg}
             sunTimes={sunTimes}
             windDirectionDeg={weatherData?.windDirectionDeg ?? null}

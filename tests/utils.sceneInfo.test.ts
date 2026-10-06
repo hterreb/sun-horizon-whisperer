@@ -71,6 +71,18 @@ describe('sceneInfo (ROADMAP item 95)', () => {
     expect(card({ type: 'boat', kind: 'freighter' }, {}, de)[0]).toBe('Frachter');
   });
 
+  it('gives a plane its type, one fact, the altitude band and its contrail (item 96)', () => {
+    expect(card({ type: 'plane', contrail: 'persistent' })).toEqual([
+      'Airliner', 'A contrail is the water vapour of the engines, frozen to ice.',
+      'Altitude: 9–12 km (cruise)', 'Contrail: Lasting (it spreads to a cloud)',
+    ]);
+    expect(card({ type: 'plane', contrail: 'none' })[3]).toBe('Contrail: None');
+    expect(card({ type: 'plane', contrail: 'short' }, {}, de)).toEqual([
+      'Verkehrsflugzeug', 'Ein Kondensstreifen ist der Wasserdampf der Triebwerke, zu Eis gefroren.',
+      'Höhe: 9–12 km (Reiseflug)', 'Kondensstreifen: Kurz (trockene Luft)',
+    ]);
+  });
+
   it("gives a cloud its type, its layer and the forecast cover of that layer (item 84)", () => {
     expect(card({ type: 'cloud', cloudType: 'Ci', band: 'high' })).toEqual(['Cirrus', 'Layer: High', 'Cover: 70%']);
     const german = card({ type: 'cloud', cloudType: 'Cu', band: 'low' }, { language: 'de' }, de);

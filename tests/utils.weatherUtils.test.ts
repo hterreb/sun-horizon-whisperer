@@ -1,4 +1,4 @@
-import { fetchCurrentWeather, getSunsetScore, getScoreReason, getWeatherAt, WMO_CODE_MAP, type WeatherData } from '../src/utils/weatherUtils';
+import { fetchCurrentWeather, getSunsetScore, getScoreReason, getUpperAirAt, getWeatherAt, WMO_CODE_MAP, type WeatherData } from '../src/utils/weatherUtils';
 import { type WeatherType } from '../src/components/CloudLayer';
 describe('weatherUtils', () => {
   it('fetches weather data (mocked)', async () => {
@@ -407,5 +407,33 @@ describe('getWeatherAt (ROADMAP item 86)', () => {
     const calledUrl = String((fetchMock as ReturnType<typeof vi.fn>).mock.calls[0][0]);
     expect(calledUrl).toContain(',temperature_2m,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,precipitation');
     expect(calledUrl).toContain('&past_days=1&forecast_days=7');
+  });
+});
+
+describe('getUpperAirAt (ROADMAP item 96)', () => {
+  const hourly = {
+    time: ['2026-10-06T00:00', '2026-10-06T01:00'],
+    cloud_cover_low: [0, 0], cloud_cover_mid: [0, 0], cloud_cover_high: [0, 0], visibility: [24000, 24000],
+    temperature_250hPa: [-48.2, -44], relative_humidity_250hPa: [72, 30],
+  };
+
+  it('returns the 250 hPa temperature and humidity of the forecast hour nearest the time', () => {
+    expect(getUpperAirAt(hourly, new Date('2026-10-06T00:20:00Z'))).toEqual({ tempC: -48.2, rhPercent: 72 });
+    expect(getUpperAirAt(hourly, new Date('2026-10-06T00:40:00Z'))).toEqual({ tempC: -44, rhPercent: 30 });
+  });
+
+  it('returns null outside the forecast, without one, or in an older cache entry without the fields', () => {
+    expect(getUpperAirAt(hourly, new Date('2026-10-06T03:00:00Z'))).toBeNull();
+    expect(getUpperAirAt(null, new Date('2026-10-06T00:00:00Z'))).toBeNull();
+    const older = { ...hourly, temperature_250hPa: undefined, relative_humidity_250hPa: undefined };
+    expect(getUpperAirAt(older, new Date('2026-10-06T00:00:00Z'))).toBeNull();
+  });
+
+  it('requests the upper air with the hourly forecast', async () => {
+    const fetchMock = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current_weather: { temperature: 20, weathercode: 0, windspeed: 0, winddirection: 0, time: '' } }) })) as unknown as typeof fetch;
+    global.fetch = fetchMock;
+    await fetchCurrentWeather(5, 5);
+    const calledUrl = String((fetchMock as ReturnType<typeof vi.fn>).mock.calls[0][0]);
+    expect(calledUrl).toContain(',temperature_250hPa,relative_humidity_250hPa');
   });
 });
