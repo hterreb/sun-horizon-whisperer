@@ -1072,7 +1072,7 @@ describe('SunTracker', () => {
         FakeNotification.answer = 'denied';
         render(<SunTracker />);
         await flush();
-        fireEvent.click(await screen.findByRole('button', { name }));
+        fireEvent.click(screen.getByRole('button', { name }));
         await flush();
         expect(screen.getByRole('button', { name })).toHaveAttribute('aria-pressed', 'false');
         expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Notifications are blocked' }));
