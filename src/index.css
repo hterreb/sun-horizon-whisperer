@@ -447,6 +447,10 @@
     /* Bird/bat silhouette (CloudLayer) — matches the style book's D bird, a soft
        dark flock shape. */
     --scene-critter-silhouette: 0 0% 0%;
+    /* Plane lights at night (ROADMAP item 96): the white strobe and the wing lights. */
+    --scene-plane-strobe: 0 0% 100%;
+    --scene-plane-red: 0 85% 62%;
+    --scene-plane-green: 140 70% 55%;
 
     /* Astronomy easter eggs (astroEvents.ts): aurora curtains, green flash, the
        copper moon of a lunar eclipse and the faint blue moon tint. */

@@ -21,8 +21,15 @@ import {
   isSmallFish, pickMeetX, planMeeting, planPreyHunt, toLinearEasing,
   type HuntFx, type HuntPlan, type HuntVariant, type PreyHunt,
 } from '@/utils/sharkHunt';
+import ScenePlane, { PLANE_ASPECT, PLANE_TRAIL_X, PLANE_TRAIL_Y } from './ScenePlane';
+import {
+  CONTRAIL_LOOK, MAX_PLANES, PLANE_BAND, PLANE_GAP_MIN_MS, PLANE_GAP_RANGE_MS, PLANE_OVERRIDE_GAP_MS, PLANE_WIDTH_PX, TRAIL_PX,
+  getPlaneLook, getPlaneOverride, getTrailLength, getTrailPieces, isPlaneWeather, showsPlaneLights, type ContrailKind,
+} from '@/utils/planes';
 import { getPrecipitationSlantPx } from '../utils/cloudLayoutUtils';
-import { type CloudLayers, getDaySeed } from '../utils/skyCloudUtils';
+import {
+  type CloudLayers, getDaySeed, getCloudColors, getCloudLight, getTimeOfDayAltitude, rgba,
+} from '../utils/skyCloudUtils';
 import {
   getWeatherEffects, pickBoat, hasBoatWake, getBoatTone, type BoatKind,
   pickFish, canSpawnFish, getRestStopMotion, type FishKind,
@@ -60,6 +67,8 @@ interface CloudLayerProps {
   longitude?: number;
   // The current hour's cover per layer (ROADMAP item 84, C1); null: the weather type's own.
   cloudLayers?: CloudLayers | null;
+  // The planes' contrails from the forecast's upper air (ROADMAP item 96).
+  contrail?: ContrailKind;
   windSpeedKmh?: number | null;
   windDirectionDeg?: number | null;
   // The forecast rain amount in mm/h (ROADMAP item 77, X1); null: the type's middle value.
@@ -377,6 +386,37 @@ export const createBird = (
   };
 };
 
+// ROADMAP item 96: an airliner high and far, with its contrail. `y` is the top edge.
+interface PlaneEntity extends MovingEntity {
+  depth: number; // 0 = near, 1 = far
+  width: number; // px
+  height: number;
+  contrail: ContrailKind;
+  lifeSec: number; // how long a point of the trail lasts
+  trailLength: number; // % of the width: a short or medium trail moves with the plane
+  lights?: 'red' | 'green'; // at night only the lights show, with this wing light
+  path?: ScenePath; // the lane plan (item 92), set at spawn
+}
+
+// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
+export const createPlane = (
+  viewportWidth: number, contrail: ContrailKind, lights: boolean, random = Math.random,
+): PlaneEntity => {
+  const look = getPlaneLook(random());
+  const startX = -(look.width / viewportWidth) * 100 - 1;
+  const dx = 101 - startX;
+  const speed = look.speed * getWaterSpeedFactor(viewportWidth); // the phone's px/s on wide screens (item 66)
+  const life = contrail === 'none' ? 0 : CONTRAIL_LOOK[contrail].lifeSec[0] +
+    random() * (CONTRAIL_LOOK[contrail].lifeSec[1] - CONTRAIL_LOOK[contrail].lifeSec[0]);
+  return {
+    id: Date.now() + Math.random(),
+    x: startX, y: look.y, dx, duration: dx / speed,
+    depth: look.depth, width: look.width, height: look.width * PLANE_ASPECT,
+    contrail, lifeSec: life, trailLength: getTrailLength(speed, life),
+    lights: lights ? (random() < 0.5 ? 'red' : 'green') : undefined,
+  };
+};
+
 // Sun below the horizon: bats instead of birds, and the boats show their lights.
 const isSunDownAt = (timeOfDay: TimeOfDay): boolean =>
   timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' ||
@@ -392,12 +432,15 @@ export interface SceneEntities {
   fish: FishEntity[];
   ships: Boat[];
   leaves: MovingEntity[];
+  planes: PlaneEntity[]; // item 96: they plan their lanes with the birds
 }
 
 // The wall-clock time (ms) of each group's last spawn check that passed its gap, and the
 // groups that showed at the last check (a group that starts fills at once, item 93).
 export interface SpawnTimes {
   birds: number; fish: number; ships: number; leaves: number;
+  planes: number;
+  planeGap?: number; // ms, rolled once per plane (item 96)
   shown?: { birds: boolean; fish: boolean; ships: boolean };
   keepAway?: ScenePath[]; // item 94 (X2): the lanes that new small fish keep out of
 }
@@ -421,6 +464,8 @@ export interface SpawnRules {
   view: { width: number; height: number }; // the scene in px
   poolX?: number | null; // the moon's x in % while its pool shows: a night hunt meets there (item 94)
   huntOverride?: HuntVariant | null; // `?hunt=` (item 94)
+  contrail?: ContrailKind; // the planes' contrail from the forecast (item 96); none without
+  planeOverride?: ContrailKind | null; // `?plane=` (item 96): a plane every 20 s with this contrail
 }
 type View = SpawnRules['view'];
 
@@ -477,6 +522,15 @@ const birdLane = (bird: BirdEntity, view: View, band = BIRD_BAND): LaneShape => 
   curve: bird.curve,
 });
 
+// A plane (item 96): the silhouette's box, its top edge at 8-30 % of the height. The trail
+// behind it is not in the box: a bird may cross a contrail.
+const planeLane = (plane: PlaneEntity, view: View): LaneShape => ({
+  width: percentOfWidth(plane.width, view),
+  above: 0,
+  height: percentOfHeight(plane.height, view),
+  band: PLANE_BAND,
+});
+
 // A boat: the hull above the waterline `y`, and the mirror image below it at its calm height,
 // the tallest (items 73 and 79). The waterline band is 67-87 % (94 % in fullscreen).
 const BOAT_MIRROR = getBoatReflection(0).heightPercent / 100;
@@ -510,7 +564,7 @@ export const spawnTick = (
   random: () => number = Math.random, lane: typeof findLane = findLane,
 ): SceneEntities => {
   const { weatherType, timeOfDay, windSpeedKmh, gapFactor, month, latitude, moonY, view, rewind, density } = rules;
-  let { birds, fish, ships, leaves } = scene;
+  let { birds, fish, ships, leaves, planes } = scene;
   const isSunDown = isSunDownAt(timeOfDay);
 
   // The new thing's path on the scene clock, at the free height nearest its random pick, or
@@ -577,7 +631,7 @@ export const spawnTick = (
     const makeBird = (progress: number) => {
       const kind = isSunDown ? 'bat' : pickBird(random(), month, latitude, timeOfDay === 'evening');
       const next = createBird(kind, view.width, rules.birdSpeedFactor, random);
-      return place(next, birdLane(next, view), pathsOf(birds), progress);
+      return place(next, birdLane(next, view), pathsOf(birds, planes), progress);
     };
     if (warm && !shown.birds) {
       fill(() => birds.length, limit, progress => {
@@ -605,7 +659,7 @@ export const spawnTick = (
       if (random() < 0.12) {
         const next = createBird('geese', view.width, rules.birdSpeedFactor, random, moonY);
         if (!birds.some(b => b.kind === 'geese')) {
-          const placed = place(next, birdLane(next, view, [moonY - 2, moonY + 2]), pathsOf(birds));
+          const placed = place(next, birdLane(next, view, [moonY - 2, moonY + 2]), pathsOf(birds, planes));
           if (placed) birds = [...birds, placed];
           noLane = !placed;
         }
@@ -800,9 +854,32 @@ export const spawnTick = (
     leaves = [];
   }
 
-  return birds === scene.birds && fish === scene.fish && ships === scene.ships && leaves === scene.leaves
+  // Planes (item 96): about one every 3-6 min, day and night, in a lane clear of the birds and
+  // the other planes. None when the sky is hidden (fog, a deck, rain, a storm). The gap is
+  // rolled once per plane; with no free lane, the next check tries again. A plane with a
+  // persistent trail stays in the list until its trail fades, but counts only while it crosses.
+  if (isPlaneWeather(weatherType)) {
+    last.planeGap ??= rules.planeOverride ? PLANE_OVERRIDE_GAP_MS : PLANE_GAP_MIN_MS + random() * PLANE_GAP_RANGE_MS;
+    if (now - last.planes > last.planeGap * gapFactor) {
+      const crossing = planes.filter(p => p.path && p.path.start <= sceneTime && sceneTime <= p.path.start + p.path.duration);
+      let placed: PlaneEntity | null = null;
+      if (crossing.length < MAX_PLANES) {
+        const next = createPlane(view.width, rules.planeOverride ?? rules.contrail ?? 'none', showsPlaneLights(timeOfDay), random);
+        placed = place(next, planeLane(next, view), pathsOf(birds, planes));
+        if (placed) planes = [...planes, placed].sort((a, b) => b.depth - a.depth);
+      }
+      if (placed || crossing.length >= MAX_PLANES) {
+        last.planes = now;
+        last.planeGap = undefined;
+      }
+    }
+  } else if (planes.length > 0) {
+    planes = [];
+  }
+
+  return birds === scene.birds && fish === scene.fish && ships === scene.ships && leaves === scene.leaves && planes === scene.planes
     ? scene
-    : { birds, fish, ships, leaves };
+    : { birds, fish, ships, leaves, planes };
 };
 
 // The hunt on a prey (item 94), inside its wrapper, so its crossing does not change. H1: it
@@ -846,6 +923,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   latitude = 0,
   longitude = 0,
   cloudLayers = null,
+  contrail = 'none',
   windSpeedKmh = null,
   windDirectionDeg = null,
   rainMmH = null,
@@ -864,7 +942,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   // The things that cross the scene. The state renders them; the ref has the latest lists at
   // once, so the spawn loop plans each new lane around all of them (item 92), also around one
   // that spawned in the same check.
-  const [entities, setEntities] = useState<SceneEntities>({ birds: [], fish: [], ships: [], leaves: [] });
+  const [entities, setEntities] = useState<SceneEntities>({ birds: [], fish: [], ships: [], leaves: [], planes: [] });
   const entitiesRef = useRef(entities);
   const updateEntities = useCallback((change: (prev: SceneEntities) => SceneEntities) => {
     const next = change(entitiesRef.current);
@@ -872,17 +950,17 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     entitiesRef.current = next;
     setEntities(next);
   }, []);
-  const { birds, fish, ships, leaves } = entities;
+  const { birds, fish, ships, leaves, planes } = entities;
 
   // Spawn-timing refs (not movement — movement is CSS now). Seeded with a placeholder
   // and set to the real mount time in an effect (Date.now() is impure, so it can't be
   // called during render); the 500ms spawn-check loop below doesn't start reading these
   // until after that effect has run.
-  const lastSpawnTimeRef = useRef<SpawnTimes>({ birds: 0, fish: 0, ships: 0, leaves: 0 });
+  const lastSpawnTimeRef = useRef<SpawnTimes>({ birds: 0, fish: 0, ships: 0, leaves: 0, planes: 0 });
   useEffect(() => {
     const now = Date.now();
     lastSpawnTimeRef.current = {
-      birds: now, fish: now, ships: now - BOAT_GAP_MIN_MS + 5000, leaves: now,
+      birds: now, fish: now, ships: now - BOAT_GAP_MIN_MS + 5000, leaves: now, planes: now,
       // Without the warm start, the groups count as shown, so they do not fill at once.
       shown: warmStart ? undefined : { birds: true, fish: true, ships: true },
     };
@@ -903,6 +981,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   const [fishOverride] = useState(() => getFishOverride(window.location.search));
   // Test override (item 94): `?hunt=H1` makes every shark hunt with H1.
   const [huntOverride] = useState(() => getHuntOverride(window.location.search));
+  // Test override (item 96): `?plane=persistent` makes a plane every 20 s with that contrail.
+  const [planeOverride] = useState(() => getPlaneOverride(window.location.search));
+  // The contrail from the forecast (item 96). In a ref, as the density: a new forecast hour
+  // does not restart the spawn loop.
+  const contrailRef = useRef(contrail);
+  useEffect(() => { contrailRef.current = contrail; }, [contrail]);
   // Busy and quiet phases (item 93, S3). In a ref, so the spawn loop does not restart each
   // time the date ticks.
   const density = sunTimes ? getSceneDensity(date, sunTimes, getDaySeed(date, latitude, longitude)) : 1;
@@ -977,8 +1061,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   useEffect(() => {
     // Reduced motion: skip spawning birds, fish, ships and leaves entirely (static sky).
     if (prefersReducedMotion) return;
-    const rules: Omit<SpawnRules, 'view' | 'density' | 'poolX'> = {
-      weatherType, timeOfDay, windSpeedKmh, isFullscreen, moonUp, moonY, month, latitude, gapFactor, fishOverride, huntOverride,
+    const rules: Omit<SpawnRules, 'view' | 'density' | 'poolX' | 'contrail'> = {
+      weatherType, timeOfDay, windSpeedKmh, isFullscreen, moonUp, moonY, month, latitude, gapFactor, fishOverride, huntOverride, planeOverride,
       birdSpeedFactor: effects.birdSpeedFactor,
       showLeaves: effects.showLeaves,
       rewind: playDirection < 0,
@@ -988,7 +1072,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       const now = Date.now();
       const view = { width: window.innerWidth, height: window.innerHeight };
       updateEntities(prev => spawnTick(
-        prev, lastSpawnTimeRef.current, { ...rules, view, density: densityRef.current, poolX: poolXRef.current }, now, getSceneTime(sceneClockRef.current, now),
+        prev, lastSpawnTimeRef.current, { ...rules, view, density: densityRef.current, poolX: poolXRef.current, contrail: contrailRef.current }, now, getSceneTime(sceneClockRef.current, now),
       ));
     };
 
@@ -999,7 +1083,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     return () => {
       clearInterval(intervalId);
     };
-  }, [weatherType, windSpeedKmh, timeOfDay, prefersReducedMotion, isFullscreen, effects.showLeaves, effects.birdSpeedFactor, moonUp, month, latitude, moonY, gapFactor, playDirection, fishOverride, huntOverride, updateEntities]);
+  }, [weatherType, windSpeedKmh, timeOfDay, prefersReducedMotion, isFullscreen, effects.showLeaves, effects.birdSpeedFactor, moonUp, month, latitude, moonY, gapFactor, playDirection, fishOverride, huntOverride, planeOverride, updateEntities]);
 
   // The shark hunts (item 94): a timeout per planned hunt, and per fish that dives under a boat,
   // gives the prey its hunt (CSS animations in renderFish) and puts the ripple and the bubbles
@@ -1143,6 +1227,94 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     ) : swimmer(String(fishItem.id), 0, 0, true);
   };
 
+  // Planes (item 96). The contrail takes the light of the high clouds (item 84): white by day,
+  // gold and pink at sunset. A short or medium trail is a fixed shape that moves with the plane:
+  // thin and bright at the engine, wider and fainter behind (each point is older there). A
+  // persistent trail stays where the plane made it: pieces that grow with the plane (the same
+  // clock as its crossing), then spread to a band and fade. Only transform and opacity move.
+  const lightAltitude = sun ? Math.round(sun.altitude * 2) / 2 : getTimeOfDayAltitude(timeOfDay);
+  const trailColour = useMemo(
+    () => rgba(getCloudColors('Ci', 'high', weatherType, getCloudLight(lightAltitude)).lit, 0.8),
+    [weatherType, lightAltitude],
+  );
+  const renderPlane = (plane: PlaneEntity) => {
+    const remove = () => updateEntities(prev => ({ ...prev, planes: prev.planes.filter(p => p.id !== plane.id) }));
+    const look = plane.contrail === 'none' ? null : CONTRAIL_LOOK[plane.contrail];
+    const persistent = plane.contrail === 'persistent';
+    const thin = TRAIL_PX * (plane.width / PLANE_WIDTH_PX);
+    const trailY = plane.height * PLANE_TRAIL_Y;
+    const trailX = plane.width * PLANE_TRAIL_X;
+    const delay = plane.delay ?? 0;
+    const pieces = persistent ? getTrailPieces(plane.x, plane.dx, plane.duration) : [];
+    const band = thin * (look?.spread ?? 1);
+    return (
+      <React.Fragment key={plane.id}>
+        {pieces.map((piece, i) => (
+          <div
+            key={i}
+            className="absolute"
+            style={{
+              left: `calc(${piece.left}% + ${trailX}px)`,
+              top: `calc(${plane.y}% + ${trailY - band / 2}px)`,
+              width: `${piece.width}%`,
+              height: band,
+              transformOrigin: 'left',
+              animation: `planeTrailGrow ${piece.growSec}s linear ${delay + piece.growAt}s both`,
+            }}
+          >
+            <div
+              className="h-full w-full"
+              style={{
+                background: `linear-gradient(to bottom, transparent, ${trailColour}, transparent)`,
+                ['--trail-thin' as string]: 1 / (look?.spread ?? 1),
+                animation: `planeTrailSpread ${plane.lifeSec}s linear ${delay + piece.growAt}s both`,
+              }}
+              data-testid="plane-trail-piece"
+              // The last piece fades last (and, in rewind, its reversed end comes last): the plane goes.
+              onAnimationEnd={i === pieces.length - 1
+                ? (event => { if (event.target === event.currentTarget && event.animationName === 'planeTrailSpread') remove(); })
+                : undefined}
+            />
+          </div>
+        ))}
+        <div
+          {...tappable({ type: 'plane', contrail: plane.contrail }, `plane-${plane.id}`)}
+          style={{
+            left: `${plane.x}%`,
+            top: `${plane.y}%`,
+            ['--dx' as string]: `${plane.dx}vw`,
+            animation: `moveAcrossX ${plane.duration}s linear ${delay}s forwards`,
+          }}
+          onAnimationEnd={event => { if (endsCrossing(event) && !persistent) remove(); }}
+        >
+          <div className="relative" style={{ width: plane.width, height: plane.height }}>
+            {look && !persistent && (
+              <div
+                className="absolute"
+                style={{
+                  right: plane.width - trailX,
+                  top: trailY - band / 2,
+                  width: `${plane.trailLength}vw`,
+                  height: band,
+                  background: `linear-gradient(to right, transparent, ${trailColour})`,
+                  clipPath: `polygon(0 0, 100% ${50 - 50 / look.spread}%, 100% ${50 + 50 / look.spread}%, 0 100%)`,
+                }}
+                data-testid="plane-trail"
+              />
+            )}
+            <div
+              className="relative"
+              style={{ opacity: plane.lights ? 1 : 0.5 * (1 - 0.3 * plane.depth), color: 'hsl(var(--scene-critter-silhouette))' }}
+            >
+              <ScenePlane width={plane.width} lights={plane.lights} />
+            </div>
+            {onInfo && <HitArea cx={plane.width / 2} cy={plane.height / 2} width={plane.width} height={plane.height} ring={infoRing === `plane-${plane.id}`} />}
+          </div>
+        </div>
+      </React.Fragment>
+    );
+  };
+
   const renderHuntFx = (fx: HuntFx) => (
     <SceneHuntFx key={fx.id} fx={fx} onDone={() => setHuntFx(list => list.filter(f => f.id !== fx.id))} />
   );
@@ -1154,6 +1326,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       style={{ ['--slant' as string]: `${precipSlantPx}px` }}
     >
       <div data-testid="iceberg" />
+      {/* Planes (ROADMAP item 96): before the clouds, so the clouds pass in front of them. */}
+      {planes.map(renderPlane)}
       {/* Clouds by type (ROADMAP item 84), with the overcast veil and their shadows on the sea. */}
       <SkyClouds
         weatherType={weatherType}
@@ -1400,6 +1574,38 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
           }
           100% {
             transform: translateY(0);
+          }
+        }
+
+        @keyframes planeStrobe {
+          0%, 14%, 100% {
+            opacity: 0;
+          }
+          5% {
+            opacity: 1;
+          }
+        }
+
+        @keyframes planeTrailGrow {
+          from {
+            transform: scaleX(0);
+          }
+          to {
+            transform: scaleX(1);
+          }
+        }
+
+        @keyframes planeTrailSpread {
+          0% {
+            opacity: 0.9;
+            transform: scaleY(var(--trail-thin));
+          }
+          40% {
+            opacity: 0.6;
+          }
+          100% {
+            opacity: 0;
+            transform: scaleY(1);
           }
         }
 

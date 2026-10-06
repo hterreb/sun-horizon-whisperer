@@ -50,6 +50,9 @@ export interface HourlyForecast {
   wind_speed_10m?: (number | null)[];
   wind_direction_10m?: (number | null)[];
   precipitation?: (number | null)[]; // mm in the hour before `time`
+  // The upper air at 250 hPa, about 10.4 km (item 96): the contrails.
+  temperature_250hPa?: (number | null)[];
+  relative_humidity_250hPa?: (number | null)[];
 }
 
 interface OpenMeteoResponse {
@@ -362,6 +365,7 @@ export const fetchCurrentWeather = async (
       `&current=cloud_cover,wind_speed_10m,wind_direction_10m,precipitation` +
       `&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility` +
       `,temperature_2m,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,precipitation` +
+      `,temperature_250hPa,relative_humidity_250hPa` +
       `&timezone=UTC&past_days=1&forecast_days=7`;
 
     const response = await fetch(url);
@@ -440,6 +444,18 @@ export const getWeatherAt = (data: WeatherData, at: Date): WeatherData => {
     precipitationMmH: getPrecipitationMmH(hourly.precipitation?.[i], 3600, code),
     cloudLayers: cloudLayersAt(hourly, at),
   };
+};
+
+// The upper air at 250 hPa (item 96) in the forecast hour nearest `at`: the temperature (°C)
+// and the relative humidity (%), for getContrail. Null outside the forecast, or in an older
+// cache entry without these fields.
+export const getUpperAirAt = (hourly: HourlyForecast | null, at: Date): { tempC: number; rhPercent: number } | null => {
+  const start = hourly?.time.length ? parseHourlyTime(hourly.time[0]) : null;
+  if (!hourly || !start) return null;
+  const i = Math.round((at.getTime() - start.getTime()) / HOUR_MS);
+  const tempC = hourly.temperature_250hPa?.[i];
+  const rhPercent = hourly.relative_humidity_250hPa?.[i];
+  return tempC == null || rhPercent == null ? null : { tempC, rhPercent };
 };
 
 export const clearWeatherCache = (): void => {
