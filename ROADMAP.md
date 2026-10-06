@@ -2038,6 +2038,13 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Depends on:** item 95 for the card.
 - **Done when:** unit tests for the shadow test, the visibility rule and the pass search (against a known ISS pass from heavens-above.com, within 1 min and 2°). In the browser with a fixed clock on the evening of a known ISS pass: the ISS crosses at the right time and in the right direction, and fades into the shadow. The frame budget holds (item 91).
 
+### 102. More fish and boats again; fish change lanes — S — **✅ Done**
+
+- **Feedback (2026-10-06):** "the latest changes drastically reduced the number of birds ships and fish". Then: "leave density that is still valid, make fish change lanes when a lane is full but spawn anyway, and up the base limits again to a value in between, when a fish meets a boat, the fish can also dive away or change the lane if it is free".
+- **Cause:** item 93 lowered the base limits, and the density (0.42–0.7 by day) scales both the limits and the spawn chances. On a phone by day this gave 1 boat and 1–2 fish.
+- **Built:** `MAX_FISH` 4 (item 93: 3, before: 5), `MAX_NIGHT_FISH` 2.5 (2 / 3), `MAX_BOATS` 2.5 (2 / 3). `getSceneLimit` rounds the base times the width and the density. The density stays as it is. A fish that meets a boat on its fallback lane changes to a free lane (`findLane` from 4 s before the meeting, a 3 s `sceneLaneShift`), else it dives (the H4 fade). Live, a new fish with no free lane spawns anyway at its pick and dodges the first thing it meets in the same way. A hunting shark and its prey keep their lane. During time-travel play nothing changes.
+- **Checked:** 2 new tests, the limit tests and the box simulations (items 92 and 93) updated: a fish that changes lane counts on its old lane until the change, a diving fish has no box after its dive. Simulation (30 min, seeds 1–5, mean on screen): phone at density 0.7, fish 1.9 → 2.8 and boats 0.6 → 1.1; 1280 px at density 0.7, fish 3.0 → 3.9 and boats 1.7 → 2.3. Birds unchanged.
+
 ---
 
 ## Ongoing — Easter eggs and special events (S each, pick any time)
