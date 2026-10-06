@@ -1058,6 +1058,7 @@ const SunTracker: React.FC = () => {
           info={getSceneInfo(infoCard.target, {
             language,
             now: date,
+            timeOfDay,
             sunPosition,
             sunTimes: passTimes ?? sunTimes,
             terrainSunTimes: terrainExtras.terrainSunTimes,

@@ -4,13 +4,15 @@
 
 import { formatNumber, type MessageKey, type Translate } from '@/i18n';
 import { type Language } from './language';
-import { formatTime, type NextGoldenBlueHours, type SunPosition } from './sunUtils';
+import { formatTime, type NextGoldenBlueHours, type SunPosition, type TimeOfDay } from './sunUtils';
 import { getMoonPhaseLabel, type MoonPosition, type MoonTimes } from './moonUtils';
 import { getMoonEclipticGeocentric } from './lunarEphemeris';
 import { isSupermoon } from './astroEvents';
 import { horizonAngleAt, ridgeAt, type HorizonProfile } from './horizonUtils';
 import { getCloudLayers, type CloudBand, type CloudLayers, type CloudType } from './skyCloudUtils';
-import { type BirdKind, type BoatKind, type FishKind } from './weatherEffectsUtils';
+import {
+  getBoatShare, getFishShare, getFlyerShare, isNightWater, type BirdKind, type BoatKind, type FishKind,
+} from './weatherEffectsUtils';
 import { type WeatherType } from '@/components/CloudLayer';
 import { type SatelliteCard } from './satelliteUtils';
 import { type ContrailKind } from './planes';
@@ -46,6 +48,8 @@ export interface SceneInfo {
 export interface SceneInfoContext {
   language: Language;
   now: Date;
+  // Day or night fish pool (item 105).
+  timeOfDay: TimeOfDay;
   sunPosition: SunPosition;
   // The sunrise and sunset of the pass the arc draws, and the line-of-sight times.
   sunTimes: { sunrise: Date | null; sunset: Date | null } | null;
@@ -118,6 +122,11 @@ const CLOUDS: Record<CloudType, MessageKey> = {
   Ci: 'cloud.Ci', Cs: 'cloud.Cs', Ac: 'cloud.Ac', As: 'cloud.As', Cu: 'cloud.Cu', Sc: 'cloud.Sc',
   St: 'cloud.St', Ns: 'cloud.Ns', Cb: 'cloud.Cb', Len: 'cloud.Len', Mam: 'cloud.Mam',
 };
+// Item 106: one fact per cloud type.
+const CLOUD_FACTS: Record<CloudType, MessageKey> = {
+  Ci: 'cloudFact.Ci', Cs: 'cloudFact.Cs', Ac: 'cloudFact.Ac', As: 'cloudFact.As', Cu: 'cloudFact.Cu', Sc: 'cloudFact.Sc',
+  St: 'cloudFact.St', Ns: 'cloudFact.Ns', Cb: 'cloudFact.Cb', Len: 'cloudFact.Len', Mam: 'cloudFact.Mam',
+};
 const LAYERS: Record<CloudBand, MessageKey> = { low: 'info.layerLow', mid: 'info.layerMid', high: 'info.layerHigh' };
 
 const DIRECTIONS: MessageKey[] = [
@@ -140,6 +149,20 @@ const signedDegrees = (value: number, language: Language): string => {
 
 const percent = (fraction: number, language: Language): string =>
   new Intl.NumberFormat(language, { style: 'percent', maximumFractionDigits: 0 }).format(fraction);
+
+// Item 105: the rarity tier of a spawn share (percent): the first tier whose minimum it reaches.
+export const RARITY_TIERS: [minShare: number, tier: MessageKey][] = [
+  [10, 'rarity.common'], [3, 'rarity.uncommon'], [1, 'rarity.rare'], [0, 'rarity.veryRare'],
+];
+
+// "Very rare · 0.5 %": the tier and the share, with at most one decimal ("<0.1" below that).
+const rarityLine = (share: number, language: Language): InfoLine => {
+  const tier = RARITY_TIERS.find(([min]) => share >= min)?.[1] ?? 'rarity.veryRare';
+  const rounded = Math.round(share * 10) / 10;
+  const value = rounded < 0.1 ? `<${formatNumber(language, 0.1, 1)}`
+    : formatNumber(language, rounded, Number.isInteger(rounded) ? 0 : 1);
+  return { label: 'info.rarity', value: { key: 'info.rarityValue', vars: { tier: { key: tier }, share: value } } };
+};
 
 // "2 h 13 min", or "45 min" under an hour.
 export const durationText = (ms: number): InfoText => {
@@ -207,15 +230,27 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
       const fish = FISH[target.kind];
       const when: MessageKey = NIGHT_ONLY.includes(target.kind) ? 'info.nightFish'
         : DAY_AND_NIGHT.includes(target.kind) ? 'info.dayAndNight' : 'info.dayFish';
-      return { title: fish.name, lines: [{ value: { key: fish.fact } }, { value: { key: when } }] };
+      return {
+        title: fish.name,
+        lines: [
+          { value: { key: fish.fact } }, { value: { key: when } },
+          rarityLine(getFishShare(target.kind, isNightWater(ctx.timeOfDay)), language),
+        ],
+      };
     }
     case 'bird': {
       const bird = BIRDS[target.kind];
-      return { title: bird.name, lines: [{ value: { key: bird.fact } }, { label: 'info.season', value: { key: bird.season } }] };
+      return {
+        title: bird.name,
+        lines: [
+          { value: { key: bird.fact } }, { label: 'info.season', value: { key: bird.season } },
+          rarityLine(getFlyerShare(target.kind), language),
+        ],
+      };
     }
     case 'boat': {
       const boat = BOATS[target.kind];
-      return { title: boat.name, lines: [{ value: { key: boat.fact } }] };
+      return { title: boat.name, lines: [{ value: { key: boat.fact } }, rarityLine(getBoatShare(target.kind), language)] };
     }
     case 'plane':
       return {
@@ -245,6 +280,7 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
       return {
         title: CLOUDS[target.cloudType],
         lines: [
+          { value: { key: CLOUD_FACTS[target.cloudType] } },
           { label: 'info.layer', value: { key: LAYERS[target.band] } },
           { label: 'info.cover', value: percent(cover / 100, language) },
         ],

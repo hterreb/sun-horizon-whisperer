@@ -154,6 +154,29 @@ export const pickNightFish = (r: number): NightFishPick => pickWeighted(NIGHT_FI
 export const pickMoonlitDayFish = (r: number): FishKind =>
   pickWeighted(FISH_WEIGHTS.filter(([kind]) => MOONLIT_DAY_FISH.includes(kind)), r);
 
+// Night fish (item 65, NR2) take over in nautical twilight, where the day fish stop.
+export const isNightWater = (timeOfDay: TimeOfDay): boolean =>
+  timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
+
+// Info cards (ROADMAP item 105): a kind's share of the spawns of a mix, in percent. 0 when the
+// kind is not in the mix.
+const shareOf = <K>(mix: [K, number][], kind: K): number =>
+  (100 * (mix.find(([k]) => k === kind)?.[1] ?? 0)) / mix.reduce((sum, [, weight]) => sum + weight, 0);
+
+// The fish's share of the pool that swims now: the night mix (a moonlit day fish is the
+// 'moonlit' share times its share of the moonlit day fish) or the day mix. A fish that is not
+// in that pool (it swims on at the switch, item 65) gets its share of the other pool.
+export const getFishShare = (kind: FishKind, night: boolean): number => {
+  const day = shareOf(FISH_WEIGHTS, kind);
+  const moonlitMix = FISH_WEIGHTS.filter(([k]) => MOONLIT_DAY_FISH.includes(k));
+  const nightShare = shareOf<string>(NIGHT_FISH_WEIGHTS, kind) +
+    (shareOf<NightFishPick>(NIGHT_FISH_WEIGHTS, 'moonlit') * shareOf(moonlitMix, kind)) / 100;
+  return night ? nightShare || day : day || nightShare;
+};
+
+// The boat's share of the fair-weather mix (all boats), item 105.
+export const getBoatShare = (kind: BoatKind): number => shareOf(BOAT_WEIGHTS, kind);
+
 // At most five fish on screen, three at night (item 103; item 102: 4 and 2.5, item 93: 3 and 2).
 // getSceneLimit rounds the base times the width and the density. A school or a pair is one
 // entry. Turtles and jellyfish count too (item 93).
@@ -186,6 +209,10 @@ export const isBirdInSeason = (kind: BirdKind, month: number, latitude: number):
 export const pickBird = (r: number, month: number, latitude: number, evening: boolean): BirdKind =>
   pickWeighted(BIRD_WEIGHTS.filter(([kind]) =>
     isBirdInSeason(kind, month, latitude) && (kind !== 'starlings' || evening)), r);
+
+// Info cards (item 105): the bird's share of all day birds, all seasons together. After
+// sunset all flyers are bats.
+export const getFlyerShare = (kind: BirdKind | 'bat'): number => (kind === 'bat' ? 100 : shareOf(BIRD_WEIGHTS, kind));
 
 // At most five birds or groups in the sky (item 103; C3: four), per phone width like the fish (item 70).
 export const MAX_BIRDS = 5;

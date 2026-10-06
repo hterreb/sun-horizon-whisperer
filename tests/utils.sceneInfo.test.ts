@@ -4,7 +4,8 @@ import {
   getSceneInfo, resolveInfoText, directionText, durationText, distanceText,
   type SceneInfo, type SceneInfoContext, type SceneInfoTarget,
 } from '@/utils/sceneInfo';
-import { FISH_WEIGHTS, BIRD_WEIGHTS, type FishKind } from '@/utils/weatherEffectsUtils';
+import { FISH_WEIGHTS, BIRD_WEIGHTS, type BoatKind, type FishKind } from '@/utils/weatherEffectsUtils';
+import { type CloudType } from '@/utils/skyCloudUtils';
 import { type HorizonProfile } from '@/utils/horizonUtils';
 import { formatTime } from '@/utils/sunUtils';
 
@@ -17,6 +18,7 @@ const at = (iso: string) => new Date(iso);
 const ctx = (over: Partial<SceneInfoContext> = {}): SceneInfoContext => ({
   language: 'en',
   now: NOW,
+  timeOfDay: 'midday',
   sunPosition: { azimuth: 200, altitude: 33.46 },
   sunTimes: { sunrise: at('2026-10-05T05:30:00Z'), sunset: at('2026-10-05T16:47:00Z') },
   terrainSunTimes: null,
@@ -41,8 +43,38 @@ const read = (info: SceneInfo, t: Translate = en) => [
 const card = (target: SceneInfoTarget, over?: Partial<SceneInfoContext>, t?: Translate) => read(getSceneInfo(target, ctx(over)), t);
 
 describe('sceneInfo (ROADMAP item 95)', () => {
+  it('gives fish, birds and boats their rarity tier and spawn share from the weights (item 105)', () => {
+    const rarity = (target: SceneInfoTarget, over?: Partial<SceneInfoContext>, t?: Translate) =>
+      card(target, over, t).find(row => /^(Rarity|Seltenheit):/.test(row));
+    expect(rarity({ type: 'fish', kind: 'shark' })).toBe('Rarity: Very rare · 0.5 %');
+    expect(rarity({ type: 'fish', kind: 'shark' }, { timeOfDay: 'night' })).toBe('Rarity: Very rare · 0.5 %');
+    expect(rarity({ type: 'fish', kind: 'classic' })).toBe('Rarity: Common · 24 %');
+    expect(rarity({ type: 'fish', kind: 'ray' })).toBe('Rarity: Rare · 2 %');
+    expect(rarity({ type: 'fish', kind: 'jellyfish' }, { timeOfDay: 'night' })).toBe('Rarity: Uncommon · 8 %');
+    // A day fish at night is a moonlit fish: 24 % of the night spawns, perch 14 of 72 of those.
+    expect(rarity({ type: 'fish', kind: 'perch' }, { timeOfDay: 'nautical-twilight' })).toBe('Rarity: Uncommon · 4.7 %');
+    // A night fish that swims on at dawn keeps its night share.
+    expect(rarity({ type: 'fish', kind: 'squid' })).toBe('Rarity: Uncommon · 5 %');
+    expect(rarity({ type: 'fish', kind: 'shark' }, { language: 'de' }, de)).toBe('Seltenheit: Sehr selten · 0,5 %');
+    expect(rarity({ type: 'bird', kind: 'gull' })).toBe('Rarity: Common · 38 %');
+    expect(rarity({ type: 'bird', kind: 'bat' })).toBe('Rarity: Common · 100 %');
+    expect(rarity({ type: 'boat', kind: 'freighter' })).toBe('Rarity: Uncommon · 6.3 %');
+    const boats: BoatKind[] = ['sailboat', 'ferry', 'fishing', 'rowboat', 'freighter'];
+    for (const kind of boats) expect(rarity({ type: 'boat', kind }), kind).toMatch(/^Rarity: .+ · [\d.]+ %$/);
+  });
+
+  it('has no rarity row on the cloud, sun, moon, plane and terrain cards (item 105)', () => {
+    const targets: SceneInfoTarget[] = [
+      { type: 'cloud', cloudType: 'Cu', band: 'low' }, { type: 'sun' }, { type: 'moon' },
+      { type: 'plane', contrail: 'none' }, { type: 'terrain', azimuth: 90 },
+    ];
+    for (const target of targets) expect(card(target).some(row => row.startsWith('Rarity')), target.type).toBe(false);
+  });
+
   it('gives a fish its species, one fact and day or night fish', () => {
-    expect(card({ type: 'fish', kind: 'lanternfish' })).toEqual(['Lanternfish', 'Lanternfish make their own light.', 'Night fish']);
+    expect(card({ type: 'fish', kind: 'lanternfish' }, { timeOfDay: 'night' })).toEqual([
+      'Lanternfish', 'Lanternfish make their own light.', 'Night fish', 'Rarity: Common · 30 %',
+    ]);
     expect(card({ type: 'fish', kind: 'perch' })[2]).toBe('Day fish');
     expect(card({ type: 'fish', kind: 'jellyfish' })[2]).toBe('Day and night');
     expect(card({ type: 'fish', kind: 'shark' })[2]).toBe('Day and night');
@@ -58,7 +90,9 @@ describe('sceneInfo (ROADMAP item 95)', () => {
   });
 
   it('gives a bird its species, one fact and its season (item 74)', () => {
-    expect(card({ type: 'bird', kind: 'geese' })).toEqual(['Geese', 'Geese fly in a V to save energy.', 'Season: Spring and autumn, on migration']);
+    expect(card({ type: 'bird', kind: 'geese' })).toEqual([
+      'Geese', 'Geese fly in a V to save energy.', 'Season: Spring and autumn, on migration', 'Rarity: Common · 10 %',
+    ]);
     expect(card({ type: 'bird', kind: 'stork' })[2]).toBe('Season: Spring and summer');
     expect(card({ type: 'bird', kind: 'starlings' })[2]).toBe('Season: Autumn');
     expect(card({ type: 'bird', kind: 'gull' })[2]).toBe('Season: All year');
@@ -67,7 +101,9 @@ describe('sceneInfo (ROADMAP item 95)', () => {
   });
 
   it('gives a boat its type and one fact', () => {
-    expect(card({ type: 'boat', kind: 'fishing' })).toEqual(['Fishing boat', 'Gulls often follow fishing boats for scraps.']);
+    expect(card({ type: 'boat', kind: 'fishing' })).toEqual([
+      'Fishing boat', 'Gulls often follow fishing boats for scraps.', 'Rarity: Common · 18.8 %',
+    ]);
     expect(card({ type: 'boat', kind: 'freighter' }, {}, de)[0]).toBe('Frachter');
   });
 
@@ -94,12 +130,23 @@ describe('sceneInfo (ROADMAP item 95)', () => {
   });
 
   it("gives a cloud its type, its layer and the forecast cover of that layer (item 84)", () => {
-    expect(card({ type: 'cloud', cloudType: 'Ci', band: 'high' })).toEqual(['Cirrus', 'Layer: High', 'Cover: 70%']);
+    expect(card({ type: 'cloud', cloudType: 'Ci', band: 'high' })).toEqual([
+      'Cirrus', 'Cirrus clouds are made only of ice crystals.', 'Layer: High', 'Cover: 70%',
+    ]);
     const german = card({ type: 'cloud', cloudType: 'Cu', band: 'low' }, { language: 'de' }, de);
-    expect(german.slice(0, 2)).toEqual(['Cumulus', 'Schicht: Tief']);
-    expect(german[2]).toMatch(/^Bedeckung: 40\s%$/); // Intl puts a no-break space before the % in German
+    expect(german.slice(0, 3)).toEqual(['Cumulus', 'Ein Cumulus wächst auf einer Säule warmer Luft, die vom Boden aufsteigt.', 'Schicht: Tief']);
+    expect(german[3]).toMatch(/^Bedeckung: 40\s%$/); // Intl puts a no-break space before the % in German
     // Without a forecast: the weather type's own cover.
-    expect(card({ type: 'cloud', cloudType: 'Ns', band: 'low' }, { weatherType: 'rain', cloudLayers: null })[2]).toMatch(/^Cover: \d+%$/);
+    expect(card({ type: 'cloud', cloudType: 'Ns', band: 'low' }, { weatherType: 'rain', cloudLayers: null })[3]).toMatch(/^Cover: \d+%$/);
+  });
+
+  it('gives every cloud type one fact (item 106)', () => {
+    const types: CloudType[] = ['Ci', 'Cs', 'Ac', 'As', 'Cu', 'Sc', 'St', 'Ns', 'Cb', 'Len', 'Mam'];
+    for (const cloudType of types) {
+      const [, fact] = card({ type: 'cloud', cloudType, band: 'mid' });
+      expect(fact, cloudType).toMatch(/^[A-Z].*\.$/);
+      expect(fact, cloudType).not.toMatch(/^cloudFact\./);
+    }
   });
 
   it('gives the sun its altitude, direction, next event with a countdown and the golden hour', () => {

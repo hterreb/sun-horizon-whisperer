@@ -2103,6 +2103,37 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Built:** `createFish` gets the lag from the fish's width and speed: at least `(PAIR_GAP + 1)` widths divided by the speed, plus 0–2 s. `PAIR_GAP` is 1.5, so 1.5 fish widths of water stay between the lead's tail and the second fish's nose. `dy` is at least `PAIR_DY` (0.6) fish heights, plus 0–1.4 %, with a random sign. `createFish` takes the scene height for this. The speeds and the paths do not change. The lane plan gets the new `lag` and `dy` as before (`fishLane`), so it keeps the whole pair free.
 - **Checked:** 1 new test: for a phone and a 1290 px screen and 6 random values, the gap is at least 1.5 widths and `|dy|` at least 0.6 heights. The P6 render test updated. Example: a near classic fish on a phone now swims about 11 s behind (50 px of water), at least 1.4 % lower or higher. The box simulation's boat check (item 92) now allows 15 % fewer boats, like the spawn check: with seeds 1–12 it failed in 10 of 12 runs before this change too, because both runs share one random stream. All tests pass.
 
+### 105. Info cards: rarity and spawn share — S — [SUN-CHASER-11](https://ainabler.sentry.io/issues/SUN-CHASER-11) — **✅ Done**
+
+- **Feedback (2026-10-06):** "infocards should tell the rarity and spawn probability percentage or time". Decision: the tier and the percent, for example "Very rare · 0.5 %".
+- **Built:** the fish, bird and boat cards (item 95) have one more row, "Rarity: <tier> · <share> %". `getFishShare`, `getFlyerShare` and `getBoatShare` in `weatherEffectsUtils` calculate the share from the spawn weights (`FISH_WEIGHTS`, `NIGHT_FISH_WEIGHTS`, `BIRD_WEIGHTS`, `BOAT_WEIGHTS`); no percent is in the code. The tiers are in `RARITY_TIERS` (`sceneInfo`): common ≥ 10 %, uncommon ≥ 3 %, rare ≥ 1 %, very rare < 1 %. The share has at most one decimal, "<0.1" below that.
+  - Fish: the pool that swims now. `SceneInfoContext` now has `timeOfDay`, and `isNightWater` (now shared with `CloudLayer`) selects the day or the night mix. At night a day fish is the 'moonlit' share times its share of the moonlit day fish (perch 4.7 %). A fish that is not in the current pool (it swims on at the switch) gets the share of the other pool.
+  - Birds: the share of all day birds, all seasons together. The season filter (month, latitude) and the evening-only starlings are not applied, because `SceneInfoContext` has no latitude. Bats: 100 % (after sunset all flyers are bats).
+  - Boats: the share of the fair-weather mix (all boats). The weather and wind filter of `pickBoat` is not applied, because `SceneInfoContext` has no wind.
+  - No time estimate ("one every N min"): the spawn gap depends on the screen width and the density. Planes, live planes, satellites, clouds, sun, moon and terrain have no rarity row.
+- **Checked:** 2 new tests, the fish, bird and boat card tests updated: shark very rare 0.5 % (day and night), classic fish common 24 %, perch at night uncommon 4.7 %, German "Sehr selten · 0,5 %"; no row on the cloud, sun, moon, plane and terrain cards. All tests pass.
+
+| Kind | Share | Tier |
+|---|---|---|
+| Fish by day: classic 24, minnow 18, perch 14, trout 12, carp 10 | 10–24 % | Common |
+| Fish by day: pike 8, catfish 4 | 4–8 % | Uncommon |
+| Fish by day: ray, turtle, jellyfish 2; seahorse, whale, pufferfish 1 | 1–2 % | Rare |
+| Fish by day and night: shark, dolphins | 0.5 % | Very rare |
+| Fish at night: lanternfish 30, burbot 15, eel 12 | 12–30 % | Common |
+| Fish at night: jellyfish 8, anglerfish 5, squid 5; moonlit classic 8, perch 4.7, trout 4, carp 3.3 | 3.3–8 % | Uncommon |
+| Fish at night: moonlit pike 2.7, catfish 1.3 | 1.3–2.7 % | Rare |
+| Birds: gull 38, heron, geese, cormorant 10 | 10–38 % | Common |
+| Birds: stork, swan, kestrel, starlings 8 | 8 % | Uncommon |
+| Boats: sailboat 43.8, ferry 18.8, fishing 18.8, rowboat 12.5 | 12.5–43.8 % | Common |
+| Boats: freighter | 6.3 % | Uncommon |
+
+### 106. Info cards: a fact per cloud type — S — [SUN-CHASER-12](https://ainabler.sentry.io/issues/SUN-CHASER-12) — **✅ Done**
+
+- **Feedback (2026-10-06):** "for the cloud infocards some cloud type facts".
+- **Built:** one fact per cloud type (`cloudFact.Ci`, `Cs`, `Ac`, `As`, `Cu`, `Sc`, `St`, `Ns`, `Cb`, `Len`, `Mam`) in all 5 languages, one short sentence like the fish facts. The cloud card shows it as the first row, without a label (like the fish fact), above the layer and the cover.
+- **Checked:** 1 new test (every cloud type has a fact sentence), the cloud card test updated. All tests pass.
+- A card redesign (item 107, lookbook first) follows and can change the style of the rows of items 105 and 106.
+
 ---
 
 ## Ongoing — Easter eggs and special events (S each, pick any time)
