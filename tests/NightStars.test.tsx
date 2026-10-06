@@ -124,6 +124,34 @@ describe('NightStars', () => {
     expect(countStars({ weatherType: 'partly', cloudCoverPercent: 30 })).toBe(300);
   });
 
+  // Runs the loop by hand at 60 Hz and counts the frames that draw (clearRect).
+  const countDrawnFrames = (shootingStarRate: number, frames: number) => {
+    const clearRect = vi.fn();
+    const ctxSpy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      clearRect, beginPath: () => {}, arc: () => {}, fill: () => {}, moveTo: () => {}, lineTo: () => {}, stroke: () => {},
+    } as unknown as CanvasRenderingContext2D);
+    let next: FrameRequestCallback | null = null;
+    const rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => { next = cb; return 1; });
+    const { unmount } = render(<NightStars timeOfDay="night" shootingStarRate={shootingStarRate} />);
+    clearRect.mockClear();
+    const t0 = performance.now();
+    for (let i = 1; i <= frames; i++) next?.(t0 + i * (1000 / 60));
+    unmount();
+    rafSpy.mockRestore();
+    ctxSpy.mockRestore();
+    return clearRect.mock.calls.length;
+  };
+
+  it('twinkles at 30 fps: draws every second frame of a 60 Hz display (ROADMAP item 91)', () => {
+    const drawn = countDrawnFrames(0, 60);
+    expect(drawn).toBeGreaterThanOrEqual(29);
+    expect(drawn).toBeLessThanOrEqual(31);
+  });
+
+  it('draws every frame while a shooting star flies (ROADMAP item 91)', () => {
+    expect(countDrawnFrames(1, 60)).toBe(60);
+  });
+
   it('draws stars statically without starting the animation loop when reduced motion is preferred (A-2)', () => {
     const ctxSpy = mockCanvasContext();
     const mediaSpy = mockReducedMotion(true);
