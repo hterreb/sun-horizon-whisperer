@@ -37,6 +37,17 @@ const endAnimation = (element: Element, animationName: string) => {
   fireEvent(element, event);
 };
 
+// Item 102: the box of a thing at time t, or null. A fish that changes lane swims on its old
+// lane until the change starts (`path.y` is the new lane); a diving fish swims under the others
+// after its dive (the H4 fade), so it has no box then.
+type Mover = { path?: ScenePath; shift?: { at: number; dy: number }; dive?: number };
+const boxAt = (e: Mover, t: number, viewHeight: number) => {
+  const p = e.path;
+  if (!p || t < p.start || t > p.start + p.duration + (p.lag ?? 0) || (e.dive !== undefined && t >= e.dive)) return null;
+  const y = e.shift && t < e.shift.at ? p.y - (e.shift.dy * 100) / viewHeight : p.y;
+  return { l: xAt(p, t - (p.lag ?? 0)), r: xAt(p, t) + p.width, top: y, bottom: y + p.height };
+};
+
 describe('CloudLayer', () => {
   const renderLayer = (weatherType: WeatherType, timeOfDay: string) =>
     render(<CloudLayer weatherType={weatherType} timeOfDay={timeOfDay as TimeOfDay} />);
@@ -212,10 +223,10 @@ describe('CloudLayer', () => {
       expect(container.querySelectorAll('[data-testid="scene-boat"]').length).toBe(2);
     });
 
-    it('never has more than 2 boats out at once on a phone (ROADMAP items 40 and 93)', () => {
-      // Spawns at ~5, 60, 115 and 170 s; no boat finishes its crossing in the test.
+    it('never has more than 3 boats out at once on a phone (ROADMAP items 40, 93 and 102)', () => {
+      // Spawns at ~5, 60, 115 and 170 s; no boat finishes its crossing in the test. The limit 2.5 rounds to 3.
       const container = atWidth(390, () => spawn({}, 180000));
-      expect(container.querySelectorAll('[data-testid="scene-boat"]').length).toBe(2);
+      expect(container.querySelectorAll('[data-testid="scene-boat"]').length).toBe(3);
     });
 
     it('sends more boats far out, toward the horizon (ROADMAP item 71)', () => {
@@ -231,9 +242,9 @@ describe('CloudLayer', () => {
     });
 
     it('lets more boats out on a wide screen, at most 1.5x (ROADMAP items 70 and 93)', () => {
-      // 1290 px is three phones wide, but the limit grows only to 1.5 x 2 = 3: three of the four spawns stay.
+      // 1290 px is three phones wide, but the limit grows only to 1.5 x 2.5 = 3.75, so 4: all four spawns stay.
       const container = atWidth(1290, () => spawn({}, 180000));
-      expect(container.querySelectorAll('[data-testid="scene-boat"]').length).toBe(3);
+      expect(container.querySelectorAll('[data-testid="scene-boat"]').length).toBe(4);
     });
 
     it('sails each boat type at its own speed (ROADMAP item 40)', () => {
@@ -397,15 +408,15 @@ describe('CloudLayer', () => {
       expect((desktop.dx / desktop.duration) * 1290).toBeCloseTo(1.15 * 430, 5);
     });
 
-    it('keeps at most three fish on screen on a phone (E4, ROADMAP item 93)', () => {
+    it('keeps at most four fish on screen on a phone (E4, ROADMAP items 93 and 102)', () => {
       // A classic fish pair every 5.5 s; none finishes its crossing in the test.
       const container = atWidth(390, () => spawnFish({}, 40000));
-      expect(container.querySelectorAll('[data-testid="scene-fish"]').length).toBe(6); // 3 pairs
+      expect(container.querySelectorAll('[data-testid="scene-fish"]').length).toBe(8); // 4 pairs
     });
 
     it('allows 1.5x the fish on a wide screen (ROADMAP items 70 and 93)', () => {
-      // 1290 px: up to 1.5 x 3 = 4.5, so 5 fish; of the seven pairs from 40 s, five stay.
-      expect(atWidth(1290, () => spawnFish({}, 40000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(10);
+      // 1290 px: up to 1.5 x 4 = 6 fish; of the seven pairs from 40 s, six stay.
+      expect(atWidth(1290, () => spawnFish({}, 40000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(12);
     });
   });
 
@@ -443,12 +454,12 @@ describe('CloudLayer', () => {
       expect(container.querySelectorAll('[data-testid="fish-light"]').length).toBe(5);
     });
 
-    it('keeps the night quiet: a check every 15-25 s, at most two fish (NR1, ROADMAP item 93)', () => {
+    it('keeps the night quiet: a check every 15-25 s, at most three fish (NR1, ROADMAP items 93 and 102)', () => {
       expect(spawnNight({ moonlight: moon }, 14000).querySelector('[data-testid="scene-fish"]')).toBeNull();
-      // A moonlit classic pair every 15.5 s; six tries in 100 s, two pairs stay on a phone.
-      expect(atWidth(390, () => spawnNight({ moonlight: moon }, 100000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(4);
-      // Three phones wide: up to 1.5 x 2 = 3 pairs (items 70 and 93).
-      expect(atWidth(1290, () => spawnNight({ moonlight: moon }, 100000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(6);
+      // A moonlit classic pair every 15.5 s; six tries in 100 s, three pairs stay on a phone (2.5 rounds to 3).
+      expect(atWidth(390, () => spawnNight({ moonlight: moon }, 100000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(6);
+      // Three phones wide: up to 1.5 x 2.5 = 3.75, so 4 pairs (items 70, 93 and 102).
+      expect(atWidth(1290, () => spawnNight({ moonlight: moon }, 100000)).querySelectorAll('[data-testid="scene-fish"]').length).toBe(8);
     });
   });
 
@@ -748,10 +759,11 @@ describe('lane planning (ROADMAP item 92)', () => {
   };
   const endOf = (p: ScenePath) => p.start + p.duration + (p.lag ?? 0);
   // The pairs of boxes that touch at time t (no margin).
-  const touching = (list: { id: number; path?: ScenePath }[], t: number, seen: Set<string>) => {
-    const boxes = list.flatMap(e => (e.path && t >= e.path.start && t <= endOf(e.path)
-      ? [{ id: e.id, l: xAt(e.path, t - (e.path.lag ?? 0)), r: xAt(e.path, t) + e.path.width, top: e.path.y, bottom: e.path.y + e.path.height }]
-      : []));
+  const touching = (list: ({ id: number } & Mover)[], t: number, seen: Set<string>, viewHeight: number) => {
+    const boxes = list.flatMap(e => {
+      const box = boxAt(e, t, viewHeight);
+      return box ? [{ id: e.id, ...box }] : [];
+    });
     for (let i = 0; i < boxes.length; i++) {
       for (let j = i + 1; j < boxes.length; j++) {
         const a = boxes[i];
@@ -782,10 +794,10 @@ describe('lane planning (ROADMAP item 92)', () => {
       scene = next;
       scene.fish.forEach(f => { if (f.dive !== undefined) dives.add(String(f.id)); });
       for (let dt = 0; dt < 0.5; dt += 0.1) {
-        touching(scene.fish, t + dt, touches);
-        touching(scene.ships, t + dt, touches);
-        touching([...scene.birds, ...scene.planes], t + dt, touches);
-        touching([...scene.fish, ...scene.ships], t + dt, water);
+        touching(scene.fish, t + dt, touches, rules.view.height);
+        touching(scene.ships, t + dt, touches, rules.view.height);
+        touching([...scene.birds, ...scene.planes], t + dt, touches, rules.view.height);
+        touching([...scene.fish, ...scene.ships], t + dt, water, rules.view.height);
       }
     }
     // A fish and a boat that meet, where the fish does not dive (item 94).
@@ -881,10 +893,9 @@ describe('a calmer sea that is full from the start (ROADMAP item 93)', () => {
   it('places the warm start with the lane plan: no two boxes touch', () => {
     for (let seed = 1; seed <= 5; seed++) {
       const sea = run(empty(), freshTimes(), () => rules(desktop), 500, 500, mulberry32(seed));
-      const water = [...sea.fish, ...sea.ships].map(e => e.path as ScenePath);
+      const water: Mover[] = [...sea.fish, ...sea.ships];
       for (let t = 0.5; t < 120; t += 0.5) {
-        const boxes = water.filter(p => t >= p.start && t <= endOf(p))
-          .map(p => ({ l: xAt(p, t - (p.lag ?? 0)), r: xAt(p, t) + p.width, top: p.y, bottom: p.y + p.height }));
+        const boxes = water.flatMap(e => boxAt(e, t, desktop.height) ?? []);
         for (let i = 0; i < boxes.length; i++) {
           for (let j = i + 1; j < boxes.length; j++) {
             const [a, b] = [boxes[i], boxes[j]];
@@ -951,9 +962,9 @@ describe('a calmer sea that is full from the start (ROADMAP item 93)', () => {
     const random = mulberry32(7);
     const last = freshTimes();
     let sea = run(empty(), last, () => rules(desktop), 500, 500, random);
-    expect(sea.fish).toHaveLength(5);
+    expect(sea.fish).toHaveLength(6);
     sea = run(sea, last, () => rules(desktop, { density: 0.3 }), 1000, 1000, random);
-    expect(sea.fish).toHaveLength(5);
+    expect(sea.fish).toHaveLength(6);
   });
 
   it('follows the busy and quiet phases over a simulated day', () => {
@@ -1161,6 +1172,41 @@ describe('the shark hunt (ROADMAP item 94)', () => {
     expect(scene.fish[0].dive).toBe(meet - 2);
     // During play nothing dives.
     expect(tick({ gapFactor: 1 / 8 }).fish[0].dive).toBeUndefined();
+  });
+
+  // Item 102: the fish changes to a free lane instead, when there is one.
+  it('moves a fish to a free lane when a boat on its fallback lane meets it (item 102)', () => {
+    const fish = { ...createFish('carp', false, false, 390, mulberry32(1)), id: 7 };
+    const path: ScenePath = { start: 0, duration: 1000, x: 30, dx: 75, width: 5, y: 0, height: 100 };
+    const last: SpawnTimes = { birds: 1e9, fish: 1e9, ships: 0, leaves: 1e9, planes: 1e9, shown: { birds: true, fish: true, ships: true } };
+    // The boat finds no lane clear of the fish, takes its fallback lane; the fish finds y = 50.
+    const answers = [null, undefined, 50];
+    const lane = (candidate: { y: number }) => { const a = answers.shift(); return a === undefined ? candidate.y : a; };
+    const scene = spawnTick(
+      { birds: [], fish: [{ ...fish, path }], ships: [], leaves: [], planes: [] }, last, rules({ fishOverride: null }),
+      200_000, 10, () => 0.3, lane,
+    );
+    const meet = firstMeeting(scene.ships[0].path!, path, 10)!;
+    expect(scene.fish[0].dive).toBeUndefined();
+    expect(scene.fish[0].path!.y).toBe(50);
+    expect(scene.fish[0].shift).toEqual({ at: Math.max(10, meet - 4), dy: (50 * 844) / 100 });
+  });
+
+  it('spawns a fish with no free lane anyway, and it dodges the first thing it meets (item 102)', () => {
+    const blocker = { ...createFish('carp', false, false, 390, mulberry32(2)), id: 8 };
+    const path: ScenePath = { start: 0, duration: 1000, x: 0, dx: 1, width: 100, y: 0, height: 100 };
+    const lane = (candidate: { y: number }, others: readonly ScenePath[]) => (others.length ? null : candidate.y);
+    const tick = (extra: Partial<SpawnRules>) => spawnTick(
+      { birds: [], fish: [{ ...blocker, path }], ships: [], leaves: [], planes: [] },
+      { birds: 1e9, fish: 0, ships: 1e9, leaves: 1e9, planes: 1e9, shown: { birds: true, fish: true, ships: true } },
+      rules({ fishOverride: 'carp', ...extra }), 200_000, 10, () => 0.1, lane,
+    );
+    const scene = tick({});
+    expect(scene.fish).toHaveLength(2);
+    // No lane is free for it, so it dives where it meets the blocker: at once.
+    expect(scene.fish.find(f => f.id !== 8)!.dive).toBe(10);
+    // During play it waits for a free lane, as before.
+    expect(tick({ gapFactor: 1 / 8 }).fish).toHaveLength(1);
   });
 
   // The component: `?fish=shark&hunt=Hn`, every spawn a hunting shark with its prey.

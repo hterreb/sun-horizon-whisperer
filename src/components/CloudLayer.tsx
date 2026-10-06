@@ -132,7 +132,9 @@ const LEAF_RATE_PERCENT_PER_SEC = 6;
 // items 70 and 93). At load the scene starts with its boats on the way (item 93, S1).
 const BOAT_GAP_MIN_MS = 55000;
 const BOAT_GAP_RANGE_MS = 60000;
-const MAX_BOATS = 2; // item 93 (S2): it was 3
+// Item 102: a fish that meets a thing swims to a free lane over this time.
+const LANE_SHIFT_SEC = 3;
+const MAX_BOATS = 2.5; // item 102: between item 93's 2 and the 3 before; getSceneLimit rounds
 // A bird check every 8-12 s (ROADMAP item 74, C3; it was 3-5 s at twice the speed). At night
 // the geese across the moon (W14) get a check every 30 s.
 const BIRD_GAP_MIN_MS = 8000;
@@ -225,6 +227,8 @@ interface FishEntity extends MovingEntity {
   rolls?: number[]; // DO1 (item 85): each dolphin's roll delay in s, 2 or 3 dolphins
   hunt?: HuntPlan; // a hunting shark (item 94): its prey and the hunt's timeline
   dive?: number; // item 94: the scene time when the fish dives under a boat (the H4 fade)
+  shift?: { at: number; dy: number }; // item 102: at the scene time `at` it swims `dy` px up or down to a free lane
+  shifted?: boolean; // item 102: the lane change has started
   hunted?: PreyHunt; // item 94: the hunt that plays on this fish
 }
 
@@ -580,6 +584,21 @@ export const spawnTick = (
   // X2: the lanes of the hunts of the last 60 s.
   const keepAway = (last.keepAway ?? []).filter(p => p.start + p.duration > sceneTime);
   last.keepAway = keepAway;
+  // Item 102: a fish that meets a thing at `at` changes to a free lane when there is one
+  // (LANE_SHIFT_SEC, ending 1 s before), else it dives (the H4 fade, 2 s before). A hunting
+  // shark and its prey keep their lane, as the hunt is planned on it.
+  const dodge = (f: FishEntity & { path: ScenePath }, at: number, others: ScenePath[]): FishEntity => {
+    if (f.shift === undefined && !f.hunt && !fish.some(g => g.hunt?.preyId === f.id)) {
+      const from = Math.max(sceneTime, at - LANE_SHIFT_SEC - 1);
+      const shape = fishLane(f, view, rewind);
+      const band: [number, number] = [shape.band[0] - shape.above, shape.band[1] - shape.above];
+      const y = lane({ ...f.path, band, view }, others, from);
+      if (y !== null && y !== f.path.y) {
+        return { ...f, path: { ...f.path, y }, shift: { at: from, dy: ((y - f.path.y) * view.height) / 100 } };
+      }
+    }
+    return { ...f, dive: Math.min(f.dive ?? Infinity, Math.max(sceneTime, at - 2)) };
+  };
   const place = <T extends MovingEntity>(
     item: T, shape: LaneShape, others: ScenePath[], progress = 0,
   ): (T & { path: ScenePath }) | null => {
@@ -744,7 +763,15 @@ export const spawnTick = (
         if (hunter) return hunter;
       }
       // X2: new small fish keep out of a hunting shark's lane for 60 s.
-      return place(newFish, fishLane(newFish, view, rewind), isSmallFish(newFish.kind) ? [...others, ...keepAway] : others, progress);
+      const avoid = isSmallFish(newFish.kind) ? [...others, ...keepAway] : others;
+      const shape = fishLane(newFish, view, rewind);
+      const placed = place(newFish, shape, avoid, progress);
+      if (placed || !live) return placed;
+      // Item 102: with no free lane the fish spawns anyway at its pick, and dodges the first thing it meets.
+      const forced = place(newFish, shape, [], progress);
+      if (!forced) return null;
+      const at = Math.min(...avoid.map(o => firstMeeting(forced.path, o, sceneTime) ?? Infinity));
+      return at === Infinity ? forced : dodge(forced, at, avoid);
     };
     if (warm && !shown.fish) {
       fill(() => fish.length, limit, progress => {
@@ -802,13 +829,15 @@ export const spawnTick = (
       const clear = place(newShip, shape, pathsOf(ships, fish), progress);
       if (clear) return clear;
       const placed = place(newShip, shape, pathsOf(ships), progress);
-      // Item 94: each fish that the boat on this lane meets dives (the H4 fade) 2 s before.
+      // Each fish that the boat on this lane meets changes lane or dives (items 94 and 102).
       if (placed && live) {
-        fish = fish.map(f => {
-          if (!f.path) return f;
-          const at = firstMeeting(placed.path, f.path, sceneTime);
-          return at === null ? f : { ...f, dive: Math.min(f.dive ?? Infinity, Math.max(sceneTime, at - 2)) };
-        });
+        for (const f of fish) {
+          const at = f.path && firstMeeting(placed.path, f.path, sceneTime);
+          if (!f.path || at === null || at === undefined) continue;
+          const others = [placed.path, ...pathsOf(ships, fish.filter(g => g !== f))];
+          const dodged = dodge({ ...f, path: f.path }, at, others);
+          fish = fish.map(g => (g === f ? dodged : g));
+        }
       }
       return placed;
     };
@@ -1095,10 +1124,11 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     const timers = huntTimersRef.current;
     const done = huntsDoneRef.current;
     const pending = fish.flatMap(f => [
-      ...(f.hunt ? [{ key: `hunt-${f.id}`, at: f.hunt.fireAt, preyId: f.hunt.preyId, prey: f.hunt.prey, fx: f.hunt.fx && {
+      ...(f.hunt ? [{ key: `hunt-${f.id}`, at: f.hunt.fireAt, preyId: f.hunt.preyId, patch: { hunted: f.hunt.prey }, fx: f.hunt.fx && {
         ...f.hunt.fx, id: f.id, tone: f.light === 'moon' ? 'moon' as const : boatTone === 'day' ? 'day' as const : 'dusk' as const,
       } }] : []),
-      ...(f.dive !== undefined ? [{ key: `dive-${f.id}`, at: f.dive, preyId: f.id, prey: { variant: 'H4' as const }, fx: undefined }] : []),
+      ...(f.dive !== undefined ? [{ key: `dive-${f.id}`, at: f.dive, preyId: f.id, patch: { hunted: { variant: 'H4' as const } }, fx: undefined }] : []),
+      ...(f.shift ? [{ key: `shift-${f.id}`, at: f.shift.at, preyId: f.id, patch: { shifted: true }, fx: undefined }] : []),
     ]);
     if (playDirection !== 0) {
       timers.forEach(clearTimeout);
@@ -1113,7 +1143,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         timers.delete(hunt.key);
         done.add(hunt.key);
         if (!entitiesRef.current.fish.some(f => f.id === hunt.preyId)) return;
-        updateEntities(prev => ({ ...prev, fish: prev.fish.map(f => (f.id === hunt.preyId ? { ...f, hunted: hunt.prey } : f)) }));
+        updateEntities(prev => ({ ...prev, fish: prev.fish.map(f => (f.id === hunt.preyId ? { ...f, ...hunt.patch } : f)) }));
         const fx = hunt.fx;
         if (fx) setHuntFx(list => [...list, fx]);
       }, Math.max(0, (hunt.at - now) * 1000)));
@@ -1184,6 +1214,21 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
           height: VISITOR_VIEW_HEIGHT * visitorUnit,
         }
       : { cx: fishItem.width / 2, cy: fishItem.height / 2, width: fishItem.width, height: fishItem.height };
+    const contentOf = (key: string) => (
+      <>
+        {hunted && hunted.variant !== 'H3' ? (
+          <div
+            style={preyHuntStyle(hunted)}
+            data-testid="hunted-fish"
+            // H1, H2: the fish is gone at the end of its fade.
+            onAnimationEnd={event => { if (event.target === event.currentTarget && event.animationName === 'sceneHuntFade') remove(); }}
+          >
+            {body}
+          </div>
+        ) : body}
+        {onInfo && <HitArea {...hitBox} ring={infoRing === `fish-${fishItem.id}-${key}`} />}
+      </>
+    );
     const swimmer = (key: string, lag: number, dy: number, removes: boolean) => (
       <div
         key={key}
@@ -1205,17 +1250,19 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         // its animationend bubbles up here (e.g. when a play rate runs it backwards).
         onAnimationEnd={removes ? (event => { if (endsCrossing(event)) remove(); }) : undefined}
       >
-        {hunted && hunted.variant !== 'H3' ? (
+        {/* Item 102: the lane change, in a wrapper from its plan on, so its start does not mount
+            the fish again; the pair's second fish changes `lag` s later. */}
+        {fishItem.shift ? (
           <div
-            style={preyHuntStyle(hunted)}
-            data-testid="hunted-fish"
-            // H1, H2: the fish is gone at the end of its fade.
-            onAnimationEnd={event => { if (event.target === event.currentTarget && event.animationName === 'sceneHuntFade') remove(); }}
+            data-testid="lane-shift"
+            style={fishItem.shifted ? {
+              ['--shift-dy' as string]: `${fishItem.shift.dy}px`,
+              animation: `sceneLaneShift ${LANE_SHIFT_SEC}s ease-in-out ${lag}s both`,
+            } : undefined}
           >
-            {body}
+            {contentOf(key)}
           </div>
-        ) : body}
-        {onInfo && <HitArea {...hitBox} ring={infoRing === `fish-${fishItem.id}-${key}`} />}
+        ) : contentOf(key)}
       </div>
     );
     return fishItem.companion ? (
@@ -1550,6 +1597,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
           to {
             opacity: 0;
             filter: blur(1.5px) brightness(0.65);
+          }
+        }
+
+        @keyframes sceneLaneShift {
+          to {
+            transform: translateY(var(--shift-dy));
           }
         }
 
