@@ -875,6 +875,35 @@ describe('InfoPanel: line of sight as an icon at the sun and moon rows (ROADMAP 
       expect(screen.getByRole('switch', { name: 'Satellite tracking' })).toHaveAttribute('aria-checked', 'true');
     });
 
+    it('has an "ISS passes" toggle next to the sunset reminder, with the gold plus, gated while locked', () => {
+      const value = premiumValue({});
+      const onToggle = vi.fn();
+      const { rerender } = render(
+        <PremiumContext.Provider value={value}>
+          <InfoPanel {...defaultProps} onSunsetReminderToggle={vi.fn()} onIssReminderToggle={onToggle} />
+        </PremiumContext.Provider>
+      );
+      const button = screen.getByRole('button', { name: 'ISS passes' });
+      expect(button).toHaveAttribute('aria-pressed', 'false');
+      expect(button).toHaveAttribute('title', 'ISS passes: remind me 10 minutes before a visible pass (while the app is open)');
+      expect(button.querySelector('[data-testid="premium-badge"]')).toBeInTheDocument();
+      // Next to the sunset reminder, in the same row.
+      expect(button.previousElementSibling).toHaveAttribute('aria-label', 'Remind me 15 minutes before sunset (while the app is open)');
+      fireEvent.click(button);
+      expect(value.requirePremium).toHaveBeenCalledWith(onToggle);
+      rerender(
+        <PremiumContext.Provider value={premiumValue({ isPremium: true, isLocked: false, requirePremium: (action) => action?.() })}>
+          <InfoPanel {...defaultProps} onIssReminderToggle={onToggle} isIssReminderOn />
+        </PremiumContext.Provider>
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'ISS passes' }));
+      expect(onToggle).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('button', { name: 'ISS passes' })).toHaveAttribute('aria-pressed', 'true');
+      // Without the Notification API there is no toggle.
+      rerender(<InfoPanel {...defaultProps} />);
+      expect(screen.queryByRole('button', { name: 'ISS passes' })).not.toBeInTheDocument();
+    });
+
     it('after a Play purchase the gold plus is gone and the score shows', () => {
       render(
         <PremiumContext.Provider value={premiumValue({ isPremium: true, isLocked: false })}>

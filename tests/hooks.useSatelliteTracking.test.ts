@@ -46,6 +46,13 @@ describe('useSatelliteTracking (ROADMAP item 97)', () => {
     expect(Math.abs(result.current.issPass!.start.getTime() - Date.parse(refFull.start))).toBeLessThanOrEqual(60_000);
   });
 
+  it('loads the data for the ISS reminder alone, without a sky (tracking off)', async () => {
+    const { result } = renderHook(() => useSatelliteTracking(false, new Date('2026-10-06T18:35:00Z'), latitude, longitude, -9, true));
+    await waitFor(() => expect(result.current.issPass).not.toBeNull());
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(result.current.sky).toBeNull();
+  });
+
   it('stays without satellites when the data cannot be loaded', async () => {
     load.mockResolvedValue(null);
     const { result } = renderHook(() => useSatelliteTracking(true, new Date(refFull.max), latitude, longitude, -9, false));

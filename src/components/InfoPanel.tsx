@@ -31,6 +31,7 @@ import { type WeatherType } from './CloudLayer';
 import { getTimeTravelRange, toDateTimeLocalValue } from '@/utils/timeTravel';
 import { formatTemperature, type TemperatureUnit } from '@/utils/temperatureUnit';
 import { SUNSET_REMINDER_MIN } from '@/utils/sunsetReminder';
+import { PASS_REMINDER_MIN } from '@/utils/satelliteUtils';
 import { LANGUAGES, LANGUAGE_NAMES, type Language } from '@/utils/language';
 import { formatNumber, translate, type MessageKey } from '@/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -137,6 +138,10 @@ interface InfoPanelProps {
   // Satellite tracking (ROADMAP item 97): the switch with the gold plus.
   isSatelliteTrackingOn?: boolean;
   onSatelliteTrackingToggle?: () => void;
+  // "ISS passes" (ROADMAP item 97): the reminder toggle next to the sunset reminder, with the
+  // gold plus. Not passed when the browser has no Notification API.
+  isIssReminderOn?: boolean;
+  onIssReminderToggle?: () => void;
 }
 
 const InfoPanel: React.FC<InfoPanelProps> = ({
@@ -182,6 +187,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   onSunsetReminderToggle,
   isSatelliteTrackingOn = false,
   onSatelliteTrackingToggle,
+  isIssReminderOn = false,
+  onIssReminderToggle,
 }) => {
   const { t, language, setLanguage } = useLanguage();
   // Premium gate (ROADMAP item 14): every gold-plus control goes through requirePremium.
@@ -782,6 +789,19 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                     aria-pressed={isSunsetReminderOn}
                   >
                     {isSunsetReminderOn ? <AlarmClockCheck size={14} /> : <AlarmClock size={14} />}
+                  </button>
+                )}
+                {onIssReminderToggle && (
+                  <button
+                    type="button"
+                    onClick={() => requirePremium(onIssReminderToggle)}
+                    className={`${INLINE_ICON_TOGGLE} relative ml-1 ${isIssReminderOn ? 'bg-white/20' : ''}`}
+                    aria-label={t('issReminder.label')}
+                    title={t('issReminder.toggle', { minutes: PASS_REMINDER_MIN })}
+                    aria-pressed={isIssReminderOn}
+                  >
+                    <Satellite size={14} />
+                    <PremiumBadge className="absolute -right-1 -top-1 h-2.5 w-2.5" />
                   </button>
                 )}
                 {!polarSunLabel && shownSunset && (

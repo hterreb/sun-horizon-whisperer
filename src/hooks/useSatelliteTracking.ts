@@ -37,11 +37,12 @@ export interface SatelliteTracking {
 }
 
 // Satellite tracking (ROADMAP item 97, Premium): loads satellite.js with a dynamic import()
-// and the CelesTrak data only when `enabled`, then gives the sky once per second of `date`
+// and the CelesTrak data only when `showSky` (the tracking switch) or `wantIssPass` (the
+// "ISS passes" switch) is on. With `showSky` it gives the sky once per second of `date`
 // (the app clock, so time travel moves the satellites too). Nothing is computed while the
 // sun is above the twilight band around -6°.
 export const useSatelliteTracking = (
-  enabled: boolean,
+  showSky: boolean,
   date: Date,
   latitude: number,
   longitude: number,
@@ -50,6 +51,7 @@ export const useSatelliteTracking = (
 ): SatelliteTracking => {
   const [lib, setLib] = useState<SatelliteLib | null>(null);
   const [records, setRecords] = useState<GpRecord[] | null>(null);
+  const enabled = showSky || wantIssPass;
 
   useEffect(() => {
     if (!enabled || lib) return;
@@ -81,7 +83,7 @@ export const useSatelliteTracking = (
   const observer = useMemo(() => ({ latitude, longitude }), [latitude, longitude]);
 
   const second = Math.floor(date.getTime() / 1000);
-  const hasData = enabled && satellites.length > 0 && isNearEpoch(satellites[0], date);
+  const hasData = showSky && satellites.length > 0 && isNearEpoch(satellites[0], date);
   // `sunAltitude` comes in 30 s steps; the margin keeps the computation on for the whole
   // twilight fade (getSkySatellites checks the sun each second).
   const isDark = sunAltitude < TWILIGHT_FADE[1] + 0.2;

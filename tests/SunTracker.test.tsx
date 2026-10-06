@@ -1011,5 +1011,71 @@ describe('SunTracker', () => {
       expect(visProps.current?.satellites).toBeNull();
       expect(loadSatelliteData).toHaveBeenCalledTimes(1);
     });
+
+    describe('ISS passes (Lutz, 2026-10-06)', () => {
+      const shown: string[] = [];
+      class FakeNotification {
+        static permission: NotificationPermission = 'default';
+        static answer: NotificationPermission = 'granted';
+        static requestPermission = async () => (FakeNotification.permission = FakeNotification.answer);
+        onclick: (() => void) | null = null;
+        constructor(_title: string, options: NotificationOptions) {
+          shown.push(options.body ?? '');
+        }
+        close() {}
+      }
+      const name = 'ISS passes';
+      // 12 min before the evening pass of 7 Oct (09:46:27 UTC, NW, up to 23°).
+      const BEFORE_PASS = new Date('2026-10-07T09:34:30Z');
+
+      beforeEach(() => {
+        shown.length = 0;
+        FakeNotification.permission = 'default';
+        FakeNotification.answer = 'granted';
+        vi.stubGlobal('Notification', FakeNotification);
+        vi.setSystemTime(BEFORE_PASS);
+        vi.mocked(loadSatelliteData).mockResolvedValue([issFixture.omm as unknown as GpRecord]);
+      });
+      afterEach(() => {
+        vi.unstubAllGlobals();
+      });
+
+      it('is off by default; on, it reminds 10 min before a visible ISS pass, also with the tracking off', async () => {
+        localStorage.setItem('satellite-tracking', 'off');
+        render(<SunTracker />);
+        await flush();
+        const button = screen.getByRole('button', { name });
+        expect(button).toHaveAttribute('aria-pressed', 'false');
+        expect(button.querySelector('[data-testid="premium-badge"]')).toBeInTheDocument();
+        expect(loadSatelliteData).not.toHaveBeenCalled();
+        fireEvent.click(button);
+        for (let i = 0; i < 3; i++) await flush();
+        expect(screen.getByRole('button', { name })).toHaveAttribute('aria-pressed', 'true');
+        expect(localStorage.getItem('iss-pass-reminder')).toBe('on');
+        expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'ISS pass reminder on' }));
+        expect(loadSatelliteData).toHaveBeenCalled();
+        // No satellites in the sky with the tracking off.
+        expect(visProps.current?.satellites).toBeNull();
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(3 * 60_000);
+        });
+        expect(shown).toHaveLength(1);
+        expect(shown[0]).toMatch(/^ISS visible at \d{2}:\d{2}, from NW to NW, up to 23°$/);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(10 * 60_000);
+        });
+        expect(shown).toHaveLength(1);
+      });
+
+      it('stays off with a hint when the permission is denied', async () => {
+        FakeNotification.answer = 'denied';
+        render(<SunTracker />);
+        await flush();
+        fireEvent.click(screen.getByRole('button', { name }));
+        await flush();
+        expect(screen.getByRole('button', { name })).toHaveAttribute('aria-pressed', 'false');
+        expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Notifications are blocked' }));
+      });
+    });
   });
 });

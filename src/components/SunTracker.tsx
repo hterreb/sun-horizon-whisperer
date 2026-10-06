@@ -53,7 +53,7 @@ import { useSunsetCountdown, primeCountdownAudio } from '@/hooks/useSunsetCountd
 import { useSunsetReminder, requestReminderPermission, getNotificationPermission } from '@/hooks/useSunsetReminder';
 import { SUNSET_REMINDER_MIN } from '@/utils/sunsetReminder';
 import { useSatelliteTracking, useSatellitePassReminder } from '@/hooks/useSatelliteTracking';
-import { getSatelliteCard } from '@/utils/satelliteUtils';
+import { PASS_REMINDER_MIN, getSatelliteCard } from '@/utils/satelliteUtils';
 import { loadManualLocation, saveManualLocation, clearManualLocation } from '../utils/manualLocation';
 import {
   hasSeenCompassCalibrationHint,
@@ -88,6 +88,8 @@ const SUNSET_COUNTDOWN_STORAGE_KEY = 'sunset-countdown';
 const SUNSET_REMINDER_STORAGE_KEY = 'sunset-reminder';
 // Satellite tracking toggle (ROADMAP item 97), on by default (Premium in the Play app).
 const SATELLITE_TRACKING_STORAGE_KEY = 'satellite-tracking';
+// "ISS passes" reminder toggle (ROADMAP item 97), off by default.
+const ISS_REMINDER_STORAGE_KEY = 'iss-pass-reminder';
 const SATELLITE_CARD_STEP_MS = 10_000;
 const DEFAULT_EYE_HEIGHT_M = 1.7;
 // Manual weather's strong-wind switch (ROADMAP item 73): above the 40 km/h strong-wind line.
@@ -762,8 +764,7 @@ const SunTracker: React.FC = () => {
   useSunsetReminder(countdownTarget?.time ?? null, isReminderOn && !isTimePreview, language);
 
   // Satellite tracking (ROADMAP item 97): on by default; Premium in the Play app (item 45).
-  // It sends no place: the CelesTrak data is global. The ISS pass reminder uses the sunset
-  // reminder's switch and notification permission (item 69).
+  // It sends no place: the CelesTrak data is global.
   const [isSatelliteTrackingSaved, setIsSatelliteTrackingSaved] = useState(() => {
     try {
       return localStorage.getItem(SATELLITE_TRACKING_STORAGE_KEY) !== 'off';
@@ -781,7 +782,43 @@ const SunTracker: React.FC = () => {
       console.error('Error saving satellite tracking:', error);
     }
   }, [isSatelliteTrackingOn]);
-  const isPassReminderOn = isSatelliteTrackingOn && isReminderOn && !isTimePreview;
+  // "ISS passes" (Lutz, 2026-10-06): its own switch next to the sunset reminder, off by
+  // default, Premium-gated like the tracking (free on the web, item 45). It asks for the
+  // notification permission as the sunset reminder does (item 69), and works also with the
+  // tracking off (it then loads the data without showing satellites).
+  const [isIssReminderSaved, setIsIssReminderSaved] = useState(() => {
+    try {
+      return localStorage.getItem(ISS_REMINDER_STORAGE_KEY) === 'on';
+    } catch {
+      return false;
+    }
+  });
+  const isIssReminderOn = isIssReminderSaved && notificationPermission === 'granted' && !premium.isLocked;
+  const handleIssReminderToggle = useCallback(async () => {
+    const next = !isIssReminderOn;
+    if (next) {
+      const granted = await requestReminderPermission();
+      setNotificationPermission(getNotificationPermission());
+      if (!granted) {
+        toast({
+          title: t('reminder.blockedTitle'),
+          description: t('issReminder.blockedDescription'),
+        });
+        return;
+      }
+      toast({
+        title: t('issReminder.onTitle'),
+        description: t('issReminder.onDescription', { minutes: PASS_REMINDER_MIN }),
+      });
+    }
+    setIsIssReminderSaved(next);
+    try {
+      localStorage.setItem(ISS_REMINDER_STORAGE_KEY, next ? 'on' : 'off');
+    } catch (error) {
+      console.error('Error saving the ISS pass reminder:', error);
+    }
+  }, [isIssReminderOn, t]);
+  const isPassReminderOn = isIssReminderOn && !isTimePreview && location.loaded;
   const satelliteTracking = useSatelliteTracking(
     isSatelliteTrackingOn && location.loaded,
     date,
@@ -966,6 +1003,8 @@ const SunTracker: React.FC = () => {
             onSunsetReminderToggle={notificationPermission === 'unsupported' ? undefined : handleReminderToggle}
             isSatelliteTrackingOn={isSatelliteTrackingOn}
             onSatelliteTrackingToggle={handleSatelliteTrackingToggle}
+            isIssReminderOn={isIssReminderOn}
+            onIssReminderToggle={notificationPermission === 'unsupported' ? undefined : handleIssReminderToggle}
           />
         </>
       )}
