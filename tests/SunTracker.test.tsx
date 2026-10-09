@@ -1401,6 +1401,15 @@ describe('SunTracker national days', () => {
     expect(localStorage.getItem('collection')).toBeNull();
   });
 
+  it('lights up the boats on Christmas Day, and the badge counts when a boat shows', async () => {
+    vi.setSystemTime(new Date('2026-12-25T12:00:00Z'));
+    answer('DE');
+    render(<SunTracker />);
+    await waitFor(() => expect(screen.getAllByTestId('christmas-bulb').length).toBeGreaterThan(0));
+    expect(screen.getAllByTestId('boat-bunting')[0].getAttribute('data-shape')).toBe('lights');
+    await waitFor(() => expect(JSON.parse(localStorage.getItem('collection') ?? '{}')).toHaveProperty('egg:christmas'));
+  });
+
   it('?egg=festaRepubblica flies the jets on any day and counts no badge', async () => {
     window.history.pushState({}, '', '/?egg=festaRepubblica');
     global.fetch = vi.fn(() => Promise.reject(new Error('offline'))) as unknown as typeof fetch;

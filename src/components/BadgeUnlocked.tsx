@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Award } from 'lucide-react';
 import { BadgeArt } from '@/components/CollectionView';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { useLanguage } from '@/hooks/useLanguage';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { BADGES, badgeTier, type BadgeId } from '@/utils/collection';
@@ -8,15 +9,15 @@ import { GLASS_CARD_SURFACE } from '@/utils/glassChrome';
 import { cardBorderClass, ringBorderClass, type RarityTier } from '@/utils/rarityTier';
 
 // "Badge unlocked" card (ROADMAP item 114): a new badge shows like a game achievement. A glass
-// card at the top centre: the badge as in the collection grid with its tier ring, the kicker,
-// the name, the tier word and the counter. Calm motion, CSS only: the card slides down 12 px
+// card at the bottom centre, just above the radio bar: the badge as in the collection grid with its tier ring, the kicker,
+// the name, the tier word and the counter. Calm motion, CSS only: the card slides up 12 px
 // and fades in, one light sweep crosses the badge, the ring glows once. Reduced motion: fade
-// only. It fades out after SHOW_MS; a tap opens the collection at the badge; a swipe up or
+// only. It fades out after SHOW_MS; a tap opens the collection at the badge; a swipe down or
 // Escape closes it. SunTracker shows one card at a time (a queue).
 
 export const SHOW_MS = 4000;
 export const FADE_OUT_MS = 300;
-const SWIPE_UP_PX = 24;
+const SWIPE_DOWN_PX = 24;
 
 // The tier colour as text colour: the tier word, and the glow (its shadow is `currentColor`).
 const TIER_TEXT: Record<RarityTier, string> = {
@@ -34,6 +35,7 @@ interface BadgeUnlockedProps {
 const BadgeUnlocked: React.FC<BadgeUnlockedProps> = ({ badgeId, found, onOpen, onDone }) => {
   const { t } = useLanguage();
   const reducedMotion = usePrefersReducedMotion();
+  const isMobile = useIsMobile();
   const [leaving, setLeaving] = useState(false);
   const doneRef = useRef(onDone);
   useEffect(() => {
@@ -74,7 +76,7 @@ const BadgeUnlocked: React.FC<BadgeUnlockedProps> = ({ badgeId, found, onOpen, o
     swiped.current = false;
   };
   const handlePointerUp = (event: React.PointerEvent) => {
-    if (swipeStartY.current !== null && swipeStartY.current - event.clientY > SWIPE_UP_PX) {
+    if (swipeStartY.current !== null && event.clientY - swipeStartY.current > SWIPE_DOWN_PX) {
       swiped.current = true;
       setLeaving(true);
     }
@@ -92,7 +94,8 @@ const BadgeUnlocked: React.FC<BadgeUnlockedProps> = ({ badgeId, found, onOpen, o
   return (
     <div
       className="pointer-events-none fixed inset-x-0 z-110 flex justify-center px-4"
-      style={{ top: 'calc(env(safe-area-inset-top) + 12px)' }}
+      // Same height as the time-travel button: above the radio bar (MusicPlayer), never on it.
+      style={{ bottom: `calc(${isMobile ? '7.5rem' : '4.5rem'} + env(safe-area-inset-bottom))` }}
       data-share-hide
     >
       <div role="status" aria-live="polite" className={`pointer-events-auto ${motion}`} data-testid="badge-unlocked">

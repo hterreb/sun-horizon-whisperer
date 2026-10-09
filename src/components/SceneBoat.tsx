@@ -112,7 +112,7 @@ interface SceneBoatProps {
 const SceneBoat = ({ kind, tone, lit, wake, seaWindKmh = UNKNOWN_SEA_WIND_KMH }: SceneBoatProps) => {
   const id = useId().replace(/:/g, '');
   const boat = FLEET[kind];
-  // National days and Día de los Muertos: a decorated boat reports that it shows, so the egg's badge counts.
+  // National days, Día de los Muertos and Christmas: a decorated boat reports that it shows, so the egg's badge counts.
   const bunting = useBunting();
   useEffect(() => bunting?.onShow(), [bunting]);
   const height = BOAT_HEIGHT_PX;
@@ -163,7 +163,7 @@ const SceneBoat = ({ kind, tone, lit, wake, seaWindKmh = UNKNOWN_SEA_WIND_KMH }:
           </g>
         )}
         {parts}
-        {bunting && <BoatBunting kind={kind} colors={bunting.colors} shape={bunting.shape} />}
+        {bunting && bunting.shape !== 'lights' && <BoatBunting kind={kind} colors={bunting.colors} shape={bunting.shape} />}
       </svg>
       {/* X1: a faint, still mirror image below the waterline, fading out downward: sharp in
           calm water, striped and fainter in wind (item 79, X2). */}
@@ -182,6 +182,12 @@ const SceneBoat = ({ kind, tone, lit, wake, seaWindKmh = UNKNOWN_SEA_WIND_KMH }:
       >
         <svg {...svg} className="absolute left-0 top-0" style={{ transform: 'scaleY(-1)', filter }}>{parts}</svg>
       </div>
+      {bunting?.shape === 'lights' && (
+        // Christmas: the bulbs light up the dark, so they sit above the dimming filter, like the mast lights.
+        <svg {...svg} className="absolute inset-0">
+          <BoatBunting kind={kind} colors={bunting.colors} shape="lights" lit={lit} />
+        </svg>
+      )}
       {lit && (
         <svg {...svg} className="absolute inset-0">
           <g className="fill-brand-gold-light" style={{ filter: 'drop-shadow(0 0 2px hsl(var(--brand-gold)))' }}>

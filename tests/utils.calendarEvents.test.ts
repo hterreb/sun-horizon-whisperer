@@ -117,14 +117,33 @@ describe('isSantaTime (Christmas Eve)', () => {
 });
 
 describe('getSolsticeTraceDates', () => {
-  const iso = (d: Date) => d.toISOString();
-  it('gives the other solstice day at the same clock time', () => {
-    expect(getSolsticeTraceDates('solstice-longest', new Date(2027, 5, 21, 12)).map(iso)).toEqual(['2027-12-22T12:00:00.000Z']);
-    expect(getSolsticeTraceDates('solstice-shortest', new Date(2027, 11, 22, 9)).map(iso)).toEqual(['2027-06-21T09:00:00.000Z']);
+  const fan = (event: Parameters<typeof getSolsticeTraceDates>[0], date: Date) =>
+    getSolsticeTraceDates(event, date).map(({ season, date: d, today }) => `${season} ${d.toISOString()}${today ? ' today' : ''}`);
+
+  it('gives the June solstice, equinox and December solstice days at the same clock time, today marked', () => {
+    expect(fan('solstice-longest', new Date(2027, 5, 21, 12))).toEqual([
+      'june 2027-06-21T12:00:00.000Z today',
+      'equinox 2027-09-23T12:00:00.000Z',
+      'december 2027-12-22T12:00:00.000Z',
+    ]);
+    expect(fan('solstice-shortest', new Date(2027, 11, 22, 9))).toEqual([
+      'june 2027-06-21T09:00:00.000Z',
+      'equinox 2027-09-23T09:00:00.000Z',
+      'december 2027-12-22T09:00:00.000Z today',
+    ]);
   });
 
-  it('gives both solstice days on an equinox', () => {
-    expect(getSolsticeTraceDates('equinox', new Date(2027, 2, 20, 12)).map(iso)).toEqual(['2027-06-21T12:00:00.000Z', '2027-12-22T12:00:00.000Z']);
+  it('marks the equinox as today on the September equinox and on Nowruz (the March equinox)', () => {
+    expect(fan('equinox', new Date(2027, 8, 23, 12))).toEqual([
+      'june 2027-06-21T12:00:00.000Z',
+      'equinox 2027-09-23T12:00:00.000Z today',
+      'december 2027-12-22T12:00:00.000Z',
+    ]);
+    expect(fan('nowruz', new Date(2027, 2, 20, 12))).toEqual([
+      'june 2027-06-21T12:00:00.000Z',
+      'equinox 2027-03-20T12:00:00.000Z today',
+      'december 2027-12-22T12:00:00.000Z',
+    ]);
   });
 
   it('gives none for other events', () => {

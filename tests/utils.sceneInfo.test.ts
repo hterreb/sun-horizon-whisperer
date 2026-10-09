@@ -410,7 +410,7 @@ describe('sceneInfo: easter egg cards (ROADMAP item 113)', () => {
     expect(eggCard('blackCat', de, { language: 'de' })[2]).toBe('Seltenheit: Ultraselten · 1,6 Tage im Jahr');
   });
 
-  it('gives Santa 1 day a year (Dec 24 only, not the 2 Christmas ornament days)', () => {
+  it('gives Santa 1 day a year (Dec 24 only, not the 2 Christmas lights days)', () => {
     expect(getEventDaysPerYear('christmas')).toBe(2);
     expect(eggCard('santa').at(-1)).toBe('Rarity: Ultra rare · 1 day a year');
   });

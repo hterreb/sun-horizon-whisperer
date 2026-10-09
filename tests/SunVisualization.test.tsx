@@ -395,7 +395,7 @@ describe('SunVisualization (rendered): static cardinal direction labels (ROADMAP
     expect(strokes).not.toContain('hsl(var(--scene-moon))'); // no moon arc while it's midday
   });
 
-  it('draws the faint other-solstice sun path on a solstice day, both on an equinox, none on a normal day', () => {
+  it('draws the sun-path fan on a solstice and an equinox: three paths, today bold and gold, day-length pills; none on a normal day', () => {
     setMockedContainerSize(800, 600);
     const props = {
       sunPosition: { azimuth: 180, altitude: 60 },
@@ -407,20 +407,46 @@ describe('SunVisualization (rendered): static cardinal direction labels (ROADMAP
       latitude: 47.78, // Ravensburg
       longitude: 9.61,
     };
-    const { rerender } = render(<SunVisualization {...props} date={new Date(2027, 5, 21, 12)} calendarEvent="solstice-longest" />);
-    const traces = screen.getAllByTestId('solstice-trace');
-    expect(traces).toHaveLength(1);
-    expect(traces[0].getAttribute('stroke')).toBe('hsl(var(--scene-solstice-trace))');
-
-    // On an equinox both solstice paths: June's apex sits higher (smaller y) than December's.
-    rerender(<SunVisualization {...props} date={new Date(2027, 2, 20, 12)} calendarEvent="equinox" />);
     const apexY = (el: Element) =>
       Math.min(...Array.from((el.getAttribute('d') ?? '').matchAll(/,(-?\d+(?:\.\d+)?)/g)).map((m) => parseFloat(m[1])));
-    const [june, december] = screen.getAllByTestId('solstice-trace');
-    expect(apexY(december) - apexY(june)).toBeGreaterThan(50);
+    const pillTexts = () => screen.getAllByTestId('solstice-pill').map((p) => `${p.getAttribute('data-today')} ${p.textContent}`);
+
+    // June solstice: June (today) bold and gold, equinox and December thin white dashes,
+    // apexes from high to low.
+    const { rerender } = render(<SunVisualization {...props} date={new Date(2027, 5, 21, 12)} calendarEvent="solstice-longest" />);
+    const [june, equinox, december] = screen.getAllByTestId('solstice-trace');
+    expect(screen.getAllByTestId('solstice-trace')).toHaveLength(3);
+    expect(june.getAttribute('data-today')).toBe('true');
+    expect(june.getAttribute('stroke')).toBe('hsl(var(--scene-solstice-trace))');
+    expect(june.getAttribute('stroke-width')).toBe('3');
+    expect(june.getAttribute('stroke-dasharray')).toBeNull();
+    for (const other of [equinox, december]) {
+      expect(other.getAttribute('data-today')).toBe('false');
+      expect(other.getAttribute('stroke')).toBe('hsl(var(--scene-solstice-fan))');
+      expect(other.getAttribute('stroke-opacity')).toBe('0.8');
+      expect(other.getAttribute('stroke-dasharray')).not.toBeNull();
+    }
+    expect(apexY(equinox) - apexY(june)).toBeGreaterThan(50);
+    expect(apexY(december) - apexY(equinox)).toBeGreaterThan(50);
+    // Ravensburg: about 16 h on the June solstice, 12 h on the equinox, 8 h 20 min in December.
+    expect(pillTexts()).toEqual([
+      expect.stringMatching(/^true Today · 16 h \d+ min$/),
+      expect.stringMatching(/^false Equinox · 12 h \d+ min$/),
+      expect.stringMatching(/^false Dec · 8 h \d+ min$/),
+    ]);
+
+    // September equinox: the equinox path is today's, the two solstice paths are dashed.
+    rerender(<SunVisualization {...props} date={new Date(2027, 8, 23, 12)} calendarEvent="equinox" />);
+    expect(screen.getAllByTestId('solstice-trace').map((p) => p.getAttribute('data-today'))).toEqual(['false', 'true', 'false']);
+    expect(pillTexts()).toEqual([
+      expect.stringMatching(/^true Today · 12 h \d+ min$/),
+      expect.stringMatching(/^false Jun · 16 h \d+ min$/),
+      expect.stringMatching(/^false Dec · 8 h \d+ min$/),
+    ]);
 
     rerender(<SunVisualization {...props} date={new Date(2027, 5, 22, 12)} calendarEvent={null} />);
     expect(screen.queryByTestId('solstice-trace')).toBeNull();
+    expect(screen.queryByTestId('solstice-pill')).toBeNull();
   });
 
   it('draws the midnight sun arc round the whole sky, brighter, with its pill (sky eggs)', () => {
