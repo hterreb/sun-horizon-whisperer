@@ -1104,6 +1104,18 @@ describe('sun and altitude pill (ROADMAP items 46, 48)', () => {
     expect(pill()).toHaveTextContent('Sunset in 3 s');
     expect(within(pill()).getByTestId('premium-badge')).toBeInTheDocument();
   });
+
+  it('with the countdown sound off, the pill is a button with a muted bell that turns the sound on (item 108)', () => {
+    const onSoundOn = vi.fn();
+    const { rerender } = render(<SunVisualization {...baseProps} sunsetCountdown={{ seconds: 7, lineOfSight: false }} onCountdownSoundOn={onSoundOn} />);
+    const button = screen.getByRole('button', { name: 'Turn on the countdown sound' });
+    expect(button).toHaveTextContent('Sunset in 7 s');
+    fireEvent.click(button);
+    expect(onSoundOn).toHaveBeenCalledTimes(1);
+    rerender(<SunVisualization {...baseProps} sunsetCountdown={{ seconds: 7, lineOfSight: false }} />);
+    expect(screen.queryByRole('button', { name: 'Turn on the countdown sound' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('sun-altitude')).toHaveTextContent('Sunset in 7 s');
+  });
 });
 
 describe('SunVisualization sunglasses egg', () => {

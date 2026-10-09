@@ -768,6 +768,18 @@ describe('SunTracker', () => {
         expect(starts).toHaveLength(0);
       });
 
+      it('with the toggle off, a tap on the pill turns the sound on, like the bell (item 108)', () => {
+        runToCountdown(false);
+        tickFor(4000, 1000);
+        fireEvent.click(screen.getByRole('button', { name: 'Turn on the countdown sound' }));
+        expect(screen.getByRole('button', { name: 'Sunset countdown' })).toHaveAttribute('aria-pressed', 'true');
+        expect(localStorage.getItem('sunset-countdown')).toBe('on');
+        // The check tone of primeCountdownAudio.
+        expect(starts).toHaveLength(1);
+        expect(screen.queryByRole('button', { name: 'Turn on the countdown sound' })).not.toBeInTheDocument();
+        expect(screen.getByTestId('sun-altitude')).toHaveTextContent('Sunset in 7 s');
+      });
+
       it('with the page hidden at T-11 s, schedules no tones', () => {
         start(new Date(sunset.getTime() - 20_000));
         toggle();

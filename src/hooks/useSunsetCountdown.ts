@@ -8,7 +8,8 @@ const CHIME_NOTE_S = 0.15;
 const TICK_S = 0.08;
 const CHIME_S = 1.2;
 const FADE_S = 0.01;
-const VOLUME = 0.08;
+// Loud enough to hear over the radio (item 108), which ducks during the countdown.
+const VOLUME = 0.2;
 const COUNTDOWN_MS = 10_000;
 // The 1 s clock reaches T-11 s at a remaining time in this window. The upper edge has
 // room for a late tick, so a slow interval does not skip the countdown.
@@ -49,11 +50,18 @@ export const primeCountdownAudio = () => {
   if (ctx) playTone(ctx, ctx.currentTime, [TICK_HZ], TICK_S);
 };
 
+// The countdown's result: the seconds left for the pill, and whether the tones play
+// (from the scheduling at T-11 s to the end of the chime), so the radio can duck (item 108).
+export interface SunsetCountdown {
+  seconds: number | null;
+  isSounding: boolean;
+}
+
 // Schedules the 10 ticks and the chime when the 1 s clock `now` reaches T-11 s before
 // `target`, only while `live` (live time), `soundOn` (the toggle) and the page is visible.
-// Returns the seconds left (10 to 1) in live time, also with the sound off (item 98),
+// `seconds` is the seconds left (10 to 1) in live time, also with the sound off (item 98),
 // else null.
-export const useSunsetCountdown = (target: Date | null, now: Date, live: boolean, soundOn: boolean): number | null => {
+export const useSunsetCountdown = (target: Date | null, now: Date, live: boolean, soundOn: boolean): SunsetCountdown => {
   const active = live && soundOn;
   // The target the tones are scheduled for. Set during render (not in an effect), the
   // same pattern as SunTracker's cursor state.
@@ -66,6 +74,18 @@ export const useSunsetCountdown = (target: Date | null, now: Date, live: boolean
   } else if (active && reachesStart && scheduledFor !== targetMs && document.visibilityState === 'visible') {
     setScheduledFor(targetMs);
   }
+
+  // With the toggle saved on, a reload leaves the AudioContext suspended until a user
+  // gesture (item 108). The first tap anywhere starts it; the capture phase also counts
+  // a tap that a child handles, for example the radio's play switch.
+  useEffect(() => {
+    if (!soundOn || audioContext?.state === 'running') return;
+    const unlock = () => {
+      getAudioContext();
+    };
+    window.addEventListener('pointerdown', unlock, { capture: true, once: true });
+    return () => window.removeEventListener('pointerdown', unlock, { capture: true });
+  }, [soundOn]);
 
   // Schedule all 11 tones at once on the AudioContext clock, so the ticks are exact.
   // Toggle off, a preview or unmount stops the tones that are still to come.
@@ -81,5 +101,6 @@ export const useSunsetCountdown = (target: Date | null, now: Date, live: boolean
   }, [scheduledFor]);
 
   const isCounting = live && remainingMs !== null && remainingMs > 0 && remainingMs <= COUNTDOWN_MS;
-  return isCounting ? Math.ceil(remainingMs / 1000) : null;
+  const isSounding = scheduledFor !== null && now.getTime() <= scheduledFor + CHIME_S * 1000;
+  return { seconds: isCounting ? Math.ceil(remainingMs / 1000) : null, isSounding };
 };

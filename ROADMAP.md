@@ -2134,6 +2134,39 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Checked:** 1 new test (every cloud type has a fact sentence), the cloud card test updated. All tests pass.
 - A card redesign (item 107, lookbook first) follows and can change the style of the rows of items 105 and 106.
 
+### 108. The countdown you hear over the radio — S — [SUN-CHASER-14](https://ainabler.sentry.io/issues/SUN-CHASER-14) — **✅ Done**
+
+- **Feedback (2026-10-06 19:15 CEST, Ravensburg):** "I didn't hear the countdown to sunset as I had sound on but was playing the radio station does this interfere? The visual count down worked".
+- **Cause:** since item 98 the pill shows for everyone, but the sound plays only with the bell on (off by default). The ticks were soft (gain 0.08) under a radio at 0.5. With the bell saved as on, a page load leaves the `AudioContext` suspended until a tap (CD2 of item 98 was not built).
+- **Pick (2026-10-07):** all four, A–D.
+- **Built:**
+  - A: with the bell on, one `pointerdown` listener on `window` (capture, once) creates or resumes the `AudioContext`. The radio's play tap counts.
+  - B: `useSunsetCountdown` returns `{ seconds, isSounding }`. While the tones play (from T−11 s to the end of the chime), `SunTracker` passes `duck` to `MusicPlayer`, which plays at 30 % of the slider volume. The slider does not change.
+  - C: tick and chime gain 0.2 (was 0.08).
+  - D: with the bell off, the pill is a button with a `BellOff` icon ("Turn on the countdown sound", 5 languages). A tap turns the bell on, like the bell in the Sunset row.
+- **Checked:** new `tests/hooks.useSunsetCountdown.test.ts` (A, `isSounding`), duck test in `MusicPlayer`, pill button tests in `SunVisualization` and `SunTracker`. All tests pass. Not checked on a phone.
+
+### 109. Longer contrails — S — [SUN-CHASER-13](https://ainabler.sentry.io/issues/SUN-CHASER-13) — **✅ Done**
+
+- **Feedback (2026-10-06 19:14 CEST, Ravensburg):** "Condensate cloud strip from plane should be longer and last a long time before it fades away".
+- **Built:** `CONTRAIL_LOOK` short 10 → 30 s, medium 60 → 180 s; persistent stays 300–600 s. `MAX_TRAIL_SEC` (live planes) 120 → 300. A scene plane with a short or medium trail flies on until the end of its trail is off the screen too (`dx` grows by the trail length; same speed).
+- **Checked:** `utils.planes` and `CloudLayer` tests updated, one new test (the trail's end leaves at 101 %). All tests pass.
+
+### 110. Live planes: all with the compass, two moving ones without — S — [SUN-CHASER-13](https://ainabler.sentry.io/issues/SUN-CHASER-13) — **✅ Done**
+
+- **Feedback (2026-10-06):** "In compass mode show all planes in line of sight, in normal mode only the nearest two that are really visible and don't hang static in the air. Don't show planes that are too close to the horizon".
+- **Built:** `MIN_ELEVATION_DEG` 1 → 5 in both modes. `pickShownPlanes(nearest, compass)` in `liveRadar`: with the compass (`SunVisualization` passes `compass`), every visible plane in the field of view, at most `MAX_COMPASS_PLANES` (40, for performance). Without it, the 2 nearest that move at least `MIN_SCREEN_SPEED_PX_S` (1 px/s) on the screen; a plane that is too slow is skipped and the next nearest takes its place. `MAX_LIVE_PLANES` is removed.
+- **Decision (2026-10-09):** 1 px/s, not 3. Simulation (planes within 100 km, ≥ 5°): 4.2 % move 1 px/s or more on a phone, 22 % at 1600 px; at 3 px/s only 0.4 %. So on a phone the radar often shows 0 or 1 plane without the compass.
+- **Checked:** `utils.liveRadar` tests for 5°, both modes and the 40 limit; `LivePlanes` tests for below 5°, compass (20 in view shown, 1 behind hidden) and normal mode (a still plane and a slow far plane skipped). All tests pass.
+
+### 111. The route on the live plane card — M — [SUN-CHASER-13](https://ainabler.sentry.io/issues/SUN-CHASER-13) — **✅ Done**
+
+- **Feedback (2026-10-06):** "Plane info card destination but not data source". Decision (2026-10-07): add the route, remove the data-source line. Attribution (2026-10-09): the privacy page only.
+- **Source:** adsb.lol `POST /api/0/routeset` answers 201 with an empty body (checked 2026-10-07). The proxy uses adsb.lol's static route data, `https://vrs-standing-data.adsb.lol/routes/<first 2>/<CALLSIGN>.json` (schedule-based, no `plausible` flag).
+- **Built:** `GET /api/planes?route=<callsign>&lat=&lon=` (`planeFeed`) returns `{ route: { from, to } | null }`, cached 1 h. The server keeps the leg that passes nearest the user's rounded place (detour at most 20 % of the leg + 250 km), else null. Callsign `^[A-Z0-9]{3,8}$` and a valid place, else 400 with no upstream call; an upstream error gives 502. Only the callsign goes to adsb.lol. `useLiveRoute` asks once when a live plane card opens; a failure leaves the line out. The card shows "Route: Paris (CDG) → Tel Aviv (TLV)" (codes only when a name is longer than 12 characters). `info.dataAdsbLol` is replaced by `info.route`. One sentence on the privacy page. No CSP change.
+- **Limits:** the route is from schedules, so near an airport a wrong leg can still show. The endpoint is the target of a deprecated adsb.lol redirect; if it moves, the line goes away.
+- **Checked:** route mapping (near and far place, stops, ICAO fallback, bad data), request handling (URL, User-Agent, cache, 404, input check, 502), card lines, `useLiveRoute`. Dev server against the real adsb.lol: ELY326 gave CDG → TLV. All tests pass.
+
 ---
 
 ## Ongoing — Easter eggs and special events (S each, pick any time)

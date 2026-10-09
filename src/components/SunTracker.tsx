@@ -747,7 +747,7 @@ const SunTracker: React.FC = () => {
     if (next) primeCountdownAudio();
   }, [isCountdownOn]);
   const countdownTarget = getCountdownTarget(date, sunTimes, terrainExtras.terrainSunTimes, isLineOfSightOn);
-  const countdownSeconds = useSunsetCountdown(countdownTarget?.time ?? null, date, !isTimePreview, isCountdownOn);
+  const { seconds: countdownSeconds, isSounding: isCountdownSounding } = useSunsetCountdown(countdownTarget?.time ?? null, date, !isTimePreview, isCountdownOn);
 
   // Sunset reminder (ROADMAP item 69): a notification SUNSET_REMINDER_MIN before the same
   // target, while the app is open. Live time only. The tap that turns it on asks for the
@@ -929,7 +929,7 @@ const SunTracker: React.FC = () => {
       {ufoOn && <Ufo onDone={handleUfoDone} />}
       {reveal === 'done' && (
         <>
-          <MusicPlayer isFullscreen={isFullscreen} />
+          <MusicPlayer isFullscreen={isFullscreen} duck={isCountdownSounding} />
           <TopLeftButtons
             isFullscreen={isFullscreen}
             showCursor={showCursor}
@@ -988,6 +988,7 @@ const SunTracker: React.FC = () => {
             playDirection={playDirection}
             satellites={satelliteTracking.sky}
             sunsetCountdown={countdownSeconds === null ? null : { seconds: countdownSeconds, lineOfSight: !!countdownTarget?.lineOfSight }}
+            onCountdownSoundOn={isCountdownOn ? undefined : handleCountdownToggle}
           />
           <InfoPanel
             sunPosition={sunPosition}
