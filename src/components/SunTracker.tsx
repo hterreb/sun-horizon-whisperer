@@ -698,7 +698,8 @@ const SunTracker: React.FC = () => {
   }, [date]);
 
   // Hidden easter eggs (ROADMAP "Ongoing — Easter eggs"): sunglasses after 7 taps on
-  // the sun, a rare UFO per night view, and a disco sky from the Konami code.
+  // the sun, a rare UFO per night view, and a disco sky from 7 taps on the moon (same
+  // rule as the sun) or the Konami code.
   // `?egg=sunglasses|ufo|disco` shows one at once, for testing.
   const [eggOverride] = useState(() => getEggOverride(window.location.search));
   const [sunglassesOn, setSunglassesOn] = useState(eggOverride === 'sunglasses');
@@ -711,6 +712,15 @@ const SunTracker: React.FC = () => {
     if (triggered) {
       setSunglassesOn(true);
       collect('egg:sunglasses');
+    }
+  }, [collect]);
+  const moonTapsRef = React.useRef({ count: 0, lastMs: -Infinity });
+  const handleMoonTap = useCallback(() => {
+    const { taps, triggered } = registerSunTap(moonTapsRef.current, Date.now());
+    moonTapsRef.current = taps;
+    if (triggered) {
+      setDiscoOn(true);
+      collect('egg:disco');
     }
   }, [collect]);
   useEffect(() => {
@@ -1097,6 +1107,7 @@ const SunTracker: React.FC = () => {
             fireworksTrigger={fireworksTrigger}
             sunglasses={sunglassesOn}
             onSunTap={handleSunTap}
+            onMoonTap={handleMoonTap}
             onSceneInfo={handleSceneInfo}
             infoRing={infoCard?.ring ?? null}
             infoRingTier={infoCardInfo?.tier ?? null}

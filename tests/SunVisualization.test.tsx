@@ -1209,6 +1209,20 @@ describe('SunVisualization info cards (ROADMAP item 95)', () => {
     }
   });
 
+  it('the moon reports each tap for the disco egg, beside its card', () => {
+    const onMoonTap = vi.fn();
+    const onSceneInfo = vi.fn();
+    render(<SunVisualization {...props} onMoonTap={onMoonTap} onSceneInfo={onSceneInfo} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Moon' }), { detail: 0 }); // keyboard click opens the card at once (item 116)
+    expect(onMoonTap).toHaveBeenCalledTimes(1);
+    expect(onSceneInfo).toHaveBeenCalledWith({ type: 'moon' }, expect.anything(), 'moon');
+  });
+
+  it('the moon is no tap target while it is not shown', () => {
+    render(<SunVisualization {...props} moonPosition={{ ...props.moonPosition, visible: false }} />);
+    expect(screen.queryByRole('button', { name: 'Moon' })).toBeNull();
+  });
+
   it('makes the moon a button of at least 44 px that opens its card, also from the keyboard', () => {
     const onSceneInfo = vi.fn();
     render(<SunVisualization {...props} onSceneInfo={onSceneInfo} />);

@@ -107,6 +107,8 @@ interface SunVisualizationProps {
   // Hidden sunglasses egg: the sun wears sunglasses; tapping the sun reports each tap to SunTracker.
   sunglasses?: boolean;
   onSunTap?: () => void;
+  // Hidden disco egg: tapping the moon reports each tap to SunTracker.
+  onMoonTap?: () => void;
   // Info cards (ROADMAP item 95): a tap on anything in the scene, and the ring id of the open card.
   onSceneInfo?: SceneInfoHandler;
   infoRing?: string | null;
@@ -581,6 +583,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   astroEvent = null,
   sunglasses = false,
   onSunTap,
+  onMoonTap,
   onSceneInfo,
   infoRing = null,
   infoRingTier = null,
@@ -1155,10 +1158,14 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
       {isMoonDiscShown && (
         // A button for the moon's info card (ROADMAP item 95), at least 44 px wide.
+        // Each tap also counts for the disco egg (ROADMAP "Ongoing — Easter eggs").
         <button
           type="button"
           aria-label={t('scene.moon')}
-          onClick={event => tap({ type: 'moon' }, tapPoint(event), 'moon', event.detail === 0)}
+          onClick={event => {
+            onMoonTap?.();
+            tap({ type: 'moon' }, tapPoint(event), 'moon', event.detail === 0);
+          }}
           className={`absolute flex min-h-11 min-w-11 items-center justify-center rounded-full pointer-events-auto touch-manipulation focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 ${compassActive ? '' : 'transition-all duration-1000'}`}
           style={{
             left: `${moonX}px`,
