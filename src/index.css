@@ -473,6 +473,7 @@
     /* Scene palette — moon, water (the water's gradient comes from the sky, ROADMAP item 53) */
     --scene-moon: 216 12.2% 83.9%;
     --scene-moon-dark: 224 14.9% 19.8%; /* the moon disc's unlit-side fill */
+    --scene-solstice-trace: 43 90% 55%; /* the solstice/equinox egg's faint golden sun-path trace */
     --scene-water: 194.3 86.3% 57.1%;
 
     /* Glass panel (InfoPanel restyle target, item 15) */
@@ -513,18 +514,36 @@
     /* Bird/bat silhouette (CloudLayer) — matches the style book's D bird, a soft
        dark flock shape. */
     --scene-critter-silhouette: 0 0% 0%;
+    /* The dark shore rock the Friday-the-13th cat sits on. */
+    --scene-cat-rock: 220 12% 14%;
+    /* The red eyes of the hanging Halloween bat (CalendarEggs). */
+    --scene-bat-eye: 0 85% 50%;
     /* Plane lights at night (ROADMAP item 96): the white strobe and the wing lights. */
     --scene-plane-strobe: 0 0% 100%;
     --scene-plane-red: 0 85% 62%;
     --scene-plane-green: 140 70% 55%;
 
     /* Astronomy easter eggs (astroEvents.ts): aurora curtains, green flash, the
-       copper moon of a lunar eclipse and the faint blue moon tint. */
+       copper moon of a lunar eclipse, the blue moon ("Blue night": the disc tint, its
+       halo and its light on the sea) and the supermoon's warm halo. */
     --scene-aurora-green: 145 80% 55%;
     --scene-aurora-violet: 280 60% 60%;
     --scene-green-flash: 130 90% 60%;
     --scene-eclipse-moon: 12 75% 38%;
-    --scene-blue-moon: 205 90% 72%;
+    --scene-blue-moon: 210 86% 70%;
+    --scene-supermoon-glow: 40 90% 78%;
+    /* Christmas ornaments (CalendarEggs, Dec 25-26): the bauble colours; gold is also
+       the caps and the stars. */
+    --scene-ornament-red: 0 78% 50%;
+    --scene-ornament-gold: 45 92% 55%;
+    --scene-ornament-green: 142 62% 38%;
+    --scene-ornament-silver: 210 40% 80%;
+    /* Sky eggs (astroEvents.ts, SkyEggs.tsx): the blue-white Pleiades (Matariki), the
+       planets of a conjunction, the electric-blue noctilucent clouds, the midnight-sun arc. */
+    --scene-pleiades: 210 100% 90%;
+    --scene-planet: 45 100% 90%;
+    --scene-noctilucent: 192 100% 68%;
+    --scene-midnight-sun: 38 100% 62%;
     /* Fish (ROADMAP item 85, FS1): two tones per species, a dark back over a pale belly,
        from the item 62 tints: back = the tint at 0.85 x saturation and 0.55 x lightness
        (at least 16 %), belly = 0.6 x saturation, lightness 55 % of the way to white (at

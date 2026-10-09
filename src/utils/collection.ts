@@ -15,7 +15,8 @@ import { ridgeAt, type HorizonProfile } from './horizonUtils';
 export type EggKind =
   | 'sunglasses' | 'ufo' | 'disco'
   | 'newYear' | 'friday13' | 'lunarNewYear' | 'solstice' | 'equinox' | 'halloweenPumpkin' | 'halloweenBats' | 'christmas' | 'santa'
-  | 'solarEclipse' | 'lunarEclipse' | 'greenFlash' | 'supermoon' | 'blueMoon' | 'meteorShower' | 'aurora';
+  | 'solarEclipse' | 'lunarEclipse' | 'greenFlash' | 'supermoon' | 'blueMoon' | 'meteorShower' | 'aurora'
+  | 'matariki' | 'conjunction' | 'noctilucent' | 'midnightSun' | 'polarNight';
 // Item 115: the states of the sun, the moon and the terrain.
 export type SunState = 'dawn' | 'morning' | 'midday' | 'afternoon' | 'evening';
 export type MoonState =
@@ -84,6 +85,9 @@ const EGGS: [EggKind, MessageKey][] = [
   ['halloweenBats', 'egg.halloweenBats'], ['christmas', 'egg.christmas'], ['santa', 'egg.santa'],
   ['solarEclipse', 'egg.solarEclipse'], ['lunarEclipse', 'egg.lunarEclipse'], ['greenFlash', 'egg.greenFlash'],
   ['supermoon', 'egg.supermoon'], ['blueMoon', 'egg.blueMoon'], ['meteorShower', 'egg.meteorShower'], ['aurora', 'egg.aurora'],
+  // Sky eggs.
+  ['matariki', 'egg.matariki'], ['conjunction', 'egg.conjunction'], ['noctilucent', 'egg.noctilucent'],
+  ['midnightSun', 'egg.midnightSun'], ['polarNight', 'egg.polarNight'],
 ];
 
 // The grid order. A fish's tier is its day share; getFishShare falls back to the night share
@@ -218,7 +222,7 @@ export const badgeForCalendarEvent = (event: CalendarEvent | null, o: CalendarBa
     case 'halloween-pumpkin': return o.moonUp ? 'egg:halloweenPumpkin' : null;
     case 'halloween-bats': return o.isNight && !o.reducedMotion ? 'egg:halloweenBats' : null;
     case 'christmas': return o.weatherType !== 'snow' && !o.reducedMotion ? 'egg:christmas' : null;
-    case 'friday-13': return o.reducedMotion ? null : 'egg:friday13';
+    case 'friday-13': return 'egg:friday13';
     case 'lunar-new-year': return o.reducedMotion ? null : 'egg:lunarNewYear';
   }
 };

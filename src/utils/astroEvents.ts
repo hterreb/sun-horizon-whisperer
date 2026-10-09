@@ -1,9 +1,11 @@
-// Astronomy easter eggs (ROADMAP "Easter eggs and special events", Astronomy): pure
-// checks for eclipses, supermoon, blue moon, meteor showers, aurora and the green
-// flash. getAstroEvent picks at most one event for the scene.
+// Astronomy easter eggs (ROADMAP "Easter eggs and special events", Astronomy and Sky): pure
+// checks for eclipses, supermoon, blue moon, meteor showers, aurora, the green flash,
+// Matariki, planet conjunctions, noctilucent clouds, midnight sun and polar night.
+// getAstroEvent picks at most one event for the scene.
 import { getNextFullMoon } from '@/utils/moonUtils';
 import { getMoonEclipticGeocentric } from '@/utils/lunarEphemeris';
-import { type TimeOfDay } from '@/utils/sunUtils';
+import { PLANETS, getGeocentricVector, separationDeg, toHorizontal, type PlanetSky } from '@/utils/planets';
+import { type SunTimes, type TimeOfDay } from '@/utils/sunUtils';
 import { type WeatherType } from '@/components/CloudLayer';
 
 export type AstroEventKind =
@@ -13,12 +15,15 @@ export type AstroEventKind =
   | 'supermoon'
   | 'blueMoon'
   | 'meteorShower'
-  | 'aurora';
+  | 'aurora'
+  | 'matariki' | 'conjunction' | 'noctilucent' | 'midnightSun' | 'polarNight';
 
 export interface AstroEvent {
   kind: AstroEventKind;
   // 0-1: how dark the eclipse is; 1 for the other events.
   strength: number;
+  // The conjunction's two planets (getConjunction); absent for `?egg=conjunction`.
+  planets?: [PlanetSky, PlanetSky];
 }
 
 const MINUTE_MS = 60_000;
@@ -144,8 +149,24 @@ const METEOR_SHOWERS: readonly { name: string; month: number; from: number; to: 
 export const getMeteorShower = (date: Date): string | null =>
   METEOR_SHOWERS.find((s) => s.month === date.getMonth() && date.getDate() >= s.from && date.getDate() <= s.to)
     ?.name ?? null;
-// Shooting stars per animation frame during a shower: 8x NightStars' normal 0.001.
-export const METEOR_SHOWER_RATE = 0.008;
+// Meteor streaks during a shower (NightStars): one at a time, one every ~8 s on
+// average; long, 3 px wide, slow (px per ms) and with a slow fade in and out.
+export const METEOR_SHOWER = {
+  intervalMs: 8000,
+  durationMs: 1600,
+  fadeInMs: 250,
+  fadeOutMs: 700,
+  width: 3,
+  length: 160,
+  speed: 0.2,
+} as const;
+// Chance to start a meteor in a frame of `dtMs` while none flies. The sky waits
+// (interval - duration) on average, so one starts every `intervalMs` on average.
+export const meteorSpawnChance = (dtMs: number): number =>
+  Math.min(1, dtMs / (METEOR_SHOWER.intervalMs - METEOR_SHOWER.durationMs));
+// Meteor opacity at `ageMs`: fades in, holds at 1, fades out; 0 once it is over.
+export const meteorOpacity = (ageMs: number): number =>
+  Math.max(0, Math.min(1, ageMs / METEOR_SHOWER.fadeInMs, (METEOR_SHOWER.durationMs - ageMs) / METEOR_SHOWER.fadeOutMs));
 
 // Aurora: static rule for now (the NOAA Kp index comes later).
 export const isAuroraTime = (latitude: number, timeOfDay: TimeOfDay): boolean =>
@@ -172,6 +193,72 @@ export const isGreenFlash = (
   return dt >= 0 && dt < GREEN_FLASH_MS && greenFlashRoll(sunset, latitude, longitude) === 0;
 };
 
+// Sky eggs (ROADMAP "Easter eggs and special events", Sky).
+
+// Matariki: the NZ public holiday (a Friday near the Pleiades' rise before dawn), from the
+// Te Kāhui o Matariki Public Holiday Act 2022, Schedule 1. Local dates.
+export const MATARIKI_DATES: readonly string[] = [
+  '2026-07-10', '2027-06-25', '2028-07-14', '2029-07-06', '2030-06-21',
+  '2031-07-11', '2032-07-02', '2033-06-24', '2034-07-07', '2035-06-29',
+];
+export const MATARIKI_DAYS = 3; // the egg shows from 3 days before to 3 days after the holiday
+export const PRE_DAWN_MS = 90 * MINUTE_MS;
+
+const localDayNumber = (date: Date): number => Math.round(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS);
+const isoDayNumber = (iso: string): number => Math.round(Date.parse(`${iso}T00:00:00Z`) / DAY_MS);
+
+export const isMatarikiWeek = (date: Date): boolean =>
+  MATARIKI_DATES.some((iso) => Math.abs(localDayNumber(date) - isoDayNumber(iso)) <= MATARIKI_DAYS);
+
+// In the Matariki week, in the last 90 min before sunrise while the sky is still dark (sun below -3°).
+export const isMatarikiTime = (date: Date, sunrise: Date | null, sunAltitude: number): boolean => {
+  if (!sunrise || sunAltitude >= -3 || !isMatarikiWeek(date)) return false;
+  const dt = sunrise.getTime() - date.getTime();
+  return dt > 0 && dt <= PRE_DAWN_MS;
+};
+
+// Planet conjunction: two of Venus, Mars, Jupiter and Saturn closer than 2°, both above the
+// horizon, at least 15° from the sun, with the sun below -4° (night or late twilight). The
+// closest pair, or null. Planet positions from planets.ts (JPL approximate elements).
+export const CONJUNCTION_DEG = 2;
+const PLANET_MIN_ALTITUDE = 3;
+const PLANET_MIN_ELONGATION = 15;
+export const getConjunction = (date: Date, latitude: number, longitude: number, sunAltitude: number): [PlanetSky, PlanetSky] | null => {
+  if (sunAltitude >= -4) return null;
+  const sun = getGeocentricVector('sun', date);
+  const vectors = PLANETS.map((name) => ({ name, v: getGeocentricVector(name, date) }));
+  let best: { sep: number; pair: [PlanetSky, PlanetSky] } | null = null;
+  for (let i = 0; i < vectors.length; i++) {
+    for (let j = i + 1; j < vectors.length; j++) {
+      const [a, b] = [vectors[i], vectors[j]];
+      const sep = separationDeg(a.v, b.v);
+      if (sep >= CONJUNCTION_DEG || (best && sep >= best.sep)) continue;
+      if (separationDeg(a.v, sun) < PLANET_MIN_ELONGATION) continue;
+      const skyA = { name: a.name, ...toHorizontal(a.v, date, latitude, longitude) };
+      const skyB = { name: b.name, ...toHorizontal(b.v, date, latitude, longitude) };
+      if (skyA.altitude < PLANET_MIN_ALTITUDE || skyB.altitude < PLANET_MIN_ALTITUDE) continue;
+      best = { sep, pair: [skyA, skyB] };
+    }
+  }
+  return best?.pair ?? null;
+};
+
+// Noctilucent clouds: in June and July at latitude 50-65° N (December and January at 50-65° S),
+// under a clear sky, 1-2 h after sunset or 1-2 h before sunrise.
+export const isNoctilucentTime = (
+  date: Date,
+  latitude: number,
+  sunset: Date | null,
+  sunrise: Date | null,
+  weatherType: WeatherType
+): boolean => {
+  if (weatherType !== 'clear' || Math.abs(latitude) < 50 || Math.abs(latitude) > 65) return false;
+  const month = date.getMonth();
+  if (!(latitude > 0 ? month === 5 || month === 6 : month === 11 || month === 0)) return false;
+  const inWindow = (dt: number) => dt >= 60 * MINUTE_MS && dt <= 120 * MINUTE_MS;
+  return (!!sunset && inWindow(date.getTime() - sunset.getTime())) || (!!sunrise && inWindow(sunrise.getTime() - date.getTime()));
+};
+
 export interface AstroInput {
   date: Date;
   latitude: number;
@@ -181,11 +268,15 @@ export interface AstroInput {
   timeOfDay: TimeOfDay;
   weatherType: WeatherType;
   sunset: Date | null;
+  // Today's flat-horizon sun times (sunUtils.getSunTimes) for the sky eggs: Matariki and the
+  // noctilucent clouds use sunrise and sunset; `polar` gives the midnight sun and polar night.
+  sunTimes?: Pick<SunTimes, 'sunrise' | 'sunset' | 'polar'> | null;
 }
 
 const MOON_SHOWN: readonly TimeOfDay[] = ['night', 'astronomical-twilight', 'nautical-twilight'];
 const KINDS: readonly AstroEventKind[] = [
   'solarEclipse', 'lunarEclipse', 'greenFlash', 'supermoon', 'blueMoon', 'meteorShower', 'aurora',
+  'matariki', 'conjunction', 'noctilucent', 'midnightSun', 'polarNight',
 ];
 
 // Reads the test override `?egg=<kind>` (e.g. `?egg=aurora`), or null.
@@ -194,11 +285,16 @@ export const parseEggOverride = (search: string): AstroEventKind | null => {
   return KINDS.find((k) => k.toLowerCase() === egg?.toLowerCase()) ?? null;
 };
 
-// At most one event, in this order: eclipses, green flash, supermoon, blue moon,
-// meteor shower, aurora. `forced` (the URL override) always wins.
+// At most one event, in this order: eclipses, green flash, supermoon, blue moon, planet
+// conjunction, meteor shower, Matariki, noctilucent clouds, aurora, midnight sun, polar night.
+// `forced` (the URL override) always wins.
 export const getAstroEvent = (input: AstroInput, forced: AstroEventKind | null = null): AstroEvent | null => {
   if (forced) return { kind: forced, strength: 1 };
-  const { date, latitude, longitude, sunAltitude, moonAltitude, timeOfDay, weatherType, sunset } = input;
+  const { date, latitude, longitude, sunAltitude, moonAltitude, timeOfDay, weatherType, sunset, sunTimes = null } = input;
+  // On a polar day or night getSunTimes invents 06:00 and 18:00, so there is no sunrise or sunset.
+  const polar = sunTimes?.polar ?? null;
+  const daySunrise = sunTimes && !polar ? sunTimes.sunrise : null;
+  const daySunset = sunTimes && !polar ? sunTimes.sunset : null;
 
   const solar = getSolarEclipseDepth(date, latitude, longitude, sunAltitude);
   if (solar > 0) return { kind: 'solarEclipse', strength: solar };
@@ -208,7 +304,13 @@ export const getAstroEvent = (input: AstroInput, forced: AstroEventKind | null =
   if (isGreenFlash(date, sunset, weatherType, latitude, longitude)) return { kind: 'greenFlash', strength: 1 };
   if (moonUp && isSupermoon(date)) return { kind: 'supermoon', strength: 1 };
   if (moonUp && isBlueMoon(date)) return { kind: 'blueMoon', strength: 1 };
+  const planets = getConjunction(date, latitude, longitude, sunAltitude);
+  if (planets) return { kind: 'conjunction', strength: 1, planets };
   if (timeOfDay === 'night' && getMeteorShower(date)) return { kind: 'meteorShower', strength: 1 };
+  if (isMatarikiTime(date, daySunrise, sunAltitude)) return { kind: 'matariki', strength: 1 };
+  if (isNoctilucentTime(date, latitude, daySunset, daySunrise, weatherType)) return { kind: 'noctilucent', strength: 1 };
   if (isAuroraTime(latitude, timeOfDay)) return { kind: 'aurora', strength: 1 };
+  if (polar === 'day') return { kind: 'midnightSun', strength: 1 };
+  if (polar === 'night') return { kind: 'polarNight', strength: 1 };
   return null;
 };

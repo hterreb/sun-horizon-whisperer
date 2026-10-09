@@ -5,14 +5,14 @@ import { type SunTimes } from './sunUtils';
 // checks in local time; the scene shows at most one event at a time.
 export type CalendarEvent =
   | 'new-year' // 00:00-00:00:59 on Jan 1: fireworks
-  | 'friday-13' // a black cat walks along the horizon once
+  | 'friday-13' // a black cat sits on a shore rock all day and watches the sky
   | 'lunar-new-year' // a dragon flies across the sky once (ROADMAP item 100)
   | 'solstice-longest' // the solstice day with the longest day for this hemisphere
   | 'solstice-shortest'
   | 'equinox'
   | 'halloween-pumpkin' // Oct 31, full moon within 3 days: a pumpkin moon
   | 'halloween-bats' // Oct 31, else: bats all night
-  | 'christmas'; // Dec 25-26: light snow (Santa flies on Dec 24: isSantaTime)
+  | 'christmas'; // Dec 25-26: falling Christmas ornaments (Santa flies on Dec 24: isSantaTime)
 
 // Mean solstice/equinox instants, Meeus "Astronomical Algorithms" table 27.B
 // (years 2000-3000). No periodic terms, so the error is up to about 30 min; this
@@ -28,6 +28,18 @@ export const getSeasonInstant = (year: number, month: 2 | 5 | 8 | 11): Date => {
   const y = (year - 2000) / 1000;
   const jde = SEASON_JDE0[month].reduce((sum, c, i) => sum + c * y ** i, 0);
   return new Date((jde - 2440587.5) * 86_400_000);
+};
+
+// The solstice/equinox egg's sun-path traces: the June and/or December solstice day that is
+// not today (both on an equinox), at today's clock time, so getSunPathAround picks the same
+// pass (current or next) as today's arc. Empty for any other event.
+const ONE_DAY_MS = 86_400_000;
+export const getSolsticeTraceDates = (event: CalendarEvent | null, date: Date): Date[] => {
+  if (event !== 'solstice-longest' && event !== 'solstice-shortest' && event !== 'equinox') return [];
+  return ([5, 11] as const).filter((m) => m !== date.getMonth()).map((m) => {
+    const days = Math.round((getSeasonInstant(date.getFullYear(), m).getTime() - date.getTime()) / ONE_DAY_MS);
+    return new Date(date.getTime() + days * ONE_DAY_MS);
+  });
 };
 
 const sameLocalDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();

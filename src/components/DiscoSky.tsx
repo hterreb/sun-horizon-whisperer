@@ -2,7 +2,7 @@ import React from 'react';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { DISCO_MS } from '@/utils/hiddenEggs';
 
-// Hidden egg (ROADMAP "Ongoing — Easter eggs"): the Konami code gives a disco sky.
+// Hidden egg (ROADMAP "Ongoing — Easter eggs"): 7 taps on the moon or the Konami code give a disco sky.
 // A soft brand-colour wash over the sky that fades in, turns its hue slowly once
 // round and fades out; no strobe. Reduced motion: a still, faint wash.
 const DiscoSky: React.FC = () => {

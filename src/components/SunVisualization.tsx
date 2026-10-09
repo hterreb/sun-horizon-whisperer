@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { Sun, ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp, Mountain, BellOff } from 'lucide-react';
-import { type SunPosition, type SunTimes, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors, getReflectionFade } from '../utils/sunUtils';
+import { type SunPosition, type SunTimes, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors, getReflectionFade, getSunPathAround } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
 import { getSunArcLabels, getMoonArcLabels, getTerrainArcLabels, getTerrainMoonArcLabels, type ArcLabels, type ArcLabelPoint } from '../utils/arcLabels';
 import { shortestHeadingDelta } from '../utils/compassUtils';
@@ -9,7 +9,8 @@ import CloudLayer, { type SceneInfoHandler, type WeatherType } from './CloudLaye
 import Fireworks from './Fireworks';
 import SunSunglasses from './SunSunglasses';
 import CalendarEggs from './CalendarEggs';
-import { type CalendarEvent } from '@/utils/calendarEvents';
+import SkyEggs from './SkyEggs';
+import { type CalendarEvent, getSolsticeTraceDates } from '@/utils/calendarEvents';
 import PremiumBadge from './PremiumBadge';
 import WeatherEffects from './WeatherEffects';
 import SolarEclipse from '@/components/SolarEclipse';
@@ -107,6 +108,8 @@ interface SunVisualizationProps {
   // Hidden sunglasses egg: the sun wears sunglasses; tapping the sun reports each tap to SunTracker.
   sunglasses?: boolean;
   onSunTap?: () => void;
+  // Hidden disco egg: tapping the moon reports each tap to SunTracker.
+  onMoonTap?: () => void;
   // Info cards (ROADMAP item 95): a tap on anything in the scene, and the ring id of the open card.
   onSceneInfo?: SceneInfoHandler;
   infoRing?: string | null;
@@ -581,6 +584,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   astroEvent = null,
   sunglasses = false,
   onSunTap,
+  onMoonTap,
   onSceneInfo,
   infoRing = null,
   infoRingTier = null,
@@ -763,6 +767,21 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     [arcLabelMinuteKey, latitude, longitude]
   );
 
+  // Solstice/equinox egg: faint traces of the other solstice day's sun path (both on an
+  // equinox), drawn like the sun arc, so today's arc reads as long or short.
+  const solsticeTracePaths = useMemo(() => {
+    const { width, height } = containerDimensions;
+    if (width === 0 || height === 0) return [];
+    return getSolsticeTraceDates(calendarEvent, date)
+      .map((d) => buildArcPath(
+        getSunPathAround(d, latitude, longitude),
+        (p) => getArcScreenPosition(p.altitude, p.azimuth, width, height, latitude, compassHeading),
+        width
+      ))
+      .filter(Boolean);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on arcLabelMinuteKey, not `date` itself
+  }, [calendarEvent, arcLabelMinuteKey, containerDimensions, latitude, longitude, compassHeading]);
+
   const sunArcLabelGeometry = useMemo(
     () => getArcLabelGeometry(sunArcLabels, latitude, compassHeading),
     [sunArcLabels, latitude, compassHeading]
@@ -851,11 +870,16 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     return 'hsl(var(--scene-ridge-golden))'; // civil-twilight/dawn/morning/evening
   };
 
-  const moonRadius = (18 + moonPosition.illumination * 6) * (astroEvent?.kind === 'supermoon' ? 1.14 : 1); // same footprint as the old 36 + illumination*12 diameter
+  const isSupermoonEgg = astroEvent?.kind === 'supermoon';
+  const moonRadius = (18 + moonPosition.illumination * 6) * (isSupermoonEgg ? 1.15 : 1); // same footprint as the old 36 + illumination*12 diameter
   const moonPhasePath = useMemo(
     () => getMoonPhasePath(moonPosition.illumination, moonPosition.phase, latitude, moonRadius),
     [moonPosition.illumination, moonPosition.phase, latitude, moonRadius]
   );
+
+  // "Blue night": a blue moon turns its halo, corona and moonlight on the sea blue (astroEvents).
+  const isBlueMoonEgg = astroEvent?.kind === 'blueMoon';
+  const moonLightVar = isBlueMoonEgg ? '--scene-blue-moon' : '--scene-moon';
 
   // Cardinal direction labels (ROADMAP item 8): always on, panning together with the
   // sun/moon and hidden outside the field of view in compass mode (ROADMAP item 19).
@@ -951,6 +975,11 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     x: sceneWidth * resolveAzimuth(azimuth, latitude, compassHeading).fraction,
     y: altitudeToY(altitude, sceneHeight),
   }), [sceneWidth, sceneHeight, latitude, compassHeading]);
+  // The sky eggs (astroEvents): the sun's mapping with the compass view; null outside it.
+  const projectSkyEgg = useCallback(
+    (altitude: number, azimuth: number) => getArcScreenPosition(altitude, azimuth, sceneWidth, sceneHeight, latitude, compassHeading),
+    [sceneWidth, sceneHeight, latitude, compassHeading]
+  );
   const showLivePlanes = !!livePlanes && sceneWidth > 0 && isPlaneWeather(weatherType);
 
   // Satellites (ROADMAP item 97): azimuth -> x and elevation -> y as for the sun and moon
@@ -1040,14 +1069,27 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       />
       <Fireworks trigger={fireworksTrigger} />
 
-      {(sunArcPath || moonArcPath) && (
+      {(sunArcPath || moonArcPath || solsticeTracePaths.length > 0) && (
         <svg className="absolute inset-0 w-full h-full pointer-events-none">
+          {solsticeTracePaths.map((d) => (
+            <path
+              key={d}
+              data-testid="solstice-trace"
+              d={d}
+              fill="none"
+              stroke="hsl(var(--scene-solstice-trace))"
+              strokeOpacity={0.35}
+              strokeWidth={1}
+              strokeDasharray="4 6"
+            />
+          ))}
           {sunArcPath && (
             <path
               d={sunArcPath}
               fill="none"
-              stroke="hsl(var(--brand-sunset))"
-              strokeOpacity={0.45}
+              // Midnight sun: the arc of the whole day, above the horizon, is brighter.
+              stroke={astroEvent?.kind === 'midnightSun' ? 'hsl(var(--scene-midnight-sun))' : 'hsl(var(--brand-sunset))'}
+              strokeOpacity={astroEvent?.kind === 'midnightSun' ? 0.75 : 0.45}
               strokeWidth={2}
             />
           )}
@@ -1147,7 +1189,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             width: moonRadius * moonLook.coronaRadius * 2,
             height: moonRadius * moonLook.coronaRadius * 2,
             transform: 'translate(-50%, -50%)',
-            background: `radial-gradient(circle closest-side, hsl(var(--scene-moon) / ${0.32 * moonLook.corona * moonBright}) 0%, hsl(var(--scene-moon) / ${0.13 * moonLook.corona * moonBright}) 40%, transparent 100%)`,
+            background: `radial-gradient(circle closest-side, hsl(var(${moonLightVar}) / ${0.32 * moonLook.corona * moonBright}) 0%, hsl(var(${moonLightVar}) / ${0.13 * moonLook.corona * moonBright}) 40%, transparent 100%)`,
           }}
           data-testid="moon-corona"
         />
@@ -1155,17 +1197,26 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
       {isMoonDiscShown && (
         // A button for the moon's info card (ROADMAP item 95), at least 44 px wide.
+        // Each tap also counts for the disco egg (ROADMAP "Ongoing — Easter eggs").
         <button
           type="button"
           aria-label={t('scene.moon')}
-          onClick={event => tap({ type: 'moon' }, tapPoint(event), 'moon', event.detail === 0)}
+          onClick={event => {
+            onMoonTap?.();
+            tap({ type: 'moon' }, tapPoint(event), 'moon', event.detail === 0);
+          }}
           className={`absolute flex min-h-11 min-w-11 items-center justify-center rounded-full pointer-events-auto touch-manipulation focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 ${compassActive ? '' : 'transition-all duration-1000'}`}
           style={{
             left: `${moonX}px`,
             top: `${moonY}px`,
             transform: 'translate(-50%, -50%)',
             opacity: moonBright * moonLook.disc,
-            filter: `drop-shadow(0 0 ${moonPosition.illumination * 15}px hsl(var(--scene-glow-white) / 0.4))`
+            // A supermoon gets a soft, static warm halo, a blue moon a blue one, instead of the white glow.
+            filter: isSupermoonEgg
+              ? `drop-shadow(0 0 ${moonPosition.illumination * 22}px hsl(var(--scene-supermoon-glow) / 0.55))`
+              : isBlueMoonEgg
+              ? `drop-shadow(0 0 ${moonPosition.illumination * 18}px hsl(var(--scene-blue-moon) / 0.6))`
+              : `drop-shadow(0 0 ${moonPosition.illumination * 15}px hsl(var(--scene-glow-white) / 0.4))`
           }}
           data-testid="moon-disc"
         >
@@ -1189,11 +1240,22 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         timeOfDay={timeOfDay}
         weatherType={weatherType}
         moon={isMoonDiscShown ? { x: moonX, y: moonY, r: moonRadius } : null}
+        blueMoon={isBlueMoonEgg && isMoonDiscShown}
         horizonY={containerDimensions.height * 0.65}
         onInfo={onSceneInfo}
         infoRing={infoRing}
         infoRingTier={infoRingTier}
         santa={santa}
+      />
+      <SkyEggs
+        event={astroEvent}
+        project={projectSkyEgg}
+        latitude={latitude}
+        horizonY={containerDimensions.height * 0.65}
+        opacity={getStarCloudFactor(weatherType, cloudCoverPercent)}
+        onInfo={onSceneInfo}
+        infoRing={infoRing}
+        infoRingTier={infoRingTier}
       />
 
       <svg className="absolute inset-0 w-full h-full pointer-events-none">
@@ -1277,7 +1339,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         if (reflectionFade <= 0) return null;
 
         const reflectX = nightReflection ? moonX : sunX;
-        const reflectColor = nightReflection ? 'hsl(var(--scene-moon))' : 'hsl(var(--scene-sun-glow-low))';
+        const reflectColor = nightReflection ? `hsl(var(${moonLightVar}))` : 'hsl(var(--scene-sun-glow-low))';
         // The bars' layout follows the wind (ROADMAP item 79, X1): today's 7 in light air.
         const { bars, rowSpacing } = getReflectionBars(seaWindKmh, nightReflection ? 0.35 : 0.6);
         const bandHeight = (containerDimensions.height - horizonLabelY) * rowSpacing;
@@ -1292,8 +1354,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
               <>
                 <defs>
                   <radialGradient id="moon-pool" cx="50%" cy="0%" r="50%">
-                    <stop offset="0%" stopColor="hsl(var(--scene-moon))" stopOpacity={0.1} />
-                    <stop offset="100%" stopColor="hsl(var(--scene-moon))" stopOpacity={0} />
+                    <stop offset="0%" stopColor={`hsl(var(${moonLightVar}))`} stopOpacity={0.1} />
+                    <stop offset="100%" stopColor={`hsl(var(${moonLightVar}))`} stopOpacity={0} />
                   </radialGradient>
                 </defs>
                 <rect

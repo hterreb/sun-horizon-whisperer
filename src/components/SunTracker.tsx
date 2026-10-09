@@ -30,7 +30,7 @@ import { getContrail } from '@/utils/planes';
 import { useLivePlanes, type LivePlanesState } from '@/hooks/useLivePlanes';
 import { useLiveRoute } from '@/hooks/useLiveRoute';
 import { getMoonLook, getSkyOvercastMix, getStarCloudFactor } from '@/utils/weatherEffectsUtils';
-import { getAstroEvent, parseEggOverride, METEOR_SHOWER_RATE } from '@/utils/astroEvents';
+import { getAstroEvent, parseEggOverride } from '@/utils/astroEvents';
 import SunVisualization from './SunVisualization';
 import SceneInfoCard from './SceneInfoCard';
 import { getSceneInfo, type SceneInfoTarget } from '@/utils/sceneInfo';
@@ -635,6 +635,9 @@ const SunTracker: React.FC = () => {
         weatherType,
         // The line-of-sight sunset when there is one, like the fireworks.
         sunset: terrainExtras.terrainSunTimes?.sunset ?? sunTimes?.sunset ?? null,
+        // The sky eggs use today's flat-horizon times: after sunset the line-of-sight times
+        // above are already the next pass.
+        sunTimes,
       }, astroEggOverride)
     : null;
 
@@ -698,7 +701,8 @@ const SunTracker: React.FC = () => {
   }, [date]);
 
   // Hidden easter eggs (ROADMAP "Ongoing — Easter eggs"): sunglasses after 7 taps on
-  // the sun, a rare UFO per night view, and a disco sky from the Konami code.
+  // the sun, a rare UFO per night view, and a disco sky from 7 taps on the moon (same
+  // rule as the sun) or the Konami code.
   // `?egg=sunglasses|ufo|disco` shows one at once, for testing.
   const [eggOverride] = useState(() => getEggOverride(window.location.search));
   const [sunglassesOn, setSunglassesOn] = useState(eggOverride === 'sunglasses');
@@ -711,6 +715,15 @@ const SunTracker: React.FC = () => {
     if (triggered) {
       setSunglassesOn(true);
       collect('egg:sunglasses');
+    }
+  }, [collect]);
+  const moonTapsRef = React.useRef({ count: 0, lastMs: -Infinity });
+  const handleMoonTap = useCallback(() => {
+    const { taps, triggered } = registerSunTap(moonTapsRef.current, Date.now());
+    moonTapsRef.current = taps;
+    if (triggered) {
+      setDiscoOn(true);
+      collect('egg:disco');
     }
   }, [collect]);
   useEffect(() => {
@@ -1028,7 +1041,7 @@ const SunTracker: React.FC = () => {
         moonPosition={moonPosition}
         weatherType={weatherType}
         cloudCoverPercent={cloudCover}
-        shootingStarRate={astroEvent?.kind === 'meteorShower' ? METEOR_SHOWER_RATE : undefined}
+        meteorShower={astroEvent?.kind === 'meteorShower'}
       />
       {astroEvent?.kind === 'aurora' && <Aurora opacity={getStarCloudFactor(weatherType, cloudCover)} />}
       {discoOn && <DiscoSky />}
@@ -1097,6 +1110,7 @@ const SunTracker: React.FC = () => {
             fireworksTrigger={fireworksTrigger}
             sunglasses={sunglassesOn}
             onSunTap={handleSunTap}
+            onMoonTap={handleMoonTap}
             onSceneInfo={handleSceneInfo}
             infoRing={infoCard?.ring ?? null}
             infoRingTier={infoCardInfo?.tier ?? null}

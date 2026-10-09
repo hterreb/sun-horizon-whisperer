@@ -395,6 +395,61 @@ describe('SunVisualization (rendered): static cardinal direction labels (ROADMAP
     expect(strokes).not.toContain('hsl(var(--scene-moon))'); // no moon arc while it's midday
   });
 
+  it('draws the faint other-solstice sun path on a solstice day, both on an equinox, none on a normal day', () => {
+    setMockedContainerSize(800, 600);
+    const props = {
+      sunPosition: { azimuth: 180, altitude: 60 },
+      moonPosition: { azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false },
+      sunPath: [],
+      moonPath: [],
+      timeOfDay: 'midday' as const,
+      weatherType: 'clear' as const,
+      latitude: 47.78, // Ravensburg
+      longitude: 9.61,
+    };
+    const { rerender } = render(<SunVisualization {...props} date={new Date(2027, 5, 21, 12)} calendarEvent="solstice-longest" />);
+    const traces = screen.getAllByTestId('solstice-trace');
+    expect(traces).toHaveLength(1);
+    expect(traces[0].getAttribute('stroke')).toBe('hsl(var(--scene-solstice-trace))');
+
+    // On an equinox both solstice paths: June's apex sits higher (smaller y) than December's.
+    rerender(<SunVisualization {...props} date={new Date(2027, 2, 20, 12)} calendarEvent="equinox" />);
+    const apexY = (el: Element) =>
+      Math.min(...Array.from((el.getAttribute('d') ?? '').matchAll(/,(-?\d+(?:\.\d+)?)/g)).map((m) => parseFloat(m[1])));
+    const [june, december] = screen.getAllByTestId('solstice-trace');
+    expect(apexY(december) - apexY(june)).toBeGreaterThan(50);
+
+    rerender(<SunVisualization {...props} date={new Date(2027, 5, 22, 12)} calendarEvent={null} />);
+    expect(screen.queryByTestId('solstice-trace')).toBeNull();
+  });
+
+  it('draws the midnight sun arc round the whole sky, brighter, with its pill (sky eggs)', () => {
+    setMockedContainerSize(800, 600);
+    const sunPath = Array.from({ length: 25 }, (_, i) => ({ azimuth: (i * 15) % 360, altitude: 8 + 30 * Math.sin((i / 24) * Math.PI) }));
+    const { container } = render(
+      <SunVisualization
+        sunPosition={{ azimuth: 180, altitude: 38 }}
+        moonPosition={{ azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false }}
+        sunPath={sunPath}
+        moonPath={[]}
+        timeOfDay="midday"
+        weatherType="clear"
+        latitude={69.65}
+        astroEvent={{ kind: 'midnightSun', strength: 1 }}
+      />
+    );
+    const arc = container.querySelector('path[stroke="hsl(var(--scene-midnight-sun))"]');
+    expect(arc?.getAttribute('stroke-opacity')).toBe('0.75');
+    // From the left edge (north) to the right edge and on past north (a second segment after
+    // the wrap), never down to the horizon line (y = 600 * 0.65).
+    const d = arc?.getAttribute('d') ?? '';
+    expect(d.match(/M/g)?.length).toBeLessThanOrEqual(2);
+    const ys = Array.from(d.matchAll(/[ML]-?[\d.]+,(-?[\d.]+)/g)).map((m) => parseFloat(m[1]));
+    expect(ys).toHaveLength(25);
+    expect(Math.max(...ys)).toBeLessThan(390);
+    expect(screen.getByTestId('sky-egg-polar').textContent).toBe('Midnight sun');
+  });
+
   it('the sun dot lies on the sun arc path when sunPath includes the current position (ROADMAP item 26)', () => {
     setMockedContainerSize(800, 600);
     const { container } = render(
@@ -540,6 +595,34 @@ describe('SunVisualization (rendered): arc rise/zenith/set labels', () => {
     rerender(<SunVisualization {...moonProps} timeOfDay="midday" />);
     expect(screen.queryByTestId('arc-label-moon-rise')).not.toBeInTheDocument();
     expect(screen.queryByTestId('arc-label-moon-set')).not.toBeInTheDocument();
+  });
+
+  it('draws a supermoon about 15 % larger with a warm halo; a blue moon stays normal', () => {
+    setMockedContainerSize(800, 600);
+    const moonProps = {
+      sunPosition: { azimuth: 0, altitude: -30 },
+      moonPosition: { azimuth: 180, altitude: 30, phase: 0.5, illumination: 1, visible: true },
+      sunPath: [],
+      moonPath: [],
+      timeOfDay: 'night' as const,
+      weatherType: 'clear' as const,
+      latitude: 48,
+      longitude: 11,
+      date: new Date('2026-12-24T22:00:00Z'),
+    };
+    const moonSvgWidth = () => Number(screen.getByTestId('moon-disc').querySelector('svg')?.getAttribute('width'));
+
+    const { rerender } = render(<SunVisualization {...moonProps} />);
+    const normalWidth = moonSvgWidth();
+    expect(screen.getByTestId('moon-disc').style.filter).toContain('--scene-glow-white');
+
+    rerender(<SunVisualization {...moonProps} astroEvent={{ kind: 'supermoon', strength: 1 }} />);
+    expect(moonSvgWidth()).toBeCloseTo(normalWidth * 1.15);
+    expect(screen.getByTestId('moon-disc').style.filter).toContain('--scene-supermoon-glow');
+
+    rerender(<SunVisualization {...moonProps} astroEvent={{ kind: 'blueMoon', strength: 1 }} />);
+    expect(moonSvgWidth()).toBe(normalWidth);
+    expect(screen.getByTestId('moon-disc').style.filter).toContain('--scene-blue-moon');
   });
 
   it('fades out together with the cardinal labels while idle in fullscreen (ROADMAP item 29)', () => {
@@ -1007,6 +1090,43 @@ describe('SunVisualization (rendered): sea visible at the horizon (ROADMAP item 
     render(<SunVisualization {...night} moonPosition={{ ...night.moonPosition, altitude: -5, visible: false }} />);
     expect(screen.queryByTestId('moon-pool')).toBeNull();
   });
+
+  it('turns a blue moon\'s disc, halo and moonlight on the sea blue, with a label; other moons stay white', () => {
+    setMockedContainerSize(800, 600);
+    const night = {
+      ...baseProps,
+      timeOfDay: 'night' as const,
+      sunPosition: { azimuth: 0, altitude: -30 },
+      moonPosition: { azimuth: 180, altitude: 30, phase: 0.5, illumination: 1, visible: true },
+    };
+    const look = () => ({
+      glow: screen.getByTestId('moon-disc').style.filter,
+      bar: screen.getByTestId('water-reflection').querySelector('rect:not([data-testid])')?.getAttribute('fill'),
+      pool: screen.getByTestId('water-reflection').querySelector('#moon-pool stop')?.getAttribute('stop-color'),
+      badge: screen.queryByTestId('season-badge')?.textContent ?? null,
+    });
+
+    const { rerender } = render(<SunVisualization {...night} astroEvent={{ kind: 'blueMoon', strength: 1 }} />);
+    expect(screen.getByTestId('moon-tint-blueMoon').getAttribute('opacity')).toBe('1');
+    expect(look()).toEqual({
+      glow: expect.stringContaining('--scene-blue-moon'),
+      bar: 'hsl(var(--scene-blue-moon))',
+      pool: 'hsl(var(--scene-blue-moon))',
+      badge: 'Blue moon · second full moon this month',
+    });
+
+    for (const astroEvent of [null, { kind: 'lunarEclipse' as const, strength: 1 }]) {
+      rerender(<SunVisualization {...night} astroEvent={astroEvent} />);
+      expect(screen.queryByTestId('moon-tint-blueMoon')).toBeNull();
+      expect(look()).toEqual({
+        glow: expect.stringContaining('--scene-glow-white'),
+        bar: 'hsl(var(--scene-moon))',
+        pool: 'hsl(var(--scene-moon))',
+        badge: null,
+      });
+    }
+    expect(screen.getByTestId('moon-tint-lunarEclipse').getAttribute('opacity')).toBe('0.85');
+  });
 });
 
 describe('SunVisualization source (ROADMAP item 15, scene colour refactor)', () => {
@@ -1207,6 +1327,20 @@ describe('SunVisualization info cards (ROADMAP item 95)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('the moon reports each tap for the disco egg, beside its card', () => {
+    const onMoonTap = vi.fn();
+    const onSceneInfo = vi.fn();
+    render(<SunVisualization {...props} onMoonTap={onMoonTap} onSceneInfo={onSceneInfo} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Moon' }), { detail: 0 }); // keyboard click opens the card at once (item 116)
+    expect(onMoonTap).toHaveBeenCalledTimes(1);
+    expect(onSceneInfo).toHaveBeenCalledWith({ type: 'moon' }, expect.anything(), 'moon');
+  });
+
+  it('the moon is no tap target while it is not shown', () => {
+    render(<SunVisualization {...props} moonPosition={{ ...props.moonPosition, visible: false }} />);
+    expect(screen.queryByRole('button', { name: 'Moon' })).toBeNull();
   });
 
   it('makes the moon a button of at least 44 px that opens its card, also from the keyboard', () => {
