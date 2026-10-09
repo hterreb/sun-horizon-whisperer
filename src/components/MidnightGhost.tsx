@@ -93,7 +93,7 @@ const MidnightGhost: React.FC<MidnightGhostProps> = ({ currentTime, onInfo, ring
     >
       {/* Ghost Icon with effects - the style book's D ghost: a soft white glow
           (ROADMAP item 15 D polish, ghostTile('d')). */}
-      <div className="relative animate-pulse">
+      <div className="relative motion-safe:animate-ghost-breathe">
         <Ghost
           size={GHOST_PX}
           className="drop-shadow-lg"

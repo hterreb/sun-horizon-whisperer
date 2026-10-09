@@ -31,6 +31,14 @@ describe('MidnightGhost', () => {
     expect(ghost.className).not.toContain('z-30');
   });
 
+  it('breathes slowly instead of pulsing, only without reduced motion (item 113 follow-up)', () => {
+    const midnight = new Date();
+    midnight.setHours(0, 0, 0, 0);
+    const { container } = render(<MidnightGhost currentTime={midnight} />);
+    expect(container.querySelector('.motion-safe\\:animate-ghost-breathe')).not.toBeNull();
+    expect(container.querySelector('.animate-pulse')).toBeNull();
+  });
+
   // More tests for disappearance, animation, etc.
 
   it('ghost floats and bounces within bounds', () => {

@@ -1,7 +1,7 @@
 import React from 'react';
 import fs from 'node:fs';
 import path from 'node:path';
-import { render, screen, within, fireEvent } from '@testing-library/react';
+import { render, screen, within, fireEvent, cleanup } from '@testing-library/react';
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import SunVisualization, {
   getAzimuthScreenFraction,
@@ -1190,6 +1190,15 @@ describe('SunVisualization info cards (ROADMAP item 95)', () => {
     expect(moon.className).toContain('min-h-11');
     fireEvent.click(moon); // a keyboard click: no point, so the centre of the button
     expect(onSceneInfo).toHaveBeenCalledWith({ type: 'moon' }, expect.objectContaining({ x: expect.any(Number) }), 'moon');
+  });
+
+  it('lets taps through to the UFO behind it; the sun and the moon still take taps (item 113 follow-up)', () => {
+    render(<SunVisualization {...props} timeOfDay="midday" />);
+    expect(screen.getByTestId('sun-visualization').className).toContain('pointer-events-none');
+    expect(screen.getByRole('button', { name: 'Sun' }).className).toContain('pointer-events-auto');
+    cleanup();
+    render(<SunVisualization {...props} />);
+    expect(screen.getByRole('button', { name: 'Moon' }).className).toContain('pointer-events-auto');
   });
 
   it('makes the terrain a button: a tap reads the azimuth under it, Enter picks the highest ridge', () => {

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Bat } from './sceneIcons';
 import LunarDragon, { DRAGON_RING } from './LunarDragon';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
+import { useLanguage } from '@/hooks/useLanguage';
+import { type MessageKey } from '@/i18n';
 import { type CalendarEvent } from '@/utils/calendarEvents';
 import { type TimeOfDay } from '@/utils/sunUtils';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
@@ -23,10 +25,10 @@ interface CalendarEggsProps {
   infoRingTier?: RarityTier | null;
 }
 
-const SEASON_TEXT: Partial<Record<CalendarEvent, string>> = {
-  'solstice-longest': 'Solstice · the longest day of the year',
-  'solstice-shortest': 'Solstice · the shortest day of the year',
-  equinox: 'Equinox · day and night are equal',
+const SEASON_TEXT: Partial<Record<CalendarEvent, MessageKey>> = {
+  'solstice-longest': 'egg.seasonLongest',
+  'solstice-shortest': 'egg.seasonShortest',
+  equinox: 'egg.seasonEquinox',
 };
 
 // Fixed layouts (share of the width/height, s), so a render never re-rolls them.
@@ -41,7 +43,9 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherTy
   const [catDone, setCatDone] = useState(false);
   const [dragonDone, setDragonDone] = useState(false);
   const isNight = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
-  const seasonText = event ? SEASON_TEXT[event] : undefined;
+  const { t } = useLanguage();
+  const seasonKey = event ? SEASON_TEXT[event] : undefined;
+  const seasonText = seasonKey && t(seasonKey);
   // Item 113: the wrapper of a tappable egg (pointer only, hidden from screen readers) and its
   // hit area with the ring, a child of the moving wrapper.
   const tapProps = (kind: EggCardKind, ring: string) => onInfo ? {

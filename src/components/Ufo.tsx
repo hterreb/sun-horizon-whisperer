@@ -6,7 +6,8 @@ import { HitArea, type SceneInfoHandler } from './CloudLayer';
 // Hidden egg (ROADMAP "Ongoing — Easter eggs"): a small UFO glides once, slowly and
 // in a straight line, across the upper night sky. Reduced motion: no UFO.
 // Item 113: a tap opens its info card (item 95 pattern: a hit area of at least 44 px, the ring
-// inside the moving wrapper, the UFO flies on). z-1: above the scene's sky, so it takes taps.
+// inside the moving wrapper, the UFO flies on). No z-index: it draws behind the sun, the moon and the
+// clouds; it takes taps because the SunVisualization root is pointer-events-none.
 export const UFO_CROSSING_MS = 40_000;
 const UFO_WIDTH = 56;
 
@@ -69,7 +70,7 @@ const Ufo: React.FC<UfoProps> = ({ onDone, onInfo, ringOn = false, ringTier = nu
       ref={ref}
       aria-hidden="true"
       data-testid="ufo"
-      className={`fixed left-0 top-[16%] z-1 ${onInfo ? 'pointer-events-auto cursor-pointer' : 'pointer-events-none'}`}
+      className={`fixed left-0 top-[16%] ${onInfo ? 'pointer-events-auto cursor-pointer' : 'pointer-events-none'}`}
       style={{ transform: `translateX(${-UFO_WIDTH}px)` }}
       onClick={onInfo && (event => onInfo({ type: 'egg', kind: 'ufo' }, { x: event.clientX, y: event.clientY }, UFO_RING))}
     >
