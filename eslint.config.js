@@ -6,7 +6,7 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   // supabase/ is Deno, not browser code (AUDIT B-6).
-  { ignores: ["dist", ".remember", "supabase"] },
+  { ignores: ["dist", ".remember", "supabase", ".claude"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],

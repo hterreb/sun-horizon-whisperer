@@ -1266,7 +1266,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           {onCollectionOpen && (
             <div className="mt-6 pt-4 border-t border-white/20">
               <button
-                onClick={onCollectionOpen}
+                onClick={() => { setIsCollapsed(true); onCollectionOpen?.(); }}
                 className={`flex items-center gap-2 text-caption opacity-80 hover:opacity-100 transition-opacity rounded ${FOCUS_RING}`}
               >
                 <Award size={14} />
