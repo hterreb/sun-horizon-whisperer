@@ -571,10 +571,13 @@
     --national-jet: 222 55% 32%;
     --scene-blue-moon: 205 90% 72%;
     /* Playful pack (ROADMAP item 117): the empty tomb's rock, its dark entrance and the
-       soft morning light on it; the St Patrick's pot and its gold. */
+       soft morning light on it, the warm glow out of it; the St Patrick's green tint, the pot
+       and its gold. */
     --scene-tomb-rock: 30 8% 42%;
     --scene-tomb-entrance: 25 15% 8%;
     --scene-tomb-light: 32 95% 78%;
+    --scene-tomb-glow: 40 100% 75%;
+    --scene-st-patrick: 140 70% 45%;
     --scene-pot: 220 10% 12%;
     --scene-gold: 45 95% 58%;
     --scene-gold-dark: 38 85% 40%;

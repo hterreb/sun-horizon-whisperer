@@ -711,16 +711,12 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   const { x: sunX, y: sunY, visible: sunDotVisible } = getSunPosition();
   const { x: moonX, y: moonY, visible: moonDotVisible } = getMoonPosition();
 
-  // April Fools (ROADMAP item 117): when the sun and the moon are both up and on the screen,
-  // they swap their drawn places for one minute with a slow cross-fade. Only the sun and the
-  // moon themselves move; their light on the water and the clouds stays. Reduced motion: no swap.
+  // April Fools (ROADMAP item 117): on Apr 1 the sun and the moon swap their sky places for
+  // one minute with a slow cross-fade, whether they are up or not. Only the sun and the moon
+  // themselves move; their light on the water and the clouds stays. Reduced motion: no swap.
   const prefersReducedMotion = usePrefersReducedMotion();
-  const aprilFools = useAprilFoolsSwap(
-    calendarEvent === 'april-fools' && !prefersReducedMotion && sunPosition.altitude > 0 && moonPosition.visible &&
-    sunDotVisible && moonDotVisible && getSunVisibility(weatherType).disc > 0 && getMoonLook(weatherType, cloudCoverPercent).disc > 0
-  );
+  const aprilFools = useAprilFoolsSwap(calendarEvent === 'april-fools' && !prefersReducedMotion);
   const [sunDrawX, sunDrawY, moonDrawX, moonDrawY] = aprilFools.swapped ? [moonX, moonY, sunX, sunY] : [sunX, sunY, moonX, moonY];
-  const aprilFade = aprilFools.faded ? 0 : 1;
   const aprilTransition: React.CSSProperties | undefined = aprilFools.running ? { transition: 'opacity 3s ease-in-out' } : undefined;
   useEffect(() => {
     if (aprilFools.swapped) onEggShown?.('aprilFools');
@@ -735,9 +731,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   const moonAltitudeVisible = moonPosition.visible && (
     timeOfDay === 'night' ||
     timeOfDay === 'astronomical-twilight' ||
-    timeOfDay === 'nautical-twilight' ||
-    // April Fools: the moon shows by day while the swap fades or holds.
-    aprilFools.swapped || aprilFools.faded
+    timeOfDay === 'nautical-twilight'
   );
 
   const isSunVisible = sunAltitudeVisible && sunDotVisible;
@@ -747,6 +741,15 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   const moonLook = getMoonLook(weatherType, cloudCoverPercent);
   const moonBright = moonPosition.illumination * 0.8 + 0.2;
   const isMoonDiscShown = isMoonVisible && moonLook.disc > 0;
+  // April Fools: swapped, each body is drawn at the other's sky place and shows when that place
+  // passes its own rule (the sun above -18°, the moon above -6°) and is on the screen; below the
+  // horizon the sea hides it. While the swap runs, both stay mounted, so they only fade.
+  const sunDrawn = aprilFools.swapped ? moonPosition.altitude > -18 && sunVisibility.halo > 0 && moonDotVisible : isSunVisible;
+  const moonDrawn = aprilFools.swapped ? sunPosition.altitude > -6 && sunDotVisible : isMoonVisible;
+  const sunFade = aprilFools.faded || !sunDrawn ? 0 : 1;
+  const moonFade = aprilFools.faded || !moonDrawn ? 0 : 1;
+  const sunMounted = sunDrawn || aprilFools.running;
+  const moonMounted = moonDrawn || aprilFools.running;
   // Before the first measure getScreenPosition gives every body (0, 0): not a real place yet.
   const sceneMeasured = containerDimensions.width > 0 && containerDimensions.height > 0;
   // The pool of moonlight for the night fish (ROADMAP item 65, NR3): as bright as the moon
@@ -1139,7 +1142,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         </svg>
       )}
 
-      {isSunVisible && getSunGlowToken() && (
+      {sunMounted && getSunGlowToken() && (
         // Soft glowing sun (ROADMAP item 15 D polish): a radial halo behind the sun
         // icon, colored by the same altitude band as getGlowIntensity's drop-shadow.
         <div
@@ -1151,7 +1154,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             width: (sunPosition.altitude > 0 ? 200 : 160) * sunVisibility.haloScale,
             height: (sunPosition.altitude > 0 ? 200 : 160) * sunVisibility.haloScale,
             transform: 'translate(-50%, -50%)',
-            opacity: sunVisibility.halo * aprilFade,
+            opacity: sunVisibility.halo * sunFade,
             ...aprilTransition,
             // Faint or no disc (overcast, fog, rain): a white light patch, not a yellow glow on grey.
             background: `radial-gradient(circle, hsl(var(${sunShines ? getSunGlowToken() : '--scene-glow-white'}) / 0.55) 0%, transparent 70%)`
@@ -1159,7 +1162,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         />
       )}
 
-      {isSunVisible && sunVisibility.disc > 0 && (
+      {sunMounted && sunVisibility.disc > 0 && (
         // The line sun with rays (item 46's filled disc was rolled back to it on request).
         // A button, so the sun is a tap target for the sunglasses egg (ROADMAP "Ongoing — Easter eggs").
         <button
@@ -1176,7 +1179,9 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           style={{
             left: `${sunDrawX}px`,
             top: `${sunDrawY}px`,
-            transform: 'translate(-50%, -50%)'
+            transform: 'translate(-50%, -50%)',
+            // Hidden while the April Fools swap runs: not a tap target.
+            pointerEvents: sunDrawn ? undefined : 'none',
           }}
         >
           {/* Drizzle, snow and overcast: the line colour mixes toward the overcast grey (ROADMAP
@@ -1187,7 +1192,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             size={sunPosition.altitude > 0 ? 96 : 80}
             strokeWidth={1}
             style={{
-              opacity: sunVisibility.disc * aprilFade,
+              opacity: sunVisibility.disc * sunFade,
               ...aprilTransition,
               ...(sunVisibility.pale > 0 && { color: `color-mix(in srgb, currentColor, hsl(var(--scene-sky-overcast)) ${sunVisibility.pale * 100}%)` }),
             }}
@@ -1215,7 +1220,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         </div>
       )}
 
-      {isMoonVisible && moonLook.corona > 0 && (
+      {moonMounted && moonLook.corona > 0 && (
         // MV4 (item 76): a soft glow in the moon's colour where it sits behind clouds or fog.
         <div
           className={`absolute pointer-events-none rounded-full ${compassActive ? '' : 'transition-all duration-1000'}`}
@@ -1225,7 +1230,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             width: moonRadius * moonLook.coronaRadius * 2,
             height: moonRadius * moonLook.coronaRadius * 2,
             transform: 'translate(-50%, -50%)',
-            opacity: aprilFade,
+            opacity: moonFade,
             ...aprilTransition,
             background: `radial-gradient(circle closest-side, hsl(var(${moonLightVar}) / ${0.32 * moonLook.corona * moonBright}) 0%, hsl(var(${moonLightVar}) / ${0.13 * moonLook.corona * moonBright}) 40%, transparent 100%)`,
           }}
@@ -1233,7 +1238,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         />
       )}
 
-      {isMoonDiscShown && (
+      {moonMounted && moonLook.disc > 0 && (
         // A button for the moon's info card (ROADMAP item 95), at least 44 px wide.
         // Each tap also counts for the disco egg (ROADMAP "Ongoing — Easter eggs").
         <button
@@ -1248,7 +1253,9 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             left: `${moonDrawX}px`,
             top: `${moonDrawY}px`,
             transform: 'translate(-50%, -50%)',
-            opacity: moonBright * moonLook.disc * aprilFade,
+            opacity: moonBright * moonLook.disc * moonFade,
+            // Hidden while the swap runs: not a tap target.
+            pointerEvents: moonDrawn ? undefined : 'none',
             ...aprilTransition,
             // A supermoon gets a soft, static warm halo, a blue moon a blue one, instead of the white glow.
             filter: isSupermoonEgg
