@@ -18,6 +18,7 @@ describe('Satellites (ROADMAP item 97)', () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it('places each tracked satellite and moves it with a 1 s transition, no blinking', () => {
@@ -65,6 +66,9 @@ describe('Satellites (ROADMAP item 97)', () => {
 
   it('sends a decorative dot within the first gap when nothing is tracked', () => {
     vi.useFakeTimers();
+    // A fixed roll: first dot at 30 s, then a 180 s gap. With free rolls, two 120 s gaps
+    // can put a third dot inside the 300 s, and the test failed now and then.
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
     render(<Satellites {...base} tracked={null} gapMs={[120_000, 240_000]} />);
     expect(screen.queryByTestId('satellite-decor')).toBeNull();
     act(() => {
