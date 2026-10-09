@@ -38,7 +38,12 @@ const PETALS = Array.from({ length: 14 }, (_, i) => ({ top: (i * 23) % 50, durat
 const MARIGOLDS = Array.from({ length: 14 }, (_, i) => ({ left: (i * 41 + 4) % 96, dy: 40 + ((i * 67) % 200), dx: i % 2 ? -20 : 20, duration: 80 + (i % 5) * 9 }));
 const CONFETTI = Array.from({ length: 18 }, (_, i) => ({ left: (i * 29 + 3) % 100, duration: 50 + (i % 4) * 7, delay: -i * 3.4, colour: PASTELS[i % 5], tilt: (i * 47) % 90 }));
 const BONFIRES = [18, 52, 83];
-const BLOSSOMS = [-2, -1, 0, 1, 2];
+// Nowruz: 7 blossoms in a gentle arc that frames the equinox pill (px from the pill's top
+// centre): the ends beside the pill, the others under it, clear of its edges.
+const BLOSSOMS = [[-140, 12, 34], [-98, 46, 28], [-50, 60, 28], [0, 64, 36], [50, 60, 28], [98, 46, 28], [140, 12, 34]]
+  .map(([x, y, size]) => ({ x, y, size }));
+// A few loose petals sink from the arc, very slowly (about 1.3 px/s), and fade out.
+const NOWRUZ_PETALS = [BLOSSOMS[1], BLOSSOMS[3], BLOSSOMS[5]].map((b, n) => ({ x: b.x, y: b.y, dx: n % 2 ? -12 : 12, duration: 28 + n * 5, delay: -n * 9 }));
 // Tanabata: Vega high, Altair lower right, the Milky Way between them (share of the width
 // and the sky height). Fixed places, not the real sky positions.
 const VEGA = { x: 30, y: 0.28 };
@@ -89,10 +94,18 @@ const Marigold = () => (
   </svg>
 );
 
-const Blossom = () => (
-  <svg width={16} height={16} viewBox="-8 -8 16 16" aria-hidden="true" className="block">
-    {[0, 72, 144, 216, 288].map(a => <circle key={a} r={3.2} cy={-3.6} transform={`rotate(${a})`} fill={c('blossom')} />)}
-    <circle r={2} fill={c('gold')} />
+// A five-petal spring blossom: pink petals with a pale heart, a faint rose outline (it reads
+// on the blue day sea and the dark night sea) and a light centre.
+const Blossom = ({ size }: { size: number }) => (
+  <svg width={size} height={size} viewBox="-12 -12 24 24" aria-hidden="true" className="block">
+    {[0, 72, 144, 216, 288].map(a => (
+      <g key={a} transform={`rotate(${a})`}>
+        <ellipse rx={4.6} ry={5.6} cy={-5.6} fill={c('blossom')} stroke={c('blossom-edge', 0.7)} strokeWidth={0.8} />
+        <ellipse rx={2.4} ry={3.2} cy={-3.8} fill={c('blossom-light', 0.85)} />
+      </g>
+    ))}
+    <circle r={2.6} fill={c('blossom-light')} />
+    <circle r={1.2} fill={c('gold')} />
   </svg>
 );
 
@@ -114,7 +127,8 @@ const Light = ({ size = 10 }: { size?: number }) => (
 
 // Cultural festival eggs (ROADMAP item 118). The calm-motion rule holds: slow straight drifts,
 // rises and falls, a soft glow; nothing jumps, flaps or flickers fast. Reduced motion: the
-// floating and glowing things stand still, the drifting petals and the confetti are hidden.
+// floating and glowing things stand still, the drifting petals and the confetti are hidden
+// (the Nowruz blossoms stay, their sinking petals go).
 // Holi tints the clouds (SkyClouds) and Día de los Muertos adds bunting to the boats (SceneBoat).
 const FestivalEggs: React.FC<FestivalEggsProps> = ({
   event, timeOfDay, weatherType, latitude, date, moon, horizonY, onInfo, infoRing = null, infoRingTier = null,
@@ -297,12 +311,29 @@ const FestivalEggs: React.FC<FestivalEggsProps> = ({
       )}
 
       {event === 'nowruz' && (
-        // Spring blossoms under the equinox pill (CalendarEggs draws the pill).
-        <div data-testid="festival-nowruz" className="absolute left-1/2 z-9 flex -translate-x-1/2 gap-3" style={{ top: horizonY + 124 }}>
-          {BLOSSOMS.map(i => (
-            <div key={i} data-testid="festival-blossom" className={`relative ${tapClass}`} {...tapProps('nowruz', `egg-blossom-${i}`)}>
-              <Blossom />
-              {hit(`egg-blossom-${i}`, 16, 16)}
+        // A gentle arc of spring blossoms framing the equinox pill (CalendarEggs draws the pill
+        // at horizon + 90 px). Under reduced motion the blossoms stay and the petals are hidden.
+        <div data-testid="festival-nowruz" className="absolute left-1/2 z-9" style={{ top: horizonY + 90 }}>
+          {BLOSSOMS.map((b, i) => (
+            <div
+              key={i}
+              data-testid="festival-blossom"
+              className={`absolute ${tapClass}`}
+              style={{ left: b.x - b.size / 2, top: b.y - b.size / 2 }}
+              {...tapProps('nowruz', `egg-blossom-${i}`)}
+            >
+              <Blossom size={b.size} />
+              {hit(`egg-blossom-${i}`, b.size, b.size)}
+            </div>
+          ))}
+          {!reducedMotion && NOWRUZ_PETALS.map((p, i) => (
+            <div
+              key={i}
+              data-testid="festival-nowruz-petal"
+              className="absolute pointer-events-none"
+              style={{ left: p.x - 5, top: p.y, opacity: 0, ['--dx' as string]: `${p.dx}px`, ['--dy' as string]: '36px', animation: `festival-sink ${p.duration}s linear ${p.delay}s infinite` }}
+            >
+              <Petal />
             </div>
           ))}
         </div>
@@ -343,6 +374,7 @@ const FestivalEggs: React.FC<FestivalEggsProps> = ({
         @keyframes festival-glow { from { opacity: 0.8; } to { opacity: 1; } }
         @keyframes festival-rise { 0% { opacity: 0; } 8% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; transform: translateY(var(--dy)); } }
         @keyframes festival-fall { to { transform: translate(var(--dx), var(--dy)); } }
+        @keyframes festival-sink { 0% { opacity: 0; } 15% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)); } }
       `}</style>
     </>
   );

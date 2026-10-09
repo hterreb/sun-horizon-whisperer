@@ -2333,7 +2333,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 | Día de los Muertos (`diaDeMuertos`) | Nov 1–2 | 14 marigolds float on the water; papel picado on the boats with a mast (not the rowboat) | All day |
 | Holi (`holi`) | Table: the day of colours (Dhulandi), after the Phalguna full moon | The day clouds get soft pink, yellow and green washes | Not a dark sky, weather not `clear` |
 | Hanukkah (`hanukkah`) | Table: from the eve of 25 Kislev, 8 days | 1 to 8 warm lights in a row above the horizon: one more each night; static | Dark sky |
-| Nowruz (`nowruz`) | The March equinox day (`getSeasonEvent`) | The equinox pill stays; 5 spring blossoms under it | All day. Also collects the equinox badge (`NOWRUZ_ALSO`) |
+| Nowruz (`nowruz`) | The March equinox day (`getSeasonEvent`) | The equinox pill stays; 7 big five-petal blossoms in a gentle arc frame it, a few petals sink slowly (hidden under reduced motion) | All day. Also collects the equinox badge (`NOWRUZ_ALSO`) |
 | Midsummer (`midsummer`) | Midsummer Eve (the Friday of Jun 19–25) and the Saturday after it | 3 small bonfires on the far shore, soft glow; the pill "Midnight sun" at latitude 60° N or more | Evening, twilight or night (at 60° N in June the sky does not get dark) |
 | Carnival (`carnival`) | Easter − 52 to Easter − 47 (the Thursday before Shrove Tuesday to Shrove Tuesday; `getEasterSunday`, anonymous Gregorian algorithm) | 18 pastel confetti pieces fall slowly (110 vh in 50–71 s) | Not a dark sky, no reduced motion |
 

@@ -116,9 +116,29 @@ describe('FestivalEggs', () => {
     expect(screen.getAllByTestId('festival-hanukkah-light')).toHaveLength(8);
   });
 
-  it('adds spring blossoms for Nowruz', () => {
-    render(<FestivalEggs {...day} event="nowruz" />);
-    expect(screen.getAllByTestId('festival-blossom')).toHaveLength(5);
+  it('frames the equinox pill with an arc of big spring blossoms for Nowruz, day and night', () => {
+    const { rerender } = render(<FestivalEggs {...day} event="nowruz" />);
+    // The arc hangs from the pill's top (CalendarEggs: horizon + 90 px).
+    expect(screen.getByTestId('festival-nowruz').style.top).toBe('590px');
+    const blossoms = screen.getAllByTestId('festival-blossom');
+    expect(blossoms).toHaveLength(7);
+    // At least 28 px wide (2× the old 16 px dots at the smallest).
+    for (const b of blossoms) expect(Number(b.querySelector('svg')?.getAttribute('width'))).toBeGreaterThanOrEqual(28);
+    const centre = (el: HTMLElement) => {
+      const size = Number(el.querySelector('svg')?.getAttribute('width'));
+      return { x: parseFloat(el.style.left) + size / 2, y: parseFloat(el.style.top) + size / 2 };
+    };
+    const [left, , , middle, , , right] = blossoms.map(centre);
+    expect(left.x).toBe(-right.x); // symmetric about the pill
+    expect(middle.x).toBe(0);
+    expect(middle.y).toBeGreaterThan(left.y); // an arc: the ends beside the pill, the middle under it
+    expect(left.y).toBe(right.y);
+    // A few petals sink very slowly from the arc.
+    const petals = screen.getAllByTestId('festival-nowruz-petal');
+    expect(petals.length).toBeGreaterThan(0);
+    expect(Number(animation(petals[0]).match(/festival-sink (\d+)s/)?.[1])).toBeGreaterThanOrEqual(25);
+    rerender(<FestivalEggs {...base} event="nowruz" />);
+    expect(screen.getAllByTestId('festival-blossom')).toHaveLength(7);
   });
 
   it('lights Midsummer bonfires when the sun is low (the sky eggs label a real midnight sun)', () => {
@@ -161,6 +181,14 @@ describe('FestivalEggs', () => {
       expect(screen.queryByTestId('festival-petal')).toBeNull();
       rerender(<FestivalEggs {...day} event="carnival" />);
       expect(screen.queryByTestId('festival-confetti')).toBeNull();
+    });
+
+    it('keeps the Nowruz blossoms still and hides their sinking petals', () => {
+      render(<FestivalEggs {...day} event="nowruz" />);
+      const blossoms = screen.getAllByTestId('festival-blossom');
+      expect(blossoms).toHaveLength(7);
+      expect(animation(blossoms[0])).toBe('');
+      expect(screen.queryByTestId('festival-nowruz-petal')).toBeNull();
     });
   });
 
