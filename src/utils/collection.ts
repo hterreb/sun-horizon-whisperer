@@ -218,7 +218,7 @@ export const badgeForCalendarEvent = (event: CalendarEvent | null, o: CalendarBa
     case 'halloween-pumpkin': return o.moonUp ? 'egg:halloweenPumpkin' : null;
     case 'halloween-bats': return o.isNight && !o.reducedMotion ? 'egg:halloweenBats' : null;
     case 'christmas': return o.weatherType !== 'snow' && !o.reducedMotion ? 'egg:christmas' : null;
-    case 'friday-13': return o.reducedMotion ? null : 'egg:friday13';
+    case 'friday-13': return 'egg:friday13';
     case 'lunar-new-year': return o.reducedMotion ? null : 'egg:lunarNewYear';
   }
 };

@@ -53,7 +53,6 @@ const ORNAMENT_STROKE = 'hsl(var(--scene-critter-silhouette) / 0.35)';
 // slow straight CSS glides; reduced motion turns the moving ones off.
 const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherType, moon, horizonY, onInfo, infoRing = null, infoRingTier = null, santa = false }) => {
   const prefersReducedMotion = usePrefersReducedMotion();
-  const [catDone, setCatDone] = useState(false);
   const [dragonDone, setDragonDone] = useState(false);
   const [santaDone, setSantaDone] = useState(false);
   const handleSantaDone = useCallback(() => setSantaDone(true), []);
@@ -156,30 +155,34 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherTy
         </svg>
       ))}
 
-      {event === 'friday-13' && !catDone && !prefersReducedMotion && (
-        // One slow walk along the horizon, left to right, then gone. No bounce.
+      {event === 'friday-13' && (
+        // "Moon-watcher": all day on a shore rock left on the horizon, seen from behind, looking up.
+        // Only the tail sways (6 s, ±6°); reduced motion keeps it still.
         <div
           data-testid="black-cat"
           // z-5: in front of the terrain silhouette, drawn later in SunVisualization.
           className={`absolute z-5 ${tapClass}`}
-          style={{ left: '-10%', top: horizonY - 30, width: 48, height: 30, ['--dx' as string]: '120vw', animation: 'egg-glide 45s linear forwards' }}
-          onAnimationEnd={() => setCatDone(true)}
+          style={{ left: '12%', top: horizonY - 71, width: 51, height: 71 }}
           {...tapProps('blackCat', 'egg-cat')}
         >
-        <svg aria-hidden="true" className="block" width={48} height={30} viewBox="0 0 48 30">
-          <g fill="#0B0B10" stroke="hsl(var(--scene-glow-white) / 0.35)" strokeWidth={0.75}>
-            <path d="M4,16 Q0,6 6,3 Q4,9 8,15 Z" />
-            <ellipse cx={20} cy={18} rx={13} ry={6} />
-            <rect x={10} y={20} width={3} height={10} rx={1} />
-            <rect x={16} y={21} width={3} height={9} rx={1} />
-            <rect x={25} y={21} width={3} height={9} rx={1} />
-            <rect x={30} y={20} width={3} height={10} rx={1} />
-            <path d="M31,12 L32,4 L36,9 L40,9 L44,4 L45,12 Q46,18 38,19 Q30,18 31,12 Z" />
+        <svg aria-hidden="true" className="block" width={51} height={71} viewBox="0 0 44 62">
+          <path d="M2,62 Q4,44 20,42 Q38,42 42,62 Z" fill="hsl(var(--scene-cat-rock))" stroke="hsl(var(--scene-glow-white) / 0.2)" strokeWidth={0.75} />
+          <g transform="translate(6,6)" fill="hsl(var(--scene-critter-silhouette))" stroke="hsl(var(--scene-glow-white) / 0.35)" strokeWidth={0.75}>
+            <g
+              data-testid="black-cat-tail"
+              fill="none"
+              strokeLinecap="round"
+              style={{ transformBox: 'fill-box', transformOrigin: '0% 100%', animation: prefersReducedMotion ? undefined : 'egg-tail 6s ease-in-out infinite' }}
+            >
+              <path d="M22,36 Q34,36 32,24" strokeWidth={4.5} />
+              <path d="M22,36 Q34,36 32,24" stroke="hsl(var(--scene-critter-silhouette))" strokeWidth={3} />
+            </g>
+            <ellipse cx={14} cy={26} rx={10} ry={13} />
+            <path d="M8,5 L8.6,-3 L13,3 Z M20,5 L19.4,-3 L15,3 Z" />
+            <circle cx={14} cy={9} r={7.5} />
           </g>
-          <circle cx={35.5} cy={13} r={1.1} fill="#FDE047" />
-          <circle cx={41} cy={13} r={1.1} fill="#FDE047" />
         </svg>
-        {hit('egg-cat', 48, 30)}
+        {hit('egg-cat', 51, 71)}
         </div>
       )}
 
@@ -202,6 +205,7 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherTy
       <style>{`
         @keyframes egg-glide { to { transform: translateX(var(--dx)); } }
         @keyframes egg-snow { to { transform: translateY(110vh) translateX(30px); } }
+        @keyframes egg-tail { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
       `}</style>
     </>
   );
