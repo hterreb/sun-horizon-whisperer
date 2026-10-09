@@ -395,6 +395,34 @@ describe('SunVisualization (rendered): static cardinal direction labels (ROADMAP
     expect(strokes).not.toContain('hsl(var(--scene-moon))'); // no moon arc while it's midday
   });
 
+  it('draws the faint other-solstice sun path on a solstice day, both on an equinox, none on a normal day', () => {
+    setMockedContainerSize(800, 600);
+    const props = {
+      sunPosition: { azimuth: 180, altitude: 60 },
+      moonPosition: { azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false },
+      sunPath: [],
+      moonPath: [],
+      timeOfDay: 'midday' as const,
+      weatherType: 'clear' as const,
+      latitude: 47.78, // Ravensburg
+      longitude: 9.61,
+    };
+    const { rerender } = render(<SunVisualization {...props} date={new Date(2027, 5, 21, 12)} calendarEvent="solstice-longest" />);
+    const traces = screen.getAllByTestId('solstice-trace');
+    expect(traces).toHaveLength(1);
+    expect(traces[0].getAttribute('stroke')).toBe('hsl(var(--scene-solstice-trace))');
+
+    // On an equinox both solstice paths: June's apex sits higher (smaller y) than December's.
+    rerender(<SunVisualization {...props} date={new Date(2027, 2, 20, 12)} calendarEvent="equinox" />);
+    const apexY = (el: Element) =>
+      Math.min(...Array.from((el.getAttribute('d') ?? '').matchAll(/,(-?\d+(?:\.\d+)?)/g)).map((m) => parseFloat(m[1])));
+    const [june, december] = screen.getAllByTestId('solstice-trace');
+    expect(apexY(december) - apexY(june)).toBeGreaterThan(50);
+
+    rerender(<SunVisualization {...props} date={new Date(2027, 5, 22, 12)} calendarEvent={null} />);
+    expect(screen.queryByTestId('solstice-trace')).toBeNull();
+  });
+
   it('the sun dot lies on the sun arc path when sunPath includes the current position (ROADMAP item 26)', () => {
     setMockedContainerSize(800, 600);
     const { container } = render(
