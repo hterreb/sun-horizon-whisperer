@@ -52,4 +52,26 @@ describe('SceneBoat bunting on a national day', () => {
       </BuntingContext.Provider>
     );
     expect(screen.getByTestId('boat-bunting').querySelectorAll('rect').length).toBeGreaterThan(2);
+  });
+
+  it('lights up on Christmas above the dimming filter, glowing at night, and reports that it shows', () => {
+    const onShow = vi.fn();
+    const { rerender } = render(
+      <BuntingContext.Provider value={{ colors: ['hsl(var(--scene-xmas-bulb-1))'], shape: 'lights', onShow }}>
+        <SceneBoat kind="fishing" tone="night" lit wake={false} />
+      </BuntingContext.Provider>
+    );
+    const lights = screen.getByTestId('boat-bunting');
+    expect(lights.getAttribute('data-shape')).toBe('lights');
+    // Not in the boat's own svg, which the night filter dims.
+    expect((lights.ownerSVGElement as SVGSVGElement).style.filter).toBe('');
+    expect(screen.getByTestId('christmas-star')).toBeTruthy();
+    expect(lights.innerHTML).toMatch(/drop-shadow/);
+    expect(onShow).toHaveBeenCalledTimes(1);
+    rerender(
+      <BuntingContext.Provider value={{ colors: ['hsl(var(--scene-xmas-bulb-1))'], shape: 'lights', onShow }}>
+        <SceneBoat kind="fishing" tone="day" lit={false} wake={false} />
+      </BuntingContext.Provider>
+    );
+    expect(screen.getByTestId('boat-bunting').innerHTML).not.toMatch(/drop-shadow/);
 });

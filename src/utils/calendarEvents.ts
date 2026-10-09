@@ -14,7 +14,7 @@ export type CalendarEvent =
   | 'equinox'
   | 'halloween-pumpkin' // Oct 31, full moon within 3 days: a pumpkin moon
   | 'halloween-bats' // Oct 31, else: bats all night
-  | 'christmas' // Dec 25-26: falling Christmas ornaments (Santa flies on Dec 24: isSantaTime)
+  | 'christmas' // Dec 25-26: Christmas lights on the boats (Santa flies on Dec 24: isSantaTime)
   // Playful pack (ROADMAP item 117)
   | 'easter' // Easter Sunday: the empty tomb, from sunrise to 12:00
   | 'april-fools' // Apr 1: the sun and the moon swap places for one minute
@@ -125,7 +125,7 @@ export const getEventDaysPerYear = (event: CalendarEvent): number => {
 };
 
 // Christmas Eve (ROADMAP "Ongoing", Calendar): Santa flies once on Dec 24, from sunset to local
-// midnight. He is not part of the 'christmas' event: the snow starts on Dec 25.
+// midnight. He is not part of the 'christmas' event: the boats' lights start on Dec 25.
 // `sunTimes` are the scene's sun times for this day. At polar day there is no night, so no Santa.
 // At polar night the sunset field holds the 18:00 fallback, so he flies from 18:00.
 // Between 00:00 and solar midnight the sun times can hold the Dec 23 sunset (SunCalc takes the

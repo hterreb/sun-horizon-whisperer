@@ -401,7 +401,7 @@ export const en = {
   'egg.fanDayLength': '{hours} h {minutes} min',
   'egg.halloweenPumpkin': 'Pumpkin moon',
   'egg.halloweenBats': 'Halloween bats',
-  'egg.christmas': 'Christmas ornaments',
+  'egg.christmas': 'Christmas lights',
   'egg.santa': 'Santa Claus',
   'egg.solarEclipse': 'Solar eclipse',
   'egg.lunarEclipse': 'Lunar eclipse',

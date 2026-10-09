@@ -533,12 +533,15 @@
     --scene-eclipse-moon: 12 75% 38%;
     --scene-blue-moon: 210 86% 70%;
     --scene-supermoon-glow: 40 90% 78%;
-    /* Christmas ornaments (CalendarEggs, Dec 25-26): the bauble colours; gold is also
-       the caps and the stars. */
-    --scene-ornament-red: 0 78% 50%;
-    --scene-ornament-gold: 45 92% 55%;
-    --scene-ornament-green: 142 62% 38%;
-    --scene-ornament-silver: 210 40% 80%;
+    /* Christmas lights on the boats (BoatBunting 'lights', Dec 25-26): the warm bulbs
+       (warm white, amber, soft red, gold), the star at the masthead or funnel top, and
+       the bulbs' glow at night. */
+    --scene-xmas-bulb-1: 42 100% 86%;
+    --scene-xmas-bulb-2: 32 100% 60%;
+    --scene-xmas-bulb-3: 6 85% 62%;
+    --scene-xmas-bulb-4: 48 100% 64%;
+    --scene-xmas-star: 45 92% 55%;
+    --scene-xmas-glow: 38 100% 70%;
     /* Sky eggs (astroEvents.ts, SkyEggs.tsx): the blue-white Pleiades (Matariki), the
        planets of a conjunction, the electric-blue noctilucent clouds, the midnight-sun arc. */
     --scene-pleiades: 210 100% 90%;

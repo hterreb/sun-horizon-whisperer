@@ -401,7 +401,7 @@ export const it: Record<keyof typeof en, string> = {
   'egg.fanDayLength': "{hours} h {minutes} min",
   'egg.halloweenPumpkin': "Luna zucca",
   'egg.halloweenBats': "Pipistrelli di Halloween",
-  'egg.christmas': "Decorazioni di Natale",
+  'egg.christmas': "Luci di Natale",
   'egg.santa': "Babbo Natale",
   'egg.solarEclipse': "Eclissi solare",
   'egg.lunarEclipse': "Eclissi lunare",

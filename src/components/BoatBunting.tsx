@@ -1,4 +1,6 @@
 import { type BoatKind } from '@/utils/weatherEffectsUtils';
+import { type Bunting } from '@/hooks/useBunting';
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 
 // National days (utils/nationalDays): a string of big pennants (big enough to see on a phone) in the flag colours, on
 // SceneBoat's 64 x 37 grid. Each line runs from the bow or the stern up to the mast or funnel
@@ -25,7 +27,50 @@ const pennantsOf = (points: [number, number][]): [number, number][] =>
     });
   });
 
-const BoatBunting = ({ kind, colors, shape = 'pennant' }: { kind: BoatKind; colors: readonly string[]; shape?: 'pennant' | 'picado' }) => {
+// Christmas (Dec 25-26): a string of small warm bulbs along the same lines, and a small gold
+// star above the line's top end (the masthead or the funnel top). The bulbs glow when the boat
+// is lit (night) and then twinkle very slowly (opacity, 6 s); reduced motion keeps them still.
+const BULB_R = 0.8;
+const BULB_SAG = 0.9; // the bulb hangs this far below the wire
+const STAR_R = 1.6;
+const STAR_LIFT = 2.6; // the star's centre above the line's top end, clear of the mast light
+const starPath = (cx: number, cy: number): string =>
+  Array.from({ length: 10 }, (_, k) => {
+    const r = k % 2 ? STAR_R * 0.45 : STAR_R;
+    const a = (Math.PI / 5) * k - Math.PI / 2;
+    return `${k ? 'L' : 'M'}${(cx + r * Math.cos(a)).toFixed(2)} ${(cy + r * Math.sin(a)).toFixed(2)}`;
+  }).join('') + 'Z';
+
+const ChristmasLights = ({ kind, colors, lit }: { kind: BoatKind; colors: readonly string[]; lit: boolean }) => {
+  const reducedMotion = usePrefersReducedMotion();
+  const line = LINES[kind];
+  const [topX, topY] = line.reduce((top, p) => (p[1] < top[1] ? p : top));
+  const twinkle = lit && !reducedMotion;
+  const glow = lit ? 'drop-shadow(0 0 1.5px hsl(var(--scene-xmas-glow)))' : undefined;
+  return (
+    <g data-testid="boat-bunting" data-shape="lights">
+      <polyline points={line.map(p => p.join(',')).join(' ')} fill="none" stroke="hsl(var(--scene-boat-navy))" strokeWidth={0.3} />
+      <g style={{ filter: glow }} opacity={lit ? 1 : 0.85}>
+        {pennantsOf(line).map(([x, y], i) => (
+          <circle
+            key={i}
+            cx={x}
+            cy={y + BULB_SAG}
+            r={BULB_R}
+            fill={colors[i % colors.length]}
+            style={twinkle ? { animation: `xmas-twinkle 6s ease-in-out ${-(i % 3) * 2}s infinite` } : undefined}
+            data-testid="christmas-bulb"
+          />
+        ))}
+        <path d={starPath(topX, topY - STAR_LIFT)} fill="hsl(var(--scene-xmas-star))" data-testid="christmas-star" />
+      </g>
+      {twinkle && <style>{'@keyframes xmas-twinkle { 50% { opacity: 0.55; } }'}</style>}
+    </g>
+  );
+};
+
+const BoatBunting = ({ kind, colors, shape = 'pennant', lit = false }: { kind: BoatKind; colors: readonly string[]; shape?: Bunting['shape']; lit?: boolean }) => {
+  if (shape === 'lights') return <ChristmasLights kind={kind} colors={colors} lit={lit} />;
   const line = LINES[kind];
   return (
     <g data-testid="boat-bunting">

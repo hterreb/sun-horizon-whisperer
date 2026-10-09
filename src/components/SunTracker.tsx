@@ -145,6 +145,8 @@ const NO_LIVE_PLANES: LivePlanesState = { feed: { now: 0, aircraft: [] }, receiv
 
 // Día de los Muertos papel picado (item 118), on the boats through BuntingContext.
 const PICADO_COLORS = [1, 2, 3, 4, 5].map((n) => `hsl(var(--scene-festival-pastel-${n}))`);
+// Christmas (Dec 25-26): the warm bulbs of the lit boats, through BuntingContext.
+const CHRISTMAS_LIGHT_COLORS = [1, 2, 3, 4].map((n) => `hsl(var(--scene-xmas-bulb-${n}))`);
 
 const SunTracker: React.FC = () => {
   const [date, setDate] = useState<Date>(new Date());
@@ -1032,7 +1034,9 @@ const SunTracker: React.FC = () => {
   useEffect(() => {
     if (nationalBadge) collect(nationalBadge);
   }, [nationalBadge, collect]);
-  const buntingBadge = !nationalForced && !isTimePreview && nationalDay?.style === 'bunting' ? (`egg:${nationalDay.kind}` as const) : null;
+  const buntingBadge = !nationalForced && !isTimePreview && nationalDay?.style === 'bunting' ? (`egg:${nationalDay.kind}` as const)
+    // Christmas: the lit boats; the badge counts when a boat shows them.
+    : !isTimePreview && calendarEvent === 'christmas' ? 'egg:christmas' as const : null;
   const handleBuntingShow = useCallback(() => {
     if (buntingBadge) collect(buntingBadge);
   }, [buntingBadge, collect]);
@@ -1040,6 +1044,8 @@ const SunTracker: React.FC = () => {
     () => (nationalDay?.style === 'bunting' ? { colors: nationalDay.colors.map((c) => `hsl(var(--national-${c}))`), onShow: handleBuntingShow }
       // Día de los Muertos (item 118): papel picado; its badge counts with the marigolds, so onShow adds nothing.
       : calendarEvent === 'dia-de-muertos' ? { colors: PICADO_COLORS, shape: 'picado', onShow: handleBuntingShow }
+      // Christmas: warm bulbs and a gold star on every boat.
+      : calendarEvent === 'christmas' ? { colors: CHRISTMAS_LIGHT_COLORS, shape: 'lights', onShow: handleBuntingShow }
       : null),
     [nationalDay, calendarEvent, handleBuntingShow]
   );

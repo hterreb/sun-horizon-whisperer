@@ -401,7 +401,7 @@ export const de: Record<keyof typeof en, string> = {
   'egg.fanDayLength': "{hours} h {minutes} min",
   'egg.halloweenPumpkin': "Kürbismond",
   'egg.halloweenBats': "Halloween-Fledermäuse",
-  'egg.christmas': "Weihnachtskugeln",
+  'egg.christmas': "Weihnachtslichter",
   'egg.santa': "Weihnachtsmann",
   'egg.solarEclipse': "Sonnenfinsternis",
   'egg.lunarEclipse': "Mondfinsternis",
