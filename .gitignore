@@ -36,3 +36,6 @@ vite.config.ts.timestamp-*
 
 # Claude Code: local settings and agent worktrees.
 /.claude/
+
+# Local wide store screenshots (not part of the Play listing assets).
+/store/screenshots-wide/
