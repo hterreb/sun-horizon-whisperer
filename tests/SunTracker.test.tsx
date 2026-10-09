@@ -942,6 +942,9 @@ describe('SunTracker', () => {
       fireEvent.click(fishHit, { clientX: 150, clientY: 650 });
       expect(screen.getByRole('dialog', { name: 'Perch' })).toHaveTextContent('Its dark stripes hide the perch among water plants.');
       expect(fishHit.querySelector('[data-testid="scene-info-ring"]')).not.toBeNull();
+      // Item 107: a perch is common (14 % of the day fish), so the card and the ring have the common tier colour.
+      expect(card()!.className).toContain('border-tier-common/50');
+      expect(fishHit.querySelector('[data-testid="scene-info-ring"]')!.className).toContain('border-tier-common/80');
       // The fish swims on: its wrapper keeps the crossing animation.
       expect(fishHit.closest<HTMLElement>('[aria-hidden="true"]')!.style.animation).toContain('moveAcrossX');
 

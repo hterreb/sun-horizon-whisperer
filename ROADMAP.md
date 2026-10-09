@@ -2112,6 +2112,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   - Boats: the share of the fair-weather mix (all boats). The weather and wind filter of `pickBoat` is not applied, because `SceneInfoContext` has no wind.
   - No time estimate ("one every N min"): the spawn gap depends on the screen width and the density. Planes, live planes, satellites, clouds, sun, moon and terrain have no rarity row.
 - **Checked:** 2 new tests, the fish, bird and boat card tests updated: shark very rare 0.5 % (day and night), classic fish common 24 %, perch at night uncommon 4.7 %, German "Sehr selten · 0,5 %"; no row on the cloud, sun, moon, plane and terrain cards. All tests pass.
+- **Changed in item 107:** the bats are no longer 100 %. `getBatShare` gives their share of the day's flying time (astronomical dawn to sunrise and sunset to astronomical dusk, against sunrise to sunset), and the birds share the rest by their weights. At Lake Constance this is about 23 % (common), so the bird rows in the table below are now 77 % of the values shown.
 
 | Kind | Share | Tier |
 |---|---|---|
@@ -2133,6 +2134,19 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Built:** one fact per cloud type (`cloudFact.Ci`, `Cs`, `Ac`, `As`, `Cu`, `Sc`, `St`, `Ns`, `Cb`, `Len`, `Mam`) in all 5 languages, one short sentence like the fish facts. The cloud card shows it as the first row, without a label (like the fish fact), above the layer and the cover.
 - **Checked:** 1 new test (every cloud type has a fact sentence), the cloud card test updated. All tests pass.
 - A card redesign (item 107, lookbook first) follows and can change the style of the rows of items 105 and 106.
+
+### 107. Info cards: field guide look — M — [SUN-CHASER-10](https://ainabler.sentry.io/issues/SUN-CHASER-10) — **✅ Done**
+
+- **Feedback (2026-10-06):** "the info cards are a bit plain, please do a lookbook".
+- **Lookbook:** [Info card lookbook](https://claude.ai/artifact/MinHW6ZN1ru6ohph4eYE5A). Pick: K4, with the tier colour as a faint outline on the card and the ring.
+- **Built:**
+  - `SceneInfoCard` is an almanac entry: a kicker (type icon and type name, uppercase, in the type colour), the title, the Latin name in italics, a thin rule, label-value rows with dotted leaders, a 4-step meter on the rarity row, and the fact as a "Field note" ("Cloud fact" on clouds) at the end. Max width 16 rem. It fades in over 200 ms from 96 % (`animate-card-in`); with reduced motion it only fades.
+  - The card glass is 58 % (`GLASS_CARD_SURFACE`); the other panels keep 45 %.
+  - `sceneInfo` stays pure. It now returns `kicker`, `icon`, `latin`, `fact` and `tier`; the fact is no longer a row. Latin names are plain strings, only for kinds that are one species, and the WMO names for clouds (the card hides the Latin name when it is the same as the title).
+  - Rarity tiers (`rarityTier.ts`, tokens `--color-tier-*`): common `#cbd5e1`, uncommon `#5eead4`, rare `#60a5fa`, very rare `#f5b82e`. The card has a 1 px outline in the tier colour at 50 %; the ring around the tapped fish, bird or boat (item 95) has it at 80 %. Things without a tier keep the neutral border and the white ring. `SunTracker` passes the tier of the open card through `SunVisualization` to `CloudLayer` (`infoRingTier`).
+  - Kicker icons are lucide icons and the scene's `Bat`; colours are the `--color-kind-*` tokens. 12 new texts in all 5 languages.
+  - Bats (item 105): `getBatShare(sunTimes)` in `weatherEffectsUtils`. `SceneInfoContext.sceneSunTimes` gives the day's sun times.
+- **Checked:** new and updated tests for the card (kicker, Latin line, field note, tier border, 58 % glass), the `sceneInfo` data (kicker, Latin names, fact, tier), `getBatShare` and `getFlyerShare`, the tier classes, and the ring colour with and without a tier (`CloudLayer`, `SunTracker`). Typecheck, lint and all tests pass. In the browser at 390 × 844 (Konstanz): perch card by day and sailboat card at night show the new look and the grey common ring.
 
 ### 108. The countdown you hear over the radio — S — [SUN-CHASER-14](https://ainabler.sentry.io/issues/SUN-CHASER-14) — **✅ Done**
 

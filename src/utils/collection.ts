@@ -60,9 +60,13 @@ const EGGS: [EggKind, MessageKey][] = [
 
 // The grid order. A fish's tier is its day share; getFishShare falls back to the night share
 // for the night-only fish.
+// ponytail: a badge has one fixed tier, so the bats' share (by the hours of the day since
+// item 107) is a typical mid-latitude value; pass the real sun times if badges should vary.
+const BADGE_BAT_SHARE = 20;
+
 export const BADGES: readonly Badge[] = [
   ...FISH.map(([kind, name]): Badge => ({ id: `fish:${kind}`, group: 'fish', name, rarity: getRarityTier(getFishShare(kind, false)) })),
-  ...FLYERS.map(([kind, name]): Badge => ({ id: `flyer:${kind}`, group: 'flyer', name, rarity: getRarityTier(getFlyerShare(kind)) })),
+  ...FLYERS.map(([kind, name]): Badge => ({ id: `flyer:${kind}`, group: 'flyer', name, rarity: getRarityTier(getFlyerShare(kind, BADGE_BAT_SHARE)) })),
   ...BOATS.map(([kind, name]): Badge => ({ id: `boat:${kind}`, group: 'boat', name, rarity: getRarityTier(getBoatShare(kind)) })),
   { id: 'plane', group: 'sky', name: 'plane.airliner', rarity: null },
   { id: 'sun', group: 'sky', name: 'scene.sun', rarity: null },

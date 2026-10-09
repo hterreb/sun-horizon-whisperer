@@ -12,6 +12,7 @@ import SkyClouds from './SkyClouds';
 import { Bat } from './sceneIcons';
 import { type TimeOfDay, type SunTimes } from '../utils/sunUtils';
 import { getSceneDensity } from '@/utils/sceneDensity';
+import { ringBorderClass, type RarityTier } from '@/utils/rarityTier';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import { useScenePlaybackRate } from '@/hooks/useScenePlaybackRate';
 import { getScenePlaybackRate, getSpawnGapFactor, type PlayDirection } from '@/utils/timeTravel';
@@ -102,6 +103,8 @@ interface CloudLayerProps {
   // the thing whose card is open, which then shows a thin ring.
   onInfo?: SceneInfoHandler;
   infoRing?: string | null;
+  // Item 107: the open card's rarity tier gives the ring its colour; null: the neutral ring.
+  infoRingTier?: RarityTier | null;
 }
 
 export type SceneInfoHandler = (target: SceneInfoTarget, point: { x: number; y: number }, ring: string) => void;
@@ -111,13 +114,14 @@ const HIT_PX = 44;
 
 // An invisible hit area of at least HIT_PX x HIT_PX around a thing's box (`width` x `height` px,
 // centred at `cx`, `cy` in its wrapper), with the ring when the thing's card is open. A child
-// of the wrapper, so the wrapper's CSS animation moves the ring too.
-export const HitArea: React.FC<{ cx: number; cy: number; width: number; height: number; ring: boolean }> = ({ cx, cy, width, height, ring }) => {
+// of the wrapper, so the wrapper's CSS animation moves the ring too. The ring has the colour of
+// the card's rarity tier (item 107), or the neutral colour.
+export const HitArea: React.FC<{ cx: number; cy: number; width: number; height: number; ring: boolean; tier?: RarityTier | null }> = ({ cx, cy, width, height, ring, tier = null }) => {
   const w = Math.max(HIT_PX, width);
   const h = Math.max(HIT_PX, height);
   return (
     <span className="absolute" style={{ left: cx - w / 2, top: cy - h / 2, width: w, height: h }} data-testid="scene-hit">
-      {ring && <span className="absolute inset-0 rounded-full border border-white/70" data-testid="scene-info-ring" />}
+      {ring && <span className={`absolute inset-0 rounded-full border ${ringBorderClass(tier)}`} data-testid="scene-info-ring" />}
     </span>
   );
 };
@@ -991,6 +995,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   warmStart = true,
   onInfo,
   infoRing = null,
+  infoRingTier = null,
 }) => {
   // The things that cross the scene. The state renders them; the ref has the latest lists at
   // once, so the spawn loop plans each new lane around all of them (item 92), also around one
@@ -1252,7 +1257,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             {body}
           </div>
         ) : body}
-        {onInfo && <HitArea {...hitBox} ring={infoRing === `fish-${fishItem.id}-${key}`} />}
+        {onInfo && <HitArea {...hitBox} ring={infoRing === `fish-${fishItem.id}-${key}`} tier={infoRingTier} />}
       </>
     );
     const swimmer = (key: string, lag: number, dy: number, removes: boolean) => (
@@ -1503,7 +1508,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             )) : (
               <SceneBird kind={bird.kind} width={bird.size} />
             )}
-            {onInfo && <HitArea cx={bird.width / 2} cy={bird.height / 2} width={bird.width} height={bird.height} ring={infoRing === `bird-${bird.id}`} />}
+            {onInfo && <HitArea cx={bird.width / 2} cy={bird.height / 2} width={bird.width} height={bird.height} ring={infoRing === `bird-${bird.id}`} tier={infoRingTier} />}
           </div>
         </div>
       ))}
@@ -1551,6 +1556,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
                 width={BOAT_WIDTH_PX * boatScale(ship)}
                 height={BOAT_HEIGHT_PX * boatScale(ship)}
                 ring={infoRing === `boat-${ship.id}`}
+                tier={infoRingTier}
               />
             )}
           </div>

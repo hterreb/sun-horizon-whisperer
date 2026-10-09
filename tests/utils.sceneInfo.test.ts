@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { translate, type Translate } from '@/i18n';
 import {
-  getSceneInfo, getRarityTier, resolveInfoText, directionText, durationText, distanceText,
+  getSceneInfo, resolveInfoText, directionText, durationText, distanceText, rarityTier, getRarityTier,
   type SceneInfo, type SceneInfoContext, type SceneInfoTarget,
 } from '@/utils/sceneInfo';
 import { FISH_WEIGHTS, BIRD_WEIGHTS, type BoatKind, type FishKind } from '@/utils/weatherEffectsUtils';
 import { type CloudType } from '@/utils/skyCloudUtils';
 import { type HorizonProfile } from '@/utils/horizonUtils';
-import { formatTime } from '@/utils/sunUtils';
+import { formatTime, type SunTimes } from '@/utils/sunUtils';
 
 // ROADMAP item 95: the info card's content per type, read in English and German.
 const en: Translate = (key, vars) => translate('en', key, vars);
@@ -15,10 +15,20 @@ const de: Translate = (key, vars) => translate('de', key, vars);
 const NOW = new Date('2026-10-05T12:00:00Z');
 const at = (iso: string) => new Date(iso);
 
+// The scene's day: 1 h 40 min of twilight before sunrise and after sunset (bats), 11 h 17 min
+// of day (birds): the bats have 200 of 877 flying minutes, 22.8 %.
+const SCENE_SUN_TIMES: SunTimes = {
+  astronomicalDawn: at('2026-10-05T03:50:00Z'), nauticalDawn: at('2026-10-05T04:25:00Z'), dawn: at('2026-10-05T05:00:00Z'),
+  sunrise: at('2026-10-05T05:30:00Z'), solarNoon: at('2026-10-05T11:08:30Z'), sunset: at('2026-10-05T16:47:00Z'),
+  dusk: at('2026-10-05T17:17:00Z'), nauticalDusk: at('2026-10-05T17:52:00Z'), astronomicalDusk: at('2026-10-05T18:27:00Z'),
+  polar: null,
+};
+
 const ctx = (over: Partial<SceneInfoContext> = {}): SceneInfoContext => ({
   language: 'en',
   now: NOW,
   timeOfDay: 'midday',
+  sceneSunTimes: SCENE_SUN_TIMES,
   sunPosition: { azimuth: 200, altitude: 33.46 },
   sunTimes: { sunrise: at('2026-10-05T05:30:00Z'), sunset: at('2026-10-05T16:47:00Z') },
   terrainSunTimes: null,
@@ -35,9 +45,11 @@ const ctx = (over: Partial<SceneInfoContext> = {}): SceneInfoContext => ({
   ...over,
 });
 
-// The card as text: the title, then each row as "label: value" or the value alone.
+// The card as text: the title, the fact (item 107: a field note at the end of the card), then
+// each row as "label: value" or the value alone.
 const read = (info: SceneInfo, t: Translate = en) => [
   t(info.title),
+  ...(info.fact ? [t(info.fact.text)] : []),
   ...info.lines.map(l => (l.label ? `${t(l.label)}: ${resolveInfoText(t, l.value)}` : resolveInfoText(t, l.value))),
 ];
 const card = (target: SceneInfoTarget, over?: Partial<SceneInfoContext>, t?: Translate) => read(getSceneInfo(target, ctx(over)), t);
@@ -56,8 +68,10 @@ describe('sceneInfo (ROADMAP item 95)', () => {
     // A night fish that swims on at dawn keeps its night share.
     expect(rarity({ type: 'fish', kind: 'squid' })).toBe('Rarity: Uncommon · 5 %');
     expect(rarity({ type: 'fish', kind: 'shark' }, { language: 'de' }, de)).toBe('Seltenheit: Sehr selten · 0,5 %');
-    expect(rarity({ type: 'bird', kind: 'gull' })).toBe('Rarity: Common · 38 %');
-    expect(rarity({ type: 'bird', kind: 'bat' })).toBe('Rarity: Common · 100 %');
+    // Item 107: the bats have 22.8 % of the flying time; the birds share the other 77.2 %.
+    expect(rarity({ type: 'bird', kind: 'gull' })).toBe('Rarity: Common · 29.3 %');
+    expect(rarity({ type: 'bird', kind: 'bat' })).toBe('Rarity: Common · 22.8 %');
+    expect(rarity({ type: 'bird', kind: 'stork' })).toBe('Rarity: Uncommon · 6.2 %');
     expect(rarity({ type: 'boat', kind: 'freighter' })).toBe('Rarity: Uncommon · 6.3 %');
     const boats: BoatKind[] = ['sailboat', 'ferry', 'fishing', 'rowboat', 'freighter'];
     for (const kind of boats) expect(rarity({ type: 'boat', kind }), kind).toMatch(/^Rarity: .+ · [\d.]+ %$/);
@@ -91,13 +105,19 @@ describe('sceneInfo (ROADMAP item 95)', () => {
 
   it('gives a bird its species, one fact and its season (item 74)', () => {
     expect(card({ type: 'bird', kind: 'geese' })).toEqual([
-      'Geese', 'Geese fly in a V to save energy.', 'Season: Spring and autumn, on migration', 'Rarity: Common · 10 %',
+      'Geese', 'Geese fly in a V to save energy.', 'Season: Spring and autumn, on migration', 'Rarity: Uncommon · 7.7 %',
     ]);
     expect(card({ type: 'bird', kind: 'stork' })[2]).toBe('Season: Spring and summer');
     expect(card({ type: 'bird', kind: 'starlings' })[2]).toBe('Season: Autumn');
     expect(card({ type: 'bird', kind: 'gull' })[2]).toBe('Season: All year');
     expect(card({ type: 'bird', kind: 'bat' })[2]).toBe('Season: At dusk');
     for (const [kind] of BIRD_WEIGHTS) expect(card({ type: 'bird', kind })[1], kind).toMatch(/\.$/);
+  });
+
+  it('leaves out the flyers\' rarity row without the day\'s sun times (item 107)', () => {
+    const info = getSceneInfo({ type: 'bird', kind: 'bat' }, ctx({ sceneSunTimes: null }));
+    expect(info.tier).toBeNull();
+    expect(read(info).some(row => row.startsWith('Rarity'))).toBe(false);
   });
 
   it('gives a boat its type and one fact', () => {
@@ -234,6 +254,79 @@ describe('sceneInfo (ROADMAP item 95)', () => {
     expect(shadowed[shadowed.length - 1]).toBe(`Nächster Überflug: ${new Intl.DateTimeFormat('de', { weekday: 'short' }).format(tomorrow.start)} ${formatTime(tomorrow.start, 'de')}`);
     // Without the values (no data yet): the name and dashes.
     expect(card({ type: 'satellite', id: 1, name: 'X' })).toEqual(['Satellite', 'X', "Into Earth's shadow: —", 'Next pass: —']);
+  });
+});
+
+describe('sceneInfo: field guide data (ROADMAP item 107)', () => {
+  const info = (target: SceneInfoTarget, over?: Partial<SceneInfoContext>) => getSceneInfo(target, ctx(over));
+
+  it('gives each type its kicker and icon', () => {
+    const kicker = (target: SceneInfoTarget) => { const i = info(target); return [en(i.kicker), i.icon]; };
+    expect(kicker({ type: 'fish', kind: 'perch' })).toEqual(['Water life', 'water']);
+    expect(kicker({ type: 'fish', kind: 'shark' })).toEqual(['Sea visitor', 'visitor']);
+    expect(kicker({ type: 'bird', kind: 'stork' })).toEqual(['Bird', 'bird']);
+    expect(kicker({ type: 'bird', kind: 'bat' })).toEqual(['Flying mammal', 'bat']);
+    expect(kicker({ type: 'boat', kind: 'ferry' })).toEqual(['Watercraft', 'boat']);
+    expect(kicker({ type: 'plane', contrail: 'none' })).toEqual(['Aircraft', 'plane']);
+    expect(kicker({ type: 'cloud', cloudType: 'Cu', band: 'low' })).toEqual(['Cloud', 'cloud']);
+    expect(kicker({ type: 'sun' })).toEqual(['Sky', 'sun']);
+    expect(kicker({ type: 'moon' })).toEqual(['Sky', 'moon']);
+    expect(kicker({ type: 'terrain', azimuth: 0 })).toEqual(['Horizon', 'terrain']);
+    expect(kicker({ type: 'satellite', id: 1, name: 'X' })).toEqual(['Orbit', 'satellite']);
+  });
+
+  it('gives a Latin name to the real species only', () => {
+    expect(info({ type: 'fish', kind: 'pike' }).latin).toBe('Esox lucius');
+    expect(info({ type: 'fish', kind: 'eel' }).latin).toBe('Anguilla anguilla');
+    expect(info({ type: 'bird', kind: 'stork' }).latin).toBe('Ciconia ciconia');
+    expect(info({ type: 'bird', kind: 'starlings' }).latin).toBe('Sturnus vulgaris');
+    for (const target of [
+      { type: 'fish', kind: 'classic' }, { type: 'fish', kind: 'shark' }, { type: 'bird', kind: 'gull' },
+      { type: 'bird', kind: 'bat' }, { type: 'boat', kind: 'sailboat' }, { type: 'sun' }, { type: 'moon' },
+      { type: 'cloud', cloudType: 'Mam', band: 'low' },
+    ] as SceneInfoTarget[]) expect(info(target).latin, JSON.stringify(target)).toBeUndefined();
+    // A binomial: genus with a capital letter, species in lower case.
+    const kinds: FishKind[] = [...FISH_WEIGHTS.map(([k]) => k), 'burbot', 'eel', 'lanternfish', 'anglerfish', 'squid'];
+    for (const kind of kinds) {
+      const latin = info({ type: 'fish', kind }).latin;
+      if (latin) expect(latin, kind).toMatch(/^[A-Z][a-z]+ [a-z]+$/);
+    }
+  });
+
+  it('gives a cloud its WMO Latin name', () => {
+    expect(info({ type: 'cloud', cloudType: 'Cu', band: 'low' }).latin).toBe('Cumulus');
+    expect(info({ type: 'cloud', cloudType: 'Len', band: 'mid' }).latin).toBe('Altocumulus lenticularis');
+  });
+
+  it('puts the fact in a field note (a cloud fact for clouds), not in the rows', () => {
+    const fish = info({ type: 'fish', kind: 'perch' });
+    expect(fish.fact).toEqual({ label: 'info.fieldNote', text: 'fishFact.perch' });
+    expect(fish.lines.some(l => typeof l.value === 'object' && l.value.key === 'fishFact.perch')).toBe(false);
+    expect(info({ type: 'cloud', cloudType: 'Ci', band: 'high' }).fact).toEqual({ label: 'info.cloudFact', text: 'cloudFact.Ci' });
+    expect(info({ type: 'plane', contrail: 'none' }).fact?.text).toBe('planeFact.airliner');
+    expect(info({ type: 'sun' }).fact).toBeUndefined();
+  });
+
+  it('gives fish, birds and boats their rarity tier, the others none', () => {
+    expect(info({ type: 'fish', kind: 'shark' }).tier).toBe('veryRare');
+    expect(info({ type: 'fish', kind: 'ray' }).tier).toBe('rare');
+    expect(info({ type: 'boat', kind: 'freighter' }).tier).toBe('uncommon');
+    expect(info({ type: 'bird', kind: 'gull' }).tier).toBe('common');
+    const rarityRow = info({ type: 'fish', kind: 'shark' }).lines.find(l => l.label === 'info.rarity');
+    expect(rarityRow?.tier).toBe('veryRare');
+    for (const target of [
+      { type: 'sun' }, { type: 'moon' }, { type: 'cloud', cloudType: 'Cu', band: 'low' }, { type: 'terrain', azimuth: 0 },
+      { type: 'plane', contrail: 'none' }, { type: 'satellite', id: 1, name: 'X' },
+      { type: 'livePlane', callsign: null, airline: null, aircraftType: null, altM: 0, speedKt: 0 },
+    ] as SceneInfoTarget[]) expect(info(target).tier, target.type).toBeNull();
+  });
+
+  it('maps a share to its tier at the thresholds', () => {
+    expect(rarityTier(10)).toBe('common');
+    expect(rarityTier(9.99)).toBe('uncommon');
+    expect(rarityTier(3)).toBe('uncommon');
+    expect(rarityTier(1)).toBe('rare');
+    expect(rarityTier(0.5)).toBe('veryRare');
   });
 });
 

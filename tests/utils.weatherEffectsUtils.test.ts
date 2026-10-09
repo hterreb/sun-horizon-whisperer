@@ -1,4 +1,5 @@
-import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, hasBoatWake, getBoatTone, pickFish, FISH_WEIGHTS, canSpawnFish, getRestStopMotion, pickNightFish, pickMoonlitDayFish, NIGHT_FISH_WEIGHTS, MAX_FISH, MAX_NIGHT_FISH, MAX_BIRDS, getFishOverride, getWaterSpeedFactor, getWaterLimit, getSceneLimit, getStarCloudFactor, getTwilightStars, getSkyOvercastMix, getSunVisibility, getMoonCloudFactor, getMoonLook, BIRD_WEIGHTS, pickBird, isBirdInSeason } from '../src/utils/weatherEffectsUtils';
+import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, hasBoatWake, getBoatTone, pickFish, FISH_WEIGHTS, canSpawnFish, getRestStopMotion, pickNightFish, pickMoonlitDayFish, NIGHT_FISH_WEIGHTS, MAX_FISH, MAX_NIGHT_FISH, MAX_BIRDS, getFishOverride, getWaterSpeedFactor, getWaterLimit, getSceneLimit, getStarCloudFactor, getTwilightStars, getSkyOvercastMix, getSunVisibility, getMoonCloudFactor, getMoonLook, BIRD_WEIGHTS, pickBird, isBirdInSeason, getBatShare, getFlyerShare } from '../src/utils/weatherEffectsUtils';
+import { getSunTimes } from '../src/utils/sunUtils';
 
 describe('getWeatherEffects (ROADMAP item 10)', () => {
   it('shows fog only for the fog type', () => {
@@ -258,6 +259,37 @@ describe('bird mix and seasons (ROADMAP item 74)', () => {
     const july = picks(7, 47.8, true);
     expect(july.has('stork')).toBe(true);
     expect(july.has('geese') || july.has('starlings')).toBe(false);
+  });
+});
+
+describe('bats by the hours of the day (ROADMAP item 107)', () => {
+  const at = (hhmm: string) => new Date(`2026-10-07T${hhmm}:00Z`);
+  const times = (astronomicalDawn: string, sunrise: string, sunset: string, astronomicalDusk: string) => ({
+    ...getSunTimes(at('12:00'), 47.66, 9.18),
+    astronomicalDawn: at(astronomicalDawn), sunrise: at(sunrise), sunset: at(sunset), astronomicalDusk: at(astronomicalDusk),
+  });
+
+  it('is the share of the flying time from astronomical dawn to sunrise and from sunset to astronomical dusk', () => {
+    // 2 h + 2 h of twilight, 12 h of day: 4 of 16 h.
+    expect(getBatShare(times('04:00', '06:00', '18:00', '20:00'))).toBeCloseTo(25, 6);
+    // No twilight (polar day: no astronomical dawn or dusk inside the day): no bats.
+    expect(getBatShare(times('06:00', '06:00', '18:00', '18:00'))).toBe(0);
+    // A twilight time on the wrong side counts as none.
+    expect(getBatShare(times('07:00', '06:00', '18:00', '17:00'))).toBe(0);
+  });
+
+  it('is common at Lake Constance in October: about 23 % of the flying time', () => {
+    const share = getBatShare(getSunTimes(at('12:00'), 47.66, 9.18));
+    expect(share).toBeGreaterThan(22);
+    expect(share).toBeLessThan(24);
+  });
+
+  it('gives the birds the rest of the flying time by their weights; the bats their share', () => {
+    expect(getFlyerShare('bat', 25)).toBe(25);
+    expect(getFlyerShare('gull', 25)).toBeCloseTo(28.5, 6);
+    expect(getFlyerShare('gull', 0)).toBe(38);
+    const all = BIRD_WEIGHTS.reduce((sum, [kind]) => sum + getFlyerShare(kind, 25), 0) + getFlyerShare('bat', 25);
+    expect(all).toBeCloseTo(100, 6);
   });
 });
 
