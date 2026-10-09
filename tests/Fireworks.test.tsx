@@ -67,3 +67,31 @@ describe('Fireworks', () => {
     expect(rafSpy).not.toHaveBeenCalled();
   });
 });
+
+describe('Fireworks palette (national days)', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('bursts in the given colours', () => {
+    let frame: FrameRequestCallback | null = null;
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => { frame = cb; return 1; });
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    const strokes = new Set<string>();
+    const ctx = {
+      setTransform: () => {}, clearRect: () => {}, beginPath: () => {}, moveTo: () => {}, lineTo: () => {}, stroke: () => {},
+      set strokeStyle(value: string) { strokes.add(value); },
+    };
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx as unknown as CanvasRenderingContext2D);
+    vi.spyOn(performance, 'now').mockReturnValue(0);
+    const palette = ['hsl(211 100% 50%)', 'hsl(0 0% 100%)', 'hsl(4 85% 57%)'];
+    render(<Fireworks trigger={1000} palette={palette} />);
+    // 3 s of frames: the first rockets burst after 1 s.
+    for (let t = 100; t <= 3000 && frame; t += 100) {
+      const run: FrameRequestCallback = frame;
+      frame = null;
+      run(t);
+    }
+    const burstColours = [...strokes].filter((c) => c !== '#fff3d1');
+    expect(burstColours.length).toBeGreaterThan(0);
+    for (const colour of burstColours) expect(palette).toContain(colour);
+  });
+});

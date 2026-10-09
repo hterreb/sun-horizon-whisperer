@@ -31,7 +31,7 @@ describe('getCalendarEvent', () => {
     expect(getCalendarEvent(new Date(2027, 1, 6, 0, 0))).toBe('lunar-new-year');
     expect(getCalendarEvent(new Date(2027, 1, 6, 23, 59))).toBe('lunar-new-year');
     expect(getCalendarEvent(new Date(2035, 1, 8, 12))).toBe('lunar-new-year');
-    expect(getCalendarEvent(new Date(2027, 1, 7, 12))).toBeNull();
+    expect(getCalendarEvent(new Date(2027, 1, 10, 12))).toBeNull(); // Feb 7 is Carnival now (item 118)
     expect(getCalendarEvent(new Date(2028, 1, 6, 12))).toBeNull();
   });
 
@@ -48,8 +48,8 @@ describe('getCalendarEvent', () => {
     expect(getCalendarEvent(new Date(2026, 5, 22, 12), 47.8)).toBeNull();
   });
 
-  it('returns equinox on the equinox day', () => {
-    expect(getCalendarEvent(new Date(2026, 2, 20, 9))).toBe('equinox');
+  it('returns equinox on the equinox day (the March one is Nowruz, item 118)', () => {
+    expect(getCalendarEvent(new Date(2027, 2, 20, 9))).toBe('nowruz');
     expect(getCalendarEvent(new Date(2026, 8, 23, 20), -33.9)).toBe('equinox');
     expect(getCalendarEvent(new Date(2026, 8, 22, 20))).toBeNull();
   });
@@ -109,7 +109,8 @@ describe('isSantaTime (Christmas Eve)', () => {
 
   it('has no snow on Christmas Eve and snow on Dec 25, every year', () => {
     for (let year = 2026; year <= 2040; year++) {
-      expect(getCalendarEvent(new Date(year, 11, 24, 20))).toBeNull();
+      // No snow on Dec 24 (Hanukkah can fall on it, item 118).
+      expect(getCalendarEvent(new Date(year, 11, 24, 20))).not.toBe('christmas');
       expect(getCalendarEvent(new Date(year, 11, 25, 12))).toBe('christmas');
     }
   });

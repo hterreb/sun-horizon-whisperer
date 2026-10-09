@@ -2,9 +2,11 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   BADGES, COLLECTION_STORAGE_KEY, addToCollection, badgeForAstroEvent, badgeForCalendarEvent, badgeForSanta, badgeForTarget,
   countCollected, getMoonState, getSunState, getTerrainBand, isCollectionPaused, loadCollection, saveCollection,
-  stateBadgeForTarget, type BadgeId, type CalendarBadgeOptions, type StateBadgeContext,
+  NOWRUZ_ALSO, stateBadgeForTarget, type BadgeId, type CalendarBadgeOptions, type StateBadgeContext,
 } from '@/utils/collection';
 import { type HorizonProfile } from '@/utils/horizonUtils';
+import { badgeForNationalDay, type NationalBadgeOptions } from '@/utils/collection';
+import { NATIONAL_DAYS, type NationalDayKind } from '@/utils/nationalDays';
 import { FISH_WEIGHTS, BIRD_WEIGHTS, type FishKind } from '@/utils/weatherEffectsUtils';
 
 // ROADMAP item 112: the collection badges.
@@ -18,15 +20,15 @@ describe('collection (ROADMAP item 112)', () => {
     vi.restoreAllMocks();
   });
 
-  it('has 92 badges with unique ids, one for every fish, flyer, boat and cloud type', () => {
+  it('has 118 badges with unique ids, one for every fish, flyer, boat and cloud type', () => {
     const ids = BADGES.map(b => b.id);
-    expect(ids).toHaveLength(92); // item 115: 69 + 5 sun + 5 terrain + 8 moon states; + 5 sky eggs
-    expect(new Set(ids).size).toBe(92);
+    expect(ids).toHaveLength(118); // item 115: 69 + 5 sun + 5 terrain + 8 moon states; + 5 sky eggs + 9 national days + 5 playful eggs + 12 festivals
+    expect(new Set(ids).size).toBe(118);
     for (const kind of [...FISH_WEIGHTS.map(([k]) => k), ...NIGHT_ONLY]) expect(ids).toContain(`fish:${kind}`);
     for (const kind of [...BIRD_WEIGHTS.map(([k]) => k), 'bat']) expect(ids).toContain(`flyer:${kind}`);
     for (const kind of ['sailboat', 'ferry', 'fishing', 'rowboat', 'freighter']) expect(ids).toContain(`boat:${kind}`);
     for (const type of ['Ci', 'Cs', 'Ac', 'As', 'Cu', 'Sc', 'St', 'Ns', 'Cb', 'Len', 'Mam']) expect(ids).toContain(`cloud:${type}`);
-    expect(BADGES.filter(b => b.group === 'egg')).toHaveLength(24);
+    expect(BADGES.filter(b => b.group === 'egg')).toHaveLength(50);
     expect(BADGES.find(b => b.id === 'plane')?.group).toBe('sky');
   });
 
@@ -128,6 +130,8 @@ describe('collection (ROADMAP item 112)', () => {
     expect(isCollectionPaused('?egg=lenticular')).toBe(true);
     expect(isCollectionPaused('?fish=shark')).toBe(true);
     expect(isCollectionPaused('?hunt=1')).toBe(true);
+    expect(isCollectionPaused('?country=FR')).toBe(true);
+    expect(isCollectionPaused('?egg=bastilleDay')).toBe(true);
     expect(isCollectionPaused('')).toBe(false);
     expect(isCollectionPaused('?lang=de')).toBe(false);
   });
@@ -216,5 +220,64 @@ describe('state badges (ROADMAP item 115)', () => {
     expect(countCollected(loadCollection())).toBe(4);
     saveCollection({ ...old, 'terrain:alpine': '2026-10-09T12:00:00.000Z' });
     expect(loadCollection()['terrain:alpine']).toBe('2026-10-09T12:00:00.000Z');
+  });
+
+  // Item 118: the festival eggs count when FestivalEggs draws them.
+  it('maps each festival to its own ultra rare badge, when the scene shows it', () => {
+    const night = { ...shown, timeOfDay: 'night' as const };
+    const day = { ...shown, isNight: false, timeOfDay: 'midday' as const, weatherType: 'partly' };
+    expect(badgeForCalendarEvent('diwali', night)).toBe('egg:diwali');
+    expect(badgeForCalendarEvent('diwali', day)).toBeNull();
+    expect(badgeForCalendarEvent('loy-krathong', night)).toBe('egg:loyKrathong');
+    expect(badgeForCalendarEvent('mid-autumn', night)).toBe('egg:midAutumn');
+    expect(badgeForCalendarEvent('tanabata', night)).toBe('egg:tanabata');
+    expect(badgeForCalendarEvent('hanukkah', { ...night, reducedMotion: true })).toBe('egg:hanukkah'); // static lights
+    expect(badgeForCalendarEvent('midsummer', { ...night, timeOfDay: 'evening' })).toBe('egg:midsummer');
+    expect(badgeForCalendarEvent('eid-al-fitr', day)).toBe('egg:eidAlFitr');
+    expect(badgeForCalendarEvent('dia-de-muertos', day)).toBe('egg:diaDeMuertos');
+    expect(badgeForCalendarEvent('holi', day)).toBe('egg:holi');
+    expect(badgeForCalendarEvent('holi', { ...day, weatherType: 'clear' })).toBeNull();
+    expect(badgeForCalendarEvent('hanami', day)).toBe('egg:hanami');
+    expect(badgeForCalendarEvent('hanami', { ...day, reducedMotion: true })).toBeNull();
+    expect(badgeForCalendarEvent('carnival', day)).toBe('egg:carnival');
+    expect(badgeForCalendarEvent('carnival', night)).toBeNull();
+    expect(badgeForCalendarEvent('nowruz', day)).toBe('egg:nowruz');
+    expect(NOWRUZ_ALSO).toBe('egg:equinox');
+    expect(badgeForCalendarEvent('diwali', { ...night, isTimePreview: true })).toBeNull();
+    expect(badgeForCalendarEvent('diwali', shown)).toBeNull(); // no time of day
+    for (const kind of ['loyKrathong', 'diwali', 'eidAlFitr', 'midAutumn', 'hanami', 'tanabata', 'diaDeMuertos', 'holi', 'hanukkah', 'nowruz', 'midsummer', 'carnival']) {
+      expect(tier(`egg:${kind}` as BadgeId)).toBe('rarity.ultraRare');
+    }
+  });
+});
+
+describe('national-day badges', () => {
+  const day = (kind: NationalDayKind) => NATIONAL_DAYS.find(d => d.kind === kind)!;
+  const night: NationalBadgeOptions = { isDay: false, isNight: true, reducedMotion: false, isTimePreview: false };
+  const noon: NationalBadgeOptions = { ...night, isDay: true, isNight: false };
+
+  it('has one ultra rare egg badge per national day', () => {
+    for (const d of NATIONAL_DAYS) {
+      expect(BADGES.find(b => b.id === `egg:${d.kind}`)?.rarity).toBe('rarity.ultraRare');
+    }
+  });
+
+  it('counts the jets by day only, and not with reduced motion', () => {
+    expect(badgeForNationalDay(day('festaRepubblica'), noon)).toBe('egg:festaRepubblica');
+    expect(badgeForNationalDay(day('festaRepubblica'), night)).toBeNull();
+    expect(badgeForNationalDay(day('festaRepubblica'), { ...noon, reducedMotion: true })).toBeNull();
+  });
+
+  it('counts the fireworks at night only, and not with reduced motion except the Guy Fawkes bonfire', () => {
+    expect(badgeForNationalDay(day('bastilleDay'), night)).toBe('egg:bastilleDay');
+    expect(badgeForNationalDay(day('independenceDay'), noon)).toBeNull();
+    expect(badgeForNationalDay(day('independenceDay'), { ...night, reducedMotion: true })).toBeNull();
+    expect(badgeForNationalDay(day('guyFawkes'), { ...night, reducedMotion: true })).toBe('egg:guyFawkes');
+  });
+
+  it('leaves bunting to the boats, and counts nothing without a day or in the time preview', () => {
+    expect(badgeForNationalDay(day('germanUnity'), noon)).toBeNull();
+    expect(badgeForNationalDay(null, noon)).toBeNull();
+    expect(badgeForNationalDay(day('bastilleDay'), { ...night, isTimePreview: true })).toBeNull();
   });
 });

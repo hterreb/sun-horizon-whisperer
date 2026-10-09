@@ -7,7 +7,10 @@ import { type SceneInfoTarget, getRarityTier } from './sceneInfo';
 import { getBoatShare, getFishShare, getFlyerShare, type BirdKind, type BoatKind, type FishKind } from './weatherEffectsUtils';
 import { type CloudType } from './skyCloudUtils';
 import { type CalendarEvent } from './calendarEvents';
+import { FESTIVALS, isFestivalEvent, isFestivalShown, type FestivalEgg } from './festivalEvents';
 import { type AstroEventKind } from './astroEvents';
+import { type NationalDay, type NationalDayKind } from './nationalDays';
+import { type PlayfulEgg } from './playfulEggs';
 import { type TimeOfDay } from './sunUtils';
 import { getMoonPhaseIndex } from './moonUtils';
 import { ridgeAt, type HorizonProfile } from './horizonUtils';
@@ -16,7 +19,10 @@ export type EggKind =
   | 'sunglasses' | 'ufo' | 'disco'
   | 'newYear' | 'friday13' | 'lunarNewYear' | 'solstice' | 'equinox' | 'halloweenPumpkin' | 'halloweenBats' | 'christmas' | 'santa'
   | 'solarEclipse' | 'lunarEclipse' | 'greenFlash' | 'supermoon' | 'blueMoon' | 'meteorShower' | 'aurora'
-  | 'matariki' | 'conjunction' | 'noctilucent' | 'midnightSun' | 'polarNight';
+  | 'matariki' | 'conjunction' | 'noctilucent' | 'midnightSun' | 'polarNight'
+  | NationalDayKind
+  | 'aprilFools' | 'easter' | 'valentine' | 'stPatrick' | 'patientWatcher'
+  | FestivalEgg; // item 118: cultural festivals
 // Item 115: the states of the sun, the moon and the terrain.
 export type SunState = 'dawn' | 'morning' | 'midday' | 'afternoon' | 'evening';
 export type MoonState =
@@ -88,6 +94,17 @@ const EGGS: [EggKind, MessageKey][] = [
   // Sky eggs.
   ['matariki', 'egg.matariki'], ['conjunction', 'egg.conjunction'], ['noctilucent', 'egg.noctilucent'],
   ['midnightSun', 'egg.midnightSun'], ['polarNight', 'egg.polarNight'],
+  // National days (nationalDays.ts), one badge each.
+  ['festaRepubblica', 'egg.festaRepubblica'], ['bastilleDay', 'egg.bastilleDay'], ['independenceDay', 'egg.independenceDay'],
+  ['guyFawkes', 'egg.guyFawkes'], ['germanUnity', 'egg.germanUnity'], ['fiestaNacional', 'egg.fiestaNacional'],
+  ['canadaDay', 'egg.canadaDay'], ['australiaDay', 'egg.australiaDay'], ['kingsDay', 'egg.kingsDay'],
+  // Playful pack (ROADMAP item 117).
+  ['aprilFools', 'egg.aprilFools'], ['easter', 'egg.easter'], ['valentine', 'egg.valentine'], ['stPatrick', 'egg.stPatrick'],
+  ['patientWatcher', 'egg.patientWatcher'],
+  // Item 118: cultural festivals.
+  ['loyKrathong', 'egg.loyKrathong'], ['diwali', 'egg.diwali'], ['eidAlFitr', 'egg.eidAlFitr'], ['midAutumn', 'egg.midAutumn'],
+  ['hanami', 'egg.hanami'], ['tanabata', 'egg.tanabata'], ['diaDeMuertos', 'egg.diaDeMuertos'], ['holi', 'egg.holi'],
+  ['hanukkah', 'egg.hanukkah'], ['nowruz', 'egg.nowruz'], ['midsummer', 'egg.midsummer'], ['carnival', 'egg.carnival'],
 ];
 
 // The grid order. A fish's tier is its day share; getFishShare falls back to the night share
@@ -208,12 +225,19 @@ export interface CalendarBadgeOptions {
   weatherType: string;
   reducedMotion: boolean;
   isTimePreview: boolean;
+  // Item 118: the festival eggs show by time of day (isFestivalShown); without it they do not count.
+  timeOfDay?: TimeOfDay;
 }
 
 // The calendar egg's badge when the scene really shows it (CalendarEggs' rules). New Year
 // is null: SunTracker collects it where the fireworks start. Never in the time preview.
 export const badgeForCalendarEvent = (event: CalendarEvent | null, o: CalendarBadgeOptions): BadgeId | null => {
   if (!event || o.isTimePreview) return null;
+  // Item 118: Nowruz gives its own badge; SunTracker adds the equinox badge (NOWRUZ_ALSO).
+  if (isFestivalEvent(event)) {
+    return o.timeOfDay && isFestivalShown(event, { timeOfDay: o.timeOfDay, weatherType: o.weatherType, reducedMotion: o.reducedMotion })
+      ? `egg:${FESTIVALS[event]}` : null;
+  }
   switch (event) {
     case 'new-year': return null;
     case 'solstice-longest':
@@ -224,20 +248,53 @@ export const badgeForCalendarEvent = (event: CalendarEvent | null, o: CalendarBa
     case 'christmas': return o.weatherType !== 'snow' && !o.reducedMotion ? 'egg:christmas' : null;
     case 'friday-13': return 'egg:friday13';
     case 'lunar-new-year': return o.reducedMotion ? null : 'egg:lunarNewYear';
+    // Playful pack (ROADMAP item 117): the scene reports when the egg really shows
+    // (SunTracker.handleEggShown, badgeForPlayfulEgg).
+    case 'easter':
+    case 'april-fools':
+    case 'valentine':
+    case 'st-patrick': return null;
   }
 };
+
+// Item 118: Nowruz is the March equinox, so it also collects the equinox badge.
+export const NOWRUZ_ALSO: BadgeId = 'egg:equinox';
 
 // Christmas Eve: Santa's badge when he flies (`santaTime` from calendarEvents.isSantaTime). He
 // flies also when it snows; reduced motion hides him. Never in the time preview.
 export const badgeForSanta = (santaTime: boolean, o: Pick<CalendarBadgeOptions, 'reducedMotion' | 'isTimePreview'>): BadgeId | null =>
   santaTime && !o.reducedMotion && !o.isTimePreview ? 'egg:santa' : null;
 
+// Playful pack (ROADMAP item 117): the badge of an egg that the scene shows, never in the time preview.
+export const badgeForPlayfulEgg = (kind: PlayfulEgg | 'patientWatcher', isTimePreview: boolean): BadgeId | null =>
+  isTimePreview ? null : `egg:${kind}`;
+
 export const badgeForAstroEvent = (kind: AstroEventKind): BadgeId => `egg:${kind}`;
 
-// Test links (?egg=, ?fish=, ?hunt=) force a scene, so nothing counts while one is set.
+export interface NationalBadgeOptions {
+  isDay: boolean; // the sun is up (dawn to evening)
+  isNight: boolean; // dark sky: night or astronomical/nautical twilight
+  reducedMotion: boolean;
+  isTimePreview: boolean;
+}
+
+// National days: the badge when the scene really shows the egg (NationalEggs' rules). The jets
+// fly by day and the fireworks burst at night; reduced motion hides both, but the Guy Fawkes
+// bonfire glow stays. Bunting gives null here: a decorated boat reports itself (useBunting),
+// as a bunting day without a boat on screen shows nothing. Never in the time preview.
+export const badgeForNationalDay = (day: NationalDay | null, o: NationalBadgeOptions): BadgeId | null => {
+  if (!day || o.isTimePreview) return null;
+  switch (day.style) {
+    case 'jets': return o.isDay && !o.reducedMotion ? `egg:${day.kind}` : null;
+    case 'fireworks': return o.isNight && (!o.reducedMotion || day.bonfire) ? `egg:${day.kind}` : null;
+    case 'bunting': return null;
+  }
+};
+
+// Test links (?egg=, ?fish=, ?hunt=, ?country=) force a scene, so nothing counts while one is set.
 export const isCollectionPaused = (search: string): boolean => {
   const params = new URLSearchParams(search);
-  return params.has('egg') || params.has('fish') || params.has('hunt');
+  return params.has('egg') || params.has('fish') || params.has('hunt') || params.has('country');
 };
 
 export const countCollected = (collection: Collection): number =>

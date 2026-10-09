@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { NATIONAL_DAYS } from '@/utils/nationalDays';
 import { translate, type Translate } from '@/i18n';
 import {
   getSceneInfo, resolveInfoText, directionText, durationText, distanceText, rarityTier, getRarityTier, RARITY_TIERS,
@@ -347,8 +348,12 @@ describe('sceneInfo: field guide data (ROADMAP item 107)', () => {
 describe('sceneInfo: easter egg cards (ROADMAP item 113)', () => {
   const info = (kind: EggCardKind, over?: Partial<SceneInfoContext>) => getSceneInfo({ type: 'egg', kind }, ctx(over));
   const eggCard = (kind: EggCardKind, t: Translate = en, over?: Partial<SceneInfoContext>) => read(info(kind, over), t);
+  // Item 118: the festival eggs (Holi has no card: its clouds keep the cloud card).
+  const festivals: EggCardKind[] = [
+    'loyKrathong', 'diwali', 'eidAlFitr', 'midAutumn', 'hanami', 'tanabata', 'diaDeMuertos', 'hanukkah', 'nowruz', 'midsummer', 'carnival',
+  ];
   const kinds: EggCardKind[] = ['ufo', 'ghost', 'dragon', 'santa', 'blackCat', 'halloweenBat', 'pumpkinMoon',
-    'matariki', 'conjunction', 'noctilucent', 'midnightSun', 'polarNight'];
+    'matariki', 'conjunction', 'noctilucent', 'midnightSun', 'polarNight', 'emptyTomb', 'potOfGold', 'heartCloud', ...festivals];
 
   it('gives every egg the "ultra rare" tier, a title, a field note and the rarity row', () => {
     for (const kind of kinds) {
@@ -371,7 +376,7 @@ describe('sceneInfo: easter egg cards (ROADMAP item 113)', () => {
   it('names a hidden egg an "Easter egg" and a calendar egg a "Special event"', () => {
     expect(info('ufo')).toMatchObject({ kicker: 'infoKind.easterEgg', icon: 'egg' });
     expect(info('ghost')).toMatchObject({ kicker: 'infoKind.easterEgg', icon: 'egg' });
-    for (const kind of ['dragon', 'santa', 'blackCat', 'halloweenBat', 'pumpkinMoon', 'matariki', 'conjunction', 'noctilucent', 'midnightSun', 'polarNight'] as const) {
+    for (const kind of ['dragon', 'santa', 'blackCat', 'halloweenBat', 'pumpkinMoon', 'matariki', 'conjunction', 'noctilucent', 'midnightSun', 'polarNight', 'emptyTomb', 'potOfGold', 'heartCloud'] as const) {
       expect(info(kind), kind).toMatchObject({ kicker: 'infoKind.specialEvent', icon: 'event' });
     }
     expect(info('blackCat').latin).toBe('Felis catus');
@@ -416,6 +421,31 @@ describe('sceneInfo: easter egg cards (ROADMAP item 113)', () => {
     expect(info('ufo').santaTracker).toBeUndefined();
     // No place name yet: a translated fallback, no new lookup.
     expect(eggCard('santa', de, { language: 'de', placeName: null }).slice(2, 4)).toEqual(['Route: Nordpol → deinen Himmel', 'Höhe: 10.700 m']);
+  });
+
+  it('gives each national day a "Special event" card: title, fact and 1 day a year', () => {
+    for (const { kind } of NATIONAL_DAYS) {
+      expect(info(kind), kind).toMatchObject({ kicker: 'infoKind.specialEvent', icon: 'event', tier: 'ultraRare' });
+      for (const t of [en, de]) {
+        const [title, fact] = eggCard(kind, t);
+        expect(title, kind).not.toMatch(/^egg\./);
+        expect(fact, kind).toMatch(/\.$/);
+      }
+      expect(eggCard(kind)[2], kind).toBe('Rarity: Ultra rare · 1 day a year');
+    }
+    expect(eggCard('festaRepubblica')[0]).toBe('Italian Republic Day');
+    expect(eggCard('festaRepubblica', de, { language: 'de' })[1]).toMatch(/Frecce Tricolori/);
+  });
+
+  it('makes each festival a "Special event" with its days a year (item 118)', () => {
+    for (const kind of festivals) expect(info(kind), kind).toMatchObject({ kicker: 'infoKind.specialEvent', icon: 'event' });
+    expect(eggCard('diwali')).toEqual([
+      'Diwali',
+      'Diwali, the festival of lights, celebrates the victory of light over darkness; Hindus, Sikhs and Jains light rows of clay lamps called diyas.',
+      'Rarity: Ultra rare · 1 day a year',
+    ]);
+    expect(eggCard('hanukkah', de, { language: 'de' })[0]).toBe('Chanukka');
+    expect(eggCard('tanabata')[2]).toBe('Rarity: Ultra rare · 1 day a year');
   });
 
   it('shows the tier alone for the midnight ghost (no chance in the code)', () => {

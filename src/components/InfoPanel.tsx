@@ -28,6 +28,7 @@ import { isValidLatitude, isValidLongitude } from '../utils/manualLocation';
 import { type HorizonProfileStatus } from '../hooks/useHorizonProfile';
 import { type HorizonProfile } from '@/utils/horizonUtils';
 import { type WeatherType } from './CloudLayer';
+import { countryCodeOf } from '@/utils/nationalDays';
 import { getTimeTravelRange, toDateTimeLocalValue } from '@/utils/timeTravel';
 import { formatTemperature, type TemperatureUnit } from '@/utils/temperatureUnit';
 import { SUNSET_REMINDER_MIN } from '@/utils/sunsetReminder';
@@ -149,6 +150,10 @@ interface InfoPanelProps {
   onLivePlanesToggle?: (on: boolean) => void;
   // Collection badges (ROADMAP item 112): the row button that opens the collection.
   onCollectionOpen?: () => void;
+  // National days (utils/nationalDays): the place's country code from the reverse-geocode
+  // answer below, or null (a searched place, no answer, an error). Keep it stable (a state
+  // setter): a new function fetches again.
+  onCountryChange?: (countryCode: string | null) => void;
 }
 
 const InfoPanel: React.FC<InfoPanelProps> = ({
@@ -200,6 +205,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   isLivePlanesOn = false,
   onLivePlanesToggle,
   onCollectionOpen,
+  onCountryChange,
 }) => {
   const { t, language, setLanguage } = useLanguage();
   // Premium gate (ROADMAP item 14): every gold-plus control goes through requirePremium.
@@ -279,6 +285,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
       const timeoutId = setTimeout(() => {
         setLocationName(manualPlaceName);
         setLoadingLocation(false);
+        onCountryChange?.(null);
       }, 0);
       return () => clearTimeout(timeoutId);
     }
@@ -297,6 +304,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
         );
         const data = await response.json();
         if (cancelled) return;
+        onCountryChange?.(countryCodeOf(data));
 
         if (data.city && data.countryName) {
           setLocationName(`${data.city}, ${data.countryName}`);
@@ -311,6 +319,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
         if (cancelled) return;
         console.error('Error fetching location name:', error);
         setLocationName(null);
+        onCountryChange?.(null);
       } finally {
         if (!cancelled) setLoadingLocation(false);
       }
@@ -320,7 +329,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [location.latitude, location.longitude, location.loaded, manualPlaceName, language]);
+  }, [location.latitude, location.longitude, location.loaded, manualPlaceName, language, onCountryChange]);
 
   // The shown place name for SunTracker (Santa's card, lookbook S7); '' (loading) counts as none.
   const shownPlaceName = locationName || null;

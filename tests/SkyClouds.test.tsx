@@ -172,3 +172,14 @@ describe('SkyClouds layout cross-fade (ROADMAP item 87)', () => {
     expect(container.querySelectorAll('[data-testid="sky-clouds"]')).toHaveLength(1);
   });
 });
+
+describe('SkyClouds at Holi (ROADMAP item 118)', () => {
+  it('tints the day clouds in soft pastels, not at night and not on other days', () => {
+    const tinted = (c: HTMLElement) => c.querySelectorAll('[data-testid="cloud-holi"]');
+    const holi = sky({ weatherType: 'partly', holi: true });
+    expect(tinted(holi).length).toBe(holi.querySelectorAll('[data-testid="sky-cloud"]').length);
+    expect(tinted(holi)[0].getAttribute('fill')).toMatch(/--scene-festival-pastel-[123]/);
+    expect(tinted(sky({ weatherType: 'partly' }))).toHaveLength(0);
+    expect(tinted(sky({ weatherType: 'partly', holi: true, timeOfDay: 'night' }))).toHaveLength(0);
+  });
+});
