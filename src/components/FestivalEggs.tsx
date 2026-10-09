@@ -145,7 +145,7 @@ const FestivalEggs: React.FC<FestivalEggsProps> = ({
 }) => {
   const reducedMotion = usePrefersReducedMotion();
   const { t } = useLanguage();
-  const { tap, hint } = useDoubleTap(onInfo);
+  const { tap } = useDoubleTap(onInfo);
   if (!isFestivalEvent(event)) return null;
   const shown = isFestivalShown(event, { timeOfDay, weatherType, reducedMotion });
 
@@ -156,7 +156,7 @@ const FestivalEggs: React.FC<FestivalEggsProps> = ({
   } : {};
   const tapClass = onInfo ? 'pointer-events-auto cursor-pointer touch-manipulation' : 'pointer-events-none';
   const hit = (ring: string, w: number, h: number) =>
-    onInfo && <HitArea cx={w / 2} cy={h / 2} width={w} height={h} ring={infoRing === ring || hint === ring} tier={infoRing === ring ? infoRingTier : null} />;
+    onInfo && <HitArea cx={w / 2} cy={h / 2} width={w} height={h} ring={infoRing === ring} tier={infoRing === ring ? infoRingTier : null} />;
   const anim = (value: string) => (reducedMotion ? undefined : value);
   const pill = (testId: string, text: string) => (
     <div

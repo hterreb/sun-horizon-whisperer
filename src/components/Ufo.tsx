@@ -38,7 +38,7 @@ const Ufo: React.FC<UfoProps> = ({ onDone, onInfo, ringOn = false, ringTier = nu
   const ref = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
   // Item 116: a double tap opens the card; a single tap shows the ring for a moment.
-  const { tap, hint } = useDoubleTap(onInfo);
+  const { tap } = useDoubleTap(onInfo);
 
   useEffect(() => {
     if (prefersReducedMotion) {
@@ -81,7 +81,7 @@ const Ufo: React.FC<UfoProps> = ({ onDone, onInfo, ringOn = false, ringTier = nu
       <span className="block" style={{ filter: 'drop-shadow(0 0 8px hsl(var(--brand-cyan) / 0.6))' }}>
         <UfoShape width={UFO_WIDTH} />
       </span>
-      {onInfo && <HitArea cx={UFO_WIDTH / 2} cy={UFO_WIDTH / 4} width={UFO_WIDTH} height={UFO_WIDTH / 2} ring={ringOn || hint === UFO_RING} tier={ringOn ? ringTier : null} />}
+      {onInfo && <HitArea cx={UFO_WIDTH / 2} cy={UFO_WIDTH / 4} width={UFO_WIDTH} height={UFO_WIDTH / 2} ring={ringOn} tier={ringOn ? ringTier : null} />}
     </div>
   );
 };

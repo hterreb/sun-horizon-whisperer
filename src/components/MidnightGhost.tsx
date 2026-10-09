@@ -24,7 +24,7 @@ const MidnightGhost: React.FC<MidnightGhostProps> = ({ currentTime, onInfo, ring
   const [position, setPosition] = useState({ x: 50, y: 30, direction: 1 });
   const prefersReducedMotion = usePrefersReducedMotion();
   // Item 116: a double tap opens the card; a single tap shows the ring for a moment.
-  const { tap, hint } = useDoubleTap(onInfo);
+  const { tap } = useDoubleTap(onInfo);
 
   // Visibility follows `isMidnight` directly: show as soon as it turns true, hide as
   // soon as it turns false. Adjusting state during render (rather than in an effect)
@@ -116,7 +116,7 @@ const MidnightGhost: React.FC<MidnightGhostProps> = ({ currentTime, onInfo, ring
         />
       </div>
       
-      {onInfo && <HitArea cx={GHOST_PX / 2} cy={GHOST_PX / 2} width={GHOST_PX} height={GHOST_PX} ring={ringOn || hint === GHOST_RING} tier={ringOn ? ringTier : null} />}
+      {onInfo && <HitArea cx={GHOST_PX / 2} cy={GHOST_PX / 2} width={GHOST_PX} height={GHOST_PX} ring={ringOn} tier={ringOn ? ringTier : null} />}
 
       {/* Floating particles around ghost */}
       <div className="absolute inset-0">

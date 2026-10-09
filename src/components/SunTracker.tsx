@@ -70,7 +70,7 @@ import CollectionView from './CollectionView';
 import BadgeUnlocked from './BadgeUnlocked';
 import {
   BADGES, NOWRUZ_ALSO, addToCollection, badgeForAstroEvent, badgeForCalendarEvent, badgeForPlayfulEgg, badgeForSanta, badgeForTarget, countCollected, isCollectionPaused, loadCollection,
-  saveCollection, stateBadgeForTarget, type BadgeId, type Collection, type StateBadgeContext,
+  badgeForRoute, saveCollection, stateBadgeForTarget, type BadgeId, type Collection, type StateBadgeContext,
 } from '@/utils/collection';
 import { watchSunEvent, NO_SUN_EVENT_WATCH, getCountdownTarget } from '../utils/sunEvents';
 import { getCalendarEvent, isSantaTime } from '@/utils/calendarEvents';
@@ -1064,6 +1064,11 @@ const SunTracker: React.FC = () => {
   // A live plane's card asks for its route once (item 111).
   const liveRouteCallsign = infoCard?.target.type === 'livePlane' ? infoCard.target.callsign : null;
   const liveRoute = useLiveRoute(liveRouteCallsign, location.latitude, location.longitude);
+  // Item 120: the route gives the plane's haul badge.
+  const routeBadge = badgeForRoute(liveRoute);
+  useEffect(() => {
+    if (routeBadge) collect(routeBadge);
+  }, [routeBadge, collect]);
   // The place name the InfoPanel shows, for Santa's route (lookbook S7). No second lookup.
   const [placeName, setPlaceName] = useState<string | null>(null);
 

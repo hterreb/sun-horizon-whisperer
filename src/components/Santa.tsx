@@ -97,7 +97,7 @@ const Santa: React.FC<SantaProps> = ({ onDone, onInfo, ringOn = false, ringTier 
   // The latest drawn moon; when it hides behind clouds mid-flight he keeps its last place.
   const moonRef = useRef(startMoon);
   // Item 116: a double tap opens the card; a single tap shows the ring for a moment.
-  const { tap, hint } = useDoubleTap(onInfo);
+  const { tap } = useDoubleTap(onInfo);
   const width = startMoon ? Math.round(startMoon.r * MOON_WIDTH_PER_R) : FAR_WIDTH;
   const height = (width * SANTA_HEIGHT) / SANTA_WIDTH;
   const scale = width / SANTA_WIDTH;
@@ -213,7 +213,7 @@ const Santa: React.FC<SantaProps> = ({ onDone, onInfo, ringOn = false, ringTier 
       >
         {t('egg.santaGreeting')}
       </span>
-      {onInfo && <HitArea cx={width / 2} cy={height / 2} width={width} height={HIT_HEIGHT} ring={ringOn || hint === SANTA_RING} tier={ringOn ? ringTier : null} />}
+      {onInfo && <HitArea cx={width / 2} cy={height / 2} width={width} height={HIT_HEIGHT} ring={ringOn} tier={ringOn ? ringTier : null} />}
     </div>
   );
 };

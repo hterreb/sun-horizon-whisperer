@@ -3,7 +3,12 @@
 // saveCollection, which use localStorage (try/catch-wrapped like manualLocation).
 
 import { type MessageKey } from '@/i18n';
-import { type SceneInfoTarget, getRarityTier } from './sceneInfo';
+import {
+  type SceneInfoTarget, type PlaneHaul, type SatelliteSize, type TerrainBand,
+  CLOUD_TIERS, HAUL_TIERS, RARITY_NAMES, SATELLITE_TIERS, TERRAIN_TIERS, getPlaneHaul, getRarityTier, getSatelliteSize, getTerrainBand,
+} from './sceneInfo';
+import { type LiveRoute } from './planeFeed';
+import { TIER_ORDER, type RarityTier } from './rarityTier';
 import { getBoatShare, getFishShare, getFlyerShare, type BirdKind, type BoatKind, type FishKind } from './weatherEffectsUtils';
 import { type CloudType } from './skyCloudUtils';
 import { type CalendarEvent } from './calendarEvents';
@@ -27,13 +32,14 @@ export type EggKind =
 export type SunState = 'dawn' | 'morning' | 'midday' | 'afternoon' | 'evening';
 export type MoonState =
   | 'new' | 'waxingCrescent' | 'firstQuarter' | 'waxingGibbous' | 'full' | 'waningGibbous' | 'thirdQuarter' | 'waningCrescent';
-export type TerrainBand = 'hills' | 'lowMountains' | 'mountains' | 'highMountains' | 'alpine';
-export type StateBase = 'sun' | 'moon' | 'terrain';
+// Item 120: the terrain band, the plane haul and the satellite size live in sceneInfo (their card tiers).
+export { getPlaneHaul, getTerrainBand, type PlaneHaul, type SatelliteSize, type TerrainBand };
+export type StateBase = 'sun' | 'moon' | 'terrain' | 'plane' | 'satellite';
 export type BadgeGroup = 'fish' | 'flyer' | 'boat' | 'sky' | 'cloud' | 'egg';
 export type BadgeId =
   | `fish:${FishKind}` | `flyer:${BirdKind | 'bat'}` | `boat:${BoatKind}` | 'plane' | `cloud:${CloudType}`
   | 'sun' | 'moon' | 'terrain' | 'satellite' | `egg:${EggKind}`
-  | `sun:${SunState}` | `moon:${MoonState}` | `terrain:${TerrainBand}`;
+  | `sun:${SunState}` | `moon:${MoonState}` | `terrain:${TerrainBand}` | `plane:${PlaneHaul}` | `satellite:${SatelliteSize}`;
 export interface Badge {
   id: BadgeId;
   group: BadgeGroup;
@@ -83,6 +89,15 @@ export const TERRAIN_BANDS: [TerrainBand, MessageKey][] = [
   ['hills', 'badge.terrainHills'], ['lowMountains', 'badge.terrainLowMountains'], ['mountains', 'badge.terrainMountains'],
   ['highMountains', 'badge.terrainHighMountains'], ['alpine', 'badge.terrainAlpine'],
 ];
+// Item 120: from short to far, from small to big.
+export const PLANE_HAULS: [PlaneHaul, MessageKey][] = [
+  ['regional', 'badge.planeRegional'], ['short', 'badge.planeShort'], ['medium', 'badge.planeMedium'], ['long', 'badge.planeLong'],
+  ['ultraLong', 'badge.planeUltraLong'],
+];
+export const SATELLITE_SIZES: [SatelliteSize, MessageKey][] = [
+  ['small', 'badge.satelliteSmall'], ['medium', 'badge.satelliteMedium'], ['large', 'badge.satelliteLarge'], ['giant', 'badge.satelliteGiant'],
+  ['iss', 'badge.satelliteIss'],
+];
 
 const EGGS: [EggKind, MessageKey][] = [
   ['sunglasses', 'egg.sunglasses'], ['ufo', 'egg.ufo'], ['disco', 'egg.disco'],
@@ -118,18 +133,24 @@ export const BADGES: readonly Badge[] = [
   ...FLYERS.map(([kind, name]): Badge => ({ id: `flyer:${kind}`, group: 'flyer', name, rarity: getRarityTier(getFlyerShare(kind, BADGE_BAT_SHARE)) })),
   ...BOATS.map(([kind, name]): Badge => ({ id: `boat:${kind}`, group: 'boat', name, rarity: getRarityTier(getBoatShare(kind)) })),
   { id: 'plane', group: 'sky', name: 'plane.airliner', rarity: null },
+  ...PLANE_HAULS.map(([haul, name]): Badge => ({ id: `plane:${haul}`, group: 'sky', name, rarity: RARITY_NAMES[HAUL_TIERS[haul]], base: 'plane' })),
   { id: 'satellite', group: 'sky', name: 'scene.satellite', rarity: null },
+  ...SATELLITE_SIZES.map(([size, name]): Badge => ({ id: `satellite:${size}`, group: 'sky', name, rarity: RARITY_NAMES[SATELLITE_TIERS[size]], base: 'satellite' })),
   // Item 115: each base badge, then its states (one grid row each).
   { id: 'sun', group: 'sky', name: 'scene.sun', rarity: null },
   ...SUN_STATES.map(([state, name]): Badge => ({ id: `sun:${state}`, group: 'sky', name, rarity: null, base: 'sun' })),
   { id: 'moon', group: 'sky', name: 'scene.moon', rarity: null },
   ...MOON_STATES.map(([state, name]): Badge => ({ id: `moon:${state}`, group: 'sky', name, rarity: null, base: 'moon' })),
   { id: 'terrain', group: 'sky', name: 'scene.terrain', rarity: null },
-  ...TERRAIN_BANDS.map(([band, name]): Badge => ({ id: `terrain:${band}`, group: 'sky', name, rarity: null, base: 'terrain' })),
-  ...CLOUDS.map(([type, name]): Badge => ({ id: `cloud:${type}`, group: 'cloud', name, rarity: null })),
+  ...TERRAIN_BANDS.map(([band, name]): Badge => ({ id: `terrain:${band}`, group: 'sky', name, rarity: RARITY_NAMES[TERRAIN_TIERS[band]], base: 'terrain' })),
+  ...CLOUDS.map(([type, name]): Badge => ({ id: `cloud:${type}`, group: 'cloud', name, rarity: RARITY_NAMES[CLOUD_TIERS[type]] })),
   ...EGGS.map(([kind, name]): Badge => ({ id: `egg:${kind}`, group: 'egg', name, rarity: 'rarity.ultraRare' })),
 ];
 const IDS = new Set<string>(BADGES.map(b => b.id));
+
+// The tier of a badge (its colour), or null for a badge without a rarity.
+export const badgeTier = (badge: Badge): RarityTier | null =>
+  TIER_ORDER.find((tier) => RARITY_NAMES[tier] === badge.rarity) ?? null;
 
 export const loadCollection = (): Collection => {
   try {
@@ -176,16 +197,6 @@ export const badgeForTarget = (target: SceneInfoTarget): BadgeId | null => {
   }
 };
 
-// Item 115: the height band of a ridge point (m above sea level). A limit belongs to the
-// higher band (500 m is low mountains).
-export const getTerrainBand = (heightM: number): TerrainBand => {
-  if (heightM < 500) return 'hills';
-  if (heightM < 1000) return 'lowMountains';
-  if (heightM < 2000) return 'mountains';
-  if (heightM < 3000) return 'highMountains';
-  return 'alpine';
-};
-
 const SUN_STATE_IDS = new Set<string>(SUN_STATES.map(([state]) => state));
 
 // The sun state of a time of day; null at night and in the twilights.
@@ -215,9 +226,14 @@ export const stateBadgeForTarget = (target: SceneInfoTarget, ctx: StateBadgeCont
       const ridge = ctx.horizonProfile ? ridgeAt(ctx.horizonProfile, target.azimuth) : null;
       return ridge ? `terrain:${getTerrainBand(ridge.height)}` : null;
     }
+    // Item 120: the size does not depend on the time.
+    case 'satellite': return `satellite:${getSatelliteSize(target.id, target.name)}`;
     default: return null;
   }
 };
+
+// Item 120: a live plane's haul badge, when its route has come (useLiveRoute).
+export const badgeForRoute = (route: LiveRoute | null): BadgeId | null => route && `plane:${getPlaneHaul(route.km)}`;
 
 export interface CalendarBadgeOptions {
   isNight: boolean;

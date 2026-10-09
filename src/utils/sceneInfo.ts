@@ -164,6 +164,58 @@ const CLOUDS: Record<CloudType, MessageKey> = {
   Ci: 'cloud.Ci', Cs: 'cloud.Cs', Ac: 'cloud.Ac', As: 'cloud.As', Cu: 'cloud.Cu', Sc: 'cloud.Sc',
   St: 'cloud.St', Ns: 'cloud.Ns', Cb: 'cloud.Cb', Len: 'cloud.Len', Mam: 'cloud.Mam',
 };
+// The cloud tier: how often the type is in the sky. Clouds are not rolled, so it is fixed; the
+// lenticular and mammatus clouds show only on X1 egg days (skyCloudUtils).
+export const CLOUD_TIERS: Record<CloudType, RarityTier> = {
+  Cu: 'common', Sc: 'common', St: 'common', Ci: 'frequent', Ac: 'frequent', As: 'frequent',
+  Cs: 'uncommon', Ns: 'uncommon', Cb: 'rare', Len: 'veryRare', Mam: 'veryRare',
+};
+// Item 120: the terrain, plane and satellite classes and their fixed tiers: the higher, the
+// farther, the bigger, the rarer.
+export type TerrainBand = 'hills' | 'lowMountains' | 'mountains' | 'highMountains' | 'alpine';
+// Item 115: the height band of a ridge point (m above sea level). A limit belongs to the
+// higher band (500 m is low mountains).
+export const getTerrainBand = (heightM: number): TerrainBand => {
+  if (heightM < 500) return 'hills';
+  if (heightM < 1000) return 'lowMountains';
+  if (heightM < 2000) return 'mountains';
+  if (heightM < 3000) return 'highMountains';
+  return 'alpine';
+};
+export const TERRAIN_TIERS: Record<TerrainBand, RarityTier> = {
+  hills: 'common', lowMountains: 'frequent', mountains: 'uncommon', highMountains: 'rare', alpine: 'veryRare',
+};
+// The great-circle length of a live plane's route leg (planeFeed.mapRoute).
+export type PlaneHaul = 'regional' | 'short' | 'medium' | 'long' | 'ultraLong';
+export const getPlaneHaul = (km: number): PlaneHaul => {
+  if (km < 800) return 'regional';
+  if (km < 2000) return 'short';
+  if (km < 4500) return 'medium';
+  if (km < 9000) return 'long';
+  return 'ultraLong';
+};
+export const HAUL_TIERS: Record<PlaneHaul, RarityTier> = {
+  regional: 'common', short: 'frequent', medium: 'uncommon', long: 'rare', ultraLong: 'veryRare',
+};
+// The size of a tracked satellite, from its CelesTrak name: the small constellation satellites,
+// the rest, the bus-sized rocket bodies, the giants (Hubble, the Chinese station) and the ISS.
+// ponytail: name rules, no size data in the GP records; add CelesTrak's SATCAT RCS size if they misfit.
+export type SatelliteSize = 'small' | 'medium' | 'large' | 'giant' | 'iss';
+export const HUBBLE_NORAD_ID = 20580;
+export const getSatelliteSize = (id: number, name: string): SatelliteSize => {
+  if (/^ISS\b/.test(name)) return 'iss';
+  if (id === HUBBLE_NORAD_ID || /^CSS\b/.test(name)) return 'giant';
+  if (/\bR\/B\b/.test(name)) return 'large';
+  if (/^(STARLINK|ONEWEB)/.test(name)) return 'small';
+  return 'medium';
+};
+export const SATELLITE_TIERS: Record<SatelliteSize, RarityTier> = {
+  small: 'common', medium: 'frequent', large: 'uncommon', giant: 'rare', iss: 'veryRare',
+};
+
+// The rarity row of a thing with a fixed tier: the tier alone.
+const tierLine = (tier: RarityTier): InfoLine & { tier: RarityTier } => ({ label: 'info.rarity', value: { key: RARITY_NAMES[tier] }, tier });
+
 // Item 106: one fact per cloud type.
 const CLOUD_FACTS: Record<CloudType, MessageKey> = {
   Ci: 'cloudFact.Ci', Cs: 'cloudFact.Cs', Ac: 'cloudFact.Ac', As: 'cloudFact.As', Cu: 'cloudFact.Cu', Sc: 'cloudFact.Sc',
@@ -423,14 +475,14 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
         kicker: 'infoKind.plane',
         icon: 'plane',
         title: 'plane.live',
-        tier: null,
+        tier: ctx.route ? HAUL_TIERS[getPlaneHaul(ctx.route.km)] : null,
         lines: [
           { label: 'info.callsign', value: target.callsign ?? '—' },
           { label: 'info.airline', value: target.airline ?? '—' },
           { label: 'info.aircraftType', value: target.aircraftType ?? '—' },
           { label: 'info.altitude', value: { key: 'info.km', vars: { value: formatNumber(language, target.altM / 1000, 1) } } },
           { label: 'info.speed', value: { key: 'info.kmh', vars: { value: formatNumber(language, Math.round(target.speedKt * 1.852), 0) } } },
-          ...(ctx.route ? [{ label: 'info.route' as const, value: routeText(ctx.route) }] : []),
+          ...(ctx.route ? [{ label: 'info.route' as const, value: routeText(ctx.route) }, tierLine(HAUL_TIERS[getPlaneHaul(ctx.route.km)])] : []),
         ],
       };
     case 'cloud': {
@@ -443,9 +495,10 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
         lines: [
           { label: 'info.layer', value: { key: LAYERS[target.band] } },
           { label: 'info.cover', value: percent(cover / 100, language) },
+          tierLine(CLOUD_TIERS[target.cloudType]),
         ],
         fact: { label: 'info.cloudFact', text: CLOUD_FACTS[target.cloudType] },
-        tier: null,
+        tier: CLOUD_TIERS[target.cloudType],
       };
     }
     case 'sun': {
@@ -486,11 +539,12 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
     case 'terrain': {
       const profile = ctx.horizonProfile;
       const ridge = profile ? ridgeAt(profile, target.azimuth) : null;
+      const tier = ridge ? TERRAIN_TIERS[getTerrainBand(ridge.height)] : null;
       return {
         kicker: 'infoKind.horizon',
         icon: 'terrain',
         title: 'scene.terrain',
-        tier: null,
+        tier,
         lines: [
           { label: 'info.direction', value: directionText(target.azimuth) },
           ...(profile ? [{ label: 'info.horizonAngle' as const, value: signedDegrees(horizonAngleAt(profile, target.azimuth), language) }] : []),
@@ -498,11 +552,14 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
             { label: 'info.ridgeDistance' as const, value: distanceText(ridge.distance, language) },
             { label: 'info.ridgeHeight' as const, value: { key: 'info.metresAsl' as const, vars: { value: formatNumber(language, ridge.height, 0) } } },
           ] : []),
+          ...(tier ? [tierLine(tier)] : []),
         ],
       };
     }
-    case 'satellite':
-      return { kicker: 'infoKind.orbit', icon: 'satellite', title: 'scene.satellite', lines: satelliteLines(target.name, ctx), tier: null };
+    case 'satellite': {
+      const tier = SATELLITE_TIERS[getSatelliteSize(target.id, target.name)];
+      return { kicker: 'infoKind.orbit', icon: 'satellite', title: 'scene.satellite', lines: [...satelliteLines(target.name, ctx), tierLine(tier)], tier };
+    }
     case 'egg': {
       const egg = EGGS[target.kind];
       if (target.kind === 'santa') return santaCard(egg, ctx);

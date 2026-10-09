@@ -86,7 +86,7 @@ const Satellites: React.FC<SatellitesProps> = ({
   const { t } = useLanguage();
   const prefersReducedMotion = usePrefersReducedMotion();
   // Item 116: a double tap opens the card; a keyboard click (no pointer, detail 0) at once.
-  const { tap, hint } = useDoubleTap(onInfo);
+  const { tap } = useDoubleTap(onInfo);
   const containerRef = useRef<HTMLDivElement>(null);
   const [decors, setDecors] = useState<Decor[]>([]);
   const nextId = useRef(0);
@@ -167,7 +167,7 @@ const Satellites: React.FC<SatellitesProps> = ({
               className="rounded-full bg-white"
               style={{ width: size, height: size, boxShadow: dot.iss ? '0 0 4px 1px rgb(255 255 255 / 0.6)' : undefined }}
             />
-            {(infoRing === ring || hint === ring) && <span className="absolute inset-2 rounded-full border border-white/70" data-testid="scene-info-ring" />}
+            {(infoRing === ring) && <span className="absolute inset-2 rounded-full border border-white/70" data-testid="scene-info-ring" />}
           </button>
         );
       })}

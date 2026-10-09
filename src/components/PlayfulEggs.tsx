@@ -43,7 +43,7 @@ const PlayfulEggs: React.FC<PlayfulEggsProps> = ({
   event, easterMorning, width, horizonY, sunX, sunLight, rainbow, onInfo, infoRing = null, infoRingTier = null, onShown,
 }) => {
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
-  const { tap, hint } = useDoubleTap(onInfo);
+  const { tap } = useDoubleTap(onInfo);
   const showTomb = event === 'easter' && easterMorning && width > 0;
   const potX = event === 'st-patrick' ? getPotOfGoldX(rainbow, width, horizonY) : null;
   const showPot = potX !== null;
@@ -63,7 +63,7 @@ const PlayfulEggs: React.FC<PlayfulEggsProps> = ({
   } : {};
   const tapClass = onInfo ? 'pointer-events-auto cursor-pointer touch-manipulation' : 'pointer-events-none';
   const hit = (ring: string, w: number, h: number) =>
-    onInfo && <HitArea cx={w / 2} cy={h / 2} width={w} height={h} ring={infoRing === ring || hint === ring} tier={infoRing === ring ? infoRingTier : null} />;
+    onInfo && <HitArea cx={w / 2} cy={h / 2} width={w} height={h} ring={infoRing === ring} tier={infoRing === ring ? infoRingTier : null} />;
 
   // The tomb stands near the edge away from the sun, so the sun lights its face. At 10 % or
   // 90 % it stays clear of the sunrise and sunset labels (E and W, at 25 % and 75 %).

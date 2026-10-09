@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  BADGES, COLLECTION_STORAGE_KEY, addToCollection, badgeForAstroEvent, badgeForCalendarEvent, badgeForSanta, badgeForTarget,
+  BADGES, COLLECTION_STORAGE_KEY, addToCollection, badgeForAstroEvent, badgeForRoute, getPlaneHaul, badgeForCalendarEvent, badgeForSanta, badgeForTarget,
   countCollected, getMoonState, getSunState, getTerrainBand, isCollectionPaused, loadCollection, saveCollection,
   NOWRUZ_ALSO, stateBadgeForTarget, type BadgeId, type CalendarBadgeOptions, type StateBadgeContext,
 } from '@/utils/collection';
@@ -20,10 +20,10 @@ describe('collection (ROADMAP item 112)', () => {
     vi.restoreAllMocks();
   });
 
-  it('has 118 badges with unique ids, one for every fish, flyer, boat and cloud type', () => {
+  it('has 128 badges with unique ids, one for every fish, flyer, boat and cloud type', () => {
     const ids = BADGES.map(b => b.id);
-    expect(ids).toHaveLength(118); // item 115: 69 + 5 sun + 5 terrain + 8 moon states; + 5 sky eggs + 9 national days + 5 playful eggs + 12 festivals
-    expect(new Set(ids).size).toBe(118);
+    expect(ids).toHaveLength(128); // item 115: 69 + 5 sun + 5 terrain + 8 moon states; + 5 sky eggs + 9 national days + 5 playful eggs + 12 festivals; item 120: + 5 hauls + 5 sizes
+    expect(new Set(ids).size).toBe(128);
     for (const kind of [...FISH_WEIGHTS.map(([k]) => k), ...NIGHT_ONLY]) expect(ids).toContain(`fish:${kind}`);
     for (const kind of [...BIRD_WEIGHTS.map(([k]) => k), 'bat']) expect(ids).toContain(`flyer:${kind}`);
     for (const kind of ['sailboat', 'ferry', 'fishing', 'rowboat', 'freighter']) expect(ids).toContain(`boat:${kind}`);
@@ -32,13 +32,16 @@ describe('collection (ROADMAP item 112)', () => {
     expect(BADGES.find(b => b.id === 'plane')?.group).toBe('sky');
   });
 
-  it('gives the rolled kinds their rarity tier, the eggs ultra rare, the rest none', () => {
+  it('gives the rolled kinds their rarity tier, the clouds their fixed tier, the eggs ultra rare, the rest none', () => {
     expect(tier('fish:seahorse')).toBe('rarity.rare');
     expect(tier('fish:shark')).toBe('rarity.veryRare');
     expect(tier('fish:squid')).toBe('rarity.uncommon'); // night only: the night share
     expect(tier('flyer:bat')).toBe('rarity.frequent'); // item 113: 10-25 % is frequent
     expect(tier('boat:sailboat')).toBe('rarity.common');
-    expect(tier('cloud:Cb')).toBeNull();
+    expect(tier('cloud:Cu')).toBe('rarity.common');
+    expect(tier('cloud:Cb')).toBe('rarity.rare');
+    expect(tier('cloud:Mam')).toBe('rarity.veryRare');
+    expect(tier('sun')).toBeNull();
     expect(BADGES.filter(b => b.group === 'egg').every(b => b.rarity === 'rarity.ultraRare')).toBe(true); // item 113
   });
 
@@ -150,14 +153,38 @@ describe('state badges (ROADMAP item 115)', () => {
   };
   const ctx: StateBadgeContext = { timeOfDay: 'midday', moonPhase: 0.5, horizonProfile: profile, isTimePreview: false };
 
-  it('keeps the base badges and adds 5 sun, 8 moon and 5 terrain states after their base', () => {
+  it('keeps the base badges and adds the states after their base (items 115, 120)', () => {
     const ids = BADGES.map(b => b.id);
-    for (const base of ['sun', 'moon', 'terrain'] as const) {
+    const counts = { sun: 5, moon: 8, terrain: 5, plane: 5, satellite: 5 };
+    for (const base of ['sun', 'moon', 'terrain', 'plane', 'satellite'] as const) {
       const states = BADGES.filter(b => b.base === base).map(b => b.id);
-      expect(states).toHaveLength(base === 'moon' ? 8 : 5);
+      expect(states).toHaveLength(counts[base]);
       expect(ids.slice(ids.indexOf(base) + 1, ids.indexOf(base) + 1 + states.length)).toEqual(states);
     }
-    expect(BADGES.filter(b => b.base).every(b => b.group === 'sky' && b.rarity === null)).toBe(true);
+    expect(BADGES.filter(b => b.base).every(b => b.group === 'sky')).toBe(true);
+    // Sun and moon states have no tier; higher, farther and bigger is rarer (item 120).
+    expect(BADGES.filter(b => b.base === 'sun' || b.base === 'moon').every(b => b.rarity === null)).toBe(true);
+    const tiers = (base: string) => BADGES.filter(b => b.base === base).map(b => b.rarity);
+    expect(tiers('terrain')).toEqual(['rarity.common', 'rarity.frequent', 'rarity.uncommon', 'rarity.rare', 'rarity.veryRare']);
+    expect(tiers('plane')).toEqual(tiers('terrain'));
+    expect(tiers('satellite')).toEqual(tiers('terrain'));
+  });
+
+  it('gives the plane haul at 800 / 2000 / 4500 / 9000 km and the route badge (item 120)', () => {
+    expect([0, 799, 800, 1999, 2000, 4499, 4500, 8999, 9000].map(getPlaneHaul))
+      .toEqual(['regional', 'regional', 'short', 'short', 'medium', 'medium', 'long', 'long', 'ultraLong']);
+    expect(badgeForRoute(null)).toBeNull();
+    expect(badgeForRoute({ from: { code: 'CDG', name: null }, to: { code: 'JFK', name: null }, km: 5835 })).toBe('plane:long');
+  });
+
+  it('gives a satellite its size badge from its name (item 120)', () => {
+    const sat = (id: number, name: string) => stateBadgeForTarget({ type: 'satellite', id, name }, ctx);
+    expect(sat(25544, 'ISS (ZARYA)')).toBe('satellite:iss');
+    expect(sat(48274, 'CSS (TIANHE)')).toBe('satellite:giant');
+    expect(sat(20580, 'HST')).toBe('satellite:giant');
+    expect(sat(1, 'SL-16 R/B')).toBe('satellite:large');
+    expect(sat(2, 'STARLINK-1234')).toBe('satellite:small');
+    expect(sat(3, 'NOAA 19')).toBe('satellite:medium');
   });
 
   it('gives the height band at the limits 500 / 1000 / 2000 / 3000 m', () => {

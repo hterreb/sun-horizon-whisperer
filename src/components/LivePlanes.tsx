@@ -116,7 +116,7 @@ const LivePlanes: React.FC<LivePlanesProps> = ({
 }) => {
   const { feed, receivedAt } = state;
   // Item 116: a double tap opens the card; a single tap shows the ring for a moment.
-  const { tap, hint } = useDoubleTap(onInfo);
+  const { tap } = useDoubleTap(onInfo);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (reducedMotion) return;
@@ -172,7 +172,7 @@ const LivePlanes: React.FC<LivePlanesProps> = ({
               band={Math.round(band * 10) / 10}
               spread={look?.spread ?? 1}
               trailColour={trailColour}
-              ringOn={infoRing === `live-${ac.hex}` || hint === `live-${ac.hex}`}
+              ringOn={infoRing === `live-${ac.hex}`}
               onInfo={onInfo && tap}
             />
           </div>
