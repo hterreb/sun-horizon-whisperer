@@ -105,6 +105,14 @@ describe('CalendarEggs', () => {
     expect(screen.getByTestId('santa').getAttribute('data-mode')).toBe('far');
   });
 
+  it('waits for the measured scene before Santa starts, then picks his mode', () => {
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
+    const { rerender } = render(<CalendarEggs {...base} moon={null} measured={false} event="christmas" santa />);
+    expect(screen.queryByTestId('santa')).toBeNull();
+    rerender(<CalendarEggs {...base} measured event="christmas" santa />);
+    expect(screen.getByTestId('santa').getAttribute('data-mode')).toBe('moon');
+  });
+
   it('shows Santa only with the Christmas event', () => {
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
     render(<CalendarEggs {...base} event="friday-13" santa />);

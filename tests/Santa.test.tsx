@@ -110,6 +110,44 @@ describe('Santa', () => {
     expect(santa.getAttribute('data-mode')).toBe('moon');
   });
 
+  it('S2: never flies back when the moon moves behind him before he slows down (compass pan)', () => {
+    vi.stubGlobal('innerWidth', 390);
+    vi.spyOn(Math, 'random').mockReturnValue(0.2);
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => frames.push(cb));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    const onDone = vi.fn();
+    const { rerender } = render(<Santa onDone={onDone} moon={{ x: 330, y: 200, r: 28 }} />);
+    const santa = screen.getByTestId('santa');
+    const x = () => parseFloat(santa.style.transform.replace('translateX(', ''));
+    const xs: number[] = [];
+    for (let ms = 0; ms <= 60_000 && !onDone.mock.calls.length; ms += 250) {
+      // At 20 s he has flown 195 px (x 141); the moon now sits at 100, behind him.
+      if (ms === 20_000) rerender(<Santa onDone={onDone} moon={{ x: 100, y: 200, r: 28 }} />);
+      act(() => { frames.shift()!(ms); });
+      if (!onDone.mock.calls.length) xs.push(x());
+    }
+    for (let i = 1; i < xs.length; i++) expect(xs[i], `frame ${i}`).toBeGreaterThanOrEqual(xs[i - 1] - 1e-9);
+    // He slows down from where he is and stops 1.5 v further on.
+    expect(Math.max(...xs.slice(80, 100))).toBeLessThanOrEqual(-54 + 9.75 * 20.25 + 1.5 * 9.75 + 1e-6);
+  });
+
+  it('keeps his path when the window resizes mid-flight (speed and start latched)', () => {
+    const { x, at } = fly(390, 0.8);
+    at(0);
+    at(10_000);
+    const before = x();
+    vi.stubGlobal('innerWidth', 1200);
+    at(10_500);
+    expect(x()).toBeCloseTo(before - 0.5 * 9.75 * FAR_SPEED);
+  });
+
+  it('still ends (onDone) with a zero window width', () => {
+    const { onDone, at } = fly(0, 0.2);
+    for (let ms = 0; ms <= 200_000 && !onDone.mock.calls.length; ms += 1000) at(ms);
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
   it('S4: a red glow on Rudolph\'s nose, inside the mirrored drawing, and a tap target of 44 px', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.8);
     vi.stubGlobal('requestAnimationFrame', vi.fn());
@@ -125,7 +163,7 @@ describe('Santa', () => {
     expect(glow.style.filter).toBe('blur(2px)');
     const hit = santa.querySelector<HTMLElement>('[data-testid="scene-hit"]')!;
     expect(parseFloat(hit.style.width)).toBeGreaterThanOrEqual(44);
-    expect(parseFloat(hit.style.height)).toBeGreaterThanOrEqual(32);
+    expect(parseFloat(hit.style.height)).toBeGreaterThanOrEqual(44);
   });
 
   it('S9: rings the bells once when he enters, with the sound setting', () => {

@@ -716,6 +716,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   const moonLook = getMoonLook(weatherType, cloudCoverPercent);
   const moonBright = moonPosition.illumination * 0.8 + 0.2;
   const isMoonDiscShown = isMoonVisible && moonLook.disc > 0;
+  // Before the first measure getScreenPosition gives every body (0, 0): not a real place yet.
+  const sceneMeasured = containerDimensions.width > 0 && containerDimensions.height > 0;
   // The pool of moonlight for the night fish (ROADMAP item 65, NR3): as bright as the moon
   // is full, dimmed by clouds, and fading as the moon sets, like its reflection bars.
   const nightWater = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
@@ -1191,7 +1193,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         event={calendarEvent}
         timeOfDay={timeOfDay}
         weatherType={weatherType}
-        moon={isMoonDiscShown ? { x: moonX, y: moonY, r: moonRadius } : null}
+        moon={isMoonDiscShown && sceneMeasured ? { x: moonX, y: moonY, r: moonRadius } : null}
+        measured={sceneMeasured}
         horizonY={containerDimensions.height * 0.65}
         onInfo={onSceneInfo}
         infoRing={infoRing}

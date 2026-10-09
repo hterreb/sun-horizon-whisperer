@@ -111,30 +111,47 @@ const Santa: React.FC<SantaProps> = ({ onDone, onInfo, ringOn = false, ringTier 
 
   useEffect(() => {
     let start: number | null = null;
+    // Latched on the first frame, so a resize cannot make the whole path jump.
+    let v = 0;
+    let x0 = 0;
+    let farStop = 0; // S4: the middle of the screen at his start
     // Set once he starts to slow down, so a moving moon (compass) cannot make him jump.
     let frozenStop: number | null = null;
+    let stopAhead = 0;
+    let lastSeconds = 0;
     const frame = (now: number) => {
+      const screen = window.innerWidth;
       if (start === null) {
         start = now;
+        // At least 1 px/s, so a zero width cannot stop the flight (onDone always comes).
+        v = Math.max(1, Math.min(screen * SPEED_PCT / 100, PX_CAP) * (atMoon ? 1 : FAR_SPEED));
+        x0 = leftToRight ? -width : screen;
+        farStop = screen / 2;
         // S9: he enters the screen now.
         playSleighBells(getRunningAudioContext(), soundRef.current);
       }
-      const screen = window.innerWidth;
-      const v = Math.min(screen * SPEED_PCT / 100, PX_CAP) * (atMoon ? 1 : FAR_SPEED);
-      const x0 = leftToRight ? -width : screen;
       const m = atMoon ? moonRef.current : null;
-      const xs = (m ? m.x : screen / 2) - width / 2;
+      const xs = (m ? m.x : farStop) - width / 2;
       const seconds = (now - start) / 1000;
-      const stopDistance = frozenStop ?? Math.abs(xs - x0);
-      if (frozenStop === null && seconds >= santaStopTimes(stopDistance, v).tA) frozenStop = stopDistance;
+      if (frozenStop === null) {
+        const ahead = leftToRight ? xs - x0 : x0 - xs;
+        const { tA } = santaStopTimes(ahead, v);
+        // The braking point is behind his place of the last frame (the moon moved back, e.g. a
+        // compass pan): he slows down from that place, so he never flies back.
+        if (tA < lastSeconds) frozenStop = v * lastSeconds + 1.5 * v;
+        else if (seconds >= tA) frozenStop = ahead;
+        else stopAhead = ahead;
+      }
+      lastSeconds = seconds;
+      const stopDistance = frozenStop ?? stopAhead;
       const travelled = santaTravel(seconds, stopDistance, v);
-      if (travelled >= screen + width) {
+      const x = leftToRight ? x0 + travelled : x0 - travelled;
+      if (leftToRight ? x >= screen : x <= -width) {
         rafRef.current = null;
         onDone();
         return;
       }
       if (ref.current) {
-        const x = leftToRight ? x0 + travelled : x0 - travelled;
         ref.current.style.transform = `translateX(${x}px)`;
         if (m) ref.current.style.top = `${m.y - height / 2}px`;
       }

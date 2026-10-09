@@ -424,7 +424,7 @@ export const fr: Record<keyof typeof en, string> = {
   'egg.santaGreeting': "Oh oh oh !",
   'egg.santaCallsign': "SANTA 1",
   'egg.santaRoute': "Pôle Nord → {place}",
-  'egg.santaRouteHere': "ton ciel",
+  'egg.santaRouteHere': "votre ciel",
   'egg.santaPresents': "Cadeaux livrés",
   'egg.santaCookies': "Biscuits mangés",
   'egg.santaJustForFun': "Juste pour s'amuser, pas de vraies données",
