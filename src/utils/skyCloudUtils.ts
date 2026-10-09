@@ -362,6 +362,12 @@ export const getSkyClouds = ({ weather: wx, layers, width: w, height: h, seed, e
 };
 
 // Where a glider is at a progress (0-1) through its loop, in px.
+// Valentine's Day (ROADMAP item 117): the glider whose one cloud becomes the heart. The first
+// single cumulus-like cloud (not a row tile, not a thin cirrus); null when there is none.
+const HEART_TYPES: readonly CloudType[] = ['Cu', 'Sc', 'Ac'];
+export const getHeartGliderId = (gliders: readonly CloudGlider[]): string | null =>
+  gliders.find(g => g.clouds.length === 1 && HEART_TYPES.includes(g.clouds[0].type))?.id ?? null;
+
 export const getGliderOffset = (glider: Pick<CloudGlider, 'from' | 'to'>, progress: number): number =>
   glider.from + (glider.to - glider.from) * progress;
 // The progress at the start (the negative delay).

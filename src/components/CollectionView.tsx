@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import {
-  Cat, Eclipse, Flame, Glasses, Moon, MoonStar, Mountain, PartyPopper, Rainbow, Satellite,
-  Snowflake, Sparkles, Star, Sun, SunMoon, Sunset, X, type LucideIcon,
+  ArrowLeftRight, Cat, Coins, Eclipse, Flame, Glasses, Heart, Hourglass, Moon, MoonStar, Mountain, PartyPopper, Rainbow, Satellite,
+  Snowflake, Sparkles, Star, Sun, SunMoon, Sunrise, Sunset, X, type LucideIcon,
 } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import SceneFish from '@/components/SceneFish';
@@ -80,6 +80,12 @@ const EGG_ICONS: Record<Exclude<EggKind, 'ufo' | 'santa'>, [LucideIcon, string]>
   blueMoon: [Moon, 'text-brand-sky'],
   meteorShower: [Star, 'text-brand-gold-light'],
   aurora: [Rainbow, 'text-brand-cyan'],
+  // Playful pack (ROADMAP item 117).
+  aprilFools: [ArrowLeftRight, 'text-brand-peach'],
+  easter: [Sunrise, 'text-brand-gold-light'],
+  valentine: [Heart, 'text-brand-coral'],
+  stPatrick: [Coins, 'text-brand-gold'],
+  patientWatcher: [Hourglass, 'text-brand-peach'],
 };
 
 const SKY_ICONS: Record<'sun' | 'moon' | 'terrain' | 'satellite', [LucideIcon, string]> = {

@@ -24,7 +24,8 @@ import { SANTA_DAYS_PER_YEAR, getEventDaysPerYear, type CalendarEvent } from './
 
 // Item 113: the easter eggs and special events that are one thing in the scene and take taps.
 // Not the collection's EggKind (item 112), which has one badge per egg or event.
-export type EggCardKind = 'ufo' | 'ghost' | 'dragon' | 'santa' | 'blackCat' | 'halloweenBat' | 'pumpkinMoon';
+export type EggCardKind = 'ufo' | 'ghost' | 'dragon' | 'santa' | 'blackCat' | 'halloweenBat' | 'pumpkinMoon'
+  | 'emptyTomb' | 'potOfGold' | 'heartCloud'; // item 117
 
 export type SceneInfoTarget =
   | { type: 'fish'; kind: FishKind }
@@ -180,6 +181,10 @@ const EGGS: Record<EggCardKind, { name: MessageKey; fact: MessageKey; hidden: bo
   blackCat: { name: 'egg.blackCat', fact: 'eggFact.blackCat', hidden: false, chance: { event: 'friday-13' }, latin: 'Felis catus' },
   halloweenBat: { name: 'egg.halloweenBat', fact: 'eggFact.halloweenBat', hidden: false, chance: { event: 'halloween-bats' } },
   pumpkinMoon: { name: 'egg.halloweenPumpkin', fact: 'eggFact.pumpkinMoon', hidden: false, chance: { event: 'halloween-pumpkin' } },
+  // Playful pack (item 117): the chance is the day; the pot also needs a rainbow, the heart a cloud.
+  emptyTomb: { name: 'egg.easter', fact: 'eggFact.emptyTomb', hidden: false, chance: { event: 'easter' } },
+  potOfGold: { name: 'egg.stPatrick', fact: 'eggFact.potOfGold', hidden: false, chance: { event: 'st-patrick' } },
+  heartCloud: { name: 'egg.valentine', fact: 'eggFact.heartCloud', hidden: false, chance: { event: 'valentine' } },
 };
 
 const DIRECTIONS: MessageKey[] = [

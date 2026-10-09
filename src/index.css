@@ -525,6 +525,14 @@
     --scene-green-flash: 130 90% 60%;
     --scene-eclipse-moon: 12 75% 38%;
     --scene-blue-moon: 205 90% 72%;
+    /* Playful pack (ROADMAP item 117): the empty tomb's rock, its dark entrance and the
+       soft morning light on it; the St Patrick's pot and its gold. */
+    --scene-tomb-rock: 30 8% 42%;
+    --scene-tomb-entrance: 25 15% 8%;
+    --scene-tomb-light: 32 95% 78%;
+    --scene-pot: 220 10% 12%;
+    --scene-gold: 45 95% 58%;
+    --scene-gold-dark: 38 85% 40%;
     /* Fish (ROADMAP item 85, FS1): two tones per species, a dark back over a pale belly,
        from the item 62 tints: back = the tint at 0.85 x saturation and 0.55 x lightness
        (at least 16 %), belly = 0.6 x saturation, lightness 55 % of the way to white (at

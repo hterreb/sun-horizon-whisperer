@@ -2,11 +2,12 @@ import React, { memo, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { type SceneInfoHandler, type WeatherType } from './CloudLayer';
 import { type TimeOfDay, getBackgroundGradient, getWaterColors } from '@/utils/sunUtils';
 import { getCloudDriftDirection, getCloudMoonlight } from '@/utils/cloudLayoutUtils';
-import { CLOUD_SHAPES, getShaftStrands } from '@/utils/cloudShapes';
+import { CLOUD_SHAPES, HEART_SHAPE, getShaftStrands } from '@/utils/cloudShapes';
+import { type PlayfulEgg } from '@/utils/playfulEggs';
 import {
   type CloudGlider, type CloudLayers, type CloudLight, type SkyCloud,
   getCloudCentre, getCloudFill, getCloudLayers, getDaySeed, getCloudLight, getCloudShadowBox,
-  getCloudShadowLook, getCloudTypes, getCloudVeil, getGliderOffset, getGliderStartProgress, getLightAngle,
+  getCloudShadowLook, getCloudTypes, getCloudVeil, getGliderOffset, getHeartGliderId, getGliderStartProgress, getLightAngle,
   getRowOpacity, getRowSpan, getSceneScale, getSkyClouds, getSkyColorAt, getTimeOfDayAltitude,
 } from '@/utils/skyCloudUtils';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
@@ -33,6 +34,9 @@ interface SkyCloudsProps {
   moon: { x: number; y: number; r?: number; light?: number } | null;
   skyGradient: string | null;
   egg: boolean; // an X1 day
+  // Valentine's Day (ROADMAP item 117): by day, one cloud is a heart; onHeartShown reports it.
+  heart?: boolean;
+  onHeartShown?: (kind: PlayfulEgg) => void;
   // Info cards (ROADMAP item 95): a tap on a cloud, and the ring id of the open card.
   onInfo?: SceneInfoHandler;
   infoRing?: string | null;
@@ -59,22 +63,27 @@ interface CloudSvgProps {
   moonGlow: number;
   onInfo?: SceneInfoHandler; // item 95: only the clouds of the shown layout take taps
   ringId: string;
+  heart?: boolean; // item 117: the Valentine's heart; its tap opens the egg card
 }
 
 // One cloud. Memoized on plain values, so the once-a-second tick only redraws a cloud
 // whose light direction or silver lining changed.
 const CloudSvg = memo(function CloudSvg({
   cloud, gradId, weather, light, angle, skyGradient, height, width, rowLeft, liningX, liningY, liningR, moonGlow,
-  onInfo, ringId,
+  onInfo, ringId, heart = false,
 }: CloudSvgProps) {
-  const shape = CLOUD_SHAPES[cloud.type][cloud.variant];
+  const shape = heart ? HEART_SHAPE : CLOUD_SHAPES[cloud.type][cloud.variant];
   const span = rowLeft === undefined ? null : getRowSpan(rowLeft, cloud.scale, width, angle);
   const fill = getCloudFill(cloud, weather, light, angle, cloud.tint > 0 ? getSkyColorAt(skyGradient, cloud.y / height) : null, span);
   const size = { width: 120 * cloud.scale, height: 60 * cloud.scale };
   return (
     <div
       className={onInfo ? 'absolute pointer-events-auto cursor-pointer touch-manipulation' : 'absolute'}
-      onClick={onInfo && (event => onInfo({ type: 'cloud', cloudType: cloud.type, band: cloud.band }, { x: event.clientX, y: event.clientY }, ringId))}
+      onClick={onInfo && (event => onInfo(
+        heart ? { type: 'egg', kind: 'heartCloud' } : { type: 'cloud', cloudType: cloud.type, band: cloud.band },
+        { x: event.clientX, y: event.clientY },
+        ringId,
+      ))}
       style={{
         left: cloud.x,
         top: cloud.y - 30 * cloud.scale,
@@ -84,6 +93,7 @@ const CloudSvg = memo(function CloudSvg({
       }}
       data-testid="sky-cloud"
       data-type={cloud.type}
+      data-heart={heart || undefined}
     >
       <svg {...size} viewBox="0 0 120 60" overflow="visible" aria-hidden="true">
         <defs>
@@ -166,7 +176,7 @@ interface Layout {
 
 const SkyClouds: React.FC<SkyCloudsProps> = ({
   weatherType, timeOfDay, date, latitude, longitude, cloudLayers, windDirectionDeg, sun, moon, skyGradient, egg,
-  onInfo, infoRing = null,
+  heart = false, onHeartShown, onInfo, infoRing = null,
 }) => {
   const reduced = usePrefersReducedMotion();
   // Item 116: a double tap opens the cloud's card; a single tap shows its ring for a moment.
@@ -222,6 +232,12 @@ const SkyClouds: React.FC<SkyCloudsProps> = ({
     }, 1000);
     return () => clearInterval(id);
   }, [gliders, layoutKey, reduced]);
+
+  // Item 117: the heart is one cloud of the shown layout, by day (the sun above the horizon).
+  const heartId = heart && sun !== null && sun.altitude > 0 ? getHeartGliderId(gliders) : null;
+  useEffect(() => {
+    if (heartId) onHeartShown?.('valentine');
+  }, [heartId, onHeartShown]);
 
   const moonGlow = moon?.light ?? 1;
   const scale = getSceneScale(height);
@@ -310,6 +326,7 @@ const SkyClouds: React.FC<SkyCloudsProps> = ({
                     moonGlow={moonGlow}
                     onInfo={out || !onInfo ? undefined : tap}
                     ringId={ringId}
+                    heart={!out && glider.id === heartId}
                   />
                   {/* Item 95: the ring of the open card, outside the cloud's blur; the glide moves it. */}
                   {!out && (infoRing === ringId || hint === ringId) && (
