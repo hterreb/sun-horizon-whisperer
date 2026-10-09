@@ -32,7 +32,7 @@ describe('collection (ROADMAP item 112)', () => {
     expect(tier('fish:seahorse')).toBe('rarity.rare');
     expect(tier('fish:shark')).toBe('rarity.veryRare');
     expect(tier('fish:squid')).toBe('rarity.uncommon'); // night only: the night share
-    expect(tier('flyer:bat')).toBe('rarity.common');
+    expect(tier('flyer:bat')).toBe('rarity.frequent'); // item 113: 10-25 % is frequent
     expect(tier('boat:sailboat')).toBe('rarity.common');
     expect(tier('cloud:Cb')).toBeNull();
     expect(tier('egg:ufo')).toBeNull();
@@ -80,6 +80,9 @@ describe('collection (ROADMAP item 112)', () => {
     expect(badgeForTarget({ type: 'cloud', cloudType: 'Len', band: 'mid' })).toBe('cloud:Len');
     expect(badgeForTarget({ type: 'satellite', id: 25544, name: 'ISS' })).toBe('satellite');
     expect(badgeForTarget({ type: 'terrain', azimuth: 90 })).toBe('terrain');
+    // Item 113: an egg card adds no badge; the egg counts when it shows.
+    expect(badgeForTarget({ type: 'egg', kind: 'ufo' })).toBeNull();
+    expect(badgeForTarget({ type: 'egg', kind: 'ghost' })).toBeNull();
   });
 
   it('maps a calendar event to its badge only when the scene shows it', () => {

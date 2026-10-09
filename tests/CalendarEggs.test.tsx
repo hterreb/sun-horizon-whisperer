@@ -83,6 +83,63 @@ describe('CalendarEggs', () => {
     expect(screen.queryByTestId('lunar-dragon')).toBeNull();
   });
 
+  describe('egg info cards (ROADMAP item 113)', () => {
+    const tap = (wrapper: Element, x = 120, y = 300) =>
+      fireEvent.click(wrapper.querySelector('[data-testid="scene-hit"]')!, { clientX: x, clientY: y });
+
+    it('opens the card of the black cat, a Halloween bat and the pumpkin moon; the thing moves on', () => {
+      const onInfo = vi.fn();
+      const { rerender } = render(<CalendarEggs {...base} event="friday-13" onInfo={onInfo} />);
+      const cat = screen.getByTestId('black-cat');
+      expect(cat.className).toContain('pointer-events-auto');
+      expect(cat.getAttribute('aria-hidden')).toBe('true');
+      tap(cat);
+      expect(onInfo).toHaveBeenLastCalledWith({ type: 'egg', kind: 'blackCat' }, { x: 120, y: 300 }, 'egg-cat');
+      expect(cat.getAttribute('style')).toMatch(/egg-glide 45s/);
+
+      rerender(<CalendarEggs {...base} event="halloween-bats" onInfo={onInfo} />);
+      tap(screen.getAllByTestId('halloween-bat')[2]);
+      expect(onInfo).toHaveBeenLastCalledWith({ type: 'egg', kind: 'halloweenBat' }, { x: 120, y: 300 }, 'egg-bat-2');
+
+      rerender(<CalendarEggs {...base} event="halloween-pumpkin" onInfo={onInfo} />);
+      tap(screen.getByTestId('pumpkin-moon').parentElement!);
+      expect(onInfo).toHaveBeenLastCalledWith({ type: 'egg', kind: 'pumpkinMoon' }, { x: 120, y: 300 }, 'egg-pumpkin');
+    });
+
+    it('gives each hit area at least 44 × 44 px and the ring of the open card in its tier colour', () => {
+      render(<CalendarEggs {...base} event="halloween-bats" onInfo={vi.fn()} infoRing="egg-bat-1" infoRingTier="ultraRare" />);
+      const bats = screen.getAllByTestId('halloween-bat');
+      const hit = bats[1].querySelector<HTMLElement>('[data-testid="scene-hit"]')!;
+      expect(parseFloat(hit.style.width)).toBeGreaterThanOrEqual(44);
+      expect(parseFloat(hit.style.height)).toBeGreaterThanOrEqual(44);
+      expect(bats[1].querySelector('[data-testid="scene-info-ring"]')!.className).toContain('border-tier-ultra-rare/80');
+      expect(bats[0].querySelector('[data-testid="scene-info-ring"]')).toBeNull();
+    });
+
+    it('opens the dragon card from the hit area that follows it', () => {
+      const frames: FrameRequestCallback[] = [];
+      vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => frames.push(cb));
+      vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+      vi.spyOn(Element.prototype, 'clientWidth', 'get').mockReturnValue(390);
+      vi.spyOn(Element.prototype, 'clientHeight', 'get').mockReturnValue(844);
+      const onInfo = vi.fn();
+      render(<CalendarEggs {...base} event="lunar-new-year" onInfo={onInfo} infoRing="egg-dragon" infoRingTier="ultraRare" />);
+      act(() => { frames.shift()!(0); frames.shift()!(30_000); });
+      const hit = screen.getByTestId('lunar-dragon-hit');
+      // 30 s at 6.24 px/s: the box has moved from off screen into the scene.
+      expect(hit.style.transform).toMatch(/^translate\(-?\d+(\.\d)?px, \d+(\.\d)?px\)$/);
+      tap(hit);
+      expect(onInfo).toHaveBeenLastCalledWith({ type: 'egg', kind: 'dragon' }, { x: 120, y: 300 }, 'egg-dragon');
+      expect(hit.querySelector('[data-testid="scene-info-ring"]')!.className).toContain('border-tier-ultra-rare/80');
+    });
+
+    it('takes no taps without onInfo', () => {
+      render(<CalendarEggs {...base} event="friday-13" />);
+      expect(screen.getByTestId('black-cat').className).toContain('pointer-events-none');
+      expect(screen.queryByTestId('scene-hit')).toBeNull();
+    });
+  });
+
   it('turns the moving eggs off under reduced motion, keeps the static ones', () => {
     mockReducedMotion(true);
     const { rerender } = render(<CalendarEggs {...base} event="friday-13" />);

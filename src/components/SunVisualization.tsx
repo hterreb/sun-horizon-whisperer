@@ -1180,6 +1180,9 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         weatherType={weatherType}
         moon={isMoonDiscShown ? { x: moonX, y: moonY, r: moonRadius } : null}
         horizonY={containerDimensions.height * 0.65}
+        onInfo={onSceneInfo}
+        infoRing={infoRing}
+        infoRingTier={infoRingTier}
       />
 
       <svg className="absolute inset-0 w-full h-full pointer-events-none">

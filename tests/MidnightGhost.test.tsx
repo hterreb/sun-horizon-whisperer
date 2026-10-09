@@ -1,6 +1,6 @@
 import React from 'react';
-import { render } from '@testing-library/react';
-import MidnightGhost from '../src/components/MidnightGhost';
+import { render, screen, fireEvent } from '@testing-library/react';
+import MidnightGhost, { GHOST_RING } from '../src/components/MidnightGhost';
 
 const mockReducedMotion = (matches: boolean) =>
   vi.spyOn(window, 'matchMedia').mockReturnValue({
@@ -90,5 +90,26 @@ describe('MidnightGhost', () => {
     setIntervalSpy.mockRestore();
     mediaSpy.mockRestore();
     vi.useRealTimers();
+  });
+
+  it('a tap opens its info card; the ring shows while the card is open (item 113)', () => {
+    const midnight = new Date();
+    midnight.setHours(0, 0, 0, 0);
+    const onInfo = vi.fn();
+    const { rerender } = render(<MidnightGhost currentTime={midnight} onInfo={onInfo} />);
+    const ghost = screen.getByTestId('midnight-ghost');
+    expect(ghost.className).toContain('pointer-events-auto');
+    expect(ghost.getAttribute('aria-hidden')).toBe('true');
+    fireEvent.click(ghost.querySelector('[data-testid="scene-hit"]')!, { clientX: 200, clientY: 250 });
+    expect(onInfo).toHaveBeenCalledWith({ type: 'egg', kind: 'ghost' }, { x: 200, y: 250 }, GHOST_RING);
+    rerender(<MidnightGhost currentTime={midnight} onInfo={onInfo} ringOn ringTier="ultraRare" />);
+    expect(ghost.querySelector('[data-testid="scene-info-ring"]')!.className).toContain('border-tier-ultra-rare/80');
+  });
+
+  it('takes no taps without onInfo', () => {
+    const midnight = new Date();
+    midnight.setHours(0, 0, 0, 0);
+    render(<MidnightGhost currentTime={midnight} />);
+    expect(screen.getByTestId('midnight-ghost').className).toContain('pointer-events-none');
   });
 });

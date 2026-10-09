@@ -49,7 +49,10 @@ describe('SceneInfoCard (ROADMAP item 95)', () => {
     expect(latin.className).toContain('italic');
     expect(card().querySelector('hr')).not.toBeNull();
     expect(card().querySelector('.border-dotted')).not.toBeNull();
-    expect(screen.getByTestId('rarity-meter').querySelectorAll('i')).toHaveLength(4);
+    // Item 113: one bar per tier, 6 tiers; a common perch lights the first one.
+    const bars = screen.getByTestId('rarity-meter').querySelectorAll('i');
+    expect(bars).toHaveLength(6);
+    expect([...bars].filter(bar => bar.className.includes('bg-tier-common'))).toHaveLength(1);
     const note = screen.getByText('Field note');
     expect(note.nextElementSibling).toHaveTextContent('Its dark stripes hide the perch among water plants.');
     expect(card().lastElementChild).toContainElement(note);
@@ -73,6 +76,21 @@ describe('SceneInfoCard (ROADMAP item 95)', () => {
     expect(screen.getAllByText('Cumulus')).toHaveLength(1); // the title only
     expect(screen.getByText('Cloud fact')).toBeInTheDocument();
     expect(screen.queryByTestId('rarity-meter')).toBeNull();
+  });
+
+  it('shows an easter egg card: the egg kicker, the ultra rare outline and a full meter (item 113)', () => {
+    show(200, 400, {
+      kicker: 'infoKind.easterEgg', icon: 'egg', title: 'egg.ufo',
+      lines: [{ label: 'info.rarity', value: { key: 'info.rarityChance', vars: { tier: { key: 'rarity.ultraRare' }, chance: { key: 'eggChance.perNight', vars: { share: '0.5' } } } }, tier: 'ultraRare' }],
+      fact: { label: 'info.fieldNote', text: 'eggFact.ufo' }, tier: 'ultraRare',
+    });
+    expect(screen.getByRole('dialog', { name: 'UFO' })).toHaveTextContent('Ultra rare · 0.5 % per night');
+    const kicker = screen.getByTestId('scene-info-kicker');
+    expect(kicker).toHaveTextContent('Easter egg');
+    expect(kicker.className).toContain('text-tier-ultra-rare');
+    expect(card().className).toContain('border-tier-ultra-rare/50');
+    const bars = [...screen.getByTestId('rarity-meter').querySelectorAll('i')];
+    expect(bars.every(bar => bar.className.includes('bg-tier-ultra-rare'))).toBe(true);
   });
 
   it('fades in from 96 % (item 107)', () => {

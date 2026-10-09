@@ -105,7 +105,9 @@ export const saveCollection = (collection: Collection): void => {
 export const addToCollection = (collection: Collection, id: BadgeId, now: Date): Collection | null =>
   collection[id] ? null : { ...collection, [id]: now.toISOString() };
 
-export const badgeForTarget = (target: SceneInfoTarget): BadgeId => {
+// Item 113: an egg card gives no badge. The egg's badge counts when the egg shows (the rules
+// below and SunTracker), so a tap in a time preview or on the ghost (no badge) adds nothing.
+export const badgeForTarget = (target: SceneInfoTarget): BadgeId | null => {
   switch (target.type) {
     case 'fish': return `fish:${target.kind}`;
     case 'bird': return `flyer:${target.kind}`;
@@ -117,6 +119,7 @@ export const badgeForTarget = (target: SceneInfoTarget): BadgeId => {
     case 'moon':
     case 'terrain':
     case 'satellite': return target.type;
+    case 'egg': return null;
   }
 };
 

@@ -1,8 +1,12 @@
 import React, { useEffect, useRef } from 'react';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
+import { type RarityTier } from '@/utils/rarityTier';
+import { HitArea, type SceneInfoHandler } from './CloudLayer';
 
 // Hidden egg (ROADMAP "Ongoing — Easter eggs"): a small UFO glides once, slowly and
 // in a straight line, across the upper night sky. Reduced motion: no UFO.
+// Item 113: a tap opens its info card (item 95 pattern: a hit area of at least 44 px, the ring
+// inside the moving wrapper, the UFO flies on). z-1: above the scene's sky, so it takes taps.
 export const UFO_CROSSING_MS = 40_000;
 const UFO_WIDTH = 56;
 
@@ -20,9 +24,14 @@ export const UfoShape = ({ width }: { width: number }) => (
 interface UfoProps {
   // Called once the crossing ends (keep it stable: a new function restarts the crossing).
   onDone: () => void;
+  onInfo?: SceneInfoHandler;
+  ringOn?: boolean; // its info card is open
+  ringTier?: RarityTier | null;
 }
 
-const Ufo: React.FC<UfoProps> = ({ onDone }) => {
+export const UFO_RING = 'egg-ufo';
+
+const Ufo: React.FC<UfoProps> = ({ onDone, onInfo, ringOn = false, ringTier = null }) => {
   const prefersReducedMotion = usePrefersReducedMotion();
   const ref = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
@@ -60,10 +69,15 @@ const Ufo: React.FC<UfoProps> = ({ onDone }) => {
       ref={ref}
       aria-hidden="true"
       data-testid="ufo"
-      className="fixed left-0 top-[16%] pointer-events-none"
-      style={{ transform: `translateX(${-UFO_WIDTH}px)`, filter: 'drop-shadow(0 0 8px hsl(var(--brand-cyan) / 0.6))' }}
+      className={`fixed left-0 top-[16%] z-1 ${onInfo ? 'pointer-events-auto cursor-pointer' : 'pointer-events-none'}`}
+      style={{ transform: `translateX(${-UFO_WIDTH}px)` }}
+      onClick={onInfo && (event => onInfo({ type: 'egg', kind: 'ufo' }, { x: event.clientX, y: event.clientY }, UFO_RING))}
     >
-      <UfoShape width={UFO_WIDTH} />
+      {/* The glow on the drawing only, so the ring (item 113) stays clean. */}
+      <span className="block" style={{ filter: 'drop-shadow(0 0 8px hsl(var(--brand-cyan) / 0.6))' }}>
+        <UfoShape width={UFO_WIDTH} />
+      </span>
+      {onInfo && <HitArea cx={UFO_WIDTH / 2} cy={UFO_WIDTH / 4} width={UFO_WIDTH} height={UFO_WIDTH / 2} ring={ringOn} tier={ringTier} />}
     </div>
   );
 };
