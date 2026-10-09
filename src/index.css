@@ -486,12 +486,14 @@
     --scene-plane-green: 140 70% 55%;
 
     /* Astronomy easter eggs (astroEvents.ts): aurora curtains, green flash, the
-       copper moon of a lunar eclipse and the faint blue moon tint. */
+       copper moon of a lunar eclipse, the faint blue moon tint and the supermoon's
+       warm halo. */
     --scene-aurora-green: 145 80% 55%;
     --scene-aurora-violet: 280 60% 60%;
     --scene-green-flash: 130 90% 60%;
     --scene-eclipse-moon: 12 75% 38%;
     --scene-blue-moon: 205 90% 72%;
+    --scene-supermoon-glow: 40 90% 78%;
     /* Fish (ROADMAP item 85, FS1): two tones per species, a dark back over a pale belly,
        from the item 62 tints: back = the tint at 0.85 x saturation and 0.55 x lightness
        (at least 16 %), belly = 0.6 x saturation, lightness 55 % of the way to white (at
