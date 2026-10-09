@@ -4,6 +4,9 @@ import {
   isSupermoon,
   isBlueMoon,
   getMeteorShower,
+  METEOR_SHOWER,
+  meteorSpawnChance,
+  meteorOpacity,
   isAuroraTime,
   isGreenFlash,
   greenFlashRoll,
@@ -87,6 +90,32 @@ describe('getMeteorShower', () => {
     expect(getMeteorShower(new Date(2026, 11, 14, 23))).toBe('Geminids');
     expect(getMeteorShower(new Date(2027, 0, 3, 23))).toBe('Quadrantids');
     expect(getMeteorShower(new Date(2026, 7, 20, 23))).toBeNull();
+  });
+});
+
+describe('meteor shower streaks', () => {
+  it('draws long streaks 2-3 px wide that fade slowly', () => {
+    expect(METEOR_SHOWER.width).toBeGreaterThanOrEqual(2);
+    expect(METEOR_SHOWER.width).toBeLessThanOrEqual(3);
+    expect(METEOR_SHOWER.length).toBeGreaterThanOrEqual(100);
+    expect(METEOR_SHOWER.fadeOutMs).toBeGreaterThanOrEqual(300);
+  });
+
+  it('starts one meteor every ~8 s on average (wait plus flight)', () => {
+    const frameMs = 1000 / 60;
+    const meanWaitMs = frameMs / meteorSpawnChance(frameMs);
+    expect(meanWaitMs + METEOR_SHOWER.durationMs).toBeCloseTo(8000);
+    // The chance scales with the frame time, so 120 Hz shows no more meteors than 60 Hz.
+    expect(meteorSpawnChance(frameMs / 2)).toBeCloseTo(meteorSpawnChance(frameMs) / 2);
+  });
+
+  it('fades in, holds and fades out without a jump', () => {
+    expect(meteorOpacity(0)).toBe(0);
+    expect(meteorOpacity(METEOR_SHOWER.fadeInMs / 2)).toBeCloseTo(0.5);
+    expect(meteorOpacity(METEOR_SHOWER.durationMs / 2)).toBe(1);
+    expect(meteorOpacity(METEOR_SHOWER.durationMs - METEOR_SHOWER.fadeOutMs / 2)).toBeCloseTo(0.5);
+    expect(meteorOpacity(METEOR_SHOWER.durationMs)).toBe(0);
+    expect(meteorOpacity(METEOR_SHOWER.durationMs + 100)).toBe(0);
   });
 });
 

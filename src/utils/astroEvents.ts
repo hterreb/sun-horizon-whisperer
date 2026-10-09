@@ -144,8 +144,24 @@ const METEOR_SHOWERS: readonly { name: string; month: number; from: number; to: 
 export const getMeteorShower = (date: Date): string | null =>
   METEOR_SHOWERS.find((s) => s.month === date.getMonth() && date.getDate() >= s.from && date.getDate() <= s.to)
     ?.name ?? null;
-// Shooting stars per animation frame during a shower: 8x NightStars' normal 0.001.
-export const METEOR_SHOWER_RATE = 0.008;
+// Meteor streaks during a shower (NightStars): one at a time, one every ~8 s on
+// average; long, 3 px wide, slow (px per ms) and with a slow fade in and out.
+export const METEOR_SHOWER = {
+  intervalMs: 8000,
+  durationMs: 1600,
+  fadeInMs: 250,
+  fadeOutMs: 700,
+  width: 3,
+  length: 160,
+  speed: 0.2,
+} as const;
+// Chance to start a meteor in a frame of `dtMs` while none flies. The sky waits
+// (interval - duration) on average, so one starts every `intervalMs` on average.
+export const meteorSpawnChance = (dtMs: number): number =>
+  Math.min(1, dtMs / (METEOR_SHOWER.intervalMs - METEOR_SHOWER.durationMs));
+// Meteor opacity at `ageMs`: fades in, holds at 1, fades out; 0 once it is over.
+export const meteorOpacity = (ageMs: number): number =>
+  Math.max(0, Math.min(1, ageMs / METEOR_SHOWER.fadeInMs, (METEOR_SHOWER.durationMs - ageMs) / METEOR_SHOWER.fadeOutMs));
 
 // Aurora: static rule for now (the NOAA Kp index comes later).
 export const isAuroraTime = (latitude: number, timeOfDay: TimeOfDay): boolean =>
