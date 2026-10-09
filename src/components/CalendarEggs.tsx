@@ -27,6 +27,8 @@ interface CalendarEggsProps {
   infoRingTier?: RarityTier | null;
   // Christmas Eve from sunset to midnight (calendarEvents.isSantaTime), or ?egg=santa.
   santa?: boolean;
+  // A blue moon is shown (astroEvents): its label goes in the season badge.
+  blueMoon?: boolean;
 }
 
 const SEASON_TEXT: Partial<Record<CalendarEvent, MessageKey>> = {
@@ -59,7 +61,7 @@ const BAT_EYE = 'hsl(var(--scene-bat-eye))';
 
 // The calendar easter eggs (the New Year one is SunTracker's fireworks). All motion is
 // slow straight CSS glides; reduced motion turns the moving ones off.
-const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherType, moon, horizonY, onInfo, infoRing = null, infoRingTier = null, santa = false }) => {
+const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherType, moon, horizonY, onInfo, infoRing = null, infoRingTier = null, santa = false, blueMoon = false }) => {
   const prefersReducedMotion = usePrefersReducedMotion();
   const [dragonDone, setDragonDone] = useState(false);
   const [santaDone, setSantaDone] = useState(false);
@@ -73,7 +75,7 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherTy
   const isNight = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
   const { t } = useLanguage();
   const seasonKey = event ? SEASON_TEXT[event] : undefined;
-  const seasonText = seasonKey && t(seasonKey);
+  const seasonText = seasonKey ? t(seasonKey) : blueMoon && t('egg.blueMoonLabel');
   // Item 113: the wrapper of a tappable egg (pointer only, hidden from screen readers) and its
   // hit area with the ring, a child of the moving wrapper.
   // Item 116: a double tap opens the card; a single tap shows the ring for a moment.

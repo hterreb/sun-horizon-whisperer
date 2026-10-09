@@ -876,6 +876,10 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     [moonPosition.illumination, moonPosition.phase, latitude, moonRadius]
   );
 
+  // "Blue night": a blue moon turns its halo, corona and moonlight on the sea blue (astroEvents).
+  const isBlueMoonEgg = astroEvent?.kind === 'blueMoon';
+  const moonLightVar = isBlueMoonEgg ? '--scene-blue-moon' : '--scene-moon';
+
   // Cardinal direction labels (ROADMAP item 8): always on, panning together with the
   // sun/moon and hidden outside the field of view in compass mode (ROADMAP item 19).
   const cardinalLabels = useMemo(
@@ -1178,7 +1182,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             width: moonRadius * moonLook.coronaRadius * 2,
             height: moonRadius * moonLook.coronaRadius * 2,
             transform: 'translate(-50%, -50%)',
-            background: `radial-gradient(circle closest-side, hsl(var(--scene-moon) / ${0.32 * moonLook.corona * moonBright}) 0%, hsl(var(--scene-moon) / ${0.13 * moonLook.corona * moonBright}) 40%, transparent 100%)`,
+            background: `radial-gradient(circle closest-side, hsl(var(${moonLightVar}) / ${0.32 * moonLook.corona * moonBright}) 0%, hsl(var(${moonLightVar}) / ${0.13 * moonLook.corona * moonBright}) 40%, transparent 100%)`,
           }}
           data-testid="moon-corona"
         />
@@ -1200,9 +1204,11 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             top: `${moonY}px`,
             transform: 'translate(-50%, -50%)',
             opacity: moonBright * moonLook.disc,
-            // A supermoon gets a soft, static warm halo instead of the white glow.
+            // A supermoon gets a soft, static warm halo, a blue moon a blue one, instead of the white glow.
             filter: isSupermoonEgg
               ? `drop-shadow(0 0 ${moonPosition.illumination * 22}px hsl(var(--scene-supermoon-glow) / 0.55))`
+              : isBlueMoonEgg
+              ? `drop-shadow(0 0 ${moonPosition.illumination * 18}px hsl(var(--scene-blue-moon) / 0.6))`
               : `drop-shadow(0 0 ${moonPosition.illumination * 15}px hsl(var(--scene-glow-white) / 0.4))`
           }}
           data-testid="moon-disc"
@@ -1227,6 +1233,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         timeOfDay={timeOfDay}
         weatherType={weatherType}
         moon={isMoonDiscShown ? { x: moonX, y: moonY, r: moonRadius } : null}
+        blueMoon={isBlueMoonEgg && isMoonDiscShown}
         horizonY={containerDimensions.height * 0.65}
         onInfo={onSceneInfo}
         infoRing={infoRing}
@@ -1315,7 +1322,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         if (reflectionFade <= 0) return null;
 
         const reflectX = nightReflection ? moonX : sunX;
-        const reflectColor = nightReflection ? 'hsl(var(--scene-moon))' : 'hsl(var(--scene-sun-glow-low))';
+        const reflectColor = nightReflection ? `hsl(var(${moonLightVar}))` : 'hsl(var(--scene-sun-glow-low))';
         // The bars' layout follows the wind (ROADMAP item 79, X1): today's 7 in light air.
         const { bars, rowSpacing } = getReflectionBars(seaWindKmh, nightReflection ? 0.35 : 0.6);
         const bandHeight = (containerDimensions.height - horizonLabelY) * rowSpacing;
@@ -1330,8 +1337,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
               <>
                 <defs>
                   <radialGradient id="moon-pool" cx="50%" cy="0%" r="50%">
-                    <stop offset="0%" stopColor="hsl(var(--scene-moon))" stopOpacity={0.1} />
-                    <stop offset="100%" stopColor="hsl(var(--scene-moon))" stopOpacity={0} />
+                    <stop offset="0%" stopColor={`hsl(var(${moonLightVar}))`} stopOpacity={0.1} />
+                    <stop offset="100%" stopColor={`hsl(var(${moonLightVar}))`} stopOpacity={0} />
                   </radialGradient>
                 </defs>
                 <rect

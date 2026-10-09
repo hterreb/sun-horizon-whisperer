@@ -10,8 +10,10 @@ describe('MoonTint', () => {
     expect(Number(tint.getAttribute('opacity'))).toBeCloseTo(0.425);
   });
 
-  it('tints a blue moon faintly blue', () => {
+  it('tints a blue moon deep blue, at full strength', () => {
     render(<svg><MoonTint kind="blueMoon" strength={1} radius={20} /></svg>);
-    expect(screen.getByTestId('moon-tint-blueMoon').getAttribute('fill')).toContain('--scene-blue-moon');
+    const tint = screen.getByTestId('moon-tint-blueMoon');
+    expect(tint.getAttribute('fill')).toContain('--scene-blue-moon');
+    expect(tint.getAttribute('opacity')).toBe('1');
   });
 });

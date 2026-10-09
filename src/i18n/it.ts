@@ -403,6 +403,7 @@ export const it: Record<keyof typeof en, string> = {
   'egg.greenFlash': "Raggio verde",
   'egg.supermoon': "Superluna",
   'egg.blueMoon': "Luna blu",
+  'egg.blueMoonLabel': "Luna blu · seconda luna piena del mese",
   'egg.meteorShower': "Sciame meteorico",
   'egg.aurora': "Aurora polare",
   'rarity.frequent': "Frequente",

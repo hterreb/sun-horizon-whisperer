@@ -595,7 +595,7 @@ describe('SunVisualization (rendered): arc rise/zenith/set labels', () => {
 
     rerender(<SunVisualization {...moonProps} astroEvent={{ kind: 'blueMoon', strength: 1 }} />);
     expect(moonSvgWidth()).toBe(normalWidth);
-    expect(screen.getByTestId('moon-disc').style.filter).toContain('--scene-glow-white');
+    expect(screen.getByTestId('moon-disc').style.filter).toContain('--scene-blue-moon');
   });
 
   it('fades out together with the cardinal labels while idle in fullscreen (ROADMAP item 29)', () => {
@@ -1062,6 +1062,43 @@ describe('SunVisualization (rendered): sea visible at the horizon (ROADMAP item 
 
     render(<SunVisualization {...night} moonPosition={{ ...night.moonPosition, altitude: -5, visible: false }} />);
     expect(screen.queryByTestId('moon-pool')).toBeNull();
+  });
+
+  it('turns a blue moon\'s disc, halo and moonlight on the sea blue, with a label; other moons stay white', () => {
+    setMockedContainerSize(800, 600);
+    const night = {
+      ...baseProps,
+      timeOfDay: 'night' as const,
+      sunPosition: { azimuth: 0, altitude: -30 },
+      moonPosition: { azimuth: 180, altitude: 30, phase: 0.5, illumination: 1, visible: true },
+    };
+    const look = () => ({
+      glow: screen.getByTestId('moon-disc').style.filter,
+      bar: screen.getByTestId('water-reflection').querySelector('rect:not([data-testid])')?.getAttribute('fill'),
+      pool: screen.getByTestId('water-reflection').querySelector('#moon-pool stop')?.getAttribute('stop-color'),
+      badge: screen.queryByTestId('season-badge')?.textContent ?? null,
+    });
+
+    const { rerender } = render(<SunVisualization {...night} astroEvent={{ kind: 'blueMoon', strength: 1 }} />);
+    expect(screen.getByTestId('moon-tint-blueMoon').getAttribute('opacity')).toBe('1');
+    expect(look()).toEqual({
+      glow: expect.stringContaining('--scene-blue-moon'),
+      bar: 'hsl(var(--scene-blue-moon))',
+      pool: 'hsl(var(--scene-blue-moon))',
+      badge: 'Blue moon · second full moon this month',
+    });
+
+    for (const astroEvent of [null, { kind: 'lunarEclipse' as const, strength: 1 }]) {
+      rerender(<SunVisualization {...night} astroEvent={astroEvent} />);
+      expect(screen.queryByTestId('moon-tint-blueMoon')).toBeNull();
+      expect(look()).toEqual({
+        glow: expect.stringContaining('--scene-glow-white'),
+        bar: 'hsl(var(--scene-moon))',
+        pool: 'hsl(var(--scene-moon))',
+        badge: null,
+      });
+    }
+    expect(screen.getByTestId('moon-tint-lunarEclipse').getAttribute('opacity')).toBe('0.85');
   });
 });
 
