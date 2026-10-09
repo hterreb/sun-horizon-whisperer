@@ -96,10 +96,10 @@ describe('CalendarEggs', () => {
     expect(screen.queryByTestId('santa')).toBeNull();
   });
 
-  it('shows Santa only with the Christmas event', () => {
+  it('shows Santa on Christmas Eve without the Christmas snow (snow is Dec 25-26)', () => {
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
-    render(<CalendarEggs {...base} event="friday-13" santa />);
-    expect(screen.queryByTestId('santa')).toBeNull();
+    render(<CalendarEggs {...base} event={null} santa />);
+    expect(screen.getByTestId('santa')).toBeInTheDocument();
   });
 
   it('walks the black cat once, then removes it', () => {

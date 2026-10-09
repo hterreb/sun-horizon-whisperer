@@ -12,7 +12,7 @@ export type CalendarEvent =
   | 'equinox'
   | 'halloween-pumpkin' // Oct 31, full moon within 3 days: a pumpkin moon
   | 'halloween-bats' // Oct 31, else: bats all night
-  | 'christmas'; // Dec 24-26: light snow
+  | 'christmas'; // Dec 25-26: light snow (Santa flies on Dec 24: isSantaTime)
 
 // Mean solstice/equinox instants, Meeus "Astronomical Algorithms" table 27.B
 // (years 2000-3000). No periodic terms, so the error is up to about 30 min; this
@@ -50,7 +50,7 @@ const isHalloweenFullMoon = (year: number) => getNextFullMoon(new Date(year, 9, 
 
 // One event id, or null. When two could apply, the most specific (shortest) wins:
 // the New Year minute, then single days (Lunar New Year, Friday the 13th, solstice/equinox,
-// Halloween), then the 3 Christmas days. Without a latitude, the north is assumed.
+// Halloween), then the 2 Christmas days. Without a latitude, the north is assumed.
 export const getCalendarEvent = (date: Date, latitude = 0): CalendarEvent | null => {
   const month = date.getMonth();
   const day = date.getDate();
@@ -60,7 +60,7 @@ export const getCalendarEvent = (date: Date, latitude = 0): CalendarEvent | null
   const season = getSeasonEvent(date, latitude);
   if (season) return season;
   if (month === 9 && day === 31) return isHalloweenFullMoon(date.getFullYear()) ? 'halloween-pumpkin' : 'halloween-bats';
-  if (month === 11 && day >= 24 && day <= 26) return 'christmas';
+  if (month === 11 && day >= 25 && day <= 26) return 'christmas';
   return null;
 };
 
@@ -84,7 +84,7 @@ export const getEventDaysPerYear = (event: CalendarEvent): number => {
 };
 
 // Christmas Eve (ROADMAP "Ongoing", Calendar): Santa flies once on Dec 24, from sunset to local
-// midnight. He is part of the 'christmas' event (no more specific event falls on Dec 24).
+// midnight. He is not part of the 'christmas' event: the snow starts on Dec 25.
 // `sunTimes` are the scene's sun times for this day. At polar day there is no night, so no Santa.
 // At polar night the sunset field holds the 18:00 fallback, so he flies from 18:00.
 // Between 00:00 and solar midnight the sun times can hold the Dec 23 sunset (SunCalc takes the
