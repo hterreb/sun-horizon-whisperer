@@ -38,15 +38,24 @@ export const getSeasonInstant = (year: number, month: 2 | 5 | 8 | 11): Date => {
   return new Date((jde - 2440587.5) * 86_400_000);
 };
 
-// The solstice/equinox egg's sun-path traces: the June and/or December solstice day that is
-// not today (both on an equinox), at today's clock time, so getSunPathAround picks the same
-// pass (current or next) as today's arc. Empty for any other event.
+// The solstice/equinox egg's sun-path fan, like a sundial chart: the June solstice, equinox
+// and December solstice days (the same three in the south), each at today's clock time, so
+// getSunPathAround picks the same pass (current or next) as today's arc. The day that is
+// today keeps `date` itself and is marked `today`. The equinox is today's on an equinox
+// (March on Nowruz), else September's. Empty for any other event.
 const ONE_DAY_MS = 86_400_000;
-export const getSolsticeTraceDates = (event: CalendarEvent | null, date: Date): Date[] => {
-  if (event !== 'solstice-longest' && event !== 'solstice-shortest' && event !== 'equinox') return [];
-  return ([5, 11] as const).filter((m) => m !== date.getMonth()).map((m) => {
+export type SeasonPath = 'june' | 'equinox' | 'december';
+export const getSolsticeTraceDates = (
+  event: CalendarEvent | null,
+  date: Date
+): { season: SeasonPath; date: Date; today: boolean }[] => {
+  if (event !== 'solstice-longest' && event !== 'solstice-shortest' && event !== 'equinox' && event !== 'nowruz') return [];
+  const month = date.getMonth();
+  const seasons = [['june', 5], ['equinox', month === 2 ? 2 : 8], ['december', 11]] as const;
+  return seasons.map(([season, m]) => {
+    if (m === month) return { season, date, today: true };
     const days = Math.round((getSeasonInstant(date.getFullYear(), m).getTime() - date.getTime()) / ONE_DAY_MS);
-    return new Date(date.getTime() + days * ONE_DAY_MS);
+    return { season, date: new Date(date.getTime() + days * ONE_DAY_MS), today: false };
   });
 };
 

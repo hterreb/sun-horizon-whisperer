@@ -234,6 +234,14 @@ export const getSunTimes = (date: Date, latitude: number, longitude: number): Su
   };
 };
 
+// Day length in whole minutes, sunset - sunrise; 24 h on a polar day, 0 on a polar night
+// (getSunTimes' fallback times are not real).
+export const getDayLengthMinutes = (date: Date, latitude: number, longitude: number): number => {
+  const times = getSunTimes(date, latitude, longitude);
+  if (times.polar) return times.polar === 'day' ? 24 * 60 : 0;
+  return Math.round((times.sunset.getTime() - times.sunrise.getTime()) / 60_000);
+};
+
 // 24-hour "18:42" in the UI language (ROADMAP item 67); "—" for a missing time.
 export const formatTime = (date: Date | null, locale?: string): string => {
   if (!isValidDate(date)) return '—';

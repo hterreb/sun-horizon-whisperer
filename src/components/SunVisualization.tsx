@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { Sun, ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp, Mountain, BellOff } from 'lucide-react';
-import { type SunPosition, type SunTimes, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors, getReflectionFade, getSunPathAround } from '../utils/sunUtils';
+import { type SunPosition, type SunTimes, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors, getReflectionFade, getSunPathAround, getDayLengthMinutes } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
 import { getSunArcLabels, getMoonArcLabels, getTerrainArcLabels, getTerrainMoonArcLabels, type ArcLabels, type ArcLabelPoint } from '../utils/arcLabels';
 import { shortestHeadingDelta } from '../utils/compassUtils';
@@ -14,7 +14,7 @@ import FestivalEggs from './FestivalEggs';
 import PlayfulEggs from './PlayfulEggs';
 import { useAprilFoolsSwap } from '@/hooks/useAprilFoolsSwap';
 import { type PlayfulEgg } from '@/utils/playfulEggs';
-import { type CalendarEvent, getSolsticeTraceDates } from '@/utils/calendarEvents';
+import { type CalendarEvent, type SeasonPath, getSolsticeTraceDates } from '@/utils/calendarEvents';
 import PremiumBadge from './PremiumBadge';
 import WeatherEffects from './WeatherEffects';
 import SolarEclipse from '@/components/SolarEclipse';
@@ -521,6 +521,13 @@ const ARC_LABEL_HALF_WIDTH = 32;
 const ARC_LABEL_HEIGHT = 22;
 // Half the widest cardinal pill ("NW"), so a label at the 0°/360° edge stays whole (AUDIT A-8).
 const CARDINAL_LABEL_HALF_WIDTH = 18;
+// Half the solstice fan's day-length pill ("Equinox · 12 h 8 min").
+const FAN_PILL_HALF_WIDTH = 70;
+const FAN_PILL_NAMES: Record<SeasonPath, MessageKey> = {
+  june: 'egg.fanJune',
+  equinox: 'egg.fanEquinox',
+  december: 'egg.fanDecember',
+};
 const COLLAPSED_PANEL_HEIGHT = 112;
 
 // The collapsed InfoPanel's box (InfoPanel.tsx root classes): top-right, 300 px wide or
@@ -808,18 +815,27 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     [arcLabelMinuteKey, latitude, longitude]
   );
 
-  // Solstice/equinox egg: faint traces of the other solstice day's sun path (both on an
-  // equinox), drawn like the sun arc, so today's arc reads as long or short.
+  // Solstice/equinox egg: the sun-path fan, like a sundial chart - the June solstice,
+  // equinox and December solstice paths, drawn like the sun arc, today's bold and gold.
+  // Each gets its day length and the screen point of its apex (null outside the view).
   const solsticeTracePaths = useMemo(() => {
     const { width, height } = containerDimensions;
     if (width === 0 || height === 0) return [];
+    const toXY = (p: { altitude: number; azimuth: number }) =>
+      getArcScreenPosition(p.altitude, p.azimuth, width, height, latitude, compassHeading);
     return getSolsticeTraceDates(calendarEvent, date)
-      .map((d) => buildArcPath(
-        getSunPathAround(d, latitude, longitude),
-        (p) => getArcScreenPosition(p.altitude, p.azimuth, width, height, latitude, compassHeading),
-        width
-      ))
-      .filter(Boolean);
+      .map(({ season, date: day, today }) => {
+        const path = getSunPathAround(day, latitude, longitude);
+        const top = path.reduce((a, b) => (b.altitude > a.altitude ? b : a), path[0]);
+        return {
+          season,
+          today,
+          d: buildArcPath(path, toXY, width),
+          minutes: getDayLengthMinutes(day, latitude, longitude),
+          apex: top && top.altitude > 0 ? toXY(top) : null,
+        };
+      })
+      .filter((trace) => trace.d);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on arcLabelMinuteKey, not `date` itself
   }, [calendarEvent, arcLabelMinuteKey, containerDimensions, latitude, longitude, compassHeading]);
 
@@ -981,6 +997,26 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     .map(offSunLabels)
     .filter(notCoveredBy(moonTerrainArcLabelPositions));
 
+  // Day-length pills of the sun-path fan: just above each apex (the noon label sits below
+  // it), today's first. A pill that would cover an arc label or an earlier fan pill steps
+  // down into the arc (ponytail: max 2 steps), else it is hidden.
+  const arcLabelsShown = [...sunArcLabelPositions, ...terrainArcLabelPositions, ...moonArcLabelPositions, ...moonTerrainArcLabelPositions];
+  const fanPillPositions = solsticeTracePaths
+    .filter((trace) => trace.apex)
+    .sort((a, b) => Number(b.today) - Number(a.today))
+    .reduce<Array<(typeof solsticeTracePaths)[number] & { x: number; y: number }>>((kept, trace) => {
+      const { width } = containerDimensions;
+      const x = Math.max(FAN_PILL_HALF_WIDTH, Math.min(width - FAN_PILL_HALF_WIDTH, trace.apex!.x));
+      const top = avoidCollapsedPanel({ ...trace, x, y: trace.apex!.y - ARC_LABEL_HEIGHT }, width);
+      const isClear = (pill: { x: number; y: number }) => {
+        const hits = (other: { x: number; y: number }, halfWidth: number) =>
+          Math.abs(other.x - pill.x) < halfWidth + FAN_PILL_HALF_WIDTH && Math.abs(other.y - pill.y) < ARC_LABEL_HEIGHT;
+        return !arcLabelsShown.some((l) => hits(l, ARC_LABEL_HALF_WIDTH)) && !kept.some((k) => hits(k, FAN_PILL_HALF_WIDTH));
+      };
+      const pill = [0, 1, 2].map((step) => ({ ...top, y: top.y + step * ARC_LABEL_HEIGHT })).find(isClear);
+      return pill ? [...kept, pill] : kept;
+    }, []);
+
   // Rainbow (ROADMAP item 10): raining/drizzling, opposite the sun's azimuth, using the
   // same azimuth->x mapping as the sun/moon.
   const rainbowGeometry = useMemo(
@@ -1114,18 +1150,6 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
       {(sunArcPath || moonArcPath || solsticeTracePaths.length > 0) && (
         <svg className="absolute inset-0 w-full h-full pointer-events-none">
-          {solsticeTracePaths.map((d) => (
-            <path
-              key={d}
-              data-testid="solstice-trace"
-              d={d}
-              fill="none"
-              stroke="hsl(var(--scene-solstice-trace))"
-              strokeOpacity={0.35}
-              strokeWidth={1}
-              strokeDasharray="4 6"
-            />
-          ))}
           {sunArcPath && (
             <path
               d={sunArcPath}
@@ -1136,6 +1160,26 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
               strokeWidth={2}
             />
           )}
+          {/* Solstice/equinox fan, over the sun arc: today's path bold and gold on a soft
+              glow, the other two thin white dashes. */}
+          {solsticeTracePaths.map(({ season, today, d }) => (
+            <g key={season}>
+              {today && (
+                <path d={d} fill="none" stroke="hsl(var(--scene-solstice-trace))" strokeOpacity={0.25} strokeWidth={9} strokeLinecap="round" />
+              )}
+              <path
+                data-testid="solstice-trace"
+                data-today={today}
+                d={d}
+                fill="none"
+                stroke={today ? 'hsl(var(--scene-solstice-trace))' : 'hsl(var(--scene-solstice-fan))'}
+                strokeOpacity={today ? 1 : 0.8}
+                strokeWidth={today ? 3 : 1.4}
+                strokeDasharray={today ? undefined : '5 5'}
+                strokeLinecap="round"
+              />
+            </g>
+          ))}
           {moonArcPath && (
             <path
               d={moonArcPath}
@@ -1497,6 +1541,34 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
               <span className="text-caption text-white/90 bg-panel-background border border-panel-border px-2 py-0.5 rounded-full">
                 {t(DIRECTION_LABELS[label])}
               </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {fanPillPositions.length > 0 && (
+        // Day lengths of the solstice/equinox fan, styled like the arc labels below.
+        <div
+          className={`absolute inset-0 z-9 pointer-events-none transition-opacity duration-300 ${
+            cardinalLabelsVisible ? 'opacity-100' : 'opacity-0'
+          }`}
+          aria-hidden="true"
+        >
+          {fanPillPositions.map((pill) => (
+            <div
+              key={pill.season}
+              data-testid="solstice-pill"
+              data-today={pill.today}
+              className="absolute whitespace-nowrap text-caption tabular-nums bg-panel-background/70 border border-panel-border/40 px-1.5 py-0.5 rounded-full"
+              style={{
+                left: `${pill.x}px`,
+                top: `${pill.y}px`,
+                transform: 'translate(-50%, -50%)',
+                color: pill.today ? 'hsl(var(--scene-solstice-trace))' : 'hsl(var(--scene-solstice-fan))',
+              }}
+            >
+              {t(pill.today ? 'egg.fanToday' : FAN_PILL_NAMES[pill.season])} ·{' '}
+              {t('egg.fanDayLength', { hours: Math.floor(pill.minutes / 60), minutes: pill.minutes % 60 })}
             </div>
           ))}
         </div>

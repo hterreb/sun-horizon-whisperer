@@ -1,4 +1,4 @@
-import { getSunPosition, getSunTimes, getTimeOfDay, getRelevantTwilightTimes, formatTime, getGoldenHourTimes, getBlueHourTimes, getNextGoldenBlueHours, mixGradientTowardOvercast, getSunPathAround, getBackgroundGradient, findSunPass, getWaterColors, getReflectionFade } from '../src/utils/sunUtils';
+import { getSunPosition, getSunTimes, getTimeOfDay, getRelevantTwilightTimes, formatTime, getGoldenHourTimes, getBlueHourTimes, getNextGoldenBlueHours, mixGradientTowardOvercast, getSunPathAround, getBackgroundGradient, findSunPass, getWaterColors, getReflectionFade, getDayLengthMinutes } from '../src/utils/sunUtils';
 describe('sunUtils', () => {
   it('calculates sun position', () => {
     const pos = getSunPosition(new Date(), 0, 0);
@@ -476,5 +476,19 @@ describe('sunUtils', () => {
         expect(pass!.end.getTime() - pass!.start.getTime()).toBeGreaterThan(6 * 60 * 60 * 1000);
       }
     });
+  });
+});
+
+describe('getDayLengthMinutes', () => {
+  it('is sunset - sunrise: about 16 h, 12 h and 8 h 20 min in Ravensburg in June, September and December', () => {
+    expect(getDayLengthMinutes(new Date(2027, 5, 21, 12), 47.78, 9.61)).toBeGreaterThan(15 * 60 + 50);
+    expect(getDayLengthMinutes(new Date(2027, 5, 21, 12), 47.78, 9.61)).toBeLessThan(16 * 60 + 30);
+    expect(Math.abs(getDayLengthMinutes(new Date(2027, 8, 23, 12), 47.78, 9.61) - 12 * 60)).toBeLessThan(20);
+    expect(Math.abs(getDayLengthMinutes(new Date(2027, 11, 22, 12), 47.78, 9.61) - (8 * 60 + 20))).toBeLessThan(15);
+  });
+
+  it('is 24 h on a polar day and 0 on a polar night', () => {
+    expect(getDayLengthMinutes(new Date(2027, 5, 21, 12), 78.2, 15.6)).toBe(24 * 60);
+    expect(getDayLengthMinutes(new Date(2027, 11, 22, 12), 78.2, 15.6)).toBe(0);
   });
 });
