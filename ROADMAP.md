@@ -2357,19 +2357,21 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 
 ### 119. A calm rain sound when it rains — S
 
-- **Request (2026-10-09):** "lo-fi calm low rain sound when it is raining".
-- **Now:** the rain is only seen (item 77). The only sounds are the radio (`MusicPlayer`, lo-fi streams) and the countdown (`useSunsetCountdown`, Web Audio tones).
-- **Assumption:** the rain sound goes with the radio. It plays only while the radio plays, so it needs no new button, and the browser's autoplay rule is met (the radio's play tap is the user gesture). A rain sound without the radio is an open question.
+- **Request (2026-10-09):** "lo-fi calm low rain sound when it is raining". Then: "make it play with the radio but also make it able to play on its own, button should be in the audio control panel".
+- **Now:** the rain is only seen (item 77). The only sounds are the radio (`MusicPlayer`, lo-fi streams) and the countdown (`useSunsetCountdown`, Web Audio tones). The audio control panel is the radio pill at the bottom left: switch, `Music` icon, station name, next, volume icon, slider.
 - **Spec:**
   1. **Sound:** synthesized with Web Audio, no audio file: a looped noise buffer (pink or brown noise) through a low-pass filter (about 1–2 kHz), so it is a soft, low hiss and not a white-noise rush. No thunder, no single drop clicks. No new host, so no CSP change and no licence.
-  2. **When:** the weather type is `drizzle`, `rain` or `thunderstorm` (live or manual weather, and the time-travel forecast of item 86), and the radio plays. Snow and hail: no sound.
-  3. **Level:** quiet under the music. The rain gain is a fixed share of the radio slider volume (start at 0.25×), and the radio mute mutes it too. More rain is a little louder: the gain follows item 77's `t` (0.6× at drizzle up to 1× at a storm). Keep it calm: no level jumps.
-  4. **Fades:** 3 s fade in when rain starts or the radio starts, 3 s fade out when it stops. A change of amount ramps over 3 s.
-  5. **Shared context:** use one `AudioContext` for the app. Move `getAudioContext` from `useSunsetCountdown.ts` to a small util and use it in both places.
-  6. **Background (item 90):** the rain sound follows the radio. When the radio keeps playing in the background, the rain goes on too; when the radio pauses, the rain fades out.
-  7. No new UI text, so no i18n keys. If the open question adds a toggle, it needs keys in the 5 languages.
-- **Done when:** util tests (rain types give a gain, the other types give 0; the gain grows with `t`; it is a share of the radio volume; mute gives 0). A `MusicPlayer` (or hook) test with a mocked `AudioContext`: radio on + rain starts the noise and ramps the gain up over 3 s; radio off ramps it down; no rain, no noise node. By ear on a phone: calm, low, under the music, no clicks at the loop point.
-- **Open:** should the rain sound also play without the radio (its own small toggle, off by default)?
+  2. **When it rains:** the weather type is `drizzle`, `rain` or `thunderstorm` (live or manual weather, and the time-travel forecast of item 86). Snow and hail: no sound.
+  3. **Button:** a toggle button in the radio pill, after the next button: lucide `CloudRain`, `aria-pressed`, `aria-label` "Rain sound" (key `music.rain` in the 5 languages). The same style as the next button; pressed is full white, not pressed is `text-white/50`. It shows only while it rains (point 2).
+  4. **One state, `rainOn`** (in `MusicPlayer`, not saved, off at page load):
+     - The radio switch on sets `rainOn` true, so the rain plays with the radio. The radio switch off sets it false.
+     - The rain button toggles `rainOn` alone. With the radio off, it plays the rain on its own. With the radio on, it turns the rain off under the music.
+     - The rain sound plays when `rainOn` and it rains. Rain that stops fades the sound out; rain that comes back while `rainOn` is still true fades it in.
+     - Not saved, because a browser does not play sound before a tap. The tap on the switch or the button is the user gesture.
+  5. **Level:** the slider sets both. The rain gain is slider × 0.25 with the radio on (quiet under the music) and slider × 0.6 alone. Slider at 0 mutes both. More rain is a little louder: × 0.6 at drizzle up to × 1 at a storm (item 77's `t`). No level jumps: each change ramps over 3 s, and start and stop fade over 3 s.
+  6. **Shared context:** one `AudioContext` for the app. Move `getAudioContext` from `useSunsetCountdown.ts` to a small util and use it in both places.
+  7. **Background (item 90):** with the radio on, the rain goes on in the background with it. Rain alone has no Media Session, so a phone can stop it in the background. Accepted; no Media Session for rain alone.
+- **Done when:** util tests (rain types give a gain, other types 0; the gain grows with `t`; radio on 0.25×, alone 0.6×; slider 0 gives 0). `MusicPlayer` tests with a mocked `AudioContext`: the rain button shows only while it rains; the radio switch on presses it and starts the noise with a 3 s ramp; the button alone with the radio off plays the rain; the button off with the radio on stops only the rain; the radio switch off stops both. `tests/i18n.test.ts` passes. By ear on a phone: calm, low, under the music, no click at the loop point.
 ---
 
 ## Ongoing — Easter eggs and special events (S each, pick any time)
