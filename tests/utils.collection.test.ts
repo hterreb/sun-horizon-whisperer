@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   BADGES, COLLECTION_STORAGE_KEY, addToCollection, badgeForAstroEvent, badgeForCalendarEvent, badgeForTarget,
-  countCollected, isCollectionPaused, loadCollection, saveCollection, type BadgeId, type CalendarBadgeOptions,
+  countCollected, getMoonState, getSunState, getTerrainBand, isCollectionPaused, loadCollection, saveCollection,
+  stateBadgeForTarget, type BadgeId, type CalendarBadgeOptions, type StateBadgeContext,
 } from '@/utils/collection';
+import { type HorizonProfile } from '@/utils/horizonUtils';
 import { FISH_WEIGHTS, BIRD_WEIGHTS, type FishKind } from '@/utils/weatherEffectsUtils';
 
 // ROADMAP item 112: the collection badges.
@@ -16,10 +18,10 @@ describe('collection (ROADMAP item 112)', () => {
     vi.restoreAllMocks();
   });
 
-  it('has 68 badges with unique ids, one for every fish, flyer, boat and cloud type', () => {
+  it('has 86 badges with unique ids, one for every fish, flyer, boat and cloud type', () => {
     const ids = BADGES.map(b => b.id);
-    expect(ids).toHaveLength(68);
-    expect(new Set(ids).size).toBe(68);
+    expect(ids).toHaveLength(86); // item 115: 68 + 5 sun + 5 terrain + 8 moon states
+    expect(new Set(ids).size).toBe(86);
     for (const kind of [...FISH_WEIGHTS.map(([k]) => k), ...NIGHT_ONLY]) expect(ids).toContain(`fish:${kind}`);
     for (const kind of [...BIRD_WEIGHTS.map(([k]) => k), 'bat']) expect(ids).toContain(`flyer:${kind}`);
     for (const kind of ['sailboat', 'ferry', 'fishing', 'rowboat', 'freighter']) expect(ids).toContain(`boat:${kind}`);
@@ -119,5 +121,87 @@ describe('collection (ROADMAP item 112)', () => {
 
   it('counts known badges only', () => {
     expect(countCollected({ sun: 'x', 'egg:ufo': 'y', ['fish:nemo' as BadgeId]: 'z' })).toBe(2);
+  });
+});
+
+describe('state badges (ROADMAP item 115)', () => {
+  // A ridge 1000 m high at 90°, 499 m elsewhere.
+  const ridgeHeights = Array.from({ length: 360 }, (_, i) => (i === 90 ? 1000 : 499));
+  const profile: HorizonProfile = {
+    angles: new Array(360).fill(1), observerElevation: 400, eyeHeight: 1.7,
+    ridgeDistances: new Array(360).fill(5000), ridgeHeights,
+  };
+  const ctx: StateBadgeContext = { timeOfDay: 'midday', moonPhase: 0.5, horizonProfile: profile, isTimePreview: false };
+
+  it('keeps the base badges and adds 5 sun, 8 moon and 5 terrain states after their base', () => {
+    const ids = BADGES.map(b => b.id);
+    for (const base of ['sun', 'moon', 'terrain'] as const) {
+      const states = BADGES.filter(b => b.base === base).map(b => b.id);
+      expect(states).toHaveLength(base === 'moon' ? 8 : 5);
+      expect(ids.slice(ids.indexOf(base) + 1, ids.indexOf(base) + 1 + states.length)).toEqual(states);
+    }
+    expect(BADGES.filter(b => b.base).every(b => b.group === 'sky' && b.rarity === null)).toBe(true);
+  });
+
+  it('gives the height band at the limits 500 / 1000 / 2000 / 3000 m', () => {
+    expect(getTerrainBand(0)).toBe('hills');
+    expect(getTerrainBand(499.9)).toBe('hills');
+    expect(getTerrainBand(500)).toBe('lowMountains');
+    expect(getTerrainBand(999)).toBe('lowMountains');
+    expect(getTerrainBand(1000)).toBe('mountains');
+    expect(getTerrainBand(1999)).toBe('mountains');
+    expect(getTerrainBand(2000)).toBe('highMountains');
+    expect(getTerrainBand(2999)).toBe('highMountains');
+    expect(getTerrainBand(3000)).toBe('alpine');
+    expect(getTerrainBand(4808)).toBe('alpine');
+  });
+
+  it('gives a sun state for each daytime time of day, none at night or in the twilights', () => {
+    expect(['dawn', 'morning', 'midday', 'afternoon', 'evening'].map(t => getSunState(t as StateBadgeContext['timeOfDay'])))
+      .toEqual(['dawn', 'morning', 'midday', 'afternoon', 'evening']);
+    for (const t of ['night', 'astronomical-twilight', 'nautical-twilight', 'civil-twilight'] as const) expect(getSunState(t)).toBeNull();
+  });
+
+  it('gives a moon state for each of the 8 phases', () => {
+    expect([0, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 0.99].map(getMoonState)).toEqual([
+      'new', 'waxingCrescent', 'firstQuarter', 'waxingGibbous', 'full', 'waningGibbous', 'thirdQuarter', 'waningCrescent', 'new',
+    ]);
+  });
+
+  it('maps a tap on the sun, the moon or the terrain to its state badge', () => {
+    expect(stateBadgeForTarget({ type: 'sun' }, ctx)).toBe('sun:midday');
+    expect(stateBadgeForTarget({ type: 'sun' }, { ...ctx, timeOfDay: 'civil-twilight' })).toBeNull();
+    expect(stateBadgeForTarget({ type: 'moon' }, ctx)).toBe('moon:full');
+    expect(stateBadgeForTarget({ type: 'moon' }, { ...ctx, moonPhase: 0 })).toBe('moon:new');
+    expect(stateBadgeForTarget({ type: 'terrain', azimuth: 90 }, ctx)).toBe('terrain:mountains');
+    expect(stateBadgeForTarget({ type: 'terrain', azimuth: 200 }, ctx)).toBe('terrain:hills');
+    expect(stateBadgeForTarget({ type: 'terrain', azimuth: 90 }, { ...ctx, horizonProfile: null })).toBeNull();
+    expect(stateBadgeForTarget({ type: 'fish', kind: 'perch' }, ctx)).toBeNull();
+  });
+
+  it('gives no sun or moon state in a time preview; the ridge height still counts', () => {
+    const preview = { ...ctx, isTimePreview: true };
+    expect(stateBadgeForTarget({ type: 'sun' }, preview)).toBeNull();
+    expect(stateBadgeForTarget({ type: 'moon' }, preview)).toBeNull();
+    expect(stateBadgeForTarget({ type: 'terrain', azimuth: 90 }, preview)).toBe('terrain:mountains');
+  });
+
+  it('one tap gives the base and the state badge; a second tap adds nothing', () => {
+    const now = new Date('2026-10-09T11:00:00Z');
+    const target = { type: 'sun' } as const;
+    let c = addToCollection({}, badgeForTarget(target)!, now)!;
+    c = addToCollection(c, stateBadgeForTarget(target, ctx)!, now)!;
+    expect(Object.keys(c)).toEqual(['sun', 'sun:midday']);
+    expect(addToCollection(c, 'sun', now)).toBeNull();
+    expect(addToCollection(c, 'sun:midday', now)).toBeNull();
+  });
+
+  it('loads an old save (item 112 ids only) as it is', () => {
+    const old = { sun: '2026-10-01T10:00:00.000Z', moon: '2026-10-02T22:00:00.000Z', terrain: '2026-10-03T12:00:00.000Z', 'fish:perch': '2026-10-04T12:00:00.000Z' };
+    localStorage.setItem(COLLECTION_STORAGE_KEY, JSON.stringify(old));
+    expect(loadCollection()).toEqual(old);
+    expect(countCollected(loadCollection())).toBe(4);
+    saveCollection({ ...old, 'terrain:alpine': '2026-10-09T12:00:00.000Z' });
+    expect(loadCollection()['terrain:alpine']).toBe('2026-10-09T12:00:00.000Z');
   });
 });

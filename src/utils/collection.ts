@@ -8,21 +8,33 @@ import { getBoatShare, getFishShare, getFlyerShare, type BirdKind, type BoatKind
 import { type CloudType } from './skyCloudUtils';
 import { type CalendarEvent } from './calendarEvents';
 import { type AstroEventKind } from './astroEvents';
+import { type TimeOfDay } from './sunUtils';
+import { getMoonPhaseIndex } from './moonUtils';
+import { ridgeAt, type HorizonProfile } from './horizonUtils';
 
 export type EggKind =
   | 'sunglasses' | 'ufo' | 'disco'
   | 'newYear' | 'friday13' | 'lunarNewYear' | 'solstice' | 'equinox' | 'halloweenPumpkin' | 'halloweenBats' | 'christmas'
   | 'solarEclipse' | 'lunarEclipse' | 'greenFlash' | 'supermoon' | 'blueMoon' | 'meteorShower' | 'aurora';
+// Item 115: the states of the sun, the moon and the terrain.
+export type SunState = 'dawn' | 'morning' | 'midday' | 'afternoon' | 'evening';
+export type MoonState =
+  | 'new' | 'waxingCrescent' | 'firstQuarter' | 'waxingGibbous' | 'full' | 'waningGibbous' | 'thirdQuarter' | 'waningCrescent';
+export type TerrainBand = 'hills' | 'lowMountains' | 'mountains' | 'highMountains' | 'alpine';
+export type StateBase = 'sun' | 'moon' | 'terrain';
 export type BadgeGroup = 'fish' | 'flyer' | 'boat' | 'sky' | 'cloud' | 'egg';
 export type BadgeId =
   | `fish:${FishKind}` | `flyer:${BirdKind | 'bat'}` | `boat:${BoatKind}` | 'plane' | `cloud:${CloudType}`
-  | 'sun' | 'moon' | 'terrain' | 'satellite' | `egg:${EggKind}`;
+  | 'sun' | 'moon' | 'terrain' | 'satellite' | `egg:${EggKind}`
+  | `sun:${SunState}` | `moon:${MoonState}` | `terrain:${TerrainBand}`;
 export interface Badge {
   id: BadgeId;
   group: BadgeGroup;
   name: MessageKey;
   // The rarity tier of the spawn share; eggs are ultra rare (item 113); null for things that are not rolled.
   rarity: MessageKey | null;
+  // Item 115: a state badge has the base badge it belongs to (the grid row).
+  base?: StateBase;
 }
 
 // The first-seen time (ISO) of each badge found.
@@ -49,6 +61,22 @@ const CLOUDS: [CloudType, MessageKey][] = [
   ['Ci', 'cloud.Ci'], ['Cs', 'cloud.Cs'], ['Ac', 'cloud.Ac'], ['As', 'cloud.As'], ['Cu', 'cloud.Cu'], ['Sc', 'cloud.Sc'],
   ['St', 'cloud.St'], ['Ns', 'cloud.Ns'], ['Cb', 'cloud.Cb'], ['Len', 'cloud.Len'], ['Mam', 'cloud.Mam'],
 ];
+// Item 115. The sun states in the order of the day (getTimeOfDay), the moon states in the
+// order of getMoonPhaseIndex, the terrain bands from low to high.
+export const SUN_STATES: [SunState, MessageKey][] = [
+  ['dawn', 'badge.sunDawn'], ['morning', 'badge.sunMorning'], ['midday', 'badge.sunMidday'],
+  ['afternoon', 'badge.sunAfternoon'], ['evening', 'badge.sunEvening'],
+];
+export const MOON_STATES: [MoonState, MessageKey][] = [
+  ['new', 'moonPhase.new'], ['waxingCrescent', 'moonPhase.waxingCrescent'], ['firstQuarter', 'moonPhase.firstQuarter'],
+  ['waxingGibbous', 'moonPhase.waxingGibbous'], ['full', 'moonPhase.full'], ['waningGibbous', 'moonPhase.waningGibbous'],
+  ['thirdQuarter', 'moonPhase.thirdQuarter'], ['waningCrescent', 'moonPhase.waningCrescent'],
+];
+export const TERRAIN_BANDS: [TerrainBand, MessageKey][] = [
+  ['hills', 'badge.terrainHills'], ['lowMountains', 'badge.terrainLowMountains'], ['mountains', 'badge.terrainMountains'],
+  ['highMountains', 'badge.terrainHighMountains'], ['alpine', 'badge.terrainAlpine'],
+];
+
 const EGGS: [EggKind, MessageKey][] = [
   ['sunglasses', 'egg.sunglasses'], ['ufo', 'egg.ufo'], ['disco', 'egg.disco'],
   ['newYear', 'egg.newYear'], ['friday13', 'egg.friday13'], ['lunarNewYear', 'egg.lunarNewYear'],
@@ -69,10 +97,14 @@ export const BADGES: readonly Badge[] = [
   ...FLYERS.map(([kind, name]): Badge => ({ id: `flyer:${kind}`, group: 'flyer', name, rarity: getRarityTier(getFlyerShare(kind, BADGE_BAT_SHARE)) })),
   ...BOATS.map(([kind, name]): Badge => ({ id: `boat:${kind}`, group: 'boat', name, rarity: getRarityTier(getBoatShare(kind)) })),
   { id: 'plane', group: 'sky', name: 'plane.airliner', rarity: null },
-  { id: 'sun', group: 'sky', name: 'scene.sun', rarity: null },
-  { id: 'moon', group: 'sky', name: 'scene.moon', rarity: null },
-  { id: 'terrain', group: 'sky', name: 'scene.terrain', rarity: null },
   { id: 'satellite', group: 'sky', name: 'scene.satellite', rarity: null },
+  // Item 115: each base badge, then its states (one grid row each).
+  { id: 'sun', group: 'sky', name: 'scene.sun', rarity: null },
+  ...SUN_STATES.map(([state, name]): Badge => ({ id: `sun:${state}`, group: 'sky', name, rarity: null, base: 'sun' })),
+  { id: 'moon', group: 'sky', name: 'scene.moon', rarity: null },
+  ...MOON_STATES.map(([state, name]): Badge => ({ id: `moon:${state}`, group: 'sky', name, rarity: null, base: 'moon' })),
+  { id: 'terrain', group: 'sky', name: 'scene.terrain', rarity: null },
+  ...TERRAIN_BANDS.map(([band, name]): Badge => ({ id: `terrain:${band}`, group: 'sky', name, rarity: null, base: 'terrain' })),
   ...CLOUDS.map(([type, name]): Badge => ({ id: `cloud:${type}`, group: 'cloud', name, rarity: null })),
   ...EGGS.map(([kind, name]): Badge => ({ id: `egg:${kind}`, group: 'egg', name, rarity: 'rarity.ultraRare' })),
 ];
@@ -120,6 +152,49 @@ export const badgeForTarget = (target: SceneInfoTarget): BadgeId | null => {
     case 'terrain':
     case 'satellite': return target.type;
     case 'egg': return null;
+  }
+};
+
+// Item 115: the height band of a ridge point (m above sea level). A limit belongs to the
+// higher band (500 m is low mountains).
+export const getTerrainBand = (heightM: number): TerrainBand => {
+  if (heightM < 500) return 'hills';
+  if (heightM < 1000) return 'lowMountains';
+  if (heightM < 2000) return 'mountains';
+  if (heightM < 3000) return 'highMountains';
+  return 'alpine';
+};
+
+const SUN_STATE_IDS = new Set<string>(SUN_STATES.map(([state]) => state));
+
+// The sun state of a time of day; null at night and in the twilights.
+export const getSunState = (timeOfDay: TimeOfDay): SunState | null =>
+  SUN_STATE_IDS.has(timeOfDay) ? timeOfDay as SunState : null;
+
+export const getMoonState = (phase: number): MoonState => MOON_STATES[getMoonPhaseIndex(phase)][0];
+
+export interface StateBadgeContext {
+  timeOfDay: TimeOfDay;
+  moonPhase: number;
+  horizonProfile: HorizonProfile | null;
+  isTimePreview: boolean;
+}
+
+// Item 115: the state badge that a tap collects with the base badge, or null. The sun and
+// moon states depend on the time, so a time preview gives none; the ridge height does not.
+export const stateBadgeForTarget = (target: SceneInfoTarget, ctx: StateBadgeContext): BadgeId | null => {
+  switch (target.type) {
+    case 'sun': {
+      const state = ctx.isTimePreview ? null : getSunState(ctx.timeOfDay);
+      return state ? `sun:${state}` : null;
+    }
+    case 'moon':
+      return ctx.isTimePreview ? null : `moon:${getMoonState(ctx.moonPhase)}`;
+    case 'terrain': {
+      const ridge = ctx.horizonProfile ? ridgeAt(ctx.horizonProfile, target.azimuth) : null;
+      return ridge ? `terrain:${getTerrainBand(ridge.height)}` : null;
+    }
+    default: return null;
   }
 };
 

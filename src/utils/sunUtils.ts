@@ -319,6 +319,9 @@ const SKY_GRADIENT_STOPS: Record<TimeOfDay, [string, string, string]> = {
   'evening': [PEACH, SUNSET, NIGHT_2],
 };
 
+// The three stops of a time of day's sky, top to bottom (the sun state badges, ROADMAP item 115).
+export const getSkyGradientStops = (timeOfDay: TimeOfDay): [string, string, string] => SKY_GRADIENT_STOPS[timeOfDay];
+
 export const getBackgroundGradient = (timeOfDay: TimeOfDay): string => {
   const [start, mid, end] = SKY_GRADIENT_STOPS[timeOfDay] ?? SKY_GRADIENT_STOPS.midday;
   return `linear-gradient(to bottom, ${start} 0%, ${mid} 62%, ${end} 100%)`;
