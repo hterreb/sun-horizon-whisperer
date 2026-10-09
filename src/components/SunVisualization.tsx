@@ -854,7 +854,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     return 'hsl(var(--scene-ridge-golden))'; // civil-twilight/dawn/morning/evening
   };
 
-  const moonRadius = (18 + moonPosition.illumination * 6) * (astroEvent?.kind === 'supermoon' ? 1.14 : 1); // same footprint as the old 36 + illumination*12 diameter
+  const isSupermoonEgg = astroEvent?.kind === 'supermoon';
+  const moonRadius = (18 + moonPosition.illumination * 6) * (isSupermoonEgg ? 1.15 : 1); // same footprint as the old 36 + illumination*12 diameter
   const moonPhasePath = useMemo(
     () => getMoonPhasePath(moonPosition.illumination, moonPosition.phase, latitude, moonRadius),
     [moonPosition.illumination, moonPosition.phase, latitude, moonRadius]
@@ -1172,7 +1173,10 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             top: `${moonY}px`,
             transform: 'translate(-50%, -50%)',
             opacity: moonBright * moonLook.disc,
-            filter: `drop-shadow(0 0 ${moonPosition.illumination * 15}px hsl(var(--scene-glow-white) / 0.4))`
+            // A supermoon gets a soft, static warm halo instead of the white glow.
+            filter: isSupermoonEgg
+              ? `drop-shadow(0 0 ${moonPosition.illumination * 22}px hsl(var(--scene-supermoon-glow) / 0.55))`
+              : `drop-shadow(0 0 ${moonPosition.illumination * 15}px hsl(var(--scene-glow-white) / 0.4))`
           }}
           data-testid="moon-disc"
         >

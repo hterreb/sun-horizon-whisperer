@@ -542,6 +542,34 @@ describe('SunVisualization (rendered): arc rise/zenith/set labels', () => {
     expect(screen.queryByTestId('arc-label-moon-set')).not.toBeInTheDocument();
   });
 
+  it('draws a supermoon about 15 % larger with a warm halo; a blue moon stays normal', () => {
+    setMockedContainerSize(800, 600);
+    const moonProps = {
+      sunPosition: { azimuth: 0, altitude: -30 },
+      moonPosition: { azimuth: 180, altitude: 30, phase: 0.5, illumination: 1, visible: true },
+      sunPath: [],
+      moonPath: [],
+      timeOfDay: 'night' as const,
+      weatherType: 'clear' as const,
+      latitude: 48,
+      longitude: 11,
+      date: new Date('2026-12-24T22:00:00Z'),
+    };
+    const moonSvgWidth = () => Number(screen.getByTestId('moon-disc').querySelector('svg')?.getAttribute('width'));
+
+    const { rerender } = render(<SunVisualization {...moonProps} />);
+    const normalWidth = moonSvgWidth();
+    expect(screen.getByTestId('moon-disc').style.filter).toContain('--scene-glow-white');
+
+    rerender(<SunVisualization {...moonProps} astroEvent={{ kind: 'supermoon', strength: 1 }} />);
+    expect(moonSvgWidth()).toBeCloseTo(normalWidth * 1.15);
+    expect(screen.getByTestId('moon-disc').style.filter).toContain('--scene-supermoon-glow');
+
+    rerender(<SunVisualization {...moonProps} astroEvent={{ kind: 'blueMoon', strength: 1 }} />);
+    expect(moonSvgWidth()).toBe(normalWidth);
+    expect(screen.getByTestId('moon-disc').style.filter).toContain('--scene-glow-white');
+  });
+
   it('fades out together with the cardinal labels while idle in fullscreen (ROADMAP item 29)', () => {
     setMockedContainerSize(800, 600);
     const props = {
