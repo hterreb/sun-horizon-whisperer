@@ -257,7 +257,7 @@ describe('MusicPlayer', () => {
     });
   });
 
-  describe('rain sound (ROADMAP item 117)', () => {
+  describe('rain sound (ROADMAP item 119)', () => {
     // The app keeps one AudioContext, so the first test creates it; the arrays record the nodes.
     const sources: { start: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn> }[] = [];
     const ramps: number[] = [];

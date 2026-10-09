@@ -1,7 +1,7 @@
 let audioContext: AudioContext | null = null;
 
 // One AudioContext for the app: the countdown tones (ROADMAP item 43) and the rain sound
-// (item 117). Browsers start it only after a user gesture, so call this from a tap first.
+// (item 119). Browsers start it only after a user gesture, so call this from a tap first.
 export const getAudioContext = (): AudioContext | null => {
   if (typeof window === 'undefined' || !window.AudioContext) return null;
   audioContext ??= new window.AudioContext();

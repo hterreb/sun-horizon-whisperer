@@ -2279,7 +2279,6 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 
 - **Merge with Santa (item from #133):** the Santa sleigh hit area also uses `useDoubleTap` and `touch-manipulation`.
 
-<<<<<<< HEAD
 ### 117. Playful eggs: April Fools, the empty tomb, a heart cloud, a pot of gold, the patient watcher — M — **✅ Done**
 
 > summary: Five new collection badges (`egg:aprilFools`, `egg:easter`, `egg:valentine`, `egg:stPatrick`, `egg:patientWatcher`), each ultra rare. Four show a calm thing in the scene on a calendar day; the patient watcher is a badge only. Trigger logic in `src/utils/playfulEggs.ts`, drawing in `src/components/PlayfulEggs.tsx`, `SkyClouds` and `SunVisualization`.
@@ -2356,10 +2355,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Open:** a check of the Loy Krathong dates after 2030 and the Holi dates against an official calendar (they can be one day off); real sky positions for Vega and Altair; the look of each egg in the browser and on a phone; a native-speaker review of the new de/es/it/fr texts (item 67).
 
 
-### 119. A calm rain sound when it rains — S
-=======
-### 117. A calm rain sound when it rains — S — **✅ Done**
->>>>>>> 890a1e6 (ROADMAP 117: done, built and checked)
+### 119. A calm rain sound when it rains — S — **✅ Done**
 
 - **Request (2026-10-09):** "lo-fi calm low rain sound when it is raining". Then: "make it play with the radio but also make it able to play on its own, button should be in the audio control panel".
 - **Now:** the rain is only seen (item 77). The only sounds are the radio (`MusicPlayer`, lo-fi streams) and the countdown (`useSunsetCountdown`, Web Audio tones). The audio control panel is the radio pill at the bottom left: switch, `Music` icon, station name, next, volume icon, slider.

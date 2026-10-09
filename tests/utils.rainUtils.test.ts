@@ -118,7 +118,7 @@ describe('rain drops (ROADMAP item 77, R6)', () => {
   });
 });
 
-describe('getRainSoundGain (ROADMAP item 117)', () => {
+describe('getRainSoundGain (ROADMAP item 119)', () => {
   it('is 0 without rain or with the rain sound off', () => {
     expect(getRainSoundGain(null, true, true, 1)).toBe(0);
     expect(getRainSoundGain(4, false, true, 1)).toBe(0);

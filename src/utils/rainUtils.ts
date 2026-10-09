@@ -129,7 +129,7 @@ export const stepRainDrops = (
   return splashes;
 };
 
-// Rain sound (ROADMAP item 117): a share of the radio slider, quiet under the music,
+// Rain sound (ROADMAP item 119): a share of the radio slider, quiet under the music,
 // louder alone, and a little louder with more rain (0.6× at drizzle up to 1× at a storm).
 export const RAIN_SOUND_WITH_RADIO = 0.25;
 export const RAIN_SOUND_ALONE = 0.6;

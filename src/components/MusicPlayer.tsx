@@ -15,7 +15,7 @@ interface MusicPlayerProps {
   // True during the sunset countdown sound (item 108): the radio plays at DUCK_FACTOR
   // of the slider volume. The slider value does not change.
   duck?: boolean;
-  // The rain amount in mm/h, null without rain (ROADMAP item 117): the rain sound button shows then.
+  // The rain amount in mm/h, null without rain (ROADMAP item 119): the rain sound button shows then.
   rainMmH?: number | null;
 }
 
@@ -67,7 +67,7 @@ const loadStoredStationIndex = (): number => {
 
 const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false, duck = false, rainMmH = null }) => {
   const [isPlaying, setIsPlayingState] = useState(false);
-  // The rain sound (ROADMAP item 117): on with the radio, or alone by its button. Not saved:
+  // The rain sound (ROADMAP item 119): on with the radio, or alone by its button. Not saved:
   // a browser plays no sound before a tap.
   const [rainOn, setRainOn] = useState(false);
   const setIsPlaying = useCallback((on: boolean) => {
