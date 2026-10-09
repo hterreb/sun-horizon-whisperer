@@ -773,11 +773,11 @@ const SunTracker: React.FC = () => {
   const [cloudEggForced] = useState(() => isCloudEggForced(window.location.search));
   const cloudEgg = cloudEggForced || isCloudEggDay(date, location.latitude, location.longitude);
   // Calendar easter eggs (ROADMAP "Ongoing"): one event id per minute. `?egg=dragon`
-  // forces Lunar New Year (item 100), `?egg=santa` Christmas with Santa's flight.
+  // forces Lunar New Year (item 100), `?egg=santa` Santa's flight (no snow: that is Dec 25-26).
   const [dragonForced] = useState(() => new URLSearchParams(window.location.search).get('egg') === 'dragon');
   const [santaForced] = useState(() => new URLSearchParams(window.location.search).get('egg') === 'santa');
   const calendarEvent = useMemo(
-    () => (dragonForced ? 'lunar-new-year' : santaForced ? 'christmas' : getCalendarEvent(date, location.latitude)),
+    () => (dragonForced ? 'lunar-new-year' : getCalendarEvent(date, location.latitude)),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on passMinuteKey, not `date` itself
     [passMinuteKey, location.latitude]
   );

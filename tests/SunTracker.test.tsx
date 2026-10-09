@@ -1129,27 +1129,26 @@ describe('SunTracker', () => {
       expect(unlocked()).toBeNull();
     });
 
-    it('on Christmas Eve after sunset, Santa flies with the snow and his badge counts', () => {
+    it('on Christmas Eve after sunset, Santa flies without the snow and his badge counts', () => {
       vi.useFakeTimers();
       // 21:00 UTC: about 5.5 h after sunset in Ravensburg (the tests run in UTC).
       vi.setSystemTime(new Date('2026-12-24T21:00:00Z'));
       try {
         render(<SunTracker />);
-        expect(visProps.current).toMatchObject({ calendarEvent: 'christmas', santa: true });
+        expect(visProps.current).toMatchObject({ calendarEvent: null, santa: true });
         expect(JSON.parse(localStorage.getItem('collection')!)).toHaveProperty('egg:santa');
-        // Item 114: the snow badge shows first, then Santa's.
-        expect(unlocked()).toHaveTextContent('Badge unlocked: Christmas snow');
-        closeCard();
-        expect(unlocked()).toHaveTextContent('Badge unlocked: Santa Claus');
+        expect(JSON.parse(localStorage.getItem('collection')!)).not.toHaveProperty('egg:christmas');
+        expect(unlocked()).toHaveTextContent('Badge unlocked: Santa Claus'); // item 114
       } finally {
         vi.useRealTimers();
       }
     });
 
-    it('?egg=santa forces Santa and the Christmas snow, and collects nothing', () => {
+    it('?egg=santa forces Santa without the snow, and collects nothing', () => {
       window.history.pushState({}, '', '/?egg=santa');
       render(<SunTracker />);
-      expect(visProps.current).toMatchObject({ calendarEvent: 'christmas', santa: true });
+      expect(visProps.current).toMatchObject({ santa: true });
+      expect(visProps.current!.calendarEvent).not.toBe('christmas');
       expect(localStorage.getItem('collection')).toBeNull();
     });
 

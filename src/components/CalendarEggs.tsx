@@ -51,7 +51,7 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherTy
   // Once he starts, Santa flies to the edge, also when `santa` turns false at midnight (no jump).
   // Set during render, like SunTracker's night roll.
   const [santaFlying, setSantaFlying] = useState(false);
-  if (event === 'christmas' && santa && !santaFlying && !santaDone && !prefersReducedMotion) setSantaFlying(true);
+  if (santa && !santaFlying && !santaDone && !prefersReducedMotion) setSantaFlying(true);
   const isNight = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
   const { t } = useLanguage();
   const seasonKey = event ? SEASON_TEXT[event] : undefined;
