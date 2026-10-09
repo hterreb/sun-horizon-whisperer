@@ -13,6 +13,18 @@ describe('GreenFlash', () => {
     expect(flash.style.top).toBe('400px');
   });
 
+  it('is 128x32 and sits above the sunset-time pill', () => {
+    render(<GreenFlash x={120} y={400} />);
+    const flash = screen.getByTestId('green-flash');
+    expect(flash.style.width).toBe('128px');
+    expect(flash.style.height).toBe('32px');
+    // Bottom edge 36 px above the point: the set pill (22 px high, centred 22 px above
+    // the horizon) ends 33 px above it.
+    expect(flash.style.transform).toBe('translate(-50%, calc(-100% - 36px))');
+    // Above the arc-label layer (z-9).
+    expect(flash.className).toContain('z-20');
+  });
+
   it('shows a still glow with reduced motion', () => {
     vi.spyOn(window, 'matchMedia').mockReturnValue({
       matches: true, media: '', onchange: null, addListener: () => {}, removeListener: () => {},
