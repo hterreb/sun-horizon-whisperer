@@ -189,6 +189,9 @@ const RARITY_NAMES: Record<RarityTier, MessageKey> = {
 
 export const rarityTier = (share: number): RarityTier => RARITY_TIERS.find(([min]) => share >= min)?.[1] ?? 'veryRare';
 
+// Item 112: the tier's name key, for the collection badges.
+export const getRarityTier = (share: number): MessageKey => RARITY_NAMES[rarityTier(share)];
+
 // "Very rare · 0.5 %": the tier and the share, with at most one decimal ("<0.1" below that).
 const rarityLine = (share: number, language: Language): InfoLine & { tier: RarityTier } => {
   const tier = rarityTier(share);

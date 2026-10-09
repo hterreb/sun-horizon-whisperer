@@ -29,7 +29,7 @@ import { fetchCurrentWeather, getUpperAirAt, getWeatherAt, type WeatherData } fr
 import { getContrail } from '@/utils/planes';
 import { useLivePlanes, type LivePlanesState } from '@/hooks/useLivePlanes';
 import { useLiveRoute } from '@/hooks/useLiveRoute';
-import { getSkyOvercastMix, getStarCloudFactor } from '@/utils/weatherEffectsUtils';
+import { getMoonLook, getSkyOvercastMix, getStarCloudFactor } from '@/utils/weatherEffectsUtils';
 import { getAstroEvent, parseEggOverride, METEOR_SHOWER_RATE } from '@/utils/astroEvents';
 import SunVisualization from './SunVisualization';
 import SceneInfoCard from './SceneInfoCard';
@@ -65,6 +65,11 @@ import { getTerrainSunTimes, getTerrainMoonTimes } from '../utils/horizonUtils';
 import { getSunArcLabels, getMoonArcLabels } from '../utils/arcLabels';
 import { PremiumContext, usePremium } from '@/hooks/usePremium';
 import PremiumDialog from './PremiumDialog';
+import CollectionView from './CollectionView';
+import {
+  BADGES, addToCollection, badgeForAstroEvent, badgeForCalendarEvent, badgeForTarget, isCollectionPaused, loadCollection,
+  saveCollection, type BadgeId, type Collection,
+} from '@/utils/collection';
 import { watchSunEvent, NO_SUN_EVENT_WATCH, getCountdownTarget } from '../utils/sunEvents';
 import { getCalendarEvent } from '@/utils/calendarEvents';
 import { PLAY_SPEED, PLAY_TICK_MS, clampTimeOffset } from '@/utils/timeTravel';
@@ -632,6 +637,29 @@ const SunTracker: React.FC = () => {
       }, astroEggOverride)
     : null;
 
+  // Collection badges (ROADMAP item 112): the first time each kind of thing is seen. A test
+  // link (?egg=, ?fish=, ?hunt=) pauses it. One toast per new badge, outside the setState.
+  const [collectionPaused] = useState(() => isCollectionPaused(window.location.search));
+  const [collection, setCollection] = useState<Collection>(loadCollection);
+  const collectionRef = React.useRef(collection);
+  const [isCollectionOpen, setIsCollectionOpen] = useState(false);
+  const tRef = React.useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
+  const collect = useCallback((id: BadgeId) => {
+    if (collectionPaused) return;
+    const next = addToCollection(collectionRef.current, id, new Date());
+    if (!next) return;
+    collectionRef.current = next;
+    setCollection(next);
+    saveCollection(next);
+    const badge = BADGES.find((b) => b.id === id);
+    if (badge) toast({ title: tRef.current('collection.new', { name: tRef.current(badge.name) }) });
+  }, [collectionPaused]);
+  const handleCollectionOpen = useCallback(() => setIsCollectionOpen(true), []);
+  const handleCollectionClose = useCallback(() => setIsCollectionOpen(false), []);
+
   // Fireworks (ROADMAP items 41 and 80): one show per sunrise or sunset (terrain time
   // when there is one), at the first live, visible tick up to 15 min after it, if the
   // page was open before it (watchSunEvent). The ref keeps the armed and the last
@@ -647,6 +675,7 @@ const SunTracker: React.FC = () => {
     // New Year (ROADMAP "Ongoing", Calendar): also when the clock enters 00:00 on Jan 1.
     const entersNewYear = getCalendarEvent(date) === 'new-year' && getCalendarEvent(prev) !== 'new-year';
     let fire = !isTimePreview && entersNewYear;
+    if (fire && !prefersReducedMotion) collect('egg:newYear');
     if (document.visibilityState !== 'hidden') {
       const { watch, outcome } = watchSunEvent(sunEventWatchRef.current, date, isTimePreview, sunTimes, terrainExtras.terrainSunTimes);
       sunEventWatchRef.current = watch;
@@ -671,8 +700,11 @@ const SunTracker: React.FC = () => {
   const handleSunTap = useCallback(() => {
     const { taps, triggered } = registerSunTap(sunTapsRef.current, Date.now());
     sunTapsRef.current = taps;
-    if (triggered) setSunglassesOn(true);
-  }, []);
+    if (triggered) {
+      setSunglassesOn(true);
+      collect('egg:sunglasses');
+    }
+  }, [collect]);
   useEffect(() => {
     if (!sunglassesOn) return;
     const id = setTimeout(() => setSunglassesOn(false), SUNGLASSES_MS);
@@ -686,11 +718,12 @@ const SunTracker: React.FC = () => {
       if (progress === KONAMI_SEQUENCE.length) {
         progress = 0;
         setDiscoOn(true);
+        collect('egg:disco');
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [collect]);
   useEffect(() => {
     if (!discoOn) return;
     const id = setTimeout(() => setDiscoOn(false), DISCO_MS);
@@ -704,6 +737,10 @@ const SunTracker: React.FC = () => {
     if (isNight && rollUfo()) setUfoOn(true);
   }
   const handleUfoDone = useCallback(() => setUfoOn(false), []);
+  // Reduced motion shows no UFO, so it does not count.
+  useEffect(() => {
+    if (ufoOn && !prefersReducedMotion) collect('egg:ufo');
+  }, [ufoOn, prefersReducedMotion, collect]);
   // Info cards (ROADMAP item 95): one card at a time, for the last thing tapped in the scene.
   // `id` mounts a new card per tap, so its 15 s timer starts again.
   const [infoCard, setInfoCard] = useState<{ target: SceneInfoTarget; x: number; y: number; ring: string; id: number } | null>(null);
@@ -711,7 +748,8 @@ const SunTracker: React.FC = () => {
   const handleSceneInfo = useCallback((target: SceneInfoTarget, point: { x: number; y: number }, ring: string) => {
     infoCardCount.current += 1;
     setInfoCard({ target, ...point, ring, id: infoCardCount.current });
-  }, []);
+    collect(badgeForTarget(target));
+  }, [collect]);
   const handleInfoClose = useCallback(() => setInfoCard(null), []);
   // Rare lenticular and mammatus clouds (ROADMAP item 84, X1): one day in 30 per place;
   // `?egg=lenticular` or `?egg=mammatus` forces the day.
@@ -865,6 +903,27 @@ const SunTracker: React.FC = () => {
   // A manually picked weather ignores the real cloud cover: the sky, the stars and
   // the moon then follow the weather type alone (ROADMAP items 50, 52, 57).
   const cloudCover = useRealWeather ? weatherData?.cloudCoverPercent ?? null : null;
+
+  // Collection badges (ROADMAP item 112) of the calendar and astronomy eggs, when the scene
+  // really shows them (CalendarEggs' rules: dark sky = night or astronomical/nautical twilight).
+  // Not for a forced egg (?egg=dragon or any ?egg) and not in a time preview.
+  const isDarkSky = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
+  const calendarBadge = dragonForced ? null : badgeForCalendarEvent(calendarEvent, {
+    isNight: isDarkSky,
+    moonUp: isDarkSky && moonPosition.visible && getMoonLook(weatherType, cloudCover).disc > 0,
+    weatherType,
+    reducedMotion: prefersReducedMotion,
+    isTimePreview,
+  });
+  useEffect(() => {
+    if (calendarBadge) collect(calendarBadge);
+  }, [calendarBadge, collect]);
+  // Reduced motion draws no shooting stars, so the meteor shower does not count then.
+  const astroKind = astroEggOverride || isTimePreview ? null : astroEvent?.kind ?? null;
+  const astroBadge = astroKind && !(astroKind === 'meteorShower' && prefersReducedMotion) ? badgeForAstroEvent(astroKind) : null;
+  useEffect(() => {
+    if (astroBadge) collect(astroBadge);
+  }, [astroBadge, collect]);
   // The forecast rain amount (ROADMAP item 77); manual weather uses the type's middle value.
   const rainMmH = useRealWeather ? weatherData?.precipitationMmH ?? null : null;
   // The cover per layer for the cloud types (ROADMAP item 84); manual weather uses the type's own.
@@ -1061,6 +1120,7 @@ const SunTracker: React.FC = () => {
             onIssReminderToggle={notificationPermission === 'unsupported' ? undefined : handleIssReminderToggle}
             isLivePlanesOn={isLivePlanesOn}
             onLivePlanesToggle={handleLivePlanesToggle}
+            onCollectionOpen={handleCollectionOpen}
           />
         </>
       )}
@@ -1088,6 +1148,7 @@ const SunTracker: React.FC = () => {
       )}
     </div>
     <PremiumDialog />
+    <CollectionView open={isCollectionOpen} onClose={handleCollectionClose} collection={collection} />
     </PremiumContext.Provider>
     </LanguageContext.Provider>
   );

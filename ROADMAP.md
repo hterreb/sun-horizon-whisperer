@@ -2181,6 +2181,23 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Limits:** the route is from schedules, so near an airport a wrong leg can still show. The endpoint is the target of a deprecated adsb.lol redirect; if it moves, the line goes away.
 - **Checked:** route mapping (near and far place, stops, ICAO fallback, bad data), request handling (URL, User-Agent, cache, 404, input check, 502), card lines, `useLiveRoute`. Dev server against the real adsb.lol: ELY326 gave CDG → TLV. All tests pass.
 
+### 112. Collection: a badge for every kind you tapped or found — M — **✅ Done**
+
+- **Request (2026-10-09):** "collect taps and easter eggs, add badges for every fish, boat, cloud, easter egg that I already tapped / collected".
+- **Why:** the rarity row (item 105) makes a rare fish worth a look. A collection gives a reason to come back and find the rest.
+- **Spec:**
+  1. A tap that opens an info card (item 95) collects that kind: each fish, bird, bat, boat, plane, cloud type (item 106), satellite, sun, moon, terrain. A live plane counts as "plane"; no per-flight badges.
+  2. An easter egg or special event (Ongoing section) collects its badge when it shows on the screen. Hidden eggs (sunglasses, UFO, disco) count only when triggered for real, not by `?egg=`.
+  3. A pure util `collection.ts` saves the set of collected ids and the first-seen date in `localStorage` (`collection`), with try/catch on read and write, like the other utils. No server, no account.
+  4. A first find shows a small toast ("New: Seahorse") in the 5 languages.
+  5. A "Collection" view (from the InfoPanel) shows a grid of all badges, with a counter "23 / 61". A collected badge shows the kind in colour, its name, the rarity tier (item 105) and the first-seen date. A missing badge hides its name: a scene kind shows only a grey outline of its shape; an easter egg shows only a "?".
+  6. The badges reuse the scene's own SVG shapes, so no new artwork.
+- **Decisions (2026-10-09):** every missing badge hides its name. Missing scene kinds: grey outline only. Missing easter eggs: "?" only. One badge per fish kind, day and night pools together (a moonlit perch is the perch badge). Free (no Premium gate).
+- **Done when:** util tests (add, duplicates, corrupt storage, `?egg=` does not count); a tap on a fish adds its badge and shows the toast once; the grid shows the right count and hides missing names; `tests/i18n.test.ts` passes. Frame budget: no per-frame work (the collect runs on tap or on event start).
+- **Depends on:** item 95 (cards), item 105 (tiers). Item 107 (card redesign) can set the badge style.
+- **Built:** 68 badges in `collection.ts` (`BADGES`): 20 fish, 8 birds + bat, 5 boats, plane, sun, moon, terrain, satellite, 11 cloud types, 18 eggs. Halloween gives 2 badges (pumpkin, bats); both solstices give 1. `SunTracker.collect(id)` adds a new badge, saves it and shows one toast. It runs on a card tap (`badgeForTarget`), on the 7th sun tap, on the Konami code, when the UFO shows, when a calendar egg shows (`badgeForCalendarEvent`, the `CalendarEggs` rules) and when an astronomy event shows. New Year counts where the fireworks start. A test link (`?egg=`, `?fish=`, `?hunt=`) pauses the collection. Calendar and astronomy badges do not count in a time preview. An egg that reduced motion hides (UFO, fireworks, cat, dragon, Halloween bats, Christmas flakes, meteor shower) does not count then. `CollectionView` opens from the InfoPanel row "Collection". `getRarityTier` in `sceneInfo`; `UfoShape` from `Ufo`.
+- **Checked:** `utils.collection`, `utils.sceneInfo`, `CollectionView`, `SunTracker` (a fish tap collects with one toast "New: Seahorse"; `?egg=ufo` collects nothing; the InfoPanel button opens the view) and `InfoPanel` tests. Dev server at 390 × 844: grid, outlines, toast. All tests pass.
+
 ---
 
 ## Ongoing — Easter eggs and special events (S each, pick any time)

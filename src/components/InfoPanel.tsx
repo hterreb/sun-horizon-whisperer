@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Wind, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward, Bell, BellRing, AlarmClock, AlarmClockCheck, Satellite } from 'lucide-react';
+import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Wind, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward, Bell, BellRing, AlarmClock, AlarmClockCheck, Satellite, Award } from 'lucide-react';
 import { isFeedbackAvailable, openFeedbackForm } from '@/utils/feedback';
 import { ScrollArea } from './ui/scroll-area';
 import { Switch } from './ui/switch';
@@ -145,6 +145,8 @@ interface InfoPanelProps {
   // The live radar (ROADMAP item 96, Premium): the "Live planes" switch, off by default.
   isLivePlanesOn?: boolean;
   onLivePlanesToggle?: (on: boolean) => void;
+  // Collection badges (ROADMAP item 112): the row button that opens the collection.
+  onCollectionOpen?: () => void;
 }
 
 const InfoPanel: React.FC<InfoPanelProps> = ({
@@ -194,6 +196,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   onIssReminderToggle,
   isLivePlanesOn = false,
   onLivePlanesToggle,
+  onCollectionOpen,
 }) => {
   const { t, language, setLanguage } = useLanguage();
   // Premium gate (ROADMAP item 14): every gold-plus control goes through requirePremium.
@@ -1256,6 +1259,19 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 onCheckedChange={() => requirePremium(onSatelliteTrackingToggle)}
                 aria-label={t('satellite.tracking')}
               />
+            </div>
+          )}
+
+          {/* Collection badges (ROADMAP item 112) */}
+          {onCollectionOpen && (
+            <div className="mt-6 pt-4 border-t border-white/20">
+              <button
+                onClick={onCollectionOpen}
+                className={`flex items-center gap-2 text-caption opacity-80 hover:opacity-100 transition-opacity rounded ${FOCUS_RING}`}
+              >
+                <Award size={14} />
+                {t('collection.title')}
+              </button>
             </div>
           )}
 

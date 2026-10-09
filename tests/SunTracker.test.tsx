@@ -976,6 +976,47 @@ describe('SunTracker', () => {
       expect(card()).toBeNull();
     });
   });
+  describe('collection badges (ROADMAP item 112)', () => {
+    const newToasts = () => vi.mocked(toast).mock.calls.filter(([arg]) => String(arg.title).startsWith('New: '));
+    const tapSeahorse = () => act(() => {
+      visProps.current!.onSceneInfo!({ type: 'fish', kind: 'seahorse' }, { x: 100, y: 600 }, 'ring');
+    });
+    afterEach(() => {
+      window.history.pushState({}, '', '/');
+    });
+
+    it('a tap on a fish collects its badge with one "New" toast; a second tap adds nothing', () => {
+      render(<SunTracker />);
+      tapSeahorse();
+      expect(JSON.parse(localStorage.getItem('collection')!)).toEqual({ 'fish:seahorse': expect.any(String) });
+      expect(newToasts()).toEqual([[{ title: 'New: Seahorse' }]]);
+      tapSeahorse();
+      expect(newToasts()).toHaveLength(1);
+    });
+
+    it('collects nothing with a test link (?egg=ufo)', () => {
+      window.history.pushState({}, '', '/?egg=ufo');
+      render(<SunTracker />);
+      tapSeahorse();
+      // Seven sun taps: the sunglasses, which would count without the link.
+      act(() => {
+        for (let i = 0; i < 7; i++) visProps.current!.onSunTap!();
+      });
+      expect(visProps.current!.sunglasses).toBe(true);
+      expect(localStorage.getItem('collection')).toBeNull();
+      expect(newToasts()).toHaveLength(0);
+    });
+
+    it('the InfoPanel button opens the collection; the close button closes it', () => {
+      render(<SunTracker />);
+      tapSeahorse();
+      fireEvent.click(screen.getByRole('button', { name: 'Collection' }));
+      const view = screen.getByRole('dialog', { name: 'Collection' });
+      expect(view).toHaveTextContent('Seahorse');
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+      expect(screen.queryByRole('dialog', { name: 'Collection' })).toBeNull();
+    });
+  });
   describe('satellites (ROADMAP item 97)', () => {
     const SYDNEY = issFixture.reference.observer;
     // The top of a known ISS pass (heavens-above, see the fixture).

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { translate, type Translate } from '@/i18n';
 import {
-  getSceneInfo, resolveInfoText, directionText, durationText, distanceText, rarityTier,
+  getSceneInfo, resolveInfoText, directionText, durationText, distanceText, rarityTier, getRarityTier,
   type SceneInfo, type SceneInfoContext, type SceneInfoTarget,
 } from '@/utils/sceneInfo';
 import { FISH_WEIGHTS, BIRD_WEIGHTS, type BoatKind, type FishKind } from '@/utils/weatherEffectsUtils';
@@ -341,5 +341,15 @@ describe('sceneInfo formatting', () => {
     expect(resolveInfoText(en, durationText(45 * 60_000))).toBe('45 min');
     expect(resolveInfoText(en, distanceText(850, 'en'))).toBe('850 m');
     expect(resolveInfoText(de, distanceText(12_345, 'de'))).toBe('12,3 km');
+  });
+
+  it('gives the rarity tier of a share at the tier boundaries (item 112)', () => {
+    expect(getRarityTier(10)).toBe('rarity.common');
+    expect(getRarityTier(9.9)).toBe('rarity.uncommon');
+    expect(getRarityTier(3)).toBe('rarity.uncommon');
+    expect(getRarityTier(2.9)).toBe('rarity.rare');
+    expect(getRarityTier(1)).toBe('rarity.rare');
+    expect(getRarityTier(0.9)).toBe('rarity.veryRare');
+    expect(getRarityTier(0)).toBe('rarity.veryRare');
   });
 });

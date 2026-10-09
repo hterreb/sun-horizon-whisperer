@@ -202,4 +202,21 @@ const SceneVisitor = ({ kind, tone, width, rolls = [0, 1.5] }: SceneVisitorProps
   );
 };
 
+// The whole animal, solid and unclipped, for the collection badges (item 112).
+export const VisitorShape = ({ kind, width }: { kind: 'shark' | 'dolphins'; width: number }) => {
+  const id = useId().replace(/:/g, '');
+  const c = colors(kind, 'day');
+  const animal = kind === 'shark' ? SHARK : DOLPHIN;
+  return (
+    <svg width={width} height={width / 2} viewBox="0 2 48 24" aria-hidden="true" data-testid="visitor-shape">
+      <linearGradient id={`${id}body`} x1="0" y1="0" x2="0" y2="1">
+        <stop offset={0.3} style={{ stopColor: c.back }} />
+        <stop offset={0.7} style={{ stopColor: c.belly }} />
+      </linearGradient>
+      {animal.fins.map(d => <path key={d} d={d} style={{ fill: c.back }} />)}
+      <path d={animal.body} style={{ fill: `url(#${id}body)` }} />
+    </svg>
+  );
+};
+
 export default SceneVisitor;
