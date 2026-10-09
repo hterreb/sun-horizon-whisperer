@@ -27,7 +27,8 @@ import { NATIONAL_DAY_DAYS_PER_YEAR, type NationalDayKind } from './nationalDays
 // Not the collection's EggKind (item 112), which has one badge per egg or event.
 export type EggCardKind = 'ufo' | 'ghost' | 'dragon' | 'santa' | 'blackCat' | 'halloweenBat' | 'pumpkinMoon'
   | 'matariki' | 'conjunction' | 'noctilucent' | 'midnightSun' | 'polarNight'
-  | NationalDayKind;
+  | NationalDayKind
+  | 'emptyTomb' | 'potOfGold' | 'heartCloud'; // item 117
 
 export type SceneInfoTarget =
   | { type: 'fish'; kind: FishKind }
@@ -199,6 +200,10 @@ const EGGS: Record<EggCardKind, { name: MessageKey; fact: MessageKey; hidden: bo
   canadaDay: { name: 'egg.canadaDay', fact: 'eggFact.canadaDay', hidden: false, chance: { daysPerYear: NATIONAL_DAY_DAYS_PER_YEAR } },
   australiaDay: { name: 'egg.australiaDay', fact: 'eggFact.australiaDay', hidden: false, chance: { daysPerYear: NATIONAL_DAY_DAYS_PER_YEAR } },
   kingsDay: { name: 'egg.kingsDay', fact: 'eggFact.kingsDay', hidden: false, chance: { daysPerYear: NATIONAL_DAY_DAYS_PER_YEAR } },
+  // Playful pack (item 117): the chance is the day; the pot also needs a rainbow, the heart a cloud.
+  emptyTomb: { name: 'egg.easter', fact: 'eggFact.emptyTomb', hidden: false, chance: { event: 'easter' } },
+  potOfGold: { name: 'egg.stPatrick', fact: 'eggFact.potOfGold', hidden: false, chance: { event: 'st-patrick' } },
+  heartCloud: { name: 'egg.valentine', fact: 'eggFact.heartCloud', hidden: false, chance: { event: 'valentine' } },
 };
 
 const DIRECTIONS: MessageKey[] = [

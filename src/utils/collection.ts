@@ -9,6 +9,7 @@ import { type CloudType } from './skyCloudUtils';
 import { type CalendarEvent } from './calendarEvents';
 import { type AstroEventKind } from './astroEvents';
 import { type NationalDay, type NationalDayKind } from './nationalDays';
+import { type PlayfulEgg } from './playfulEggs';
 import { type TimeOfDay } from './sunUtils';
 import { getMoonPhaseIndex } from './moonUtils';
 import { ridgeAt, type HorizonProfile } from './horizonUtils';
@@ -18,7 +19,8 @@ export type EggKind =
   | 'newYear' | 'friday13' | 'lunarNewYear' | 'solstice' | 'equinox' | 'halloweenPumpkin' | 'halloweenBats' | 'christmas' | 'santa'
   | 'solarEclipse' | 'lunarEclipse' | 'greenFlash' | 'supermoon' | 'blueMoon' | 'meteorShower' | 'aurora'
   | 'matariki' | 'conjunction' | 'noctilucent' | 'midnightSun' | 'polarNight'
-  | NationalDayKind;
+  | NationalDayKind
+  | 'aprilFools' | 'easter' | 'valentine' | 'stPatrick' | 'patientWatcher';
 // Item 115: the states of the sun, the moon and the terrain.
 export type SunState = 'dawn' | 'morning' | 'midday' | 'afternoon' | 'evening';
 export type MoonState =
@@ -94,6 +96,9 @@ const EGGS: [EggKind, MessageKey][] = [
   ['festaRepubblica', 'egg.festaRepubblica'], ['bastilleDay', 'egg.bastilleDay'], ['independenceDay', 'egg.independenceDay'],
   ['guyFawkes', 'egg.guyFawkes'], ['germanUnity', 'egg.germanUnity'], ['fiestaNacional', 'egg.fiestaNacional'],
   ['canadaDay', 'egg.canadaDay'], ['australiaDay', 'egg.australiaDay'], ['kingsDay', 'egg.kingsDay'],
+  // Playful pack (ROADMAP item 117).
+  ['aprilFools', 'egg.aprilFools'], ['easter', 'egg.easter'], ['valentine', 'egg.valentine'], ['stPatrick', 'egg.stPatrick'],
+  ['patientWatcher', 'egg.patientWatcher'],
 ];
 
 // The grid order. A fish's tier is its day share; getFishShare falls back to the night share
@@ -230,6 +235,12 @@ export const badgeForCalendarEvent = (event: CalendarEvent | null, o: CalendarBa
     case 'christmas': return o.weatherType !== 'snow' && !o.reducedMotion ? 'egg:christmas' : null;
     case 'friday-13': return 'egg:friday13';
     case 'lunar-new-year': return o.reducedMotion ? null : 'egg:lunarNewYear';
+    // Playful pack (ROADMAP item 117): the scene reports when the egg really shows
+    // (SunTracker.handleEggShown, badgeForPlayfulEgg).
+    case 'easter':
+    case 'april-fools':
+    case 'valentine':
+    case 'st-patrick': return null;
   }
 };
 
@@ -237,6 +248,10 @@ export const badgeForCalendarEvent = (event: CalendarEvent | null, o: CalendarBa
 // flies also when it snows; reduced motion hides him. Never in the time preview.
 export const badgeForSanta = (santaTime: boolean, o: Pick<CalendarBadgeOptions, 'reducedMotion' | 'isTimePreview'>): BadgeId | null =>
   santaTime && !o.reducedMotion && !o.isTimePreview ? 'egg:santa' : null;
+
+// Playful pack (ROADMAP item 117): the badge of an egg that the scene shows, never in the time preview.
+export const badgeForPlayfulEgg = (kind: PlayfulEgg | 'patientWatcher', isTimePreview: boolean): BadgeId | null =>
+  isTimePreview ? null : `egg:${kind}`;
 
 export const badgeForAstroEvent = (kind: AstroEventKind): BadgeId => `egg:${kind}`;
 

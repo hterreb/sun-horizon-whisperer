@@ -10,6 +10,9 @@ import Fireworks from './Fireworks';
 import SunSunglasses from './SunSunglasses';
 import CalendarEggs from './CalendarEggs';
 import SkyEggs from './SkyEggs';
+import PlayfulEggs from './PlayfulEggs';
+import { useAprilFoolsSwap } from '@/hooks/useAprilFoolsSwap';
+import { type PlayfulEgg } from '@/utils/playfulEggs';
 import { type CalendarEvent, getSolsticeTraceDates } from '@/utils/calendarEvents';
 import PremiumBadge from './PremiumBadge';
 import WeatherEffects from './WeatherEffects';
@@ -119,6 +122,10 @@ interface SunVisualizationProps {
   calendarEvent?: CalendarEvent | null;
   // Christmas Eve from sunset to midnight, or ?egg=santa: Santa flies once (CalendarEggs).
   santa?: boolean;
+  // Playful pack (ROADMAP item 117): Easter Sunday from sunrise to 12:00 (or ?egg=easter), and
+  // the callback for an egg that really shows (its badge).
+  easterMorning?: boolean;
+  onEggShown?: (kind: PlayfulEgg) => void;
   // Time-travel play from SunTracker (ROADMAP item 83): the scene follows it.
   playDirection?: PlayDirection;
   // Satellite tracking (ROADMAP item 97): the tracked satellites in the sky, or null for
@@ -590,6 +597,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   infoRingTier = null,
   calendarEvent = null,
   santa = false,
+  easterMorning = false,
+  onEggShown,
   playDirection = 0,
   satellites = null
 }) => {
@@ -698,6 +707,21 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   const { x: sunX, y: sunY, visible: sunDotVisible } = getSunPosition();
   const { x: moonX, y: moonY, visible: moonDotVisible } = getMoonPosition();
 
+  // April Fools (ROADMAP item 117): when the sun and the moon are both up and on the screen,
+  // they swap their drawn places for one minute with a slow cross-fade. Only the sun and the
+  // moon themselves move; their light on the water and the clouds stays. Reduced motion: no swap.
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const aprilFools = useAprilFoolsSwap(
+    calendarEvent === 'april-fools' && !prefersReducedMotion && sunPosition.altitude > 0 && moonPosition.visible &&
+    sunDotVisible && moonDotVisible && getSunVisibility(weatherType).disc > 0 && getMoonLook(weatherType, cloudCoverPercent).disc > 0
+  );
+  const [sunDrawX, sunDrawY, moonDrawX, moonDrawY] = aprilFools.swapped ? [moonX, moonY, sunX, sunY] : [sunX, sunY, moonX, moonY];
+  const aprilFade = aprilFools.faded ? 0 : 1;
+  const aprilTransition: React.CSSProperties | undefined = aprilFools.running ? { transition: 'opacity 3s ease-in-out' } : undefined;
+  useEffect(() => {
+    if (aprilFools.swapped) onEggShown?.('aprilFools');
+  }, [aprilFools.swapped, onEggShown]);
+
   // Whether each body is up at all, on altitude/weather/time-of-day grounds alone -
   // independent of the compass field of view, so the off-FOV hint below can tell "it's
   // up, just off to one side" apart from "it's not up right now" (ROADMAP item 19).
@@ -707,7 +731,9 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   const moonAltitudeVisible = moonPosition.visible && (
     timeOfDay === 'night' ||
     timeOfDay === 'astronomical-twilight' ||
-    timeOfDay === 'nautical-twilight'
+    timeOfDay === 'nautical-twilight' ||
+    // April Fools: the moon shows by day while the swap fades or holds.
+    aprilFools.swapped || aprilFools.faded
   );
 
   const isSunVisible = sunAltitudeVisible && sunDotVisible;
@@ -969,7 +995,6 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
   // The live radar (item 96): the aircraft at their direction and elevation angle, with the
   // sun's mapping (compass mode included). None where the sky is hidden, as the decorative ones.
-  const prefersReducedMotion = usePrefersReducedMotion();
   const { width: sceneWidth, height: sceneHeight } = containerDimensions;
   const projectSky = useMemo(() => (altitude: number, azimuth: number) => ({
     x: sceneWidth * resolveAzimuth(azimuth, latitude, compassHeading).fraction,
@@ -1052,6 +1077,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           : null}
         skyGradient={skyGradient}
         cloudEgg={cloudEgg}
+        heartCloud={calendarEvent === 'valentine'}
+        onEggShown={onEggShown}
         sunTimes={sunTimes}
         onInfo={onSceneInfo}
         infoRing={infoRing}
@@ -1112,12 +1139,13 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           aria-hidden="true"
           className={`absolute rounded-full pointer-events-none ${compassActive ? '' : 'transition-transform duration-1000'}`}
           style={{
-            left: `${sunX}px`,
-            top: `${sunY}px`,
+            left: `${sunDrawX}px`,
+            top: `${sunDrawY}px`,
             width: (sunPosition.altitude > 0 ? 200 : 160) * sunVisibility.haloScale,
             height: (sunPosition.altitude > 0 ? 200 : 160) * sunVisibility.haloScale,
             transform: 'translate(-50%, -50%)',
-            opacity: sunVisibility.halo,
+            opacity: sunVisibility.halo * aprilFade,
+            ...aprilTransition,
             // Faint or no disc (overcast, fog, rain): a white light patch, not a yellow glow on grey.
             background: `radial-gradient(circle, hsl(var(${sunShines ? getSunGlowToken() : '--scene-glow-white'}) / 0.55) 0%, transparent 70%)`
           }}
@@ -1139,8 +1167,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           data-testid="sun-dot"
           className={`absolute rounded-full pointer-events-auto touch-manipulation focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 ${compassActive ? '' : 'transition-transform duration-1000'} ${getSunColor()} ${getGlowIntensity()} animate-glow`}
           style={{
-            left: `${sunX}px`,
-            top: `${sunY}px`,
+            left: `${sunDrawX}px`,
+            top: `${sunDrawY}px`,
             transform: 'translate(-50%, -50%)'
           }}
         >
@@ -1152,7 +1180,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             size={sunPosition.altitude > 0 ? 96 : 80}
             strokeWidth={1}
             style={{
-              opacity: sunVisibility.disc,
+              opacity: sunVisibility.disc * aprilFade,
+              ...aprilTransition,
               ...(sunVisibility.pale > 0 && { color: `color-mix(in srgb, currentColor, hsl(var(--scene-sky-overcast)) ${sunVisibility.pale * 100}%)` }),
             }}
           />
@@ -1184,11 +1213,13 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         <div
           className={`absolute pointer-events-none rounded-full ${compassActive ? '' : 'transition-all duration-1000'}`}
           style={{
-            left: `${moonX}px`,
-            top: `${moonY}px`,
+            left: `${moonDrawX}px`,
+            top: `${moonDrawY}px`,
             width: moonRadius * moonLook.coronaRadius * 2,
             height: moonRadius * moonLook.coronaRadius * 2,
             transform: 'translate(-50%, -50%)',
+            opacity: aprilFade,
+            ...aprilTransition,
             background: `radial-gradient(circle closest-side, hsl(var(${moonLightVar}) / ${0.32 * moonLook.corona * moonBright}) 0%, hsl(var(${moonLightVar}) / ${0.13 * moonLook.corona * moonBright}) 40%, transparent 100%)`,
           }}
           data-testid="moon-corona"
@@ -1207,10 +1238,11 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           }}
           className={`absolute flex min-h-11 min-w-11 items-center justify-center rounded-full pointer-events-auto touch-manipulation focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 ${compassActive ? '' : 'transition-all duration-1000'}`}
           style={{
-            left: `${moonX}px`,
-            top: `${moonY}px`,
+            left: `${moonDrawX}px`,
+            top: `${moonDrawY}px`,
             transform: 'translate(-50%, -50%)',
-            opacity: moonBright * moonLook.disc,
+            opacity: moonBright * moonLook.disc * aprilFade,
+            ...aprilTransition,
             // A supermoon gets a soft, static warm halo, a blue moon a blue one, instead of the white glow.
             filter: isSupermoonEgg
               ? `drop-shadow(0 0 ${moonPosition.illumination * 22}px hsl(var(--scene-supermoon-glow) / 0.55))`
@@ -1256,6 +1288,20 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         onInfo={onSceneInfo}
         infoRing={infoRing}
         infoRingTier={infoRingTier}
+      />
+
+      <PlayfulEggs
+        event={calendarEvent}
+        easterMorning={easterMorning}
+        width={containerDimensions.width}
+        horizonY={containerDimensions.height * 0.65}
+        sunX={sunX}
+        sunLight={sunVisibility.disc}
+        rainbow={rainbowGeometry}
+        onInfo={onSceneInfo}
+        infoRing={infoRing}
+        infoRingTier={infoRingTier}
+        onShown={onEggShown}
       />
 
       <svg className="absolute inset-0 w-full h-full pointer-events-none">

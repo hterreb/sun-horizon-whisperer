@@ -41,6 +41,7 @@ import {
 import { getSeaWindKmh, getBoatReflection } from '../utils/waveUtils';
 import { getRainMmH } from '../utils/rainUtils';
 import { type SceneInfoTarget } from '@/utils/sceneInfo';
+import { type PlayfulEgg } from '@/utils/playfulEggs';
 
 // ROADMAP item 10: more than the original 6 types - fog, drizzle and hail join the
 // weather-dependent clouds/illustrations, and "partly" splits out the old single
@@ -94,6 +95,9 @@ interface CloudLayerProps {
   skyGradient?: string | null;
   // A rare lenticular or mammatus day (item 84, X1).
   cloudEgg?: boolean;
+  // Valentine's Day (ROADMAP item 117): one day cloud is a heart; onEggShown reports it.
+  heartCloud?: boolean;
+  onEggShown?: (kind: PlayfulEgg) => void;
   // The day's sun times, for the busy and quiet phases (item 93, S3); null: always busy.
   sunTimes?: SunTimes | null;
   // Item 93 (S1): the scene opens full. false: it starts empty and the spawn loop fills it,
@@ -992,6 +996,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   sun = null,
   skyGradient = null,
   cloudEgg = false,
+  heartCloud = false,
+  onEggShown,
   sunTimes = null,
   warmStart = true,
   onInfo,
@@ -1426,6 +1432,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         moon={moon}
         skyGradient={skyGradient}
         egg={cloudEgg}
+        heart={heartCloud}
+        onHeartShown={onEggShown}
         onInfo={onInfo}
         infoRing={infoRing}
       />

@@ -159,6 +159,14 @@ export const CLOUD_SHAPES: Record<CloudType, CloudShape[]> = {
   Mam: [shape('Pouches', [R(-4, -6, 128, 30), ...Array.from({ length: 9 }, (_, i) => E(8 + 13.5 * i, 28 + (i % 2) * 2, 6.6, 6 + (i % 2) * 0.6))])],
 };
 
+// Valentine's Day (ROADMAP item 117): a heart in the same 120 × 60 box, for one day cloud.
+export const HEART_SHAPE: CloudShape = {
+  name: 'Heart',
+  d: 'M60 55C40 43 30 35 30 24C30 15 37 9 45 9C52 9 57 13 60 18C63 13 68 9 75 9C83 9 90 15 90 24C90 35 80 43 60 55Z',
+  top: 9,
+  bottom: 55,
+};
+
 // S2: a rain shaft as 8 thin slanted strands of different lengths, so it reads as falling
 // rain and not as a column. Each is [path, stroke width] in box units.
 export const getShaftStrands = ([x, w, slant, y0]: Shaft): [string, number][] =>

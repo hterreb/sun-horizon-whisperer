@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import {
-  Cat, Eclipse, Flame, Glasses, Moon, MoonStar, Mountain, PartyPopper, Rainbow, Satellite,
-  Sparkles, Star, Sun, SunMoon, Sunset, TreePine, X, type LucideIcon,
+  ArrowLeftRight, Cat, Coins, Eclipse, Flame, Glasses, Heart, Hourglass, Moon, MoonStar, Mountain, PartyPopper, Rainbow, Satellite,
+  Sparkles, Star, Sun, SunMoon, Sunrise, Sunset, TreePine, X, type LucideIcon,
   CloudMoon, Orbit, Sparkle, SunDim,
 } from 'lucide-react';
 import { Crown, Flag, Plane } from 'lucide-react';
@@ -97,6 +97,12 @@ const EGG_ICONS: Record<Exclude<EggKind, 'ufo' | 'santa'>, [LucideIcon, string]>
   canadaDay: [Flag, 'text-red-500'],
   australiaDay: [Flag, 'text-brand-sky'],
   kingsDay: [Crown, 'text-brand-sunset'],
+  // Playful pack (ROADMAP item 117).
+  aprilFools: [ArrowLeftRight, 'text-brand-peach'],
+  easter: [Sunrise, 'text-brand-gold-light'],
+  valentine: [Heart, 'text-brand-coral'],
+  stPatrick: [Coins, 'text-brand-gold'],
+  patientWatcher: [Hourglass, 'text-brand-peach'],
 };
 
 const SKY_ICONS: Record<'sun' | 'moon' | 'terrain' | 'satellite', [LucideIcon, string]> = {

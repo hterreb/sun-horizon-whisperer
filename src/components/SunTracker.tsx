@@ -68,7 +68,7 @@ import PremiumDialog from './PremiumDialog';
 import CollectionView from './CollectionView';
 import BadgeUnlocked from './BadgeUnlocked';
 import {
-  BADGES, addToCollection, badgeForAstroEvent, badgeForCalendarEvent, badgeForSanta, badgeForTarget, countCollected, isCollectionPaused, loadCollection,
+  BADGES, addToCollection, badgeForAstroEvent, badgeForCalendarEvent, badgeForPlayfulEgg, badgeForSanta, badgeForTarget, countCollected, isCollectionPaused, loadCollection,
   saveCollection, stateBadgeForTarget, type BadgeId, type Collection, type StateBadgeContext,
 } from '@/utils/collection';
 import { watchSunEvent, NO_SUN_EVENT_WATCH, getCountdownTarget } from '../utils/sunEvents';
@@ -77,6 +77,7 @@ import { getNationalDay, parseCountryOverride, parseNationalEggOverride } from '
 import { badgeForNationalDay } from '@/utils/collection';
 import { BuntingContext, type Bunting } from '@/hooks/useBunting';
 import NationalEggs from './NationalEggs';
+import { NO_PATIENT_WATCH, PLAYFUL_EVENT, advancePatientWatch, getPlayfulOverride, isEasterMorning, type PlayfulEgg } from '@/utils/playfulEggs';
 import { PLAY_SPEED, PLAY_TICK_MS, clampTimeOffset } from '@/utils/timeTravel';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
 import { DISCO_MS, KONAMI_SEQUENCE, SUNGLASSES_MS, advanceKonami, getEggOverride, registerSunTap, rollUfo } from '@/utils/hiddenEggs';
@@ -704,6 +705,27 @@ const SunTracker: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per clock tick
   }, [date]);
 
+  // Patient watcher (ROADMAP item 117): a badge for the app open and visible without a break
+  // from 2 min before the sunset (line of sight when there is one, like the fireworks) to 10 min
+  // after it. Live time only; a hidden page starts the watch again. Nothing is saved but the badge.
+  const patientWatchRef = React.useRef(NO_PATIENT_WATCH);
+  useEffect(() => {
+    const sunset = sunTimes && !sunTimes.polar ? terrainExtras.terrainSunTimes?.sunset ?? sunTimes.sunset : null;
+    const visible = !isTimePreview && document.visibilityState === 'visible';
+    const { watch, earned } = advancePatientWatch(patientWatchRef.current, date.getTime(), visible, sunset?.getTime() ?? null);
+    patientWatchRef.current = watch;
+    const badge = earned ? badgeForPlayfulEgg('patientWatcher', isTimePreview) : null;
+    if (badge) collect(badge);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per clock tick
+  }, [date]);
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') patientWatchRef.current = NO_PATIENT_WATCH;
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
+
   // Hidden easter eggs (ROADMAP "Ongoing — Easter eggs"): sunglasses after 7 taps on
   // the sun, a rare UFO per night view, and a disco sky from 7 taps on the moon (same
   // rule as the sun) or the Konami code.
@@ -793,8 +815,11 @@ const SunTracker: React.FC = () => {
   // forces Lunar New Year (item 100), `?egg=santa` Santa's flight (no snow: that is Dec 25-26).
   const [dragonForced] = useState(() => new URLSearchParams(window.location.search).get('egg') === 'dragon');
   const [santaForced] = useState(() => new URLSearchParams(window.location.search).get('egg') === 'santa');
+  // Playful pack (ROADMAP item 117): `?egg=aprilFools|easter|valentine|stPatrick` sets that day.
+  const [playfulForced] = useState(() => getPlayfulOverride(window.location.search));
   const calendarEvent = useMemo(
-    () => (dragonForced ? 'lunar-new-year' : getCalendarEvent(date, location.latitude)),
+    () => (dragonForced ? 'lunar-new-year' : playfulForced ? PLAYFUL_EVENT[playfulForced]
+      : getCalendarEvent(date, location.latitude)),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on passMinuteKey, not `date` itself
     [passMinuteKey, location.latitude]
   );
@@ -807,6 +832,13 @@ const SunTracker: React.FC = () => {
   const [countryOverride] = useState(() => parseCountryOverride(window.location.search));
   const [nationalForced] = useState(() => parseNationalEggOverride(window.location.search));
   const nationalDay = nationalForced ?? getNationalDay(date, countryOverride ?? detectedCountry, calendarEvent);
+  // Easter Sunday from sunrise to 12:00: the empty tomb (item 117). `?egg=easter` shows it at once.
+  const easterMorning = playfulForced === 'easter' || isEasterMorning(date, sunTimes);
+  // The scene reports a playful egg when it really shows; its badge counts then (not in a preview).
+  const handleEggShown = useCallback((kind: PlayfulEgg) => {
+    const badge = badgeForPlayfulEgg(kind, isTimePreview);
+    if (badge) collect(badge);
+  }, [collect, isTimePreview]);
 
   // Sunset countdown (ROADMAP item 43): 10 s of ticks and a chime at the next sunset
   // (line of sight when there is one). Live time only; the tap that turns it on
@@ -1150,6 +1182,8 @@ const SunTracker: React.FC = () => {
             infoRingTier={infoCardInfo?.tier ?? null}
             calendarEvent={calendarEvent}
             santa={isSanta}
+            easterMorning={easterMorning}
+            onEggShown={handleEggShown}
             playDirection={playDirection}
             satellites={satelliteTracking.sky}
             sunsetCountdown={countdownSeconds === null ? null : { seconds: countdownSeconds, lineOfSight: !!countdownTarget?.lineOfSight }}

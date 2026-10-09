@@ -1,5 +1,6 @@
 import { getNextFullMoon } from './moonUtils';
 import { type SunTimes } from './sunUtils';
+import { isEasterSunday } from './playfulEggs';
 
 // Calendar easter eggs (ROADMAP "Ongoing - Easter eggs", Calendar list). Pure date
 // checks in local time; the scene shows at most one event at a time.
@@ -12,7 +13,12 @@ export type CalendarEvent =
   | 'equinox'
   | 'halloween-pumpkin' // Oct 31, full moon within 3 days: a pumpkin moon
   | 'halloween-bats' // Oct 31, else: bats all night
-  | 'christmas'; // Dec 25-26: falling Christmas ornaments (Santa flies on Dec 24: isSantaTime)
+  | 'christmas' // Dec 25-26: falling Christmas ornaments (Santa flies on Dec 24: isSantaTime)
+  // Playful pack (ROADMAP item 117)
+  | 'easter' // Easter Sunday: the empty tomb, from sunrise to 12:00
+  | 'april-fools' // Apr 1: the sun and the moon swap places for one minute
+  | 'valentine' // Feb 14: a heart-shaped day cloud
+  | 'st-patrick'; // Mar 17: a pot of gold at the end of the rainbow
 
 // Mean solstice/equinox instants, Meeus "Astronomical Algorithms" table 27.B
 // (years 2000-3000). No periodic terms, so the error is up to about 30 min; this
@@ -71,6 +77,11 @@ export const getCalendarEvent = (date: Date, latitude = 0): CalendarEvent | null
   if (day === 13 && date.getDay() === 5) return 'friday-13';
   const season = getSeasonEvent(date, latitude);
   if (season) return season;
+  // Playful pack (ROADMAP item 117). Easter wins over April Fools (Apr 1 2029, 2040).
+  if (isEasterSunday(date)) return 'easter';
+  if (month === 3 && day === 1) return 'april-fools';
+  if (month === 1 && day === 14) return 'valentine';
+  if (month === 2 && day === 17) return 'st-patrick';
   if (month === 9 && day === 31) return isHalloweenFullMoon(date.getFullYear()) ? 'halloween-pumpkin' : 'halloween-bats';
   if (month === 11 && day >= 25 && day <= 26) return 'christmas';
   return null;
