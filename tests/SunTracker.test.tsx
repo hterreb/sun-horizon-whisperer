@@ -1063,6 +1063,26 @@ describe('SunTracker', () => {
       expect(unlocked()).toBeNull();
     });
 
+    it('a sun tap at midday collects "sun" and "sun:midday" (item 115)', () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date('2026-09-30T11:00:00Z')); // 13:00 in Ravensburg: midday
+        render(<SunTracker />);
+        expect(visProps.current).not.toBeNull();
+        act(() => {
+          visProps.current!.onSceneInfo!({ type: 'sun' }, { x: 200, y: 200 }, 'sun');
+        });
+        expect(Object.keys(JSON.parse(localStorage.getItem('collection')!))).toEqual(['sun', 'sun:midday']);
+        // Item 114: the two badges show one after the other.
+        expect(screen.getAllByTestId('badge-unlocked')).toHaveLength(1);
+        expect(unlocked()).toHaveTextContent('Badge unlocked: Sun');
+        closeCard();
+        expect(unlocked()).toHaveTextContent('Badge unlocked: Midday sun');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('collects nothing with a test link (?egg=ufo)', () => {
       window.history.pushState({}, '', '/?egg=ufo');
       render(<SunTracker />);

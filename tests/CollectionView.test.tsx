@@ -7,6 +7,7 @@ import { BADGES, type Collection } from '@/utils/collection';
 const collection: Collection = {
   'fish:seahorse': '2026-10-09T12:00:00.000Z',
   'egg:ufo': '2026-10-08T22:00:00.000Z',
+  'sun:midday': '2026-10-09T11:00:00.000Z',
 };
 
 const renderView = (open = true, onClose = vi.fn()) =>
@@ -25,7 +26,7 @@ describe('CollectionView', () => {
 
   it('shows the found count out of all badges', () => {
     renderView();
-    expect(screen.getByRole('dialog')).toHaveTextContent(`2 / ${BADGES.length}`);
+    expect(screen.getByRole('dialog')).toHaveTextContent(`3 / ${BADGES.length}`);
     expect(screen.getAllByRole('listitem')).toHaveLength(BADGES.length);
   });
 
@@ -85,5 +86,28 @@ describe('CollectionView', () => {
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
     expect(scrollIntoView.mock.contexts[0]).toBe(cellOf('fish:seahorse'));
     delete (Element.prototype as Partial<Element>).scrollIntoView;
+  });
+
+  it('groups the states under their base badge: one row each for sun, moon and terrain (item 115)', () => {
+    renderView();
+    const rowOf = (id: string) => cellOf(id).closest('ul')!;
+    expect(within(rowOf('sun')).getAllByRole('listitem')).toHaveLength(6);
+    expect(within(rowOf('moon')).getAllByRole('listitem')).toHaveLength(9);
+    expect(within(rowOf('terrain')).getAllByRole('listitem')).toHaveLength(6);
+    expect(rowOf('sun:dawn')).toBe(rowOf('sun'));
+    expect(rowOf('terrain:alpine')).toBe(rowOf('terrain'));
+    expect(rowOf('plane')).not.toBe(rowOf('sun'));
+  });
+
+  it('shows a collected state with its name and a missing state as a grey outline (item 115)', () => {
+    renderView();
+    expect(within(cellOf('sun:midday')).getByText('Midday sun')).toBeInTheDocument();
+    for (const id of ['sun:dawn', 'moon:new', 'terrain:alpine']) {
+      const cell = cellOf(id);
+      expect(cell).toHaveAttribute('data-missing');
+      expect(cell.querySelector('svg')).not.toBeNull();
+      expect((cell.firstElementChild as HTMLElement).style.filter).toBe('url(#badge-outline)');
+    }
+    expect(cellOf('moon:new')).not.toHaveTextContent('New Moon');
   });
 });

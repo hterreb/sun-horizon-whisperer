@@ -68,8 +68,8 @@ import PremiumDialog from './PremiumDialog';
 import CollectionView from './CollectionView';
 import BadgeUnlocked from './BadgeUnlocked';
 import {
-  addToCollection, badgeForAstroEvent, badgeForCalendarEvent, badgeForTarget, countCollected, isCollectionPaused, loadCollection,
-  saveCollection, type BadgeId, type Collection,
+  BADGES, addToCollection, badgeForAstroEvent, badgeForCalendarEvent, badgeForTarget, countCollected, isCollectionPaused, loadCollection,
+  saveCollection, stateBadgeForTarget, type BadgeId, type Collection, type StateBadgeContext,
 } from '@/utils/collection';
 import { watchSunEvent, NO_SUN_EVENT_WATCH, getCountdownTarget } from '../utils/sunEvents';
 import { getCalendarEvent } from '@/utils/calendarEvents';
@@ -753,11 +753,19 @@ const SunTracker: React.FC = () => {
   // `id` mounts a new card per tap, so its 15 s timer starts again.
   const [infoCard, setInfoCard] = useState<{ target: SceneInfoTarget; x: number; y: number; ring: string; id: number } | null>(null);
   const infoCardCount = React.useRef(0);
+  // Item 115: what the state badges read, in a ref so handleSceneInfo stays stable.
+  const stateBadgeContextRef = React.useRef<StateBadgeContext>({ timeOfDay, moonPhase: moonPosition.phase, horizonProfile, isTimePreview });
+  useEffect(() => {
+    stateBadgeContextRef.current = { timeOfDay, moonPhase: moonPosition.phase, horizonProfile, isTimePreview };
+  }, [timeOfDay, moonPosition.phase, horizonProfile, isTimePreview]);
   const handleSceneInfo = useCallback((target: SceneInfoTarget, point: { x: number; y: number }, ring: string) => {
     infoCardCount.current += 1;
     setInfoCard({ target, ...point, ring, id: infoCardCount.current });
+    // The base badge first, then the state badge (sun, moon, terrain): one collect each.
     const badge = badgeForTarget(target);
     if (badge) collect(badge);
+    const state = stateBadgeForTarget(target, stateBadgeContextRef.current);
+    if (state) collect(state);
   }, [collect]);
   const handleInfoClose = useCallback(() => setInfoCard(null), []);
   // Rare lenticular and mammatus clouds (ROADMAP item 84, X1): one day in 30 per place;

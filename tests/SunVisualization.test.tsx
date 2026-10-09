@@ -1252,6 +1252,13 @@ describe('SunVisualization (rendered): the moon behind clouds (ROADMAP item 76)'
     expect(screen.queryByTestId('moon-corona')).toBeNull();
   });
 
+  it('keeps the moon button at a new moon, so its badge can be collected (item 115)', () => {
+    render(<SunVisualization {...nightProps} moonPosition={{ ...nightProps.moonPosition, phase: 0, illumination: 0 }} weatherType="clear" cloudCoverPercent={0} />);
+    const moon = screen.getByRole('button', { name: 'Moon' });
+    expect(moon.className).toContain('pointer-events-auto');
+    expect(Number(moon.style.opacity)).toBeCloseTo(0.2);
+  });
+
   it('shows only the corona in fog and nothing in a storm', () => {
     const { rerender } = render(<SunVisualization {...nightProps} weatherType="fog" cloudCoverPercent={null} />);
     expect(screen.queryByTestId('moon-disc')).toBeNull();
