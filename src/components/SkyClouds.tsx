@@ -10,6 +10,7 @@ import {
   getRowOpacity, getRowSpan, getSceneScale, getSkyClouds, getSkyColorAt, getTimeOfDayAltitude,
 } from '@/utils/skyCloudUtils';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
+import { useDoubleTap } from '@/hooks/useDoubleTap';
 
 // Clouds by type (ROADMAP item 84): the real cloud layers (C1), lit by the sun (C2), in
 // three bands that glide at their own pace (C3), with soft fills (C4), the rare
@@ -72,7 +73,7 @@ const CloudSvg = memo(function CloudSvg({
   const size = { width: 120 * cloud.scale, height: 60 * cloud.scale };
   return (
     <div
-      className={onInfo ? 'absolute pointer-events-auto cursor-pointer' : 'absolute'}
+      className={onInfo ? 'absolute pointer-events-auto cursor-pointer touch-manipulation' : 'absolute'}
       onClick={onInfo && (event => onInfo({ type: 'cloud', cloudType: cloud.type, band: cloud.band }, { x: event.clientX, y: event.clientY }, ringId))}
       style={{
         left: cloud.x,
@@ -168,6 +169,8 @@ const SkyClouds: React.FC<SkyCloudsProps> = ({
   onInfo, infoRing = null,
 }) => {
   const reduced = usePrefersReducedMotion();
+  // Item 116: a double tap opens the cloud's card; a single tap shows its ring for a moment.
+  const { tap, hint } = useDoubleTap(onInfo);
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
   const [size, setSize] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
   useEffect(() => {
@@ -305,11 +308,11 @@ const SkyClouds: React.FC<SkyCloudsProps> = ({
                     liningY={lining ? quantize(lining.cy, LINING_STEP) : undefined}
                     liningR={lining ? quantize(lining.r, LINING_STEP) : undefined}
                     moonGlow={moonGlow}
-                    onInfo={out ? undefined : onInfo}
+                    onInfo={out || !onInfo ? undefined : tap}
                     ringId={ringId}
                   />
                   {/* Item 95: the ring of the open card, outside the cloud's blur; the glide moves it. */}
-                  {!out && infoRing === ringId && (
+                  {!out && (infoRing === ringId || hint === ringId) && (
                     <span
                       className="absolute rounded-full border border-white/70"
                       style={{ left: cloud.x, top: cloud.y - 30 * cloud.scale, width: 120 * cloud.scale, height: 60 * cloud.scale }}

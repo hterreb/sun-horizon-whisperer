@@ -924,6 +924,12 @@ describe('SunTracker', () => {
       advance(300);
     };
     const card = () => screen.queryByTestId('scene-info-card');
+    // Item 116: a pointer tap (detail 1); two of them in 350 ms are a double tap.
+    const tap = (el: Element, init: MouseEventInit = {}) => fireEvent.click(el, { ...init, detail: 1 });
+    const doubleTap = (el: Element, init: MouseEventInit = {}) => {
+      tap(el, init);
+      fireEvent.click(el, { ...init, detail: 2 });
+    };
 
     beforeEach(() => {
       vi.useFakeTimers();
@@ -941,7 +947,7 @@ describe('SunTracker', () => {
       for (let t = 0; t < 10; t++) advance(1000);
       const fishHit = [...screen.getAllByTestId('scene-hit')]
         .find(hit => hit.closest('[aria-hidden="true"]')!.querySelector('[data-testid="scene-fish"]'))!;
-      fireEvent.click(fishHit, { clientX: 150, clientY: 650 });
+      doubleTap(fishHit, { clientX: 150, clientY: 650 });
       expect(screen.getByRole('dialog', { name: 'Perch' })).toHaveTextContent('Its dark stripes hide the perch among water plants.');
       expect(fishHit.querySelector('[data-testid="scene-info-ring"]')).not.toBeNull();
       // Item 107: the card and the ring have the tier colour. Item 113: a perch (14 % of the day
@@ -956,19 +962,45 @@ describe('SunTracker', () => {
       expect(screen.queryByTestId('scene-info-ring')).toBeNull();
     });
 
-    it('the sun still counts 7 taps for the sunglasses; the first tap opens its card', () => {
+    it('the sun still counts 7 taps for the sunglasses; a double tap opens its card (item 116)', () => {
       start();
       const sun = screen.getByRole('button', { name: 'Sun' });
-      fireEvent.click(sun);
+      doubleTap(sun);
       expect(screen.getByRole('dialog', { name: 'Sun' })).toHaveTextContent(/Sunset in \d+ h \d+ min/);
       expect(screen.queryByTestId('sun-sunglasses')).toBeNull();
-      // A real tap: the pointerdown closes the card, the click counts and opens it again.
-      for (let i = 0; i < 6; i++) {
+      // A real tap: the pointerdown closes the card, the click counts. Single taps 500 ms apart
+      // open no card.
+      for (let i = 0; i < 5; i++) {
         fireEvent.pointerDown(sun);
-        fireEvent.click(sun);
+        tap(sun);
+        advance(500);
       }
       expect(screen.getByTestId('sun-sunglasses')).toBeInTheDocument();
-      expect(screen.getAllByTestId('scene-info-card')).toHaveLength(1);
+      expect(card()).toBeNull();
+    });
+
+    it('one tap opens no card and collects no badge, but shows the ring; a double tap does both (item 116)', () => {
+      // No test link (`?fish=` pauses the collection, item 112).
+      vi.setSystemTime(NOON);
+      saveManualLocation(RAVENSBURG.latitude, RAVENSBURG.longitude, 'Ravensburg');
+      render(<SunTracker />);
+      advance(300);
+      const sun = screen.getByRole('button', { name: 'Sun' });
+      tap(sun);
+      expect(card()).toBeNull();
+      expect(localStorage.getItem('collection')).toBeNull();
+      expect(sun.querySelector('[data-testid="scene-info-ring"]')).not.toBeNull();
+      advance(600);
+      expect(sun.querySelector('[data-testid="scene-info-ring"]')).toBeNull();
+      doubleTap(sun);
+      expect(screen.getByRole('dialog', { name: 'Sun' })).toBeInTheDocument();
+      expect(JSON.parse(localStorage.getItem('collection')!)).toHaveProperty('sun');
+    });
+
+    it('a keyboard click on the sun (Enter, Space) opens its card at once (item 116)', () => {
+      start();
+      fireEvent.click(screen.getByRole('button', { name: 'Sun' }), { detail: 0 });
+      expect(screen.getByRole('dialog', { name: 'Sun' })).toBeInTheDocument();
     });
 
     it('a tap on the UFO opens its easter egg card with the ultra rare ring (item 113)', () => {
@@ -978,7 +1010,7 @@ describe('SunTracker', () => {
       render(<SunTracker />);
       advance(300);
       const ufo = screen.getByTestId('ufo');
-      fireEvent.click(ufo.querySelector('[data-testid="scene-hit"]')!, { clientX: 100, clientY: 130 });
+      doubleTap(ufo.querySelector('[data-testid="scene-hit"]')!, { clientX: 100, clientY: 130 });
       const dialog = screen.getByRole('dialog', { name: 'UFO' });
       expect(dialog).toHaveTextContent('Easter egg');
       expect(dialog).toHaveTextContent('Ultra rare · 0.5 % per night');
@@ -988,7 +1020,7 @@ describe('SunTracker', () => {
 
     it('closes the card after 15 s', () => {
       start();
-      fireEvent.click(screen.getByRole('button', { name: 'Sun' }));
+      doubleTap(screen.getByRole('button', { name: 'Sun' }));
       expect(card()).not.toBeNull();
       advance(15_000);
       expect(card()).toBeNull();

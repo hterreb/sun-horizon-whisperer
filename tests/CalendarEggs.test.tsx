@@ -95,8 +95,12 @@ describe('CalendarEggs', () => {
   });
 
   describe('egg info cards (ROADMAP item 113)', () => {
-    const tap = (wrapper: Element, x = 120, y = 300) =>
-      fireEvent.click(wrapper.querySelector('[data-testid="scene-hit"]')!, { clientX: x, clientY: y });
+    // Item 116: a double tap opens the card.
+    const tap = (wrapper: Element, x = 120, y = 300) => {
+      const hit = wrapper.querySelector('[data-testid="scene-hit"]')!;
+      fireEvent.click(hit, { clientX: x, clientY: y, detail: 1 });
+      fireEvent.click(hit, { clientX: x, clientY: y, detail: 2 });
+    };
 
     it('opens the card of the black cat, a Halloween bat and the pumpkin moon; the thing moves on', () => {
       const onInfo = vi.fn();

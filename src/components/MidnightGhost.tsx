@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Ghost } from 'lucide-react';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
+import { useDoubleTap } from '@/hooks/useDoubleTap';
 import { type RarityTier } from '@/utils/rarityTier';
 import { HitArea, type SceneInfoHandler } from './CloudLayer';
 
@@ -22,6 +23,8 @@ const MidnightGhost: React.FC<MidnightGhostProps> = ({ currentTime, onInfo, ring
   const [isVisible, setIsVisible] = useState(isMidnight);
   const [position, setPosition] = useState({ x: 50, y: 30, direction: 1 });
   const prefersReducedMotion = usePrefersReducedMotion();
+  // Item 116: a double tap opens the card; a single tap shows the ring for a moment.
+  const { tap, hint } = useDoubleTap(onInfo);
 
   // Visibility follows `isMidnight` directly: show as soon as it turns true, hide as
   // soon as it turns false. Adjusting state during render (rather than in an effect)
@@ -80,7 +83,7 @@ const MidnightGhost: React.FC<MidnightGhostProps> = ({ currentTime, onInfo, ring
 
   return (
     <div 
-      className={`fixed z-10 transition-all duration-1000 ${onInfo ? 'pointer-events-auto cursor-pointer' : 'pointer-events-none'}`}
+      className={`fixed z-10 transition-all duration-1000 ${onInfo ? 'pointer-events-auto cursor-pointer touch-manipulation' : 'pointer-events-none'}`}
       style={{
         left: `${position.x}%`,
         top: `${position.y}%`,
@@ -89,7 +92,7 @@ const MidnightGhost: React.FC<MidnightGhostProps> = ({ currentTime, onInfo, ring
       }}
       aria-hidden={onInfo ? true : undefined}
       data-testid="midnight-ghost"
-      onClick={onInfo && (event => onInfo({ type: 'egg', kind: 'ghost' }, { x: event.clientX, y: event.clientY }, GHOST_RING))}
+      onClick={onInfo && (event => tap({ type: 'egg', kind: 'ghost' }, { x: event.clientX, y: event.clientY }, GHOST_RING))}
     >
       {/* Ghost Icon with effects - the style book's D ghost: a soft white glow
           (ROADMAP item 15 D polish, ghostTile('d')). */}
@@ -113,7 +116,7 @@ const MidnightGhost: React.FC<MidnightGhostProps> = ({ currentTime, onInfo, ring
         />
       </div>
       
-      {onInfo && <HitArea cx={GHOST_PX / 2} cy={GHOST_PX / 2} width={GHOST_PX} height={GHOST_PX} ring={ringOn} tier={ringTier} />}
+      {onInfo && <HitArea cx={GHOST_PX / 2} cy={GHOST_PX / 2} width={GHOST_PX} height={GHOST_PX} ring={ringOn || hint === GHOST_RING} tier={ringOn ? ringTier : null} />}
 
       {/* Floating particles around ghost */}
       <div className="absolute inset-0">

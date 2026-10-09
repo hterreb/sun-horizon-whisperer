@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useLanguage } from '@/hooks/useLanguage';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { useScenePlaybackRate } from '@/hooks/useScenePlaybackRate';
+import { useDoubleTap } from '@/hooks/useDoubleTap';
 import { getSpawnGapFactor, type PlayDirection } from '@/utils/timeTravel';
 import { makeDotPath, type DotPath } from '@/utils/satelliteUtils';
 import { type SceneInfoHandler } from './CloudLayer';
@@ -84,6 +85,8 @@ const Satellites: React.FC<SatellitesProps> = ({
 }) => {
   const { t } = useLanguage();
   const prefersReducedMotion = usePrefersReducedMotion();
+  // Item 116: a double tap opens the card; a keyboard click (no pointer, detail 0) at once.
+  const { tap, hint } = useDoubleTap(onInfo);
   const containerRef = useRef<HTMLDivElement>(null);
   const [decors, setDecors] = useState<Decor[]>([]);
   const nextId = useRef(0);
@@ -147,9 +150,9 @@ const Satellites: React.FC<SatellitesProps> = ({
             tabIndex={dot.shown ? 0 : -1}
             onClick={(event) => {
               const box = event.currentTarget.getBoundingClientRect();
-              onInfo?.({ type: 'satellite', id: dot.id, name: dot.name }, { x: box.left + box.width / 2, y: box.top + box.height / 2 }, ring);
+              tap({ type: 'satellite', id: dot.id, name: dot.name }, { x: box.left + box.width / 2, y: box.top + box.height / 2 }, ring, event.detail === 0);
             }}
-            className={`absolute left-0 top-0 flex items-center justify-center rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 ${dot.shown ? 'pointer-events-auto' : ''}`}
+            className={`absolute left-0 top-0 flex items-center justify-center rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 touch-manipulation ${dot.shown ? 'pointer-events-auto' : ''}`}
             style={{
               width: HIT_PX,
               height: HIT_PX,
@@ -164,7 +167,7 @@ const Satellites: React.FC<SatellitesProps> = ({
               className="rounded-full bg-white"
               style={{ width: size, height: size, boxShadow: dot.iss ? '0 0 4px 1px rgb(255 255 255 / 0.6)' : undefined }}
             />
-            {infoRing === ring && <span className="absolute inset-2 rounded-full border border-white/70" data-testid="scene-info-ring" />}
+            {(infoRing === ring || hint === ring) && <span className="absolute inset-2 rounded-full border border-white/70" data-testid="scene-info-ring" />}
           </button>
         );
       })}

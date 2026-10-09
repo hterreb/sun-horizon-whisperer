@@ -1,7 +1,7 @@
 import React from 'react';
 import fs from 'node:fs';
 import path from 'node:path';
-import { render, screen, within, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, within, fireEvent, cleanup, act } from '@testing-library/react';
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import SunVisualization, {
   getAzimuthScreenFraction,
@@ -1173,13 +1173,40 @@ describe('SunVisualization info cards (ROADMAP item 95)', () => {
     expect(getAzimuthAtFraction(getCompassScreenFraction(10, 350).fraction, 51, 350)).toBeCloseTo(10);
   });
 
-  it('opens the sun card with each tap, beside the egg count', () => {
+  it('opens the sun card on a double tap; the egg counts each tap (item 116)', () => {
     const onSunTap = vi.fn();
     const onSceneInfo = vi.fn();
     render(<SunVisualization {...props} timeOfDay="midday" onSunTap={onSunTap} onSceneInfo={onSceneInfo} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Sun' }), { detail: 1, clientX: 400, clientY: 100 });
+    const sun = screen.getByRole('button', { name: 'Sun' });
+    expect(sun.className).toContain('touch-manipulation');
+    fireEvent.click(sun, { detail: 1, clientX: 400, clientY: 100 });
     expect(onSunTap).toHaveBeenCalledTimes(1);
+    expect(onSceneInfo).not.toHaveBeenCalled();
+    expect(sun.querySelector('[data-testid="scene-info-ring"]')).not.toBeNull();
+    fireEvent.click(sun, { detail: 2, clientX: 400, clientY: 100 });
+    expect(onSunTap).toHaveBeenCalledTimes(2);
     expect(onSceneInfo).toHaveBeenCalledWith({ type: 'sun' }, { x: 400, y: 100 }, 'sun');
+  });
+
+  it('counts 7 single sun taps for the egg and opens no card; a keyboard click opens it at once (item 116)', () => {
+    vi.useFakeTimers();
+    try {
+      const onSunTap = vi.fn();
+      const onSceneInfo = vi.fn();
+      render(<SunVisualization {...props} timeOfDay="midday" onSunTap={onSunTap} onSceneInfo={onSceneInfo} />);
+      const sun = screen.getByRole('button', { name: 'Sun' });
+      for (let i = 0; i < 7; i++) {
+        fireEvent.click(sun, { detail: 1, clientX: 400, clientY: 100 });
+        act(() => { vi.advanceTimersByTime(500); });
+      }
+      expect(onSunTap).toHaveBeenCalledTimes(7);
+      expect(onSceneInfo).not.toHaveBeenCalled();
+      fireEvent.click(sun, { detail: 0 }); // Enter or Space
+      expect(onSunTap).toHaveBeenCalledTimes(8);
+      expect(onSceneInfo).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('makes the moon a button of at least 44 px that opens its card, also from the keyboard', () => {
@@ -1188,8 +1215,16 @@ describe('SunVisualization info cards (ROADMAP item 95)', () => {
     const moon = screen.getByRole('button', { name: 'Moon' });
     expect(moon.className).toContain('min-w-11');
     expect(moon.className).toContain('min-h-11');
-    fireEvent.click(moon); // a keyboard click: no point, so the centre of the button
+    fireEvent.click(moon); // a keyboard click: no point, so the centre of the button; it opens at once
     expect(onSceneInfo).toHaveBeenCalledWith({ type: 'moon' }, expect.objectContaining({ x: expect.any(Number) }), 'moon');
+    // Item 116: a pointer opens the card only on a double tap.
+    onSceneInfo.mockClear();
+    expect(moon.className).toContain('touch-manipulation');
+    fireEvent.click(moon, { detail: 1, clientX: 300, clientY: 150 });
+    expect(onSceneInfo).not.toHaveBeenCalled();
+    expect(moon.querySelector('[data-testid="scene-info-ring"]')).not.toBeNull();
+    fireEvent.click(moon, { detail: 2, clientX: 300, clientY: 150 });
+    expect(onSceneInfo).toHaveBeenCalledWith({ type: 'moon' }, { x: 300, y: 150 }, 'moon');
   });
 
   it('lets taps through to the UFO behind it; the sun and the moon still take taps (item 113 follow-up)', () => {
@@ -1206,10 +1241,14 @@ describe('SunVisualization info cards (ROADMAP item 95)', () => {
     render(<SunVisualization {...props} onSceneInfo={onSceneInfo} />);
     const terrain = screen.getByRole('button', { name: 'Terrain' });
     expect(terrain.getAttribute('tabindex')).toBe('0');
-    fireEvent.click(terrain, { clientX: 400, clientY: 380 }); // the middle of 800 px: 180°
+    expect(terrain.getAttribute('class')).toContain('touch-manipulation');
+    fireEvent.click(terrain, { clientX: 400, clientY: 380, detail: 1 }); // the middle of 800 px: 180°
+    expect(onSceneInfo).not.toHaveBeenCalled(); // item 116: a double tap opens the card
+    fireEvent.click(terrain, { clientX: 400, clientY: 380, detail: 2 });
     expect(onSceneInfo.mock.calls[0][0]).toEqual({ type: 'terrain', azimuth: 180 });
     expect(onSceneInfo.mock.calls[0][1]).toEqual({ x: 400, y: 380 });
-    fireEvent.keyDown(terrain, { key: 'Enter' });
+    fireEvent.keyDown(terrain, { key: 'Enter' }); // the keyboard opens at once
+    expect(onSceneInfo).toHaveBeenCalledTimes(2);
     expect(onSceneInfo.mock.calls[1][0].azimuth).toBeCloseTo(100);
   });
 });
