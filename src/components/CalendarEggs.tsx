@@ -27,6 +27,11 @@ interface CalendarEggsProps {
   infoRingTier?: RarityTier | null;
   // Christmas Eve from sunset to midnight (calendarEvents.isSantaTime), or ?egg=santa.
   santa?: boolean;
+  // The countdown sound is on (item 108): Santa's sleigh bells may play (lookbook S9).
+  soundOn?: boolean;
+  // The scene has its size, so `moon` is a real place (or null): Santa picks his mode
+  // (moon or far) at his start, so he waits for it.
+  measured?: boolean;
   // A blue moon is shown (astroEvents): its label goes in the season badge.
   blueMoon?: boolean;
 }
@@ -62,7 +67,7 @@ const BAT_EYE = 'hsl(var(--scene-bat-eye))';
 
 // The calendar easter eggs (the New Year one is SunTracker's fireworks). All motion is
 // slow straight CSS glides; reduced motion turns the moving ones off.
-const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherType, moon, horizonY, onInfo, infoRing = null, infoRingTier = null, santa = false, blueMoon = false }) => {
+const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherType, moon, horizonY, onInfo, infoRing = null, infoRingTier = null, santa = false, soundOn = false, measured = true, blueMoon = false }) => {
   const prefersReducedMotion = usePrefersReducedMotion();
   const [dragonDone, setDragonDone] = useState(false);
   const [santaDone, setSantaDone] = useState(false);
@@ -72,7 +77,7 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherTy
   // Once he starts, Santa flies to the edge, also when `santa` turns false at midnight (no jump).
   // Set during render, like SunTracker's night roll.
   const [santaFlying, setSantaFlying] = useState(false);
-  if (santa && !santaFlying && !santaDone && !prefersReducedMotion) setSantaFlying(true);
+  if (santa && measured && !santaFlying && !santaDone && !prefersReducedMotion) setSantaFlying(true);
   const isNight = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
   const { t } = useLanguage();
   const seasonKey = event ? SEASON_TEXT[event] : undefined;
@@ -251,8 +256,9 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherTy
       )}
 
       {santaFlying && !santaDone && !prefersReducedMotion && (
-        // One flight per page view, also when it already snows.
-        <Santa onDone={handleSantaDone} onInfo={onInfo} ringOn={infoRing === SANTA_RING} ringTier={infoRingTier} />
+        // One flight per page view, also when it already snows. With the moon on the screen he crosses it
+        // (lookbook S2), else he flies small and far (S4).
+        <Santa onDone={handleSantaDone} onInfo={onInfo} ringOn={infoRing === SANTA_RING} ringTier={infoRingTier} moon={moon} soundOn={soundOn} />
       )}
 
       <style>{`

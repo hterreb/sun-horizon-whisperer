@@ -1,9 +1,11 @@
-import React, { useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Bird, Cloud, Egg, Fish, Moon, Mountain, PartyPopper, Plane, Sailboat, Satellite, Sun, type LucideIcon } from 'lucide-react';
 import { useLanguage } from '@/hooks/useLanguage';
 import { GLASS_CARD_SURFACE } from '@/utils/glassChrome';
 import { cardBorderClass, TIER_ORDER, type RarityTier } from '@/utils/rarityTier';
 import { resolveInfoText, type SceneIconId, type SceneInfo } from '@/utils/sceneInfo';
+import { santaCounters } from '@/utils/santaTracker';
+import { formatNumber, type MessageKey } from '@/i18n';
 import { Bat } from './sceneIcons';
 
 // Info cards (ROADMAP item 95): one small glass card above the tapped point, inside the
@@ -49,6 +51,43 @@ const Meter: React.FC<{ tier: RarityTier }> = ({ tier }) => (
     ))}
   </span>
 );
+
+// One label-value row with dotted leaders.
+const Row: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+  <div className="flex items-baseline gap-1 text-caption">
+    <span className="whitespace-nowrap text-white/75">{label}</span>
+    <span className="min-w-2.5 flex-1 -translate-y-[3px] border-b border-dotted border-white/30" aria-hidden="true" />
+    <span className="inline-flex items-center gap-1.5 text-right">{children}</span>
+  </div>
+);
+
+export const NORAD_URL = 'https://www.noradsanta.org/';
+const COUNTER_TICK_MS = 1000;
+const COUNTERS: { key: 'presents' | 'cookies'; label: MessageKey }[] = [
+  { key: 'presents', label: 'egg.santaPresents' },
+  { key: 'cookies', label: 'egg.santaCookies' },
+];
+
+// Lookbook 2026-10-09, S7: Santa's playful counters. They tick once per second while the card is
+// open (an interval, no per-frame work), from the time, so a reopened card goes on where it was.
+const SantaCounters: React.FC = () => {
+  const { t, language } = useLanguage();
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), COUNTER_TICK_MS);
+    return () => clearInterval(timer);
+  }, []);
+  const counts = santaCounters(now);
+  return (
+    <>
+      {COUNTERS.map(({ key, label }) => (
+        <Row key={key} label={t(label)}>
+          <span className="tabular-nums" data-testid={`santa-${key}`}>{formatNumber(language, counts[key], 0)}</span>
+        </Row>
+      ))}
+    </>
+  );
+};
 
 interface SceneInfoCardProps {
   info: SceneInfo;
@@ -121,22 +160,27 @@ const SceneInfoCard: React.FC<SceneInfoCardProps> = ({ info, x, y, onClose }) =>
       <hr className="my-0.5 w-full border-0 border-t border-white/15" />
       {info.lines.map((line, i) =>
         line.label ? (
-          <div key={i} className="flex items-baseline gap-1 text-caption">
-            <span className="whitespace-nowrap text-white/75">{t(line.label)}</span>
-            <span className="min-w-2.5 flex-1 -translate-y-[3px] border-b border-dotted border-white/30" aria-hidden="true" />
-            <span className="inline-flex items-center gap-1.5 text-right">
-              {line.tier && <Meter tier={line.tier} />}
-              {resolveInfoText(t, line.value)}
-            </span>
-          </div>
+          <Row key={i} label={t(line.label)}>
+            {line.tier && <Meter tier={line.tier} />}
+            {resolveInfoText(t, line.value)}
+          </Row>
         ) : (
           <p key={i} className="text-caption">{resolveInfoText(t, line.value)}</p>
         )
       )}
+      {info.santaTracker && <SantaCounters />}
       {info.fact && (
         <div className="mt-0.5 flex flex-col gap-px text-caption">
           <b className="text-[11px] uppercase leading-4 tracking-[0.12em] text-white/60">{t(info.fact.label)}</b>
           <span>{t(info.fact.text)}</span>
+        </div>
+      )}
+      {info.santaTracker && (
+        <div className="mt-0.5 flex flex-col gap-px text-caption">
+          <span className="text-white/60">{t('egg.santaJustForFun')}</span>
+          <a href={NORAD_URL} target="_blank" rel="noopener noreferrer" className="font-semibold text-white underline underline-offset-2">
+            {t('egg.santaNorad')}
+          </a>
         </div>
       )}
     </div>

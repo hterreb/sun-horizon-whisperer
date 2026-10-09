@@ -146,4 +146,57 @@ describe('SceneInfoCard (ROADMAP item 95)', () => {
     act(() => { vi.advanceTimersByTime(1); });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  describe("Santa's tracker card (lookbook S7)", () => {
+    const SANTA: SceneInfo = {
+      kicker: 'infoKind.specialEvent',
+      icon: 'event',
+      title: 'egg.santaCallsign',
+      lines: [
+        { label: 'info.route', value: { key: 'egg.santaRoute', vars: { place: 'Ravensburg' } } },
+        { label: 'info.altitude', value: { key: 'info.metres', vars: { value: '10,700' } } },
+      ],
+      fact: { label: 'info.fieldNote', text: 'eggFact.santa' },
+      tier: 'ultraRare',
+      santaTracker: true,
+    };
+
+    it('shows the route, the counters, the "just for fun" line and the NORAD link', () => {
+      vi.useFakeTimers();
+      // 18:00 UTC on Dec 24: 8 h after NORAD's start.
+      vi.setSystemTime(Date.UTC(2026, 11, 24, 18));
+      show(200, 400, SANTA);
+      expect(card()).toHaveTextContent('SANTA 1');
+      expect(card()).toHaveTextContent('Route');
+      expect(card()).toHaveTextContent('North Pole → Ravensburg');
+      expect(screen.getByTestId('santa-presents')).toHaveTextContent('3,772,800,000');
+      expect(screen.getByTestId('santa-cookies')).toHaveTextContent('437,760,000');
+      expect(card()).toHaveTextContent('Just for fun, not real data');
+      const link = screen.getByRole('link', { name: 'Track Santa with NORAD' });
+      expect(link).toHaveAttribute('href', 'https://www.noradsanta.org/');
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+      // Once per second while open.
+      act(() => { vi.advanceTimersByTime(1000); });
+      expect(screen.getByTestId('santa-presents')).toHaveTextContent('3,772,931,000');
+    });
+
+    it('clears its interval when the card closes', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(Date.UTC(2026, 11, 24, 18));
+      const clear = vi.spyOn(globalThis, 'clearInterval');
+      const { unmount } = render(<SceneInfoCard info={SANTA} x={200} y={400} onClose={vi.fn()} />);
+      expect(vi.getTimerCount()).toBe(2); // the close timer and the counter
+      unmount();
+      expect(clear).toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+      clear.mockRestore();
+    });
+
+    it('has no counters or link on other cards', () => {
+      show();
+      expect(screen.queryByTestId('santa-presents')).toBeNull();
+      expect(screen.queryByRole('link')).toBeNull();
+    });
+  });
 });

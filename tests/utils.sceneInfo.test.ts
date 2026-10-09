@@ -359,11 +359,13 @@ describe('sceneInfo: easter egg cards (ROADMAP item 113)', () => {
     for (const kind of kinds) {
       const egg = info(kind);
       expect(egg.tier, kind).toBe('ultraRare');
-      expect(egg.lines).toHaveLength(1);
-      expect(egg.lines[0]).toMatchObject({ label: 'info.rarity', tier: 'ultraRare' });
+      // Santa's tracker card (lookbook S7) has the route and the altitude before the rarity row.
+      expect(egg.lines).toHaveLength(kind === 'santa' ? 3 : 1);
+      expect(egg.lines.at(-1)).toMatchObject({ label: 'info.rarity', tier: 'ultraRare' });
       expect(egg.fact?.label, kind).toBe('info.fieldNote');
       for (const t of [en, de]) {
-        const [title, fact, rarity] = eggCard(kind, t);
+        const [title, fact, ...rows] = eggCard(kind, t);
+        const rarity = rows.at(-1);
         expect(title, kind).not.toMatch(/^egg\./);
         expect(fact, kind).toMatch(/\.$/);
         expect(rarity, kind).toMatch(/^(Rarity: Ultra rare|Seltenheit: Ultraselten)/);
@@ -405,11 +407,20 @@ describe('sceneInfo: easter egg cards (ROADMAP item 113)', () => {
 
   it('gives Santa 1 day a year (Dec 24 only, not the 2 Christmas ornament days)', () => {
     expect(getEventDaysPerYear('christmas')).toBe(2);
-    expect(eggCard('santa')).toEqual([
-      'Santa Claus', 'A misprinted phone number in a 1955 advert led US air defence to track Santa; NORAD still does it every Christmas Eve.',
+    expect(eggCard('santa').at(-1)).toBe('Rarity: Ultra rare · 1 day a year');
+  });
+
+  it('gives Santa a tracker card like the live plane card (lookbook S7)', () => {
+    expect(eggCard('santa', en, { placeName: 'Ravensburg, Germany' })).toEqual([
+      'SANTA 1', 'A misprinted phone number in a 1955 advert led US air defence to track Santa; NORAD still does it every Christmas Eve.',
+      'Route: North Pole → Ravensburg',
+      'Altitude: 10,700 m',
       'Rarity: Ultra rare · 1 day a year',
     ]);
-    expect(eggCard('santa', de, { language: 'de' })[0]).toBe('Weihnachtsmann');
+    expect(info('santa').santaTracker).toBe(true);
+    expect(info('ufo').santaTracker).toBeUndefined();
+    // No place name yet: a translated fallback, no new lookup.
+    expect(eggCard('santa', de, { language: 'de', placeName: null }).slice(2, 4)).toEqual(['Route: Nordpol → deinen Himmel', 'Höhe: 10.700 m']);
   });
 
   it('gives each national day a "Special event" card: title, fact and 1 day a year', () => {

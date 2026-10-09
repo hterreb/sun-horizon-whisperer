@@ -597,6 +597,34 @@ describe('SunVisualization (rendered): arc rise/zenith/set labels', () => {
     expect(screen.queryByTestId('arc-label-moon-set')).not.toBeInTheDocument();
   });
 
+  it('starts Santa only once the scene is measured, so the (0, 0) moon before the layout does not pick his mode', () => {
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
+    setMockedContainerSize(0, 0);
+    const props = {
+      sunPosition: { azimuth: 0, altitude: -30 },
+      moonPosition: { azimuth: 180, altitude: 30, phase: 0.5, illumination: 0.5, visible: true },
+      sunPath: [],
+      moonPath: [],
+      weatherType: 'clear' as const,
+      latitude: 48,
+      longitude: 11,
+      timeOfDay: 'night' as const,
+      santa: true,
+    };
+    render(<SunVisualization {...props} />);
+    expect(screen.queryByTestId('santa')).toBeNull();
+    setMockedContainerSize(800, 600);
+    act(() => { window.dispatchEvent(new Event('resize')); });
+    const santa = screen.getByTestId('santa');
+    expect(santa.getAttribute('data-mode')).toBe('moon');
+    // His middle on the moon's centre height, not at y 0.
+    const moon = screen.getByTestId('moon-disc');
+    const height = parseFloat(santa.style.height);
+    expect(parseFloat(santa.style.top) + height / 2).toBeCloseTo(parseFloat(moon.style.top));
+    expect(parseFloat(moon.style.top)).toBeGreaterThan(50);
+    vi.restoreAllMocks();
+  });
+
   it('draws a supermoon about 15 % larger with a warm halo; a blue moon stays normal', () => {
     setMockedContainerSize(800, 600);
     const moonProps = {
