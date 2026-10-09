@@ -104,7 +104,7 @@ describe('FestivalEggs', () => {
     expect(screen.getAllByTestId('festival-marigold').length).toBeGreaterThan(0);
   });
 
-  it('shows one Hanukkah light per night', () => {
+  it('shows one Hanukkah candle per night', () => {
     const { rerender } = render(<FestivalEggs {...base} event="hanukkah" date={new Date(2026, 11, 4, 20)} />);
     expect(screen.getAllByTestId('festival-hanukkah-light')).toHaveLength(1);
     rerender(<FestivalEggs {...base} event="hanukkah" date={new Date(2026, 11, 8, 20)} />);
@@ -114,6 +114,15 @@ describe('FestivalEggs', () => {
     // ?egg=hanukkah out of season: all 8.
     rerender(<FestivalEggs {...base} event="hanukkah" date={new Date(2026, 5, 1, 20)} />);
     expect(screen.getAllByTestId('festival-hanukkah-light')).toHaveLength(8);
+  });
+
+  it('floats the Hanukkah candles on the water, below the horizon labels, with a slow bob', () => {
+    render(<FestivalEggs {...base} event="hanukkah" />);
+    // The compass and sunrise/sunset labels end about 20 px under the horizon.
+    expect(parseFloat(screen.getByTestId('festival-hanukkah').style.top)).toBeGreaterThanOrEqual(base.horizonY + 40);
+    const candle = screen.getAllByTestId('festival-hanukkah-light')[0];
+    expect(Number(animation(candle).match(/festival-bob (\d+)s/)?.[1])).toBeGreaterThanOrEqual(6);
+    expect(Number(animation(candle.querySelector('g')!).match(/festival-glow (\d+)s/)?.[1])).toBeGreaterThanOrEqual(4);
   });
 
   it('frames the equinox pill with an arc of big spring blossoms for Nowruz, day and night', () => {
@@ -174,6 +183,11 @@ describe('FestivalEggs', () => {
       expect(lantern.style.opacity).toBe('');
       rerender(<FestivalEggs {...base} event="midsummer" />);
       expect(animation(screen.getAllByTestId('festival-bonfire')[0])).toBe('');
+      rerender(<FestivalEggs {...base} event="hanukkah" date={new Date(2026, 11, 8, 20)} />);
+      const candles = screen.getAllByTestId('festival-hanukkah-light');
+      expect(candles).toHaveLength(5);
+      expect(animation(candles[0])).toBe('');
+      expect(animation(candles[0].querySelector('g')!)).toBe('');
     });
 
     it('hides the drifting petals and the confetti', () => {

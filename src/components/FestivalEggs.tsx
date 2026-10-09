@@ -118,11 +118,21 @@ const Bonfire = () => (
   </svg>
 );
 
-const Light = ({ size = 10 }: { size?: number }) => (
-  <span
-    className="block rounded-full"
-    style={{ width: size, height: size, background: `radial-gradient(circle, ${c('flame-core')} 0%, ${c('flame')} 45%, ${c('flame', 0)} 100%)` }}
-  />
+// A plain cream candle on a small floating holder, with a short reflection streak on the
+// water. The flame flickers softly (opacity, 4 s or more) unless the motion is reduced.
+const Candle = ({ flicker }: { flicker?: string }) => (
+  <svg width={14} height={34} viewBox="0 0 14 34" aria-hidden="true" className="block" overflow="visible">
+    <ellipse cx={7} cy={23} rx={3} ry={0.8} fill={c('flame', 0.35)} />
+    <ellipse cx={7} cy={26} rx={2.2} ry={0.7} fill={c('flame', 0.22)} />
+    <ellipse cx={7} cy={29} rx={1.5} ry={0.6} fill={c('flame', 0.12)} />
+    <g style={{ animation: flicker }}>
+      <circle cx={7} cy={5} r={6} fill={c('flame', 0.22)} />
+      <ellipse cx={7} cy={4} rx={1.6} ry={3} fill={c('flame')} />
+      <ellipse cx={7} cy={5} rx={0.7} ry={1.4} fill={c('flame-core')} />
+    </g>
+    <rect x={5} y={8} width={4} height={10} rx={0.8} fill={c('wax')} />
+    <ellipse cx={7} cy={19} rx={6} ry={1.8} fill={c('gold', 0.75)} />
+  </svg>
 );
 
 // Cultural festival eggs (ROADMAP item 118). The calm-motion rule holds: slow straight drifts,
@@ -299,12 +309,20 @@ const FestivalEggs: React.FC<FestivalEggsProps> = ({
       ))}
 
       {event === 'hanukkah' && shown && (
-        // One more light each night (1-8), in a row above the horizon. Static: no flicker.
-        <div data-testid="festival-hanukkah" className="absolute left-1/2 z-5 flex -translate-x-1/2 gap-2" style={{ top: horizonY - 70 }}>
+        // One more candle each night (1-8), in an even row on the water, below the horizon
+        // labels. z-6: on the sea, over the waves and the fish (z 5), under the boats (z 7).
+        // A very slow bob (2 px, 6-8 s) and a soft flicker; no shamash, so the count is the night.
+        <div data-testid="festival-hanukkah" className="absolute left-1/2 z-6 flex -translate-x-1/2 gap-3" style={{ top: horizonY + 50 }}>
           {Array.from({ length: getHanukkahNight(date) ?? 8 }, (_, i) => (
-            <div key={i} data-testid="festival-hanukkah-light" className={`relative ${tapClass}`} {...tapProps('hanukkah', `egg-light-${i}`)}>
-              <Light />
-              {hit(`egg-light-${i}`, 10, 10)}
+            <div
+              key={i}
+              data-testid="festival-hanukkah-light"
+              className={`relative ${tapClass}`}
+              style={{ animation: anim(`festival-bob ${6 + (i % 3)}s ease-in-out ${-i * 1.3}s infinite alternate`) }}
+              {...tapProps('hanukkah', `egg-light-${i}`)}
+            >
+              <Candle flicker={anim(`festival-glow ${4 + (i % 2)}s ease-in-out ${-i * 0.7}s infinite alternate`)} />
+              {hit(`egg-light-${i}`, 14, 34)}
             </div>
           ))}
         </div>
@@ -372,6 +390,7 @@ const FestivalEggs: React.FC<FestivalEggsProps> = ({
       <style>{`
         @keyframes festival-drift { to { transform: translateX(var(--dx)); } }
         @keyframes festival-glow { from { opacity: 0.8; } to { opacity: 1; } }
+        @keyframes festival-bob { to { transform: translateY(2px); } }
         @keyframes festival-rise { 0% { opacity: 0; } 8% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; transform: translateY(var(--dy)); } }
         @keyframes festival-fall { to { transform: translate(var(--dx), var(--dy)); } }
         @keyframes festival-sink { 0% { opacity: 0; } 15% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)); } }

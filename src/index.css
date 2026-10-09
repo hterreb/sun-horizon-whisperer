@@ -579,11 +579,13 @@
     --scene-gold: 45 95% 58%;
     --scene-gold-dark: 38 85% 40%;
     /* Festival eggs (item 118, FestivalEggs): warm flame light (krathong candles, diyas,
-       Hanukkah lights, bonfires), the Eid moon glow, red lanterns, petals and blossoms,
-       marigolds, leaf green, and the soft pastels of Holi, papel picado and confetti. */
+       Hanukkah lights, bonfires), the cream wax of the Hanukkah candles, the Eid moon glow,
+       red lanterns, petals and blossoms, marigolds, leaf green, and the soft pastels of Holi,
+       papel picado and confetti. */
     --scene-festival-flame: 38 100% 62%;
     --scene-festival-flame-core: 48 100% 85%;
     --scene-festival-gold: 45 95% 65%;
+    --scene-festival-wax: 45 60% 90%;
     --scene-festival-lantern: 4 80% 52%;
     --scene-festival-petal: 340 80% 88%;
     --scene-festival-blossom: 330 70% 80%;
