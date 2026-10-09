@@ -52,7 +52,7 @@ const PILL = `whitespace-nowrap rounded-full px-3 py-1 text-caption text-white $
 // tap opens the egg's info card (item 116 pattern).
 const SkyEggs: React.FC<SkyEggsProps> = ({ event, project, latitude, horizonY, opacity, onInfo, infoRing = null, infoRingTier = null }) => {
   const { t } = useLanguage();
-  const { tap, hint } = useDoubleTap(onInfo);
+  const { tap } = useDoubleTap(onInfo);
   if (!event) return null;
   const tapProps = (kind: EggCardKind, ring: string) => onInfo ? {
     'aria-hidden': true,
@@ -60,7 +60,7 @@ const SkyEggs: React.FC<SkyEggsProps> = ({ event, project, latitude, horizonY, o
   } : {};
   const tapClass = onInfo ? 'pointer-events-auto cursor-pointer touch-manipulation' : 'pointer-events-none';
   const hit = (ring: string, w: number, h: number) =>
-    onInfo && <HitArea cx={w / 2} cy={h / 2} width={w} height={h} ring={infoRing === ring || hint === ring} tier={infoRing === ring ? infoRingTier : null} />;
+    onInfo && <HitArea cx={w / 2} cy={h / 2} width={w} height={h} ring={infoRing === ring} tier={infoRing === ring ? infoRingTier : null} />;
   const sky = opacity > 0;
 
   // A pill on the water, below the season badge (CalendarEggs, horizon + 90 px).
@@ -73,7 +73,7 @@ const SkyEggs: React.FC<SkyEggsProps> = ({ event, project, latitude, horizonY, o
     >
       <div className={PILL}>{t(kind === 'midnightSun' ? 'egg.midnightSun' : 'egg.polarNight')}</div>
       {/* The pill is the hit area (at least 44 px wide); the ring goes round it, as on the moon button. */}
-      {onInfo && (infoRing === ring || hint === ring) && <span className="absolute inset-0 rounded-full border border-white/70" data-testid="scene-info-ring" />}
+      {onInfo && (infoRing === ring) && <span className="absolute inset-0 rounded-full border border-white/70" data-testid="scene-info-ring" />}
     </div>
   );
 

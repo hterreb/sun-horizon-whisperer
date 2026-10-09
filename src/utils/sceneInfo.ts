@@ -164,6 +164,12 @@ const CLOUDS: Record<CloudType, MessageKey> = {
   Ci: 'cloud.Ci', Cs: 'cloud.Cs', Ac: 'cloud.Ac', As: 'cloud.As', Cu: 'cloud.Cu', Sc: 'cloud.Sc',
   St: 'cloud.St', Ns: 'cloud.Ns', Cb: 'cloud.Cb', Len: 'cloud.Len', Mam: 'cloud.Mam',
 };
+// The cloud tier: how often the type is in the sky. Clouds are not rolled, so it is fixed; the
+// lenticular and mammatus clouds show only on X1 egg days (skyCloudUtils).
+export const CLOUD_TIERS: Record<CloudType, RarityTier> = {
+  Cu: 'common', Sc: 'common', St: 'common', Ci: 'frequent', Ac: 'frequent', As: 'frequent',
+  Cs: 'uncommon', Ns: 'uncommon', Cb: 'rare', Len: 'veryRare', Mam: 'veryRare',
+};
 // Item 106: one fact per cloud type.
 const CLOUD_FACTS: Record<CloudType, MessageKey> = {
   Ci: 'cloudFact.Ci', Cs: 'cloudFact.Cs', Ac: 'cloudFact.Ac', As: 'cloudFact.As', Cu: 'cloudFact.Cu', Sc: 'cloudFact.Sc',
@@ -443,9 +449,10 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
         lines: [
           { label: 'info.layer', value: { key: LAYERS[target.band] } },
           { label: 'info.cover', value: percent(cover / 100, language) },
+          { label: 'info.rarity', value: { key: RARITY_NAMES[CLOUD_TIERS[target.cloudType]] }, tier: CLOUD_TIERS[target.cloudType] },
         ],
         fact: { label: 'info.cloudFact', text: CLOUD_FACTS[target.cloudType] },
-        tier: null,
+        tier: CLOUD_TIERS[target.cloudType],
       };
     }
     case 'sun': {

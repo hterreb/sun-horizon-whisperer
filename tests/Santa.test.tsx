@@ -192,9 +192,9 @@ describe('Santa', () => {
     const hit = santa.querySelector<HTMLElement>('[data-testid="scene-hit"]')!;
     expect(parseFloat(hit.style.height)).toBeGreaterThanOrEqual(44);
     fireEvent.click(hit, { clientX: 60, clientY: 90 });
-    // One tap: no card, only the ring for a moment.
+    // One tap: no card, no ring.
     expect(onInfo).not.toHaveBeenCalled();
-    expect(santa.querySelector('[data-testid="scene-info-ring"]')).not.toBeNull();
+    expect(santa.querySelector('[data-testid="scene-info-ring"]')).toBeNull();
     fireEvent.click(hit, { clientX: 60, clientY: 90 });
     expect(onInfo).toHaveBeenCalledWith({ type: 'egg', kind: 'santa' }, { x: 60, y: 90 }, SANTA_RING);
     expect(santa.querySelector('[data-testid="scene-info-ring"]')).toBeNull();

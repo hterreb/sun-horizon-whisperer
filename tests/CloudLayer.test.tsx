@@ -1126,24 +1126,12 @@ describe('CloudLayer info cards (ROADMAP item 95)', () => {
     const tapAt = (el: Element, detail = 1) => fireEvent.click(el, { clientX: 120, clientY: 600, detail });
     const rings = (container: HTMLElement) => container.querySelectorAll('[data-testid="scene-info-ring"]');
 
-    it('one tap opens nothing; it shows the ring inside the thing for 600 ms', () => {
+    it('one tap opens nothing and shows no ring', () => {
       const onInfo = vi.fn();
       const view = renderScene({ onInfo });
-      vi.useFakeTimers();
-      try {
-        const hit = hits(view.container)[0];
-        tapAt(hit);
-        expect(onInfo).not.toHaveBeenCalled();
-        expect(rings(view.container)).toHaveLength(1);
-        expect(hit.querySelector('[data-testid="scene-info-ring"]')).not.toBeNull();
-        act(() => { vi.advanceTimersByTime(599); });
-        expect(rings(view.container)).toHaveLength(1);
-        act(() => { vi.advanceTimersByTime(1); });
-        expect(rings(view.container)).toHaveLength(0);
-        expect(onInfo).not.toHaveBeenCalled();
-      } finally {
-        vi.useRealTimers();
-      }
+      tapAt(hits(view.container)[0]);
+      expect(onInfo).not.toHaveBeenCalled();
+      expect(rings(view.container)).toHaveLength(0);
     });
 
     it('two taps within 350 ms open the card once; two taps 500 ms apart open nothing', () => {

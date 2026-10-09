@@ -18,17 +18,19 @@ import { Bat } from '@/components/sceneIcons';
 import { useLanguage } from '@/hooks/useLanguage';
 import { type MessageKey } from '@/i18n';
 import {
-  BADGES, MOON_STATES, TERRAIN_BANDS, countCollected, type Badge, type BadgeGroup, type BadgeId, type Collection, type EggKind,
+  BADGES, MOON_STATES, TERRAIN_BANDS, badgeTier, countCollected, type Badge, type BadgeGroup, type BadgeId, type Collection, type EggKind,
   type MoonState, type StateBase, type SunState, type TerrainBand,
 } from '@/utils/collection';
 import { getMoonPhasePath } from '@/utils/moonUtils';
 import { getSkyGradientStops } from '@/utils/sunUtils';
 import { CLOUD_SHAPES, type CloudType } from '@/utils/cloudShapes';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
+import { TIER_RING_BORDER } from '@/utils/rarityTier';
 import { type BirdKind, type BoatKind, type FishKind } from '@/utils/weatherEffectsUtils';
 
 // Collection view (ROADMAP item 112): every badge in a grid, by group. A found badge
-// shows its art in colour, its name, rarity tier and first-seen date. A missing scene
+// shows its art in colour, its name, rarity tier and first-seen date, with an outline in its
+// tier colour (white without a tier). A missing scene
 // badge shows only a grey outline of its shape, a missing egg only "?": names stay hidden.
 // Hand-built modal like PremiumDialog (src/components/ui has no dialog).
 
@@ -257,8 +259,9 @@ const CollectionView: React.FC<CollectionViewProps> = ({ open, onClose, collecti
       );
     }
     const date = formatFoundDate(firstSeen, language);
+    const tier = badgeTier(badge);
     return (
-      <li key={badge.id} data-badge-id={badge.id} className={`${cell} border-white/15 bg-white/10`}>
+      <li key={badge.id} data-badge-id={badge.id} className={`${cell} ${tier ? `border-2 ${TIER_RING_BORDER[tier]}` : 'border-white/15'} bg-white/10`}>
         <div className={artBox} aria-hidden="true"><BadgeArt badge={badge} /></div>
         <span className="text-caption font-semibold leading-tight line-clamp-2 w-full">{t(badge.name)}</span>
         {badge.rarity && <span className="text-caption opacity-75">{t(badge.rarity)}</span>}

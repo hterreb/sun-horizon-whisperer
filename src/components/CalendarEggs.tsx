@@ -85,14 +85,14 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherTy
   // Item 113: the wrapper of a tappable egg (pointer only, hidden from screen readers) and its
   // hit area with the ring, a child of the moving wrapper.
   // Item 116: a double tap opens the card; a single tap shows the ring for a moment.
-  const { tap, hint } = useDoubleTap(onInfo);
+  const { tap } = useDoubleTap(onInfo);
   const tapProps = (kind: EggCardKind, ring: string) => onInfo ? {
     'aria-hidden': true,
     onClick: (e: React.MouseEvent) => tap({ type: 'egg', kind }, { x: e.clientX, y: e.clientY }, ring),
   } : {};
   const tapClass = onInfo ? 'pointer-events-auto cursor-pointer touch-manipulation' : 'pointer-events-none';
   const hit = (ring: string, w: number, h: number) =>
-    onInfo && <HitArea cx={w / 2} cy={h / 2} width={w} height={h} ring={infoRing === ring || hint === ring} tier={infoRing === ring ? infoRingTier : null} />;
+    onInfo && <HitArea cx={w / 2} cy={h / 2} width={w} height={h} ring={infoRing === ring} tier={infoRing === ring ? infoRingTier : null} />;
 
   return (
     <>
@@ -250,7 +250,7 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherTy
           timeOfDay={timeOfDay}
           onDone={() => setDragonDone(true)}
           onInfo={onInfo && tap}
-          ringOn={infoRing === DRAGON_RING || hint === DRAGON_RING}
+          ringOn={infoRing === DRAGON_RING}
           ringTier={infoRing === DRAGON_RING ? infoRingTier : null}
         />
       )}

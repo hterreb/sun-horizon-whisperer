@@ -48,7 +48,7 @@ const resolvedColor = (token: string): string => {
 
 const NationalEggs: React.FC<NationalEggsProps> = ({ day, timeOfDay, onInfo, infoRing = null, infoRingTier = null }) => {
   const prefersReducedMotion = usePrefersReducedMotion();
-  const { tap, hint } = useDoubleTap(onInfo);
+  const { tap } = useDoubleTap(onInfo);
   const isDark = DARK.includes(timeOfDay);
   const isDay = DAY.includes(timeOfDay);
   const [jetsDone, setJetsDone] = useState(false);
@@ -72,7 +72,7 @@ const NationalEggs: React.FC<NationalEggsProps> = ({ day, timeOfDay, onInfo, inf
   } : {};
   const tapClass = onInfo ? 'pointer-events-auto cursor-pointer touch-manipulation' : 'pointer-events-none';
   const hit = (ring: string, w: number, h: number) =>
-    onInfo && <HitArea cx={w / 2} cy={h / 2} width={w} height={h} ring={infoRing === ring || hint === ring} tier={infoRing === ring ? infoRingTier : null} />;
+    onInfo && <HitArea cx={w / 2} cy={h / 2} width={w} height={h} ring={infoRing === ring} tier={infoRing === ring ? infoRingTier : null} />;
 
   return (
     <>

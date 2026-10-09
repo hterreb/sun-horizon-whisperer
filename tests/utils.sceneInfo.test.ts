@@ -82,9 +82,9 @@ describe('sceneInfo (ROADMAP item 95)', () => {
     for (const kind of boats) expect(rarity({ type: 'boat', kind }), kind).toMatch(/^Rarity: .+ · [\d.]+ %$/);
   });
 
-  it('has no rarity row on the cloud, sun, moon, plane and terrain cards (item 105)', () => {
+  it('has no rarity row on the sun, moon, plane and terrain cards (item 105)', () => {
     const targets: SceneInfoTarget[] = [
-      { type: 'cloud', cloudType: 'Cu', band: 'low' }, { type: 'sun' }, { type: 'moon' },
+      { type: 'sun' }, { type: 'moon' },
       { type: 'plane', contrail: 'none' }, { type: 'terrain', azimuth: 90 },
     ];
     for (const target of targets) expect(card(target).some(row => row.startsWith('Rarity')), target.type).toBe(false);
@@ -166,8 +166,9 @@ describe('sceneInfo (ROADMAP item 95)', () => {
 
   it("gives a cloud its type, its layer and the forecast cover of that layer (item 84)", () => {
     expect(card({ type: 'cloud', cloudType: 'Ci', band: 'high' })).toEqual([
-      'Cirrus', 'Cirrus clouds are made only of ice crystals.', 'Layer: High', 'Cover: 70%',
+      'Cirrus', 'Cirrus clouds are made only of ice crystals.', 'Layer: High', 'Cover: 70%', 'Rarity: Frequent',
     ]);
+    expect(getSceneInfo({ type: 'cloud', cloudType: 'Len', band: 'mid' }, ctx()).tier).toBe('veryRare');
     const german = card({ type: 'cloud', cloudType: 'Cu', band: 'low' }, { language: 'de' }, de);
     expect(german.slice(0, 3)).toEqual(['Cumulus', 'Ein Cumulus wächst auf einer Säule warmer Luft, die vom Boden aufsteigt.', 'Schicht: Tief']);
     expect(german[3]).toMatch(/^Bedeckung: 40\s%$/); // Intl puts a no-break space before the % in German
@@ -312,7 +313,7 @@ describe('sceneInfo: field guide data (ROADMAP item 107)', () => {
     expect(info({ type: 'sun' }).fact).toBeUndefined();
   });
 
-  it('gives fish, birds and boats their rarity tier, the others none', () => {
+  it('gives fish, birds, boats and clouds their rarity tier, the others none', () => {
     expect(info({ type: 'fish', kind: 'shark' }).tier).toBe('veryRare');
     expect(info({ type: 'fish', kind: 'ray' }).tier).toBe('rare');
     expect(info({ type: 'boat', kind: 'freighter' }).tier).toBe('uncommon');
@@ -320,7 +321,7 @@ describe('sceneInfo: field guide data (ROADMAP item 107)', () => {
     const rarityRow = info({ type: 'fish', kind: 'shark' }).lines.find(l => l.label === 'info.rarity');
     expect(rarityRow?.tier).toBe('veryRare');
     for (const target of [
-      { type: 'sun' }, { type: 'moon' }, { type: 'cloud', cloudType: 'Cu', band: 'low' }, { type: 'terrain', azimuth: 0 },
+      { type: 'sun' }, { type: 'moon' }, { type: 'terrain', azimuth: 0 },
       { type: 'plane', contrail: 'none' }, { type: 'satellite', id: 1, name: 'X' },
       { type: 'livePlane', callsign: null, airline: null, aircraftType: null, altM: 0, speedKt: 0 },
     ] as SceneInfoTarget[]) expect(info(target).tier, target.type).toBeNull();

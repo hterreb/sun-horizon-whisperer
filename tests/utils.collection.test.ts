@@ -32,13 +32,16 @@ describe('collection (ROADMAP item 112)', () => {
     expect(BADGES.find(b => b.id === 'plane')?.group).toBe('sky');
   });
 
-  it('gives the rolled kinds their rarity tier, the eggs ultra rare, the rest none', () => {
+  it('gives the rolled kinds their rarity tier, the clouds their fixed tier, the eggs ultra rare, the rest none', () => {
     expect(tier('fish:seahorse')).toBe('rarity.rare');
     expect(tier('fish:shark')).toBe('rarity.veryRare');
     expect(tier('fish:squid')).toBe('rarity.uncommon'); // night only: the night share
     expect(tier('flyer:bat')).toBe('rarity.frequent'); // item 113: 10-25 % is frequent
     expect(tier('boat:sailboat')).toBe('rarity.common');
-    expect(tier('cloud:Cb')).toBeNull();
+    expect(tier('cloud:Cu')).toBe('rarity.common');
+    expect(tier('cloud:Cb')).toBe('rarity.rare');
+    expect(tier('cloud:Mam')).toBe('rarity.veryRare');
+    expect(tier('sun')).toBeNull();
     expect(BADGES.filter(b => b.group === 'egg').every(b => b.rarity === 'rarity.ultraRare')).toBe(true); // item 113
   });
 

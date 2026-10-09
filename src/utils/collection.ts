@@ -3,7 +3,8 @@
 // saveCollection, which use localStorage (try/catch-wrapped like manualLocation).
 
 import { type MessageKey } from '@/i18n';
-import { type SceneInfoTarget, getRarityTier } from './sceneInfo';
+import { type SceneInfoTarget, CLOUD_TIERS, RARITY_NAMES, getRarityTier } from './sceneInfo';
+import { TIER_ORDER, type RarityTier } from './rarityTier';
 import { getBoatShare, getFishShare, getFlyerShare, type BirdKind, type BoatKind, type FishKind } from './weatherEffectsUtils';
 import { type CloudType } from './skyCloudUtils';
 import { type CalendarEvent } from './calendarEvents';
@@ -126,10 +127,14 @@ export const BADGES: readonly Badge[] = [
   ...MOON_STATES.map(([state, name]): Badge => ({ id: `moon:${state}`, group: 'sky', name, rarity: null, base: 'moon' })),
   { id: 'terrain', group: 'sky', name: 'scene.terrain', rarity: null },
   ...TERRAIN_BANDS.map(([band, name]): Badge => ({ id: `terrain:${band}`, group: 'sky', name, rarity: null, base: 'terrain' })),
-  ...CLOUDS.map(([type, name]): Badge => ({ id: `cloud:${type}`, group: 'cloud', name, rarity: null })),
+  ...CLOUDS.map(([type, name]): Badge => ({ id: `cloud:${type}`, group: 'cloud', name, rarity: RARITY_NAMES[CLOUD_TIERS[type]] })),
   ...EGGS.map(([kind, name]): Badge => ({ id: `egg:${kind}`, group: 'egg', name, rarity: 'rarity.ultraRare' })),
 ];
 const IDS = new Set<string>(BADGES.map(b => b.id));
+
+// The tier of a badge (its colour), or null for a badge without a rarity.
+export const badgeTier = (badge: Badge): RarityTier | null =>
+  TIER_ORDER.find((tier) => RARITY_NAMES[tier] === badge.rarity) ?? null;
 
 export const loadCollection = (): Collection => {
   try {

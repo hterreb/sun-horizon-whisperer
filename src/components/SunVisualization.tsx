@@ -678,7 +678,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
   // Item 116: the sun, the moon and the terrain open their card on a double tap; a single tap
   // shows the sun's or the moon's ring for a moment. The keyboard (Enter, Space) opens at once.
-  const { tap, hint: tapHint } = useDoubleTap(onSceneInfo);
+  const { tap } = useDoubleTap(onSceneInfo);
   // Info cards (item 95): the terrain's card for the azimuth at screen x (px in the container).
   const openTerrainInfo = (x: number, point: { x: number; y: number }, immediate: boolean) => {
     const { width } = containerDimensions;
@@ -1193,7 +1193,6 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             }}
           />
           {sunglasses && <SunSunglasses />}
-          {tapHint === 'sun' && <span className="absolute inset-0 rounded-full border border-white/70" data-testid="scene-info-ring" />}
         </button>
       )}
 
@@ -1270,7 +1269,6 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
               <MoonTint kind={astroEvent.kind} strength={astroEvent.strength} radius={moonRadius - 0.5} />
             )}
           </svg>
-          {tapHint === 'moon' && <span className="absolute inset-0 rounded-full border border-white/70" data-testid="scene-info-ring" />}
         </button>
       )}
 

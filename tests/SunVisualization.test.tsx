@@ -1330,7 +1330,7 @@ describe('SunVisualization info cards (ROADMAP item 95)', () => {
     fireEvent.click(sun, { detail: 1, clientX: 400, clientY: 100 });
     expect(onSunTap).toHaveBeenCalledTimes(1);
     expect(onSceneInfo).not.toHaveBeenCalled();
-    expect(sun.querySelector('[data-testid="scene-info-ring"]')).not.toBeNull();
+    expect(sun.querySelector('[data-testid="scene-info-ring"]')).toBeNull();
     fireEvent.click(sun, { detail: 2, clientX: 400, clientY: 100 });
     expect(onSunTap).toHaveBeenCalledTimes(2);
     expect(onSceneInfo).toHaveBeenCalledWith({ type: 'sun' }, { x: 400, y: 100 }, 'sun');
@@ -1384,7 +1384,7 @@ describe('SunVisualization info cards (ROADMAP item 95)', () => {
     expect(moon.className).toContain('touch-manipulation');
     fireEvent.click(moon, { detail: 1, clientX: 300, clientY: 150 });
     expect(onSceneInfo).not.toHaveBeenCalled();
-    expect(moon.querySelector('[data-testid="scene-info-ring"]')).not.toBeNull();
+    expect(moon.querySelector('[data-testid="scene-info-ring"]')).toBeNull();
     fireEvent.click(moon, { detail: 2, clientX: 300, clientY: 150 });
     expect(onSceneInfo).toHaveBeenCalledWith({ type: 'moon' }, { x: 300, y: 150 }, 'moon');
   });

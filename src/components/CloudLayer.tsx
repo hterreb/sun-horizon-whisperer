@@ -1008,11 +1008,10 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   infoRing = null,
   infoRingTier = null,
 }) => {
-  // Item 116: a double tap opens the card; a single tap shows the ring (`tapHint`) for a moment.
-  const { tap, hint: tapHint } = useDoubleTap(onInfo);
-  // The ring of a thing (its ring id): its card is open, or a single tap hints at it. The tier
-  // colour is only for the open card.
-  const ringOf = (id: string) => ({ ring: infoRing === id || tapHint === id, tier: infoRing === id ? infoRingTier : null });
+  // Item 116: a double tap opens the card; a single tap shows nothing.
+  const { tap } = useDoubleTap(onInfo);
+  // The ring of a thing (its ring id) while its card is open, in the tier colour.
+  const ringOf = (id: string) => ({ ring: infoRing === id, tier: infoRing === id ? infoRingTier : null });
   // The things that cross the scene. The state renders them; the ref has the latest lists at
   // once, so the spawn loop plans each new lane around all of them (item 92), also around one
   // that spawned in the same check.

@@ -979,7 +979,7 @@ describe('SunTracker', () => {
       expect(card()).toBeNull();
     });
 
-    it('one tap opens no card and collects no badge, but shows the ring; a double tap does both (item 116)', () => {
+    it('one tap opens no card and collects no badge and shows no ring; a double tap opens and collects (item 116)', () => {
       // No test link (`?fish=` pauses the collection, item 112).
       vi.setSystemTime(NOON);
       saveManualLocation(RAVENSBURG.latitude, RAVENSBURG.longitude, 'Ravensburg');
@@ -989,9 +989,8 @@ describe('SunTracker', () => {
       tap(sun);
       expect(card()).toBeNull();
       expect(localStorage.getItem('collection')).toBeNull();
-      expect(sun.querySelector('[data-testid="scene-info-ring"]')).not.toBeNull();
-      advance(600);
       expect(sun.querySelector('[data-testid="scene-info-ring"]')).toBeNull();
+      advance(600);
       doubleTap(sun);
       expect(screen.getByRole('dialog', { name: 'Sun' })).toBeInTheDocument();
       expect(JSON.parse(localStorage.getItem('collection')!)).toHaveProperty('sun');

@@ -3,11 +3,9 @@ import { Award } from 'lucide-react';
 import { BadgeArt } from '@/components/CollectionView';
 import { useLanguage } from '@/hooks/useLanguage';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
-import { type MessageKey } from '@/i18n';
-import { BADGES, type BadgeId } from '@/utils/collection';
+import { BADGES, badgeTier, type BadgeId } from '@/utils/collection';
 import { GLASS_CARD_SURFACE } from '@/utils/glassChrome';
-import { cardBorderClass, ringBorderClass, TIER_ORDER, type RarityTier } from '@/utils/rarityTier';
-import { RARITY_NAMES } from '@/utils/sceneInfo';
+import { cardBorderClass, ringBorderClass, type RarityTier } from '@/utils/rarityTier';
 
 // "Badge unlocked" card (ROADMAP item 114): a new badge shows like a game achievement. A glass
 // card at the top centre: the badge as in the collection grid with its tier ring, the kicker,
@@ -25,8 +23,6 @@ const TIER_TEXT: Record<RarityTier, string> = {
   common: 'text-tier-common', frequent: 'text-tier-frequent', uncommon: 'text-tier-uncommon',
   rare: 'text-tier-rare', veryRare: 'text-tier-very-rare', ultraRare: 'text-tier-ultra-rare',
 };
-const tierOfName = (name: MessageKey | null): RarityTier | null =>
-  TIER_ORDER.find((tier) => RARITY_NAMES[tier] === name) ?? null;
 
 interface BadgeUnlockedProps {
   badgeId: BadgeId;
@@ -66,7 +62,7 @@ const BadgeUnlocked: React.FC<BadgeUnlockedProps> = ({ badgeId, found, onOpen, o
 
   const badge = BADGES.find((b) => b.id === badgeId);
   if (!badge) return null;
-  const tier = tierOfName(badge.rarity);
+  const tier = badgeTier(badge);
   const name = t(badge.name);
   const label = badge.rarity
     ? t('badgeUnlocked.label', { name, tier: t(badge.rarity) })

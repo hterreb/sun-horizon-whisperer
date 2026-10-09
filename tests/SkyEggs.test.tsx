@@ -73,13 +73,13 @@ describe('SkyEggs', () => {
     expect(screen.getByTestId('sky-egg-polar').textContent).toBe('Polar night');
   });
 
-  it('opens the egg card on a double tap; one tap shows only the ring', () => {
+  it('opens the egg card on a double tap; one tap shows no ring', () => {
     const onInfo = vi.fn();
     render(<SkyEggs {...base} event={ev('matariki')} onInfo={onInfo} />);
     const egg = screen.getByTestId('sky-egg-matariki');
     fireEvent.click(egg);
     expect(onInfo).not.toHaveBeenCalled();
-    expect(screen.getByTestId('scene-info-ring')).toBeTruthy();
+    expect(screen.queryByTestId('scene-info-ring')).toBeNull();
     fireEvent.click(egg);
     expect(onInfo).toHaveBeenCalledWith({ type: 'egg', kind: 'matariki' }, expect.anything(), 'egg-matariki');
   });

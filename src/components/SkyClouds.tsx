@@ -185,7 +185,7 @@ const SkyClouds: React.FC<SkyCloudsProps> = ({
 }) => {
   const reduced = usePrefersReducedMotion();
   // Item 116: a double tap opens the cloud's card; a single tap shows its ring for a moment.
-  const { tap, hint } = useDoubleTap(onInfo);
+  const { tap } = useDoubleTap(onInfo);
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
   const [size, setSize] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
   useEffect(() => {
@@ -337,7 +337,7 @@ const SkyClouds: React.FC<SkyCloudsProps> = ({
                     heart={!out && glider.id === heartId}
                   />
                   {/* Item 95: the ring of the open card, outside the cloud's blur; the glide moves it. */}
-                  {!out && (infoRing === ringId || hint === ringId) && (
+                  {!out && (infoRing === ringId) && (
                     <span
                       className="absolute rounded-full border border-white/70"
                       style={{ left: cloud.x, top: cloud.y - 30 * cloud.scale, width: 120 * cloud.scale, height: 60 * cloud.scale }}
