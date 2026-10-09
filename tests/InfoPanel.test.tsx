@@ -477,6 +477,18 @@ describe('InfoPanel', () => {
       expect(fetchMock).not.toHaveBeenCalled();
     });
 
+    it('tells SunTracker the shown place name for Santa\'s card (lookbook S7), with no second lookup', async () => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+      const onPlaceName = vi.fn();
+
+      render(<InfoPanel {...defaultProps} manualPlaceName="Friedrichshafen, Germany" onPlaceName={onPlaceName} />);
+
+      await waitFor(() => expect(onPlaceName).toHaveBeenLastCalledWith('Friedrichshafen, Germany'));
+      expect(onPlaceName).toHaveBeenCalledWith(null);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
     it('ignores queries under 2 chars, debounces by 300ms, and selecting a result sets lat/lon/name', async () => {
       const fetchMock = vi.fn(() =>
         Promise.resolve({

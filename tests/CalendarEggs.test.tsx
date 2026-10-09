@@ -104,6 +104,23 @@ describe('CalendarEggs', () => {
     expect(screen.queryByTestId('santa')).toBeNull();
   });
 
+  it('flies Santa across the drawn moon (lookbook S2), else small and far (S4)', () => {
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
+    const { unmount } = render(<CalendarEggs {...base} event={null} santa />);
+    expect(screen.getByTestId('santa').getAttribute('data-mode')).toBe('moon');
+    unmount();
+    render(<CalendarEggs {...base} moon={null} event={null} santa />);
+    expect(screen.getByTestId('santa').getAttribute('data-mode')).toBe('far');
+  });
+
+  it('waits for the measured scene before Santa starts, then picks his mode', () => {
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
+    const { rerender } = render(<CalendarEggs {...base} moon={null} measured={false} event={null} santa />);
+    expect(screen.queryByTestId('santa')).toBeNull();
+    rerender(<CalendarEggs {...base} measured event={null} santa />);
+    expect(screen.getByTestId('santa').getAttribute('data-mode')).toBe('moon');
+  });
+
   it('shows Santa on Christmas Eve without the Christmas ornaments (they fall Dec 25-26)', () => {
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
     render(<CalendarEggs {...base} event={null} santa />);

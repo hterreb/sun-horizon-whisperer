@@ -976,6 +976,8 @@ const SunTracker: React.FC = () => {
   // A live plane's card asks for its route once (item 111).
   const liveRouteCallsign = infoCard?.target.type === 'livePlane' ? infoCard.target.callsign : null;
   const liveRoute = useLiveRoute(liveRouteCallsign, location.latitude, location.longitude);
+  // The place name the InfoPanel shows, for Santa's route (lookbook S7). No second lookup.
+  const [placeName, setPlaceName] = useState<string | null>(null);
 
   const skyGradient = useMemo(() => {
     // Clouds dim the sky (ROADMAP item 50): mix toward grey per weather type, scaled
@@ -1018,6 +1020,7 @@ const SunTracker: React.FC = () => {
     cloudLayers,
     satellite: satelliteCard,
     route: liveRoute,
+    placeName,
   }) : null;
 
   return (
@@ -1116,6 +1119,7 @@ const SunTracker: React.FC = () => {
             infoRingTier={infoCardInfo?.tier ?? null}
             calendarEvent={calendarEvent}
             santa={isSanta}
+            soundOn={isCountdownOn}
             playDirection={playDirection}
             satellites={satelliteTracking.sky}
             sunsetCountdown={countdownSeconds === null ? null : { seconds: countdownSeconds, lineOfSight: !!countdownTarget?.lineOfSight }}
@@ -1132,6 +1136,7 @@ const SunTracker: React.FC = () => {
             nextGoldenBlueHours={nextGoldenBlueHours}
             location={location}
             manualPlaceName={manualPlaceName}
+            onPlaceName={setPlaceName}
             timeOfDay={timeOfDay}
             currentTime={date}
             weatherType={weatherType}

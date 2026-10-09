@@ -27,6 +27,11 @@ const getAudioContext = (): AudioContext | null => {
   return audioContext;
 };
 
+// The app's AudioContext when it is already running, else null. It does not create or
+// resume one, so it plays nothing before the user turned the sound on (Santa's bells).
+export const getRunningAudioContext = (): AudioContext | null =>
+  audioContext?.state === 'running' ? audioContext : null;
+
 // One soft sine tone at `at` (AudioContext seconds), with a short fade in and out.
 // More than one frequency plays them as notes, CHIME_NOTE_S apart, on one oscillator.
 const playTone = (ctx: AudioContext, at: number, frequencies: number[], durationS: number): OscillatorNode => {
