@@ -2354,6 +2354,26 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Checked:** `utils.festivalEvents`, `utils.easterDate`, `utils.calendarEvents`, `utils.collection`, `utils.sceneInfo`, `FestivalEggs`, `SkyClouds`, `SceneBoat` and `SunTracker` tests. Typecheck, lint and all tests pass.
 - **Open:** a check of the Loy Krathong dates after 2030 and the Holi dates against an official calendar (they can be one day off); real sky positions for Vega and Altair; the look of each egg in the browser and on a phone; a native-speaker review of the new de/es/it/fr texts (item 67).
 
+
+### 119. A calm rain sound when it rains — S — **✅ Done**
+
+- **Request (2026-10-09):** "lo-fi calm low rain sound when it is raining". Then: "make it play with the radio but also make it able to play on its own, button should be in the audio control panel".
+- **Now:** the rain is only seen (item 77). The only sounds are the radio (`MusicPlayer`, lo-fi streams) and the countdown (`useSunsetCountdown`, Web Audio tones). The audio control panel is the radio pill at the bottom left: switch, `Music` icon, station name, next, volume icon, slider.
+- **Spec:**
+  1. **Sound:** synthesized with Web Audio, no audio file: a looped noise buffer (pink or brown noise) through a low-pass filter (about 1–2 kHz), so it is a soft, low hiss and not a white-noise rush. No thunder, no single drop clicks. No new host, so no CSP change and no licence.
+  2. **When it rains:** the weather type is `drizzle`, `rain` or `thunderstorm` (live or manual weather, and the time-travel forecast of item 86). Snow and hail: no sound.
+  3. **Button:** a toggle button in the radio pill, after the next button: lucide `CloudRain`, `aria-pressed`, `aria-label` "Rain sound" (key `music.rain` in the 5 languages). The same style as the next button; pressed is full white, not pressed is `text-white/50`. It shows only while it rains (point 2).
+  4. **One state, `rainOn`** (in `MusicPlayer`, not saved, off at page load):
+     - The radio switch on sets `rainOn` true, so the rain plays with the radio. The radio switch off sets it false.
+     - The rain button toggles `rainOn` alone. With the radio off, it plays the rain on its own. With the radio on, it turns the rain off under the music.
+     - The rain sound plays when `rainOn` and it rains. Rain that stops fades the sound out; rain that comes back while `rainOn` is still true fades it in.
+     - Not saved, because a browser does not play sound before a tap. The tap on the switch or the button is the user gesture.
+  5. **Level:** the slider sets both. The rain gain is slider × 0.25 with the radio on (quiet under the music) and slider × 0.6 alone. Slider at 0 mutes both. More rain is a little louder: × 0.6 at drizzle up to × 1 at a storm (item 77's `t`). No level jumps: each change ramps over 3 s, and start and stop fade over 3 s.
+  6. **Shared context:** one `AudioContext` for the app. Move `getAudioContext` from `useSunsetCountdown.ts` to a small util and use it in both places.
+  7. **Background (item 90):** with the radio on, the rain goes on in the background with it. Rain alone has no Media Session, so a phone can stop it in the background. Accepted; no Media Session for rain alone.
+- **Done when:** util tests (rain types give a gain, other types 0; the gain grows with `t`; radio on 0.25×, alone 0.6×; slider 0 gives 0). `MusicPlayer` tests with a mocked `AudioContext`: the rain button shows only while it rains; the radio switch on presses it and starts the noise with a 3 s ramp; the button alone with the radio off plays the rain; the button off with the radio on stops only the rain; the radio switch off stops both. `tests/i18n.test.ts` passes. By ear on a phone: calm, low, under the music, no click at the loop point.
+- **Built:** `useRainSound(gain)` (`src/hooks/useRainSound.ts`): a 2 s looped white-noise buffer through two 1200 Hz low-pass filters (white noise has no drift, so the loop point has no click). Each gain change ramps over 3 s; at 0 the noise fades out and stops. `getRainSoundGain` in `rainUtils.ts` (0.25× with the radio, 0.6× alone, × 0.6–1 by `t`); the countdown duck also lowers the rain. `MusicPlayer` gets `rainMmH` (`getRainMmH(weatherType, rainMmH)` from `SunTracker`) and the `CloudRain` toggle; the radio switch and the Media Session play and pause set `rainOn` with the radio. `src/utils/audioContext.ts` holds the shared `getAudioContext` and `getRunningAudioContext` (moved from `useSunsetCountdown`; Santa's bells import it from there). Key `music.rain` in the 5 languages.
+- **Checked:** util tests (no rain or off gives 0; 0.25× / 0.6× at a storm; grows with `t`; slider 0 gives 0). `MusicPlayer` tests with a fake `AudioContext` (button only while it rains; the radio switch presses it and starts the noise, off stops both with a 3 s fade; the button alone plays the rain, louder than with the radio; the button off with the radio on stops only the rain; no rain, no noise). Typecheck, lint and all tests pass. Browser at 390 × 844 (live rain, Ravensburg): the button shows in the pill, a tap presses it and the `AudioContext` runs. Not checked: the sound by ear on a phone.
 ---
 
 ## Ongoing — Easter eggs and special events (S each, pick any time)

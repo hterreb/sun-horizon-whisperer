@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { type RarityTier } from '@/utils/rarityTier';
 import { useDoubleTap } from '@/hooks/useDoubleTap';
 import { useLanguage } from '@/hooks/useLanguage';
-import { getRunningAudioContext } from '@/hooks/useSunsetCountdown';
+import { getRunningAudioContext } from '@/utils/audioContext';
 import { santaGreetingOpacity, santaStopTimes, santaTravel } from '@/utils/santaFlight';
 import { playSleighBells } from '@/utils/sleighBells';
 import { HitArea, type SceneInfoHandler } from './CloudLayer';

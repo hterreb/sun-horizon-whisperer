@@ -1,6 +1,6 @@
 import {
   getPrecipitationMmH, getRainMmH, getRainIntensity, getRainLook, getRainMistOpacity, getRainSkyMix, getRainAngleDeg,
-  getRainWaterY, placeRainDrop, stepRainDrops, MAX_RAIN_DROPS, type RainDrop, type RainScene,
+  getRainWaterY, placeRainDrop, stepRainDrops, MAX_RAIN_DROPS, getRainSoundGain, type RainDrop, type RainScene,
 } from '../src/utils/rainUtils';
 
 // A small seeded random, so the drop tests are repeatable.
@@ -115,5 +115,27 @@ describe('rain drops (ROADMAP item 77, R6)', () => {
     const random = seeded(11);
     const drops = make(50, false, random);
     for (let frame = 0; frame < 300; frame++) expect(stepRainDrops(drops, 1 / 60, scene, 2, random)).toEqual([]);
+  });
+});
+
+describe('getRainSoundGain (ROADMAP item 119)', () => {
+  it('is 0 without rain or with the rain sound off', () => {
+    expect(getRainSoundGain(null, true, true, 1)).toBe(0);
+    expect(getRainSoundGain(4, false, true, 1)).toBe(0);
+  });
+
+  it('is 0.25 of the slider with the radio and 0.6 alone, at a storm', () => {
+    expect(getRainSoundGain(20, true, true, 0.8)).toBeCloseTo(0.2);
+    expect(getRainSoundGain(20, true, false, 0.8)).toBeCloseTo(0.48);
+  });
+
+  it('grows with the rain from 0.6x toward 1x', () => {
+    const drizzle = getRainSoundGain(0.1, true, false, 1);
+    expect(drizzle).toBeCloseTo(0.36);
+    expect(getRainSoundGain(4, true, false, 1)).toBeGreaterThan(drizzle);
+  });
+
+  it('is 0 with the slider at 0', () => {
+    expect(getRainSoundGain(4, true, true, 0)).toBe(0);
   });
 });

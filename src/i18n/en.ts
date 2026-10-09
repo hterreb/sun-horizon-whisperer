@@ -588,6 +588,7 @@ export const en = {
   // Radio
   'music.play': 'Play lo-fi music',
   'music.next': 'Next station',
+  'music.rain': 'Rain sound',
   'music.volume': 'Volume',
   'music.failedTitle': 'Playback failed',
   'music.failedDescription': 'Click anywhere on the page first, then try again. Browser autoplay policies may be blocking audio.',

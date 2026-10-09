@@ -1,6 +1,7 @@
 import { renderHook } from '@testing-library/react';
 import { vi } from 'vitest';
-import { getRunningAudioContext, useSunsetCountdown } from '../src/hooks/useSunsetCountdown';
+import { useSunsetCountdown } from '../src/hooks/useSunsetCountdown';
+import { getRunningAudioContext } from '../src/utils/audioContext';
 
 const SUNSET = new Date('2026-09-30T18:50:00+02:00');
 const at = (msBefore: number) => new Date(SUNSET.getTime() - msBefore);

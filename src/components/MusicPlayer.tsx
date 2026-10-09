@@ -1,18 +1,22 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Slider } from "@/components/ui/slider";
-import { Music, SkipForward, Volume2, VolumeX } from "lucide-react";
+import { CloudRain, Music, SkipForward, Volume2, VolumeX } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useIdleHide } from '@/hooks/useIdleHide';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
+import { getRainSoundGain } from '@/utils/rainUtils';
+import { useRainSound } from '@/hooks/useRainSound';
 
 interface MusicPlayerProps {
   isFullscreen?: boolean;
   // True during the sunset countdown sound (item 108): the radio plays at DUCK_FACTOR
   // of the slider volume. The slider value does not change.
   duck?: boolean;
+  // The rain amount in mm/h, null without rain (ROADMAP item 119): the rain sound button shows then.
+  rainMmH?: number | null;
 }
 
 const DUCK_FACTOR = 0.3;
@@ -61,8 +65,15 @@ const loadStoredStationIndex = (): number => {
   }
 };
 
-const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false, duck = false }) => {
-  const [isPlaying, setIsPlaying] = useState(false);
+const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false, duck = false, rainMmH = null }) => {
+  const [isPlaying, setIsPlayingState] = useState(false);
+  // The rain sound (ROADMAP item 119): on with the radio, or alone by its button. Not saved:
+  // a browser plays no sound before a tap.
+  const [rainOn, setRainOn] = useState(false);
+  const setIsPlaying = useCallback((on: boolean) => {
+    setIsPlayingState(on);
+    setRainOn(on);
+  }, []);
   const { t } = useLanguage();
   const [volume, setVolume] = useState([0.5]);
   const [stationIndex, setStationIndex] = useState(loadStoredStationIndex);
@@ -135,7 +146,10 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false, duck = 
         audioRef.current = null;
       }
     };
-  }, [playStream]);
+  }, [playStream, setIsPlaying]);
+
+  const effectiveVolume = volume[0] * (duck ? DUCK_FACTOR : 1);
+  useRainSound(getRainSoundGain(rainMmH, rainOn, isPlaying, effectiveVolume));
 
   useEffect(() => {
     if (audioRef.current) {
@@ -175,7 +189,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false, duck = 
         audioRef.current.pause();
       }
     }
-  }, [isPlaying, t]);
+  }, [isPlaying, setIsPlaying, t]);
 
   const handleVolumeChange = (newVolume: number[]) => {
     setVolume(newVolume);
@@ -206,7 +220,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false, duck = 
       navigator.mediaSession.metadata = null;
       navigator.mediaSession.playbackState = 'none';
     };
-  }, [handleNext]);
+  }, [handleNext, setIsPlaying]);
 
   useEffect(() => {
     if (!('mediaSession' in navigator)) return;
@@ -250,6 +264,17 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false, duck = 
       >
         <SkipForward className="h-4 w-4" />
       </button>
+      {rainMmH != null && (
+        <button
+          type="button"
+          onClick={() => setRainOn((on) => !on)}
+          aria-pressed={rainOn}
+          aria-label={t('music.rain')}
+          className={`${rainOn ? 'text-white' : 'text-white/50'} hover:text-white transition-colors rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70`}
+        >
+          <CloudRain className="h-4 w-4" />
+        </button>
+      )}
       {volume[0] === 0 ? (
         <VolumeX className="h-4 w-4 text-white" />
       ) : (

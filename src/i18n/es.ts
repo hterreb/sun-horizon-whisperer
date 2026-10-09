@@ -588,6 +588,7 @@ export const es: Record<keyof typeof en, string> = {
   // Radio
   'music.play': "Reproducir música lo-fi",
   'music.next': "Siguiente emisora",
+  'music.rain': "Sonido de lluvia",
   'music.volume': "Volumen",
   'music.failedTitle': "Error de reproducción",
   'music.failedDescription': "Primero haz clic en cualquier parte de la página y vuelve a intentarlo. Puede que el navegador bloquee la reproducción automática.",
