@@ -1346,6 +1346,11 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             <stop offset="0%" stopColor={water.surface} />
             <stop offset="100%" stopColor={water.deep} />
           </linearGradient>
+          {/* St Patrick's Day (item 117): the sky's green, also on the water, stronger in the deep. */}
+          <linearGradient id="stPatrickWater" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="hsl(var(--scene-st-patrick))" stopOpacity={0.08} />
+            <stop offset="100%" stopColor="hsl(var(--scene-st-patrick))" stopOpacity={0.22} />
+          </linearGradient>
         </defs>
         {terrainFillPath && (
           // Line-of-sight ridge (ROADMAP item 13), colored per time-of-day like the
@@ -1375,6 +1380,10 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           className="transition-all duration-1000"
           data-testid="sea"
         />
+        {calendarEvent === 'st-patrick' && svgPath && (
+          // Static, under the wave canvas, so reduced motion shows it too.
+          <path d={svgPath} fill="url(#stPatrickWater)" data-testid="st-patrick-water" />
+        )}
       </svg>
 
       <SeaCanvas

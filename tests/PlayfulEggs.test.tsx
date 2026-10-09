@@ -195,6 +195,15 @@ describe('April Fools swap (SunVisualization)', () => {
     expect(onEggShown).not.toHaveBeenCalled();
   });
 
+  it('tints the water green on St Patrick\'s Day only, also with reduced motion', () => {
+    mockReducedMotion(true);
+    const { unmount } = render(<SunVisualization {...dayProps} calendarEvent="st-patrick" />);
+    expect(screen.getByTestId('st-patrick-water').getAttribute('fill')).toBe('url(#stPatrickWater)');
+    unmount();
+    render(<SunVisualization {...dayProps} calendarEvent={null} />);
+    expect(screen.queryByTestId('st-patrick-water')).toBeNull();
+  });
+
   it('does not swap on another day', () => {
     const onEggShown = vi.fn();
     render(<SunVisualization {...dayProps} calendarEvent={null} onEggShown={onEggShown} />);
