@@ -396,7 +396,7 @@ export const en = {
   'egg.seasonEquinox': 'Equinox · day and night are equal',
   'egg.halloweenPumpkin': 'Pumpkin moon',
   'egg.halloweenBats': 'Halloween bats',
-  'egg.christmas': 'Christmas snow',
+  'egg.christmas': 'Christmas ornaments',
   'egg.santa': 'Santa Claus',
   'egg.solarEclipse': 'Solar eclipse',
   'egg.lunarEclipse': 'Lunar eclipse',

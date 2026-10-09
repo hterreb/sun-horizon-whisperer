@@ -528,6 +528,12 @@
     --scene-eclipse-moon: 12 75% 38%;
     --scene-blue-moon: 205 90% 72%;
     --scene-supermoon-glow: 40 90% 78%;
+    /* Christmas ornaments (CalendarEggs, Dec 25-26): the bauble colours; gold is also
+       the caps and the stars. */
+    --scene-ornament-red: 0 78% 50%;
+    --scene-ornament-gold: 45 92% 55%;
+    --scene-ornament-green: 142 62% 38%;
+    --scene-ornament-silver: 210 40% 80%;
     /* Fish (ROADMAP item 85, FS1): two tones per species, a dark back over a pale belly,
        from the item 62 tints: back = the tint at 0.85 x saturation and 0.55 x lightness
        (at least 16 %), belly = 0.6 x saturation, lightness 55 % of the way to white (at

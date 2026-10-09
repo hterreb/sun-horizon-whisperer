@@ -397,7 +397,7 @@ describe('sceneInfo: easter egg cards (ROADMAP item 113)', () => {
     expect(eggCard('blackCat', de, { language: 'de' })[2]).toBe('Seltenheit: Ultraselten · 1,6 Tage im Jahr');
   });
 
-  it('gives Santa 1 day a year (Dec 24 only, not the 2 Christmas snow days)', () => {
+  it('gives Santa 1 day a year (Dec 24 only, not the 2 Christmas ornament days)', () => {
     expect(getEventDaysPerYear('christmas')).toBe(2);
     expect(eggCard('santa')).toEqual([
       'Santa Claus', 'A misprinted phone number in a 1955 advert led US air defence to track Santa; NORAD still does it every Christmas Eve.',
