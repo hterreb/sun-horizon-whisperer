@@ -347,7 +347,11 @@ describe('sceneInfo: field guide data (ROADMAP item 107)', () => {
 describe('sceneInfo: easter egg cards (ROADMAP item 113)', () => {
   const info = (kind: EggCardKind, over?: Partial<SceneInfoContext>) => getSceneInfo({ type: 'egg', kind }, ctx(over));
   const eggCard = (kind: EggCardKind, t: Translate = en, over?: Partial<SceneInfoContext>) => read(info(kind, over), t);
-  const kinds: EggCardKind[] = ['ufo', 'ghost', 'dragon', 'santa', 'blackCat', 'halloweenBat', 'pumpkinMoon'];
+  // Item 117: the festival eggs (Holi has no card: its clouds keep the cloud card).
+  const festivals: EggCardKind[] = [
+    'loyKrathong', 'diwali', 'eidAlFitr', 'midAutumn', 'hanami', 'tanabata', 'diaDeMuertos', 'hanukkah', 'nowruz', 'midsummer', 'carnival',
+  ];
+  const kinds: EggCardKind[] = ['ufo', 'ghost', 'dragon', 'santa', 'blackCat', 'halloweenBat', 'pumpkinMoon', ...festivals];
 
   it('gives every egg the "ultra rare" tier, a title, a field note and the rarity row', () => {
     for (const kind of kinds) {
@@ -404,6 +408,17 @@ describe('sceneInfo: easter egg cards (ROADMAP item 113)', () => {
       'Rarity: Ultra rare · 1 day a year',
     ]);
     expect(eggCard('santa', de, { language: 'de' })[0]).toBe('Weihnachtsmann');
+  });
+
+  it('makes each festival a "Special event" with its days a year (item 117)', () => {
+    for (const kind of festivals) expect(info(kind), kind).toMatchObject({ kicker: 'infoKind.specialEvent', icon: 'event' });
+    expect(eggCard('diwali')).toEqual([
+      'Diwali',
+      'Diwali, the festival of lights, celebrates the victory of light over darkness; Hindus, Sikhs and Jains light rows of clay lamps called diyas.',
+      'Rarity: Ultra rare · 1 day a year',
+    ]);
+    expect(eggCard('hanukkah', de, { language: 'de' })[0]).toBe('Chanukka');
+    expect(eggCard('tanabata')[2]).toBe('Rarity: Ultra rare · 1 day a year');
   });
 
   it('shows the tier alone for the midnight ghost (no chance in the code)', () => {

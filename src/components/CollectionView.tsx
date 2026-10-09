@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import {
   Cat, Eclipse, Flame, Glasses, Moon, MoonStar, Mountain, PartyPopper, Rainbow, Satellite,
   Snowflake, Sparkles, Star, Sun, SunMoon, Sunset, X, type LucideIcon,
+  Cherry, Drama, Flag, FlameKindling, Flower, Lamp, Palette, Rabbit, Sparkle, Sprout,
 } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import SceneFish from '@/components/SceneFish';
@@ -80,6 +81,19 @@ const EGG_ICONS: Record<Exclude<EggKind, 'ufo' | 'santa'>, [LucideIcon, string]>
   blueMoon: [Moon, 'text-brand-sky'],
   meteorShower: [Star, 'text-brand-gold-light'],
   aurora: [Rainbow, 'text-brand-cyan'],
+  // Item 117: cultural festivals.
+  loyKrathong: [Flower, 'text-brand-gold-light'],
+  diwali: [Lamp, 'text-brand-gold'],
+  eidAlFitr: [MoonStar, 'text-brand-gold-light'],
+  midAutumn: [Rabbit, 'text-brand-coral'],
+  hanami: [Cherry, 'text-pink-300'],
+  tanabata: [Star, 'text-brand-sky'],
+  diaDeMuertos: [Flag, 'text-brand-sunset'],
+  holi: [Palette, 'text-pink-300'],
+  hanukkah: [Sparkle, 'text-brand-gold-light'],
+  nowruz: [Sprout, 'text-green-400'],
+  midsummer: [FlameKindling, 'text-brand-sunset'],
+  carnival: [Drama, 'text-brand-cyan'],
 };
 
 const SKY_ICONS: Record<'sun' | 'moon' | 'terrain' | 'satellite', [LucideIcon, string]> = {

@@ -7,6 +7,7 @@ import { type SceneInfoTarget, getRarityTier } from './sceneInfo';
 import { getBoatShare, getFishShare, getFlyerShare, type BirdKind, type BoatKind, type FishKind } from './weatherEffectsUtils';
 import { type CloudType } from './skyCloudUtils';
 import { type CalendarEvent } from './calendarEvents';
+import { FESTIVALS, isFestivalEvent, isFestivalShown, type FestivalEgg } from './festivalEvents';
 import { type AstroEventKind } from './astroEvents';
 import { type TimeOfDay } from './sunUtils';
 import { getMoonPhaseIndex } from './moonUtils';
@@ -15,7 +16,8 @@ import { ridgeAt, type HorizonProfile } from './horizonUtils';
 export type EggKind =
   | 'sunglasses' | 'ufo' | 'disco'
   | 'newYear' | 'friday13' | 'lunarNewYear' | 'solstice' | 'equinox' | 'halloweenPumpkin' | 'halloweenBats' | 'christmas' | 'santa'
-  | 'solarEclipse' | 'lunarEclipse' | 'greenFlash' | 'supermoon' | 'blueMoon' | 'meteorShower' | 'aurora';
+  | 'solarEclipse' | 'lunarEclipse' | 'greenFlash' | 'supermoon' | 'blueMoon' | 'meteorShower' | 'aurora'
+  | FestivalEgg; // item 117: cultural festivals
 // Item 115: the states of the sun, the moon and the terrain.
 export type SunState = 'dawn' | 'morning' | 'midday' | 'afternoon' | 'evening';
 export type MoonState =
@@ -84,6 +86,10 @@ const EGGS: [EggKind, MessageKey][] = [
   ['halloweenBats', 'egg.halloweenBats'], ['christmas', 'egg.christmas'], ['santa', 'egg.santa'],
   ['solarEclipse', 'egg.solarEclipse'], ['lunarEclipse', 'egg.lunarEclipse'], ['greenFlash', 'egg.greenFlash'],
   ['supermoon', 'egg.supermoon'], ['blueMoon', 'egg.blueMoon'], ['meteorShower', 'egg.meteorShower'], ['aurora', 'egg.aurora'],
+  // Item 117: cultural festivals.
+  ['loyKrathong', 'egg.loyKrathong'], ['diwali', 'egg.diwali'], ['eidAlFitr', 'egg.eidAlFitr'], ['midAutumn', 'egg.midAutumn'],
+  ['hanami', 'egg.hanami'], ['tanabata', 'egg.tanabata'], ['diaDeMuertos', 'egg.diaDeMuertos'], ['holi', 'egg.holi'],
+  ['hanukkah', 'egg.hanukkah'], ['nowruz', 'egg.nowruz'], ['midsummer', 'egg.midsummer'], ['carnival', 'egg.carnival'],
 ];
 
 // The grid order. A fish's tier is its day share; getFishShare falls back to the night share
@@ -204,12 +210,19 @@ export interface CalendarBadgeOptions {
   weatherType: string;
   reducedMotion: boolean;
   isTimePreview: boolean;
+  // Item 117: the festival eggs show by time of day (isFestivalShown); without it they do not count.
+  timeOfDay?: TimeOfDay;
 }
 
 // The calendar egg's badge when the scene really shows it (CalendarEggs' rules). New Year
 // is null: SunTracker collects it where the fireworks start. Never in the time preview.
 export const badgeForCalendarEvent = (event: CalendarEvent | null, o: CalendarBadgeOptions): BadgeId | null => {
   if (!event || o.isTimePreview) return null;
+  // Item 117: Nowruz gives its own badge; SunTracker adds the equinox badge (NOWRUZ_ALSO).
+  if (isFestivalEvent(event)) {
+    return o.timeOfDay && isFestivalShown(event, { timeOfDay: o.timeOfDay, weatherType: o.weatherType, reducedMotion: o.reducedMotion })
+      ? `egg:${FESTIVALS[event]}` : null;
+  }
   switch (event) {
     case 'new-year': return null;
     case 'solstice-longest':
@@ -222,6 +235,9 @@ export const badgeForCalendarEvent = (event: CalendarEvent | null, o: CalendarBa
     case 'lunar-new-year': return o.reducedMotion ? null : 'egg:lunarNewYear';
   }
 };
+
+// Item 117: Nowruz is the March equinox, so it also collects the equinox badge.
+export const NOWRUZ_ALSO: BadgeId = 'egg:equinox';
 
 // Christmas Eve: Santa's badge when he flies (`santaTime` from calendarEvents.isSantaTime). He
 // flies also when it snows; reduced motion hides him. Never in the time preview.

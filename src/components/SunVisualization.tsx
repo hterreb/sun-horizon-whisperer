@@ -9,6 +9,7 @@ import CloudLayer, { type SceneInfoHandler, type WeatherType } from './CloudLaye
 import Fireworks from './Fireworks';
 import SunSunglasses from './SunSunglasses';
 import CalendarEggs from './CalendarEggs';
+import FestivalEggs from './FestivalEggs';
 import { type CalendarEvent } from '@/utils/calendarEvents';
 import PremiumBadge from './PremiumBadge';
 import WeatherEffects from './WeatherEffects';
@@ -1023,6 +1024,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           : null}
         skyGradient={skyGradient}
         cloudEgg={cloudEgg}
+        calendarEvent={calendarEvent}
         sunTimes={sunTimes}
         onInfo={onSceneInfo}
         infoRing={infoRing}
@@ -1194,6 +1196,18 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         infoRing={infoRing}
         infoRingTier={infoRingTier}
         santa={santa}
+      />
+      <FestivalEggs
+        event={calendarEvent}
+        timeOfDay={timeOfDay}
+        weatherType={weatherType}
+        latitude={latitude}
+        date={date}
+        moon={isMoonDiscShown ? { x: moonX, y: moonY, r: moonRadius } : null}
+        horizonY={containerDimensions.height * 0.65}
+        onInfo={onSceneInfo}
+        infoRing={infoRing}
+        infoRingTier={infoRingTier}
       />
 
       <svg className="absolute inset-0 w-full h-full pointer-events-none">

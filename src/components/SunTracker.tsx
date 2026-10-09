@@ -68,11 +68,12 @@ import PremiumDialog from './PremiumDialog';
 import CollectionView from './CollectionView';
 import BadgeUnlocked from './BadgeUnlocked';
 import {
-  BADGES, addToCollection, badgeForAstroEvent, badgeForCalendarEvent, badgeForSanta, badgeForTarget, countCollected, isCollectionPaused, loadCollection,
+  BADGES, NOWRUZ_ALSO, addToCollection, badgeForAstroEvent, badgeForCalendarEvent, badgeForSanta, badgeForTarget, countCollected, isCollectionPaused, loadCollection,
   saveCollection, stateBadgeForTarget, type BadgeId, type Collection, type StateBadgeContext,
 } from '@/utils/collection';
 import { watchSunEvent, NO_SUN_EVENT_WATCH, getCountdownTarget } from '../utils/sunEvents';
 import { getCalendarEvent, isSantaTime } from '@/utils/calendarEvents';
+import { parseFestivalOverride } from '@/utils/festivalEvents';
 import { PLAY_SPEED, PLAY_TICK_MS, clampTimeOffset } from '@/utils/timeTravel';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
 import { DISCO_MS, KONAMI_SEQUENCE, SUNGLASSES_MS, advanceKonami, getEggOverride, registerSunTap, rollUfo } from '@/utils/hiddenEggs';
@@ -776,8 +777,12 @@ const SunTracker: React.FC = () => {
   // forces Lunar New Year (item 100), `?egg=santa` Christmas with Santa's flight.
   const [dragonForced] = useState(() => new URLSearchParams(window.location.search).get('egg') === 'dragon');
   const [santaForced] = useState(() => new URLSearchParams(window.location.search).get('egg') === 'santa');
+  // Item 117: `?egg=<festival egg kind>` (for example `?egg=diwali`) forces a festival.
+  const [festivalForced] = useState(() => parseFestivalOverride(window.location.search));
+  // Item 117: no country yet, so Hanami shows for everyone; pass the place's ISO country code
+  // as the third argument once SunTracker has it.
   const calendarEvent = useMemo(
-    () => (dragonForced ? 'lunar-new-year' : santaForced ? 'christmas' : getCalendarEvent(date, location.latitude)),
+    () => (dragonForced ? 'lunar-new-year' : santaForced ? 'christmas' : festivalForced ?? getCalendarEvent(date, location.latitude)),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on passMinuteKey, not `date` itself
     [passMinuteKey, location.latitude]
   );
@@ -928,16 +933,22 @@ const SunTracker: React.FC = () => {
   // really shows them (CalendarEggs' rules: dark sky = night or astronomical/nautical twilight).
   // Not for a forced egg (?egg=dragon, ?egg=santa or any ?egg) and not in a time preview.
   const isDarkSky = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
-  const calendarBadge = dragonForced || santaForced ? null : badgeForCalendarEvent(calendarEvent, {
+  const calendarBadge = dragonForced || santaForced || festivalForced ? null : badgeForCalendarEvent(calendarEvent, {
     isNight: isDarkSky,
     moonUp: isDarkSky && moonPosition.visible && getMoonLook(weatherType, cloudCover).disc > 0,
     weatherType,
     reducedMotion: prefersReducedMotion,
     isTimePreview,
+    timeOfDay,
   });
   useEffect(() => {
     if (calendarBadge) collect(calendarBadge);
   }, [calendarBadge, collect]);
+  // Item 117: Nowruz is the March equinox, so it also collects the equinox badge.
+  const nowruzEquinoxBadge = calendarBadge === 'egg:nowruz' ? NOWRUZ_ALSO : null;
+  useEffect(() => {
+    if (nowruzEquinoxBadge) collect(nowruzEquinoxBadge);
+  }, [nowruzEquinoxBadge, collect]);
   const santaBadge = santaForced ? null : badgeForSanta(isSanta, { reducedMotion: prefersReducedMotion, isTimePreview });
   useEffect(() => {
     if (santaBadge) collect(santaBadge);

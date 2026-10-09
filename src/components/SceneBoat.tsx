@@ -86,6 +86,22 @@ const FLEET: Record<BoatKind, { parts: [Role, string][]; lights: [number, number
   },
 };
 
+// Item 117 (Día de los Muertos): papel picado bunting along a stay or between the masts, in
+// the grid. The rowboat has no mast, so it has none.
+const BUNTING: Partial<Record<BoatKind, [number, number][]>> = {
+  sailboat: [[30, 4], [54.5, 28.3]],
+  ferry: [[5, 20.5], [28.4, 6.5], [46.5, 10.5]],
+  fishing: [[38, 6], [56.6, 23.4]],
+  freighter: [[14.6, 5.5], [59.4, 19.5]],
+};
+const PICADO = [1, 2, 3, 4, 5].map(n => `hsl(var(--scene-festival-pastel-${n}))`);
+// Small flags every 4.5 units along the line, hanging down.
+const buntingFlags = (line: [number, number][]) => line.slice(1).flatMap(([x2, y2], s) => {
+  const [x1, y1] = line[s];
+  const n = Math.max(1, Math.floor(Math.hypot(x2 - x1, y2 - y1) / 4.5));
+  return Array.from({ length: n }, (_, i) => [x1 + ((x2 - x1) * (i + 0.5)) / n, y1 + ((y2 - y1) * (i + 0.5)) / n]);
+});
+
 const c = (name: string) => `hsl(var(--scene-boat-${name}))`;
 const FLAT: Partial<Record<Role, string>> = {
   stripe: c('red'), flag: c('red'), roof: c('navy'), cap: c('navy'), window: c('window'), rower: c('rower'),
@@ -105,9 +121,10 @@ interface SceneBoatProps {
   lit: boolean; // the sun is below the horizon: windows and mast lights glow
   wake: boolean;
   seaWindKmh?: number; // the reflection follows the wind (item 79, X2)
+  bunting?: boolean; // item 117: papel picado for Día de los Muertos
 }
 
-const SceneBoat = ({ kind, tone, lit, wake, seaWindKmh = UNKNOWN_SEA_WIND_KMH }: SceneBoatProps) => {
+const SceneBoat = ({ kind, tone, lit, wake, seaWindKmh = UNKNOWN_SEA_WIND_KMH, bunting = false }: SceneBoatProps) => {
   const id = useId().replace(/:/g, '');
   const boat = FLEET[kind];
   const height = BOAT_HEIGHT_PX;
@@ -158,6 +175,14 @@ const SceneBoat = ({ kind, tone, lit, wake, seaWindKmh = UNKNOWN_SEA_WIND_KMH }:
           </g>
         )}
         {parts}
+        {bunting && BUNTING[kind] && (
+          <g data-testid="boat-bunting">
+            <polyline points={BUNTING[kind]!.join(' ')} fill="none" stroke={c('navy')} strokeWidth={0.4} />
+            {buntingFlags(BUNTING[kind]!).map(([x, y], i) => (
+              <rect key={i} x={x - 1.3} y={y} width={2.6} height={3} fill={PICADO[i % PICADO.length]} />
+            ))}
+          </g>
+        )}
       </svg>
       {/* X1: a faint, still mirror image below the waterline, fading out downward: sharp in
           calm water, striped and fainter in wind (item 79, X2). */}

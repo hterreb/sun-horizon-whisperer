@@ -1,5 +1,6 @@
 import { getNextFullMoon } from './moonUtils';
 import { type SunTimes } from './sunUtils';
+import { getFestivalDay, getFestivalSpan, type FestivalEvent } from './festivalEvents';
 
 // Calendar easter eggs (ROADMAP "Ongoing - Easter eggs", Calendar list). Pure date
 // checks in local time; the scene shows at most one event at a time.
@@ -12,7 +13,8 @@ export type CalendarEvent =
   | 'equinox'
   | 'halloween-pumpkin' // Oct 31, full moon within 3 days: a pumpkin moon
   | 'halloween-bats' // Oct 31, else: bats all night
-  | 'christmas'; // Dec 24-26: light snow
+  | 'christmas' // Dec 24-26: light snow
+  | FestivalEvent; // item 117: cultural festivals (festivalEvents.ts); 'nowruz' is the March equinox
 
 // Mean solstice/equinox instants, Meeus "Astronomical Algorithms" table 27.B
 // (years 2000-3000). No periodic terms, so the error is up to about 30 min; this
@@ -40,7 +42,9 @@ const getSeasonEvent = (date: Date, latitude: number): CalendarEvent | null => {
   const month = date.getMonth();
   if (month !== 2 && month !== 5 && month !== 8 && month !== 11) return null;
   if (!sameLocalDay(getSeasonInstant(date.getFullYear(), month), date)) return null;
-  if (month === 2 || month === 8) return 'equinox';
+  // Item 117: the March equinox is also Nowruz; it keeps the equinox pill and badge.
+  if (month === 2) return 'nowruz';
+  if (month === 8) return 'equinox';
   // June is the longest day in the north and the shortest in the south.
   return (month === 5) === (latitude >= 0) ? 'solstice-longest' : 'solstice-shortest';
 };
@@ -49,19 +53,24 @@ const getSeasonEvent = (date: Date, latitude: number): CalendarEvent | null => {
 const isHalloweenFullMoon = (year: number) => getNextFullMoon(new Date(year, 9, 28)) < new Date(year, 10, 4);
 
 // One event id, or null. When two could apply, the most specific (shortest) wins:
-// the New Year minute, then single days (Lunar New Year, Friday the 13th, solstice/equinox,
-// Halloween), then the 3 Christmas days. Without a latitude, the north is assumed.
-export const getCalendarEvent = (date: Date, latitude = 0): CalendarEvent | null => {
+// the New Year minute, then single days (Lunar New Year, the one-day festivals of item 117,
+// Friday the 13th, solstice/equinox/Nowruz, Halloween), then the 3 Christmas days, then the
+// festivals of several days (Midsummer, Día de los Muertos, Carnival, Hanukkah, Hanami).
+// Without a latitude, the north is assumed. `country` (ISO 3166 code) limits Hanami to Japan;
+// without it, Hanami shows for everyone.
+export const getCalendarEvent = (date: Date, latitude = 0, country?: string | null): CalendarEvent | null => {
   const month = date.getMonth();
   const day = date.getDate();
   if (month === 0 && day === 1 && date.getHours() === 0 && date.getMinutes() === 0) return 'new-year';
   if (LUNAR_NEW_YEAR.includes(localIsoDay(date))) return 'lunar-new-year';
+  const festivalDay = getFestivalDay(date);
+  if (festivalDay) return festivalDay;
   if (day === 13 && date.getDay() === 5) return 'friday-13';
   const season = getSeasonEvent(date, latitude);
   if (season) return season;
   if (month === 9 && day === 31) return isHalloweenFullMoon(date.getFullYear()) ? 'halloween-pumpkin' : 'halloween-bats';
   if (month === 11 && day >= 24 && day <= 26) return 'christmas';
-  return null;
+  return getFestivalSpan(date, country);
 };
 
 // Item 113 (egg info cards): the mean number of days a year that show this event, over the

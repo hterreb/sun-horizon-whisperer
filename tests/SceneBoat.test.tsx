@@ -24,3 +24,16 @@ describe('SceneBoat reflection follows the wind (ROADMAP item 79, X2)', () => {
     expect(strong.css).toContain('repeating-linear-gradient');
   });
 });
+
+describe('SceneBoat bunting (ROADMAP item 117, Día de los Muertos)', () => {
+  it('hangs papel picado on the boats with a mast, not on the rowboat, and only when asked', () => {
+    const { rerender } = render(<SceneBoat kind="sailboat" tone="day" lit={false} wake={false} />);
+    expect(screen.queryByTestId('boat-bunting')).toBeNull();
+    for (const kind of ['sailboat', 'ferry', 'fishing', 'freighter'] as const) {
+      rerender(<SceneBoat kind={kind} tone="day" lit={false} wake={false} bunting />);
+      expect(screen.getByTestId('boat-bunting').querySelectorAll('rect').length, kind).toBeGreaterThan(2);
+    }
+    rerender(<SceneBoat kind="rowboat" tone="day" lit={false} wake={false} bunting />);
+    expect(screen.queryByTestId('boat-bunting')).toBeNull();
+  });
+});

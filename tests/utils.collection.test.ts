@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   BADGES, COLLECTION_STORAGE_KEY, addToCollection, badgeForAstroEvent, badgeForCalendarEvent, badgeForSanta, badgeForTarget,
   countCollected, getMoonState, getSunState, getTerrainBand, isCollectionPaused, loadCollection, saveCollection,
-  stateBadgeForTarget, type BadgeId, type CalendarBadgeOptions, type StateBadgeContext,
+  NOWRUZ_ALSO, stateBadgeForTarget, type BadgeId, type CalendarBadgeOptions, type StateBadgeContext,
 } from '@/utils/collection';
 import { type HorizonProfile } from '@/utils/horizonUtils';
 import { FISH_WEIGHTS, BIRD_WEIGHTS, type FishKind } from '@/utils/weatherEffectsUtils';
@@ -18,15 +18,15 @@ describe('collection (ROADMAP item 112)', () => {
     vi.restoreAllMocks();
   });
 
-  it('has 87 badges with unique ids, one for every fish, flyer, boat and cloud type', () => {
+  it('has 99 badges with unique ids, one for every fish, flyer, boat and cloud type', () => {
     const ids = BADGES.map(b => b.id);
-    expect(ids).toHaveLength(87); // item 115: 69 + 5 sun + 5 terrain + 8 moon states
-    expect(new Set(ids).size).toBe(87);
+    expect(ids).toHaveLength(99); // item 115: 69 + 5 sun + 5 terrain + 8 moon states; item 117: 12 festivals
+    expect(new Set(ids).size).toBe(99);
     for (const kind of [...FISH_WEIGHTS.map(([k]) => k), ...NIGHT_ONLY]) expect(ids).toContain(`fish:${kind}`);
     for (const kind of [...BIRD_WEIGHTS.map(([k]) => k), 'bat']) expect(ids).toContain(`flyer:${kind}`);
     for (const kind of ['sailboat', 'ferry', 'fishing', 'rowboat', 'freighter']) expect(ids).toContain(`boat:${kind}`);
     for (const type of ['Ci', 'Cs', 'Ac', 'As', 'Cu', 'Sc', 'St', 'Ns', 'Cb', 'Len', 'Mam']) expect(ids).toContain(`cloud:${type}`);
-    expect(BADGES.filter(b => b.group === 'egg')).toHaveLength(19);
+    expect(BADGES.filter(b => b.group === 'egg')).toHaveLength(31);
     expect(BADGES.find(b => b.id === 'plane')?.group).toBe('sky');
   });
 
@@ -211,5 +211,33 @@ describe('state badges (ROADMAP item 115)', () => {
     expect(countCollected(loadCollection())).toBe(4);
     saveCollection({ ...old, 'terrain:alpine': '2026-10-09T12:00:00.000Z' });
     expect(loadCollection()['terrain:alpine']).toBe('2026-10-09T12:00:00.000Z');
+  });
+
+  // Item 117: the festival eggs count when FestivalEggs draws them.
+  it('maps each festival to its own ultra rare badge, when the scene shows it', () => {
+    const night = { ...shown, timeOfDay: 'night' as const };
+    const day = { ...shown, isNight: false, timeOfDay: 'midday' as const, weatherType: 'partly' };
+    expect(badgeForCalendarEvent('diwali', night)).toBe('egg:diwali');
+    expect(badgeForCalendarEvent('diwali', day)).toBeNull();
+    expect(badgeForCalendarEvent('loy-krathong', night)).toBe('egg:loyKrathong');
+    expect(badgeForCalendarEvent('mid-autumn', night)).toBe('egg:midAutumn');
+    expect(badgeForCalendarEvent('tanabata', night)).toBe('egg:tanabata');
+    expect(badgeForCalendarEvent('hanukkah', { ...night, reducedMotion: true })).toBe('egg:hanukkah'); // static lights
+    expect(badgeForCalendarEvent('midsummer', { ...night, timeOfDay: 'evening' })).toBe('egg:midsummer');
+    expect(badgeForCalendarEvent('eid-al-fitr', day)).toBe('egg:eidAlFitr');
+    expect(badgeForCalendarEvent('dia-de-muertos', day)).toBe('egg:diaDeMuertos');
+    expect(badgeForCalendarEvent('holi', day)).toBe('egg:holi');
+    expect(badgeForCalendarEvent('holi', { ...day, weatherType: 'clear' })).toBeNull();
+    expect(badgeForCalendarEvent('hanami', day)).toBe('egg:hanami');
+    expect(badgeForCalendarEvent('hanami', { ...day, reducedMotion: true })).toBeNull();
+    expect(badgeForCalendarEvent('carnival', day)).toBe('egg:carnival');
+    expect(badgeForCalendarEvent('carnival', night)).toBeNull();
+    expect(badgeForCalendarEvent('nowruz', day)).toBe('egg:nowruz');
+    expect(NOWRUZ_ALSO).toBe('egg:equinox');
+    expect(badgeForCalendarEvent('diwali', { ...night, isTimePreview: true })).toBeNull();
+    expect(badgeForCalendarEvent('diwali', shown)).toBeNull(); // no time of day
+    for (const kind of ['loyKrathong', 'diwali', 'eidAlFitr', 'midAutumn', 'hanami', 'tanabata', 'diaDeMuertos', 'holi', 'hanukkah', 'nowruz', 'midsummer', 'carnival']) {
+      expect(tier(`egg:${kind}` as BadgeId)).toBe('rarity.ultraRare');
+    }
   });
 });

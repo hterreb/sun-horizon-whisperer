@@ -33,6 +33,7 @@ const SEASON_TEXT: Partial<Record<CalendarEvent, MessageKey>> = {
   'solstice-longest': 'egg.seasonLongest',
   'solstice-shortest': 'egg.seasonShortest',
   equinox: 'egg.seasonEquinox',
+  nowruz: 'egg.seasonEquinox', // item 117: the March equinox; FestivalEggs adds the blossoms
 };
 
 // Fixed layouts (share of the width/height, s), so a render never re-rolls them.

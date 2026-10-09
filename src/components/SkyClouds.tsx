@@ -11,6 +11,7 @@ import {
 } from '@/utils/skyCloudUtils';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { useDoubleTap } from '@/hooks/useDoubleTap';
+import { isDarkSky } from '@/utils/festivalEvents';
 
 // Clouds by type (ROADMAP item 84): the real cloud layers (C1), lit by the sun (C2), in
 // three bands that glide at their own pace (C3), with soft fills (C4), the rare
@@ -33,6 +34,7 @@ interface SkyCloudsProps {
   moon: { x: number; y: number; r?: number; light?: number } | null;
   skyGradient: string | null;
   egg: boolean; // an X1 day
+  holi?: boolean; // item 117: soft pastel tints on the day clouds
   // Info cards (ROADMAP item 95): a tap on a cloud, and the ring id of the open card.
   onInfo?: SceneInfoHandler;
   infoRing?: string | null;
@@ -42,6 +44,7 @@ interface SkyCloudsProps {
 const BAND_BLUR = { high: 0.6, mid: 0.75, low: 1 };
 const LINING_STEP = 0.5; // the lining moves in half-unit steps
 const quantize = (n: number, step: number) => Math.round(n / step) * step;
+const HOLI_TINTS = [1, 2, 3].map(n => `hsl(var(--scene-festival-pastel-${n}))`);
 
 interface CloudSvgProps {
   cloud: SkyCloud;
@@ -57,6 +60,7 @@ interface CloudSvgProps {
   liningY?: number;
   liningR?: number;
   moonGlow: number;
+  tint?: string; // item 117 (Holi): a soft pastel wash over the cloud
   onInfo?: SceneInfoHandler; // item 95: only the clouds of the shown layout take taps
   ringId: string;
 }
@@ -65,7 +69,7 @@ interface CloudSvgProps {
 // whose light direction or silver lining changed.
 const CloudSvg = memo(function CloudSvg({
   cloud, gradId, weather, light, angle, skyGradient, height, width, rowLeft, liningX, liningY, liningR, moonGlow,
-  onInfo, ringId,
+  tint, onInfo, ringId,
 }: CloudSvgProps) {
   const shape = CLOUD_SHAPES[cloud.type][cloud.variant];
   const span = rowLeft === undefined ? null : getRowSpan(rowLeft, cloud.scale, width, angle);
@@ -129,6 +133,7 @@ const CloudSvg = memo(function CloudSvg({
         {fill.glow && <path d={shape.d} fill={`url(#${gradId}g)`} />}
         {/* Silver lining (item 76): the parts near the moon catch its light. */}
         {liningR !== undefined && <path d={shape.d} fill={`url(#${gradId}m)`} data-testid="cloud-moonlight" />}
+        {tint && <path d={shape.d} fill={tint} fillOpacity={0.4} data-testid="cloud-holi" />}
       </svg>
     </div>
   );
@@ -166,7 +171,7 @@ interface Layout {
 
 const SkyClouds: React.FC<SkyCloudsProps> = ({
   weatherType, timeOfDay, date, latitude, longitude, cloudLayers, windDirectionDeg, sun, moon, skyGradient, egg,
-  onInfo, infoRing = null,
+  holi = false, onInfo, infoRing = null,
 }) => {
   const reduced = usePrefersReducedMotion();
   // Item 116: a double tap opens the cloud's card; a single tap shows its ring for a moment.
@@ -224,6 +229,8 @@ const SkyClouds: React.FC<SkyCloudsProps> = ({
   }, [gliders, layoutKey, reduced]);
 
   const moonGlow = moon?.light ?? 1;
+  // Item 117: Holi tints the clouds by day only (pink, yellow, green in turn).
+  const holiTints = holi && !isDarkSky(timeOfDay) ? HOLI_TINTS : null;
   const scale = getSceneScale(height);
 
   // The layout fading out (item 87), with the glide progress it had; the new one fades in.
@@ -308,6 +315,7 @@ const SkyClouds: React.FC<SkyCloudsProps> = ({
                     liningY={lining ? quantize(lining.cy, LINING_STEP) : undefined}
                     liningR={lining ? quantize(lining.r, LINING_STEP) : undefined}
                     moonGlow={moonGlow}
+                    tint={holiTints?.[(i + j) % holiTints.length]}
                     onInfo={out || !onInfo ? undefined : tap}
                     ringId={ringId}
                   />
