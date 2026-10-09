@@ -30,6 +30,18 @@ export const getSeasonInstant = (year: number, month: 2 | 5 | 8 | 11): Date => {
   return new Date((jde - 2440587.5) * 86_400_000);
 };
 
+// The solstice/equinox egg's sun-path traces: the June and/or December solstice day that is
+// not today (both on an equinox), at today's clock time, so getSunPathAround picks the same
+// pass (current or next) as today's arc. Empty for any other event.
+const ONE_DAY_MS = 86_400_000;
+export const getSolsticeTraceDates = (event: CalendarEvent | null, date: Date): Date[] => {
+  if (event !== 'solstice-longest' && event !== 'solstice-shortest' && event !== 'equinox') return [];
+  return ([5, 11] as const).filter((m) => m !== date.getMonth()).map((m) => {
+    const days = Math.round((getSeasonInstant(date.getFullYear(), m).getTime() - date.getTime()) / ONE_DAY_MS);
+    return new Date(date.getTime() + days * ONE_DAY_MS);
+  });
+};
+
 const sameLocalDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 
 // Lunar New Year (ROADMAP item 100), Hong Kong Observatory dates. Extend the list in 2035.

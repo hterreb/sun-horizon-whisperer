@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { Sun, ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp, Mountain, BellOff } from 'lucide-react';
-import { type SunPosition, type SunTimes, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors, getReflectionFade } from '../utils/sunUtils';
+import { type SunPosition, type SunTimes, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors, getReflectionFade, getSunPathAround } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
 import { getSunArcLabels, getMoonArcLabels, getTerrainArcLabels, getTerrainMoonArcLabels, type ArcLabels, type ArcLabelPoint } from '../utils/arcLabels';
 import { shortestHeadingDelta } from '../utils/compassUtils';
@@ -9,7 +9,7 @@ import CloudLayer, { type SceneInfoHandler, type WeatherType } from './CloudLaye
 import Fireworks from './Fireworks';
 import SunSunglasses from './SunSunglasses';
 import CalendarEggs from './CalendarEggs';
-import { type CalendarEvent } from '@/utils/calendarEvents';
+import { type CalendarEvent, getSolsticeTraceDates } from '@/utils/calendarEvents';
 import PremiumBadge from './PremiumBadge';
 import WeatherEffects from './WeatherEffects';
 import SolarEclipse from '@/components/SolarEclipse';
@@ -766,6 +766,21 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     [arcLabelMinuteKey, latitude, longitude]
   );
 
+  // Solstice/equinox egg: faint traces of the other solstice day's sun path (both on an
+  // equinox), drawn like the sun arc, so today's arc reads as long or short.
+  const solsticeTracePaths = useMemo(() => {
+    const { width, height } = containerDimensions;
+    if (width === 0 || height === 0) return [];
+    return getSolsticeTraceDates(calendarEvent, date)
+      .map((d) => buildArcPath(
+        getSunPathAround(d, latitude, longitude),
+        (p) => getArcScreenPosition(p.altitude, p.azimuth, width, height, latitude, compassHeading),
+        width
+      ))
+      .filter(Boolean);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on arcLabelMinuteKey, not `date` itself
+  }, [calendarEvent, arcLabelMinuteKey, containerDimensions, latitude, longitude, compassHeading]);
+
   const sunArcLabelGeometry = useMemo(
     () => getArcLabelGeometry(sunArcLabels, latitude, compassHeading),
     [sunArcLabels, latitude, compassHeading]
@@ -1044,8 +1059,20 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       />
       <Fireworks trigger={fireworksTrigger} />
 
-      {(sunArcPath || moonArcPath) && (
+      {(sunArcPath || moonArcPath || solsticeTracePaths.length > 0) && (
         <svg className="absolute inset-0 w-full h-full pointer-events-none">
+          {solsticeTracePaths.map((d) => (
+            <path
+              key={d}
+              data-testid="solstice-trace"
+              d={d}
+              fill="none"
+              stroke="hsl(var(--scene-solstice-trace))"
+              strokeOpacity={0.35}
+              strokeWidth={1}
+              strokeDasharray="4 6"
+            />
+          ))}
           {sunArcPath && (
             <path
               d={sunArcPath}
