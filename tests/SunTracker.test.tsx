@@ -997,12 +997,19 @@ describe('SunTracker', () => {
     const tapSeahorse = () => act(() => {
       visProps.current!.onSceneInfo!({ type: 'fish', kind: 'seahorse' }, { x: 100, y: 600 }, 'ring');
     });
+    // A saved place loads at once, and a fresh `visProps` cannot hold the props of an earlier
+    // test's app: the tap reached no scene now and then in CI.
+    beforeEach(() => {
+      visProps.current = null;
+      saveManualLocation(47.78, 9.61, 'Ravensburg');
+    });
     afterEach(() => {
       window.history.pushState({}, '', '/');
     });
 
     it('a tap on a fish collects its badge with one "New" toast; a second tap adds nothing', () => {
       render(<SunTracker />);
+      expect(visProps.current).not.toBeNull();
       tapSeahorse();
       expect(JSON.parse(localStorage.getItem('collection')!)).toEqual({ 'fish:seahorse': expect.any(String) });
       expect(newToasts()).toEqual([[{ title: 'New: Seahorse' }]]);
@@ -1013,6 +1020,7 @@ describe('SunTracker', () => {
     it('collects nothing with a test link (?egg=ufo)', () => {
       window.history.pushState({}, '', '/?egg=ufo');
       render(<SunTracker />);
+      expect(visProps.current).not.toBeNull();
       tapSeahorse();
       // Seven sun taps: the sunglasses, which would count without the link.
       act(() => {
@@ -1025,6 +1033,7 @@ describe('SunTracker', () => {
 
     it('the InfoPanel button opens the collection; the close button closes it', () => {
       render(<SunTracker />);
+      expect(visProps.current).not.toBeNull();
       tapSeahorse();
       fireEvent.click(screen.getByRole('button', { name: 'Collection' }));
       const view = screen.getByRole('dialog', { name: 'Collection' });
