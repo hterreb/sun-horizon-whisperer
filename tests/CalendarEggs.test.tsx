@@ -96,6 +96,15 @@ describe('CalendarEggs', () => {
     expect(screen.queryByTestId('santa')).toBeNull();
   });
 
+  it('flies Santa across the drawn moon (lookbook S2), else small and far (S4)', () => {
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
+    const { unmount } = render(<CalendarEggs {...base} event="christmas" santa />);
+    expect(screen.getByTestId('santa').getAttribute('data-mode')).toBe('moon');
+    unmount();
+    render(<CalendarEggs {...base} moon={null} event="christmas" santa />);
+    expect(screen.getByTestId('santa').getAttribute('data-mode')).toBe('far');
+  });
+
   it('shows Santa only with the Christmas event', () => {
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
     render(<CalendarEggs {...base} event="friday-13" santa />);

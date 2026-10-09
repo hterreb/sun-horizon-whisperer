@@ -63,6 +63,8 @@ export interface SceneInfo {
   lines: InfoLine[];
   fact?: { label: MessageKey; text: MessageKey }; // the "Field note" at the end
   tier: RarityTier | null; // null: no rarity row
+  // Santa's card (lookbook 2026-10-09, S7): SceneInfoCard adds the live counters and the NORAD link.
+  santaTracker?: boolean;
 }
 
 // What the sun, moon, cloud and terrain cards read; SunTracker has all of it.
@@ -88,6 +90,8 @@ export interface SceneInfoContext {
   satellite?: SatelliteCard | null;
   // The live plane's route (item 111), once the proxy has answered; null leaves it out.
   route?: LiveRoute | null;
+  // The place name the InfoPanel shows ("Ravensburg, Germany"), for Santa's route (S7); null: none.
+  placeName?: string | null;
 }
 
 // Item 107: the Latin name where the kind is one species. Group names (fish, ray, sea turtle,
@@ -462,6 +466,7 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
       return { kicker: 'infoKind.orbit', icon: 'satellite', title: 'scene.satellite', lines: satelliteLines(target.name, ctx), tier: null };
     case 'egg': {
       const egg = EGGS[target.kind];
+      if (target.kind === 'santa') return santaCard(egg, ctx);
       return {
         kicker: egg.hidden ? 'infoKind.easterEgg' : 'infoKind.specialEvent',
         icon: egg.hidden ? 'egg' : 'event',
@@ -473,6 +478,28 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
       };
     }
   }
+};
+
+// Lookbook 2026-10-09, S7: Santa's card in the style of the live plane card (item 111): his
+// callsign, the route from the North Pole to the user's place (the town, without the country),
+// and a fixed altitude. SceneInfoCard adds the counters, the "just for fun" line and the link.
+export const SANTA_ALTITUDE_M = 10_700;
+const santaCard = (egg: (typeof EGGS)['santa'], ctx: SceneInfoContext): SceneInfo => {
+  const town = ctx.placeName?.split(',')[0].trim();
+  const place: InfoText | string = town || { key: 'egg.santaRouteHere' };
+  return {
+    kicker: 'infoKind.specialEvent',
+    icon: 'event',
+    title: 'egg.santaCallsign',
+    lines: [
+      { label: 'info.route', value: { key: 'egg.santaRoute', vars: { place } } },
+      { label: 'info.altitude', value: { key: 'info.metres', vars: { value: formatNumber(ctx.language, SANTA_ALTITUDE_M, 0) } } },
+      eggRarityLine(egg.chance, ctx.language),
+    ],
+    fact: fieldNote(egg.fact),
+    tier: 'ultraRare',
+    santaTracker: true,
+  };
 };
 
 // Translates a card text, with its nested texts.

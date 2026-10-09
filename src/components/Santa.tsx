@@ -1,17 +1,37 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { type RarityTier } from '@/utils/rarityTier';
 import { useDoubleTap } from '@/hooks/useDoubleTap';
+import { useLanguage } from '@/hooks/useLanguage';
+import { getRunningAudioContext } from '@/hooks/useSunsetCountdown';
+import { santaGreetingOpacity, santaStopTimes, santaTravel } from '@/utils/santaFlight';
+import { playSleighBells } from '@/utils/sleighBells';
 import { HitArea, type SceneInfoHandler } from './CloudLayer';
 
 // Christmas Eve (ROADMAP "Ongoing — Easter eggs", Calendar): Santa in his sleigh with four
-// reindeer (Rudolph in front) glides once, slowly and in a straight line, high across the night sky. The direction
-// is random per page view. No bob and no leg motion. The parent leaves him out under reduced
-// motion. Item 113: a tap opens his info card (item 95 pattern: the ring inside the moving wrapper).
+// reindeer (Rudolph in front) flies once, slowly and in a straight line, across the night sky. The
+// direction is random per page view. No bob, no leg motion, no scale animation. The parent leaves
+// him out under reduced motion. Item 113: a tap opens his info card (item 95 pattern: the ring
+// inside the moving wrapper).
+// Lookbook 2026-10-09 (S2, S4, S6, S9):
+// - S2: with the moon on the screen, he flies at the moon's centre height, in front of the disc,
+//   MOON_WIDTH_PER_R px wide per px of moon radius (lookbook: radius 28 -> 54 px).
+// - S4: else small and far (FAR_WIDTH px, FAR_TOP_PCT down the sky, FAR_SPEED x the speed), with a
+//   red glow on Rudolph's nose.
+// - S6: halfway he stops (on the moon, or in the middle of the screen) and says "Ho ho ho!".
+// - S9: with the sound on, a short sleigh-bell jingle when he enters the screen.
 const SPEED_PCT = 2.5; // % of the width per second: the calm-motion limit for birds
 const PX_CAP = 390 * SPEED_PCT / 100; // phone px/s on wide screens (9.75)
 export const SANTA_WIDTH = 120;
 const SANTA_HEIGHT = 32;
 export const SANTA_RING = 'egg-santa';
+export const MOON_WIDTH_PER_R = 54 / 28;
+export const FAR_WIDTH = 24;
+const FAR_TOP_PCT = 23;
+export const FAR_SPEED = 0.45;
+// Rudolph's nose in SantaShape units, and its glow (px) in the far view.
+const NOSE = { x: 109.8, y: 12.7 };
+const NOSE_GLOW_R = 2.4;
+const HIT_HEIGHT = 32; // HitArea makes it at least 44 x 44
 
 // A reindeer in flight (facing right), legs stretched and still.
 const Reindeer = ({ x, nose = false }: { x: number; nose?: boolean }) => (
@@ -45,43 +65,87 @@ export const SantaShape = ({ width }: { width: number }) => (
   </svg>
 );
 
+// The drawn moon (px in the scene), as CalendarEggs gets it from SunVisualization.
+export interface SantaMoon {
+  x: number;
+  y: number;
+  r: number;
+}
+
 interface SantaProps {
   // Called once the crossing ends (keep it stable: a new function restarts the crossing).
   onDone: () => void;
   onInfo?: SceneInfoHandler;
   ringOn?: boolean; // its info card is open
   ringTier?: RarityTier | null;
+  // The drawn moon (S2), else null (S4). The mode and his size are set at the start; he follows
+  // the moon's latest position (the first one can be from before the layout).
+  moon?: SantaMoon | null;
+  // The countdown sound is on (item 108): the bells may play (S9).
+  soundOn?: boolean;
 }
 
-const Santa: React.FC<SantaProps> = ({ onDone, onInfo, ringOn = false, ringTier = null }) => {
+const Santa: React.FC<SantaProps> = ({ onDone, onInfo, ringOn = false, ringTier = null, moon = null, soundOn = false }) => {
+  const { t } = useLanguage();
   const ref = useRef<HTMLDivElement>(null);
+  const greetingRef = useRef<HTMLSpanElement>(null);
   const rafRef = useRef<number | null>(null);
+  const soundRef = useRef(soundOn);
   const [leftToRight] = useState(() => Math.random() < 0.5);
+  const [startMoon] = useState(() => moon);
+  const atMoon = startMoon !== null;
+  // The latest drawn moon; when it hides behind clouds mid-flight he keeps its last place.
+  const moonRef = useRef(startMoon);
   // Item 116: a double tap opens the card; a single tap shows the ring for a moment.
   const { tap, hint } = useDoubleTap(onInfo);
+  const width = startMoon ? Math.round(startMoon.r * MOON_WIDTH_PER_R) : FAR_WIDTH;
+  const height = (width * SANTA_HEIGHT) / SANTA_WIDTH;
+  const scale = width / SANTA_WIDTH;
+
+  useEffect(() => {
+    soundRef.current = soundOn;
+  }, [soundOn]);
+  useEffect(() => {
+    if (moon) moonRef.current = moon;
+  }, [moon]);
 
   useEffect(() => {
     let start: number | null = null;
+    // Set once he starts to slow down, so a moving moon (compass) cannot make him jump.
+    let frozenStop: number | null = null;
     const frame = (now: number) => {
-      start ??= now;
-      const width = window.innerWidth;
-      const travelled = Math.min(width * SPEED_PCT / 100, PX_CAP) * (now - start) / 1000;
-      if (travelled >= width + SANTA_WIDTH) {
+      if (start === null) {
+        start = now;
+        // S9: he enters the screen now.
+        playSleighBells(getRunningAudioContext(), soundRef.current);
+      }
+      const screen = window.innerWidth;
+      const v = Math.min(screen * SPEED_PCT / 100, PX_CAP) * (atMoon ? 1 : FAR_SPEED);
+      const x0 = leftToRight ? -width : screen;
+      const m = atMoon ? moonRef.current : null;
+      const xs = (m ? m.x : screen / 2) - width / 2;
+      const seconds = (now - start) / 1000;
+      const stopDistance = frozenStop ?? Math.abs(xs - x0);
+      if (frozenStop === null && seconds >= santaStopTimes(stopDistance, v).tA) frozenStop = stopDistance;
+      const travelled = santaTravel(seconds, stopDistance, v);
+      if (travelled >= screen + width) {
         rafRef.current = null;
         onDone();
         return;
       }
       if (ref.current) {
-        const x = leftToRight ? -SANTA_WIDTH + travelled : width - travelled;
+        const x = leftToRight ? x0 + travelled : x0 - travelled;
         ref.current.style.transform = `translateX(${x}px)`;
+        if (m) ref.current.style.top = `${m.y - height / 2}px`;
       }
+      if (greetingRef.current) greetingRef.current.style.opacity = String(santaGreetingOpacity(seconds, stopDistance, v));
       rafRef.current = requestAnimationFrame(frame);
     };
     rafRef.current = requestAnimationFrame(frame);
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
-  }, [leftToRight, onDone]);
+  }, [leftToRight, onDone, atMoon, width, height]);
 
   return (
     <div
@@ -89,19 +153,50 @@ const Santa: React.FC<SantaProps> = ({ onDone, onInfo, ringOn = false, ringTier 
       aria-hidden="true"
       data-testid="santa"
       data-direction={leftToRight ? 'right' : 'left'}
-      className={`absolute left-0 top-[11%] ${onInfo ? 'pointer-events-auto cursor-pointer touch-manipulation' : 'pointer-events-none'}`}
-      // Off screen until the first frame places it.
-      style={{ transform: `translateX(${-SANTA_WIDTH * 2}px)` }}
+      data-mode={atMoon ? 'moon' : 'far'}
+      className={`absolute left-0 ${onInfo ? 'pointer-events-auto cursor-pointer touch-manipulation' : 'pointer-events-none'}`}
+      // Off screen until the first frame places it. S2: his middle on the moon's centre height.
+      style={{ transform: `translateX(${-width * 2}px)`, top: startMoon ? startMoon.y - height / 2 : `${FAR_TOP_PCT}%`, width, height }}
       onClick={onInfo && (event => tap({ type: 'egg', kind: 'santa' }, { x: event.clientX, y: event.clientY }, SANTA_RING))}
     >
       {/* The glow and the mirror on the drawing only, so the ring (item 113) stays clean. */}
       <span
-        className="block"
+        className="relative block"
         style={{ filter: 'drop-shadow(0 0 6px hsl(var(--scene-glow-white) / 0.35))', transform: leftToRight ? undefined : 'scaleX(-1)' }}
       >
-        <SantaShape width={SANTA_WIDTH} />
+        <SantaShape width={width} />
+        {!atMoon && (
+          // S4: a viewer first sees a red dot. Inside the mirrored span, so it stays on the nose.
+          <span
+            data-testid="santa-nose-glow"
+            className="absolute rounded-full"
+            style={{
+              left: NOSE.x * scale - NOSE_GLOW_R,
+              top: NOSE.y * scale - NOSE_GLOW_R,
+              width: NOSE_GLOW_R * 2,
+              height: NOSE_GLOW_R * 2,
+              background: '#FF5050',
+              filter: 'blur(2px)',
+            }}
+          />
+        )}
       </span>
-      {onInfo && <HitArea cx={SANTA_WIDTH / 2} cy={SANTA_HEIGHT / 2} width={SANTA_WIDTH} height={SANTA_HEIGHT} ring={ringOn || hint === SANTA_RING} tier={ringOn ? ringTier : null} />}
+      {/* S6: "Ho ho ho!" during the stop; the rAF loop sets the opacity (no bounce, no scale).
+          On the moon it sits above the disc, so the bright disc does not hide it. */}
+      <span
+        ref={greetingRef}
+        data-testid="santa-greeting"
+        className="absolute bottom-full left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] leading-4 pointer-events-none"
+        style={{
+          opacity: 0,
+          marginBottom: (startMoon ? Math.max(0, startMoon.r - height / 2) : 0) + 4,
+          color: '#FFF4DC',
+          textShadow: '0 0 4px rgb(0 0 0 / 0.6)',
+        }}
+      >
+        {t('egg.santaGreeting')}
+      </span>
+      {onInfo && <HitArea cx={width / 2} cy={height / 2} width={width} height={HIT_HEIGHT} ring={ringOn || hint === SANTA_RING} tier={ringOn ? ringTier : null} />}
     </div>
   );
 };

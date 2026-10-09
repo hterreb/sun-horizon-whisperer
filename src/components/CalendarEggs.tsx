@@ -27,6 +27,8 @@ interface CalendarEggsProps {
   infoRingTier?: RarityTier | null;
   // Christmas Eve from sunset to midnight (calendarEvents.isSantaTime), or ?egg=santa.
   santa?: boolean;
+  // The countdown sound is on (item 108): Santa's sleigh bells may play (lookbook S9).
+  soundOn?: boolean;
 }
 
 const SEASON_TEXT: Partial<Record<CalendarEvent, MessageKey>> = {
@@ -42,7 +44,7 @@ const FLAKES = Array.from({ length: 28 }, (_, i) => ({ left: (i * 37) % 100, dur
 
 // The calendar easter eggs (the New Year one is SunTracker's fireworks). All motion is
 // slow straight CSS glides; reduced motion turns the moving ones off.
-const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherType, moon, horizonY, onInfo, infoRing = null, infoRingTier = null, santa = false }) => {
+const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherType, moon, horizonY, onInfo, infoRing = null, infoRingTier = null, santa = false, soundOn = false }) => {
   const prefersReducedMotion = usePrefersReducedMotion();
   const [catDone, setCatDone] = useState(false);
   const [dragonDone, setDragonDone] = useState(false);
@@ -174,8 +176,9 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherTy
       )}
 
       {santaFlying && !santaDone && !prefersReducedMotion && (
-        // One flight per page view, also when it already snows.
-        <Santa onDone={handleSantaDone} onInfo={onInfo} ringOn={infoRing === SANTA_RING} ringTier={infoRingTier} />
+        // One flight per page view, also when it already snows. With the moon on the screen he crosses it
+        // (lookbook S2), else he flies small and far (S4).
+        <Santa onDone={handleSantaDone} onInfo={onInfo} ringOn={infoRing === SANTA_RING} ringTier={infoRingTier} moon={moon} soundOn={soundOn} />
       )}
 
       <style>{`

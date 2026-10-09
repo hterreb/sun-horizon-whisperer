@@ -94,6 +94,8 @@ interface InfoPanelProps {
   // The place name chosen via search, when the current location came from one; takes
   // priority over the reverse-geocode guess below for the same coordinates.
   manualPlaceName: string | null;
+  // Tells SunTracker the place name shown here (null: none yet), for Santa's card (lookbook S7).
+  onPlaceName?: (name: string | null) => void;
   timeOfDay: TimeOfDay;
   currentTime: Date;
   weatherType: WeatherType;
@@ -160,6 +162,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   nextGoldenBlueHours,
   location,
   manualPlaceName,
+  onPlaceName,
   timeOfDay,
   currentTime,
   weatherType,
@@ -318,6 +321,12 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
       cancelled = true;
     };
   }, [location.latitude, location.longitude, location.loaded, manualPlaceName, language]);
+
+  // The shown place name for SunTracker (Santa's card, lookbook S7); '' (loading) counts as none.
+  const shownPlaceName = locationName || null;
+  useEffect(() => {
+    onPlaceName?.(shownPlaceName);
+  }, [shownPlaceName, onPlaceName]);
 
   // Focus the latitude field when the manual-location form opens.
   useEffect(() => {

@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react';
 import { vi } from 'vitest';
-import { useSunsetCountdown } from '../src/hooks/useSunsetCountdown';
+import { getRunningAudioContext, useSunsetCountdown } from '../src/hooks/useSunsetCountdown';
 
 const SUNSET = new Date('2026-09-30T18:50:00+02:00');
 const at = (msBefore: number) => new Date(SUNSET.getTime() - msBefore);
@@ -84,5 +84,16 @@ describe('useSunsetCountdown (ROADMAP item 108)', () => {
     });
     rerender({ now: at(3_700) });
     expect(result.current).toEqual({ seconds: 4, isSounding: false });
+  });
+
+  it('gives the app\'s AudioContext to Santa\'s bells only while it runs, and never creates one', () => {
+    // The earlier tests created the one context of the module.
+    const count = created.length;
+    const ctx = created[0];
+    ctx.state = 'suspended';
+    expect(getRunningAudioContext()).toBeNull();
+    ctx.state = 'running';
+    expect(getRunningAudioContext()).toBe(ctx);
+    expect(created).toHaveLength(count);
   });
 });

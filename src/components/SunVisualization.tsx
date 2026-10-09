@@ -116,6 +116,8 @@ interface SunVisualizationProps {
   calendarEvent?: CalendarEvent | null;
   // Christmas Eve from sunset to midnight, or ?egg=santa: Santa flies once (CalendarEggs).
   santa?: boolean;
+  // The countdown sound is on (item 108): Santa's sleigh bells may play (lookbook S9).
+  soundOn?: boolean;
   // Time-travel play from SunTracker (ROADMAP item 83): the scene follows it.
   playDirection?: PlayDirection;
   // Satellite tracking (ROADMAP item 97): the tracked satellites in the sky, or null for
@@ -586,6 +588,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   infoRingTier = null,
   calendarEvent = null,
   santa = false,
+  soundOn = false,
   playDirection = 0,
   satellites = null
 }) => {
@@ -1194,6 +1197,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         infoRing={infoRing}
         infoRingTier={infoRingTier}
         santa={santa}
+        soundOn={soundOn}
       />
 
       <svg className="absolute inset-0 w-full h-full pointer-events-none">
