@@ -66,8 +66,9 @@ import { getSunArcLabels, getMoonArcLabels } from '../utils/arcLabels';
 import { PremiumContext, usePremium } from '@/hooks/usePremium';
 import PremiumDialog from './PremiumDialog';
 import CollectionView from './CollectionView';
+import BadgeUnlocked from './BadgeUnlocked';
 import {
-  BADGES, addToCollection, badgeForAstroEvent, badgeForCalendarEvent, badgeForTarget, isCollectionPaused, loadCollection,
+  addToCollection, badgeForAstroEvent, badgeForCalendarEvent, badgeForTarget, countCollected, isCollectionPaused, loadCollection,
   saveCollection, type BadgeId, type Collection,
 } from '@/utils/collection';
 import { watchSunEvent, NO_SUN_EVENT_WATCH, getCountdownTarget } from '../utils/sunEvents';
@@ -638,15 +639,14 @@ const SunTracker: React.FC = () => {
     : null;
 
   // Collection badges (ROADMAP item 112): the first time each kind of thing is seen. A test
-  // link (?egg=, ?fish=, ?hunt=) pauses it. One toast per new badge, outside the setState.
+  // link (?egg=, ?fish=, ?hunt=) pauses it. Item 114: a new badge joins a queue; the
+  // "Badge unlocked" card shows the first one, so two new badges show one after the other.
   const [collectionPaused] = useState(() => isCollectionPaused(window.location.search));
   const [collection, setCollection] = useState<Collection>(loadCollection);
   const collectionRef = React.useRef(collection);
   const [isCollectionOpen, setIsCollectionOpen] = useState(false);
-  const tRef = React.useRef(t);
-  useEffect(() => {
-    tRef.current = t;
-  }, [t]);
+  const [collectionFocus, setCollectionFocus] = useState<BadgeId | null>(null);
+  const [unlockedQueue, setUnlockedQueue] = useState<{ id: BadgeId; found: number }[]>([]);
   const collect = useCallback((id: BadgeId) => {
     if (collectionPaused) return;
     const next = addToCollection(collectionRef.current, id, new Date());
@@ -654,10 +654,18 @@ const SunTracker: React.FC = () => {
     collectionRef.current = next;
     setCollection(next);
     saveCollection(next);
-    const badge = BADGES.find((b) => b.id === id);
-    if (badge) toast({ title: tRef.current('collection.new', { name: tRef.current(badge.name) }) });
+    const found = countCollected(next);
+    setUnlockedQueue((queue) => [...queue, { id, found }]);
   }, [collectionPaused]);
-  const handleCollectionOpen = useCallback(() => setIsCollectionOpen(true), []);
+  const handleUnlockedDone = useCallback(() => setUnlockedQueue((queue) => queue.slice(1)), []);
+  const handleUnlockedOpen = useCallback((id: BadgeId) => {
+    setCollectionFocus(id);
+    setIsCollectionOpen(true);
+  }, []);
+  const handleCollectionOpen = useCallback(() => {
+    setCollectionFocus(null);
+    setIsCollectionOpen(true);
+  }, []);
   const handleCollectionClose = useCallback(() => setIsCollectionOpen(false), []);
 
   // Fireworks (ROADMAP items 41 and 80): one show per sunrise or sunset (terrain time
@@ -1158,7 +1166,16 @@ const SunTracker: React.FC = () => {
       )}
     </div>
     <PremiumDialog />
-    <CollectionView open={isCollectionOpen} onClose={handleCollectionClose} collection={collection} />
+    <CollectionView open={isCollectionOpen} onClose={handleCollectionClose} collection={collection} focusId={collectionFocus} />
+    {unlockedQueue.length > 0 && (
+      <BadgeUnlocked
+        key={unlockedQueue[0].id}
+        badgeId={unlockedQueue[0].id}
+        found={unlockedQueue[0].found}
+        onOpen={handleUnlockedOpen}
+        onDone={handleUnlockedDone}
+      />
+    )}
     </PremiumContext.Provider>
     </LanguageContext.Provider>
   );

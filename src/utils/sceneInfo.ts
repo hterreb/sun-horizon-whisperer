@@ -207,7 +207,7 @@ const percent = (fraction: number, language: Language): string =>
 export const RARITY_TIERS: [minShare: number, tier: RarityTier][] = [
   [25, 'common'], [10, 'frequent'], [3, 'uncommon'], [1, 'rare'], [0, 'veryRare'],
 ];
-const RARITY_NAMES: Record<RarityTier, MessageKey> = {
+export const RARITY_NAMES: Record<RarityTier, MessageKey> = {
   common: 'rarity.common', frequent: 'rarity.frequent', uncommon: 'rarity.uncommon',
   rare: 'rarity.rare', veryRare: 'rarity.veryRare', ultraRare: 'rarity.ultraRare',
 };

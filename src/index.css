@@ -182,6 +182,12 @@
   --animate-card-in: card-in 0.2s ease-out both;
   --animate-aurora-drift: aurora-drift 40s ease-in-out infinite;
   --animate-green-flash: green-flash 2.5s ease-in-out both;
+  /* "Badge unlocked" card (item 114): calm, once each, no bounce. Reduced motion: badge-fade only. */
+  --animate-badge-in: badge-in 0.4s ease-out both;
+  --animate-badge-fade: fade-in 0.4s ease-out both;
+  --animate-badge-out: fade-out 0.3s ease-in both;
+  --animate-badge-sweep: badge-sweep 0.8s ease-in-out 0.4s both;
+  --animate-badge-glow: badge-glow 1.2s ease-in-out 0.4s both;
 
   @keyframes accordion-down {
     from {
@@ -283,6 +289,33 @@
     50% {
       transform: translateX(4%) skewX(6deg);
       opacity: 0.85;
+    }
+  }
+  @keyframes badge-in {
+    from {
+      opacity: 0;
+      transform: translateY(-12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes badge-sweep {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(100%);
+    }
+  }
+  @keyframes badge-glow {
+    0%,
+    100% {
+      opacity: 0;
+    }
+    50% {
+      opacity: 1;
     }
   }
   @keyframes green-flash {

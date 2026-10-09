@@ -37,6 +37,8 @@ import { toast } from '@/hooks/use-toast';
 vi.mock('../src/utils/satelliteData', () => ({ loadSatelliteData: vi.fn(async () => null) }));
 import { loadSatelliteData, type GpRecord } from '../src/utils/satelliteData';
 import issFixture from './fixtures/iss-omm-2026-10-05.json';
+import { BADGES } from '../src/utils/collection';
+import { FADE_OUT_MS, SHOW_MS } from '../src/components/BadgeUnlocked';
 
 describe('SunTracker', () => {
   beforeEach(() => {
@@ -992,10 +994,22 @@ describe('SunTracker', () => {
       expect(card()).toBeNull();
     });
   });
-  describe('collection badges (ROADMAP item 112)', () => {
-    const newToasts = () => vi.mocked(toast).mock.calls.filter(([arg]) => String(arg.title).startsWith('New: '));
+  describe('collection badges (ROADMAP items 112, 114)', () => {
+    const unlocked = () => screen.queryByTestId('badge-unlocked');
+    // The fade-out timer starts after the card re-renders, so two steps.
+    const closeCard = () => {
+      act(() => {
+        vi.advanceTimersByTime(SHOW_MS);
+      });
+      act(() => {
+        vi.advanceTimersByTime(FADE_OUT_MS);
+      });
+    };
     const tapSeahorse = () => act(() => {
       visProps.current!.onSceneInfo!({ type: 'fish', kind: 'seahorse' }, { x: 100, y: 600 }, 'ring');
+    });
+    const tapCumulus = () => act(() => {
+      visProps.current!.onSceneInfo!({ type: 'cloud', cloudType: 'Cu', band: 'low' }, { x: 100, y: 200 }, 'ring');
     });
     // A saved place loads at once, and a fresh `visProps` cannot hold the props of an earlier
     // test's app: the tap reached no scene now and then in CI.
@@ -1007,14 +1021,46 @@ describe('SunTracker', () => {
       window.history.pushState({}, '', '/');
     });
 
-    it('a tap on a fish collects its badge with one "New" toast; a second tap adds nothing', () => {
+    it('a tap on a fish collects its badge with one "Badge unlocked" card, no toast; a second tap adds nothing', () => {
+      vi.useFakeTimers();
       render(<SunTracker />);
       expect(visProps.current).not.toBeNull();
       tapSeahorse();
       expect(JSON.parse(localStorage.getItem('collection')!)).toEqual({ 'fish:seahorse': expect.any(String) });
-      expect(newToasts()).toEqual([[{ title: 'New: Seahorse' }]]);
+      expect(unlocked()).toHaveTextContent('Badge unlocked: Seahorse, Rare');
+      expect(unlocked()).toHaveTextContent(`1 / ${BADGES.length}`);
+      expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ title: expect.stringContaining('Seahorse') }));
+      closeCard();
+      expect(unlocked()).toBeNull();
       tapSeahorse();
-      expect(newToasts()).toHaveLength(1);
+      expect(unlocked()).toBeNull();
+      vi.useRealTimers();
+    });
+
+    it('two new badges show one after the other, not stacked', () => {
+      vi.useFakeTimers();
+      render(<SunTracker />);
+      expect(visProps.current).not.toBeNull();
+      tapSeahorse();
+      tapCumulus();
+      expect(screen.getAllByTestId('badge-unlocked')).toHaveLength(1);
+      expect(unlocked()).toHaveTextContent('Seahorse');
+      closeCard();
+      expect(screen.getAllByTestId('badge-unlocked')).toHaveLength(1);
+      expect(unlocked()).toHaveTextContent('Badge unlocked: Cumulus');
+      expect(unlocked()).toHaveTextContent(`2 / ${BADGES.length}`);
+      closeCard();
+      expect(unlocked()).toBeNull();
+      vi.useRealTimers();
+    });
+
+    it('a tap on the card opens the collection view', () => {
+      render(<SunTracker />);
+      expect(visProps.current).not.toBeNull();
+      tapSeahorse();
+      fireEvent.click(screen.getByRole('button', { name: 'Show in the collection' }));
+      expect(screen.getByRole('dialog', { name: 'Collection' })).toHaveTextContent('Seahorse');
+      expect(unlocked()).toBeNull();
     });
 
     it('collects nothing with a test link (?egg=ufo)', () => {
@@ -1028,7 +1074,7 @@ describe('SunTracker', () => {
       });
       expect(visProps.current!.sunglasses).toBe(true);
       expect(localStorage.getItem('collection')).toBeNull();
-      expect(newToasts()).toHaveLength(0);
+      expect(unlocked()).toBeNull();
     });
 
     it('the InfoPanel button opens the collection; the close button closes it', () => {

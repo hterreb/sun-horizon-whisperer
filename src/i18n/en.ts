@@ -360,7 +360,10 @@ export const en = {
   // Collection badges (item 112)
   'collection.title': 'Collection',
   'collection.count': '{found} / {total}',
-  'collection.new': 'New: {name}',
+  'badgeUnlocked.kicker': 'Badge unlocked',
+  'badgeUnlocked.label': 'Badge unlocked: {name}, {tier}',
+  'badgeUnlocked.labelNoTier': 'Badge unlocked: {name}',
+  'badgeUnlocked.open': 'Show in the collection',
   'collection.firstSeen': 'Found {date}',
   'collection.missing': 'Not found yet',
   'collection.close': 'Close',

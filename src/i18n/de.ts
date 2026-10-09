@@ -360,7 +360,10 @@ export const de: Record<keyof typeof en, string> = {
   // Collection badges (item 112)
   'collection.title': "Sammlung",
   'collection.count': "{found} / {total}",
-  'collection.new': "Neu: {name}",
+  'badgeUnlocked.kicker': "Abzeichen freigeschaltet",
+  'badgeUnlocked.label': "Abzeichen freigeschaltet: {name}, {tier}",
+  'badgeUnlocked.labelNoTier': "Abzeichen freigeschaltet: {name}",
+  'badgeUnlocked.open': "In der Sammlung zeigen",
   'collection.firstSeen': "Gefunden am {date}",
   'collection.missing': "Noch nicht gefunden",
   'collection.close': "Schließen",

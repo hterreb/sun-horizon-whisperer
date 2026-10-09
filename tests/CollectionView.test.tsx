@@ -77,4 +77,13 @@ describe('CollectionView', () => {
     fireEvent.click(screen.getByRole('dialog').parentElement!);
     expect(onClose).toHaveBeenCalledTimes(3);
   });
+
+  it('scrolls to the focus badge when it opens (item 114)', () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    render(<CollectionView open onClose={vi.fn()} collection={collection} focusId="fish:seahorse" />);
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(scrollIntoView.mock.contexts[0]).toBe(cellOf('fish:seahorse'));
+    delete (Element.prototype as Partial<Element>).scrollIntoView;
+  });
 });
