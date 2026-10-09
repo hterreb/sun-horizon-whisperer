@@ -13,14 +13,15 @@ const LINES: Record<BoatKind, [number, number][]> = {
   freighter: [[14.6, 5.5], [59.4, 19.5]],
 };
 const GAP = 7.5; // grid units between two pennants
+const BULB_GAP = 3.6; // Christmas bulbs sit closer: a string of lights, not flags
 const HALF_W = 3;
 const DROP = 6.5;
 
-// The pennant tops along each line, about GAP apart, without the line's end points.
-const pennantsOf = (points: [number, number][]): [number, number][] =>
+// The pennant tops (or bulbs) along each line, about `gap` apart, without the line's end points.
+const pennantsOf = (points: [number, number][], gap = GAP): [number, number][] =>
   points.slice(1).flatMap(([x2, y2], i) => {
     const [x1, y1] = points[i];
-    const n = Math.floor(Math.hypot(x2 - x1, y2 - y1) / GAP);
+    const n = Math.floor(Math.hypot(x2 - x1, y2 - y1) / gap);
     return Array.from({ length: Math.max(0, n - 1) }, (_, k): [number, number] => {
       const t = (k + 1) / n;
       return [x1 + (x2 - x1) * t, y1 + (y2 - y1) * t];
@@ -51,7 +52,7 @@ const ChristmasLights = ({ kind, colors, lit }: { kind: BoatKind; colors: readon
     <g data-testid="boat-bunting" data-shape="lights">
       <polyline points={line.map(p => p.join(',')).join(' ')} fill="none" stroke="hsl(var(--scene-boat-navy))" strokeWidth={0.3} />
       <g style={{ filter: glow }} opacity={lit ? 1 : 0.85}>
-        {pennantsOf(line).map(([x, y], i) => (
+        {pennantsOf(line, BULB_GAP).map(([x, y], i) => (
           <circle
             key={i}
             cx={x}
