@@ -5,7 +5,7 @@ import { type SunTimes } from './sunUtils';
 // checks in local time; the scene shows at most one event at a time.
 export type CalendarEvent =
   | 'new-year' // 00:00-00:00:59 on Jan 1: fireworks
-  | 'friday-13' // a black cat walks along the horizon once
+  | 'friday-13' // a black cat sits on a shore rock all day and watches the sky
   | 'lunar-new-year' // a dragon flies across the sky once (ROADMAP item 100)
   | 'solstice-longest' // the solstice day with the longest day for this hemisphere
   | 'solstice-shortest'

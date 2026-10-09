@@ -102,7 +102,7 @@ describe('collection (ROADMAP item 112)', () => {
     expect(badgeForCalendarEvent('christmas', shown)).toBe('egg:christmas');
     expect(badgeForCalendarEvent('christmas', { ...shown, weatherType: 'snow' })).toBeNull();
     expect(badgeForCalendarEvent('friday-13', shown)).toBe('egg:friday13');
-    expect(badgeForCalendarEvent('friday-13', { ...shown, reducedMotion: true })).toBeNull();
+    expect(badgeForCalendarEvent('friday-13', { ...shown, reducedMotion: true })).toBe('egg:friday13');
     expect(badgeForCalendarEvent('lunar-new-year', { ...shown, reducedMotion: true })).toBeNull();
   });
 

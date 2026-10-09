@@ -102,12 +102,22 @@ describe('CalendarEggs', () => {
     expect(screen.queryByTestId('santa')).toBeNull();
   });
 
-  it('walks the black cat once, then removes it', () => {
+  it('sits the black cat on its rock all day, only the tail sways slowly', () => {
     render(<CalendarEggs {...base} event="friday-13" />);
     const cat = screen.getByTestId('black-cat');
-    expect(cat.getAttribute('style')).toMatch(/45s linear forwards/);
+    // On the horizon, no walk.
+    expect(cat.style.top).toBe('429px');
+    expect(cat.getAttribute('style')).not.toMatch(/egg-glide/);
     fireEvent.animationEnd(cat);
-    expect(screen.queryByTestId('black-cat')).toBeNull();
+    expect(screen.getByTestId('black-cat')).toBeTruthy();
+    expect(screen.getByTestId('black-cat-tail').getAttribute('style')).toMatch(/egg-tail 6s ease-in-out infinite/);
+  });
+
+  it('shows the sitting cat still under reduced motion', () => {
+    mockReducedMotion(true);
+    render(<CalendarEggs {...base} event="friday-13" />);
+    expect(screen.getByTestId('black-cat').getAttribute('style')).not.toMatch(/animation/);
+    expect(screen.getByTestId('black-cat-tail').getAttribute('style')).not.toMatch(/animation/);
   });
 
   it('flies the Lunar New Year dragon once, in one of three colours, then removes it (item 100)', () => {
@@ -139,7 +149,7 @@ describe('CalendarEggs', () => {
       fireEvent.click(hit, { clientX: x, clientY: y, detail: 2 });
     };
 
-    it('opens the card of the black cat, a Halloween bat and the pumpkin moon; the thing moves on', () => {
+    it('opens the card of the black cat, a Halloween bat and the pumpkin moon; the card leaves the egg in place', () => {
       const onInfo = vi.fn();
       const { rerender } = render(<CalendarEggs {...base} event="friday-13" onInfo={onInfo} />);
       const cat = screen.getByTestId('black-cat');
@@ -147,7 +157,7 @@ describe('CalendarEggs', () => {
       expect(cat.getAttribute('aria-hidden')).toBe('true');
       tap(cat);
       expect(onInfo).toHaveBeenLastCalledWith({ type: 'egg', kind: 'blackCat' }, { x: 120, y: 300 }, 'egg-cat');
-      expect(cat.getAttribute('style')).toMatch(/egg-glide 45s/);
+      expect(screen.getByTestId('black-cat')).toBe(cat);
 
       rerender(<CalendarEggs {...base} event="halloween-bats" onInfo={onInfo} />);
       tap(screen.getAllByTestId('halloween-bat')[2]);
@@ -202,10 +212,10 @@ describe('CalendarEggs', () => {
     });
   });
 
-  it('turns the moving eggs off under reduced motion, keeps the static ones', () => {
+  it('turns the moving eggs off under reduced motion, keeps the static ones (also the sitting cat)', () => {
     mockReducedMotion(true);
     const { rerender } = render(<CalendarEggs {...base} event="friday-13" />);
-    expect(screen.queryByTestId('black-cat')).toBeNull();
+    expect(screen.getByTestId('black-cat')).toBeTruthy();
     rerender(<CalendarEggs {...base} event="lunar-new-year" />);
     expect(screen.queryByTestId('lunar-dragon')).toBeNull();
     rerender(<CalendarEggs {...base} event="halloween-bats" />);
