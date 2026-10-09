@@ -5,14 +5,17 @@ import { type MoonPosition } from '../utils/moonUtils';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import { type WeatherType } from './CloudLayer';
 import { getStarCloudFactor, getTwilightStars } from '../utils/weatherEffectsUtils';
+import { METEOR_SHOWER, meteorOpacity, meteorSpawnChance } from '../utils/astroEvents';
 
 interface NightStarsProps {
   timeOfDay: TimeOfDay;
   moonPosition?: MoonPosition;
   weatherType?: WeatherType;
   cloudCoverPercent?: number | null;
-  // Chance of a new shooting star per frame; higher during a meteor shower (astroEvents).
+  // Chance of a new shooting star per frame.
   shootingStarRate?: number;
+  // A meteor shower (astroEvents) adds long, slow meteor streaks.
+  meteorShower?: boolean;
 }
 
 interface Star {
@@ -37,7 +40,7 @@ const createStars = (width: number, height: number): Star[] =>
 // 30 fps, less 2 ms of slack, so a 60 Hz display draws on every second frame.
 const TWINKLE_FRAME_MS = 1000 / 30 - 2;
 
-const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition, weatherType = 'clear', cloudCoverPercent = null, shootingStarRate = 0.001 }) => {
+const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition, weatherType = 'clear', cloudCoverPercent = null, shootingStarRate = 0.001, meteorShower = false }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const starsRef = useRef<Star[]>([]);
   const moonBrightnessRef = useRef(moonPosition?.illumination || 0);
@@ -113,9 +116,29 @@ const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition, weathe
       maxLife: number;
     }> = [];
 
+    // One meteor streak at a time during a shower; it moves in px per ms.
+    let meteor: { x: number; y: number; vx: number; vy: number; born: number } | null = null;
+
     let animationFrameId: number;
     let lastDraw = -Infinity;
+    let lastFrame = performance.now();
     const animate = (now = performance.now()) => {
+      // Cap the frame time, so a return to the tab does not start a meteor at once.
+      const dt = Math.min(Math.max(now - lastFrame, 0), 100);
+      lastFrame = now;
+      if (meteor && now - meteor.born >= METEOR_SHOWER.durationMs) meteor = null;
+      if (meteorShower && timeOfDay === 'night' && !meteor && Math.random() < meteorSpawnChance(dt)) {
+        // Down and to the left or right, 20-50 degrees below the horizontal.
+        const angle = (20 + Math.random() * 30) * Math.PI / 180;
+        const dir = Math.random() < 0.5 ? -1 : 1;
+        meteor = {
+          x: canvas.width * (0.2 + Math.random() * 0.6),
+          y: canvas.height * Math.random() * 0.3,
+          vx: dir * Math.cos(angle) * METEOR_SHOWER.speed,
+          vy: Math.sin(angle) * METEOR_SHOWER.speed,
+          born: now,
+        };
+      }
       // Occasionally create shooting stars (full night only, not in twilight)
       if (timeOfDay === 'night' && Math.random() < shootingStarRate) {
         shootingStars.push({
@@ -129,7 +152,7 @@ const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition, weathe
       }
       // The stars twinkle slowly, so they draw at 30 fps (ROADMAP item 91); a frame
       // with a shooting star always draws, so it keeps flying at 60 fps.
-      if (shootingStars.length === 0 && now - lastDraw < TWINKLE_FRAME_MS) {
+      if (shootingStars.length === 0 && !meteor && now - lastDraw < TWINKLE_FRAME_MS) {
         animationFrameId = requestAnimationFrame(animate);
         return;
       }
@@ -178,6 +201,29 @@ const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition, weathe
         return false;
       });
 
+      if (meteor) {
+        const age = now - meteor.born;
+        const headX = meteor.x + meteor.vx * age;
+        const headY = meteor.y + meteor.vy * age;
+        // The tail grows to its full length and fades out towards its end.
+        const tail = Math.min(METEOR_SHOWER.length, METEOR_SHOWER.speed * age) / METEOR_SHOWER.speed;
+        const tailX = headX - meteor.vx * tail;
+        const tailY = headY - meteor.vy * tail;
+        const gradient = ctx.createLinearGradient(tailX, tailY, headX, headY);
+        gradient.addColorStop(0, 'rgba(255, 255, 200, 0)');
+        gradient.addColorStop(1, `rgba(255, 255, 200, ${meteorOpacity(age)})`);
+        ctx.beginPath();
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = METEOR_SHOWER.width;
+        ctx.lineCap = 'round';
+        ctx.shadowBlur = 6;
+        ctx.shadowColor = 'white';
+        ctx.moveTo(tailX, tailY);
+        ctx.lineTo(headX, headY);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+
       animationFrameId = requestAnimationFrame(animate);
     };
 
@@ -186,7 +232,7 @@ const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition, weathe
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-  }, [timeOfDay, cloudFactor, prefersReducedMotion, shootingStarRate]);
+  }, [timeOfDay, cloudFactor, prefersReducedMotion, shootingStarRate, meteorShower]);
 
   return (
     <canvas

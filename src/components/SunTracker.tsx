@@ -30,7 +30,7 @@ import { getContrail } from '@/utils/planes';
 import { useLivePlanes, type LivePlanesState } from '@/hooks/useLivePlanes';
 import { useLiveRoute } from '@/hooks/useLiveRoute';
 import { getMoonLook, getSkyOvercastMix, getStarCloudFactor } from '@/utils/weatherEffectsUtils';
-import { getAstroEvent, parseEggOverride, METEOR_SHOWER_RATE } from '@/utils/astroEvents';
+import { getAstroEvent, parseEggOverride } from '@/utils/astroEvents';
 import SunVisualization from './SunVisualization';
 import SceneInfoCard from './SceneInfoCard';
 import { getSceneInfo, type SceneInfoTarget } from '@/utils/sceneInfo';
@@ -1038,7 +1038,7 @@ const SunTracker: React.FC = () => {
         moonPosition={moonPosition}
         weatherType={weatherType}
         cloudCoverPercent={cloudCover}
-        shootingStarRate={astroEvent?.kind === 'meteorShower' ? METEOR_SHOWER_RATE : undefined}
+        meteorShower={astroEvent?.kind === 'meteorShower'}
       />
       {astroEvent?.kind === 'aurora' && <Aurora opacity={getStarCloudFactor(weatherType, cloudCover)} />}
       {discoOn && <DiscoSky />}
