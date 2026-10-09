@@ -245,7 +245,8 @@ export const badgeForCalendarEvent = (event: CalendarEvent | null, o: CalendarBa
     case 'equinox': return 'egg:equinox';
     case 'halloween-pumpkin': return o.moonUp ? 'egg:halloweenPumpkin' : null;
     case 'halloween-bats': return o.isNight && !o.reducedMotion ? 'egg:halloweenBats' : null;
-    case 'christmas': return o.weatherType !== 'snow' && !o.reducedMotion ? 'egg:christmas' : null;
+    // Christmas: the lit boats report themselves (useBunting), like a bunting day.
+    case 'christmas': return null;
     case 'friday-13': return 'egg:friday13';
     case 'lunar-new-year': return o.reducedMotion ? null : 'egg:lunarNewYear';
     // Playful pack (ROADMAP item 117): the scene reports when the egg really shows

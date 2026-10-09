@@ -396,7 +396,7 @@ export const de: Record<keyof typeof en, string> = {
   'egg.seasonEquinox': "Tagundnachtgleiche · Tag und Nacht sind gleich lang",
   'egg.halloweenPumpkin': "Kürbismond",
   'egg.halloweenBats': "Halloween-Fledermäuse",
-  'egg.christmas': "Weihnachtskugeln",
+  'egg.christmas': "Weihnachtslichter",
   'egg.santa': "Weihnachtsmann",
   'egg.solarEclipse': "Sonnenfinsternis",
   'egg.lunarEclipse': "Mondfinsternis",

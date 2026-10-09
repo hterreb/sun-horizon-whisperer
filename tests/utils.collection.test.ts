@@ -101,8 +101,8 @@ describe('collection (ROADMAP item 112)', () => {
     expect(badgeForCalendarEvent('halloween-bats', shown)).toBe('egg:halloweenBats');
     expect(badgeForCalendarEvent('halloween-bats', { ...shown, isNight: false })).toBeNull();
     expect(badgeForCalendarEvent('halloween-bats', { ...shown, reducedMotion: true })).toBeNull();
-    expect(badgeForCalendarEvent('christmas', shown)).toBe('egg:christmas');
-    expect(badgeForCalendarEvent('christmas', { ...shown, weatherType: 'snow' })).toBeNull();
+    // Christmas: the lit boats report themselves (useBunting), so no badge from here.
+    expect(badgeForCalendarEvent('christmas', shown)).toBeNull();
     expect(badgeForCalendarEvent('friday-13', shown)).toBe('egg:friday13');
     expect(badgeForCalendarEvent('friday-13', { ...shown, reducedMotion: true })).toBe('egg:friday13');
     expect(badgeForCalendarEvent('lunar-new-year', { ...shown, reducedMotion: true })).toBeNull();

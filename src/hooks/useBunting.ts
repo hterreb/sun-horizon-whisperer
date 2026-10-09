@@ -6,8 +6,9 @@ import { createContext, useContext } from 'react';
 // provider wraps the scene only: without it (the collection grid, tests) a boat has no bunting.
 export interface Bunting {
   colors: readonly string[];
-  // 'pennant' (national days, the default) or 'picado' (Día de los Muertos, item 118: small square flags).
-  shape?: 'pennant' | 'picado';
+  // 'pennant' (national days, the default), 'picado' (Día de los Muertos, item 118: small square
+  // flags) or 'lights' (Christmas: warm bulbs and a gold star).
+  shape?: 'pennant' | 'picado' | 'lights';
   onShow: () => void;
 }
 

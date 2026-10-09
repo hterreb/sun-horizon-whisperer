@@ -1277,7 +1277,6 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       <CalendarEggs
         event={calendarEvent}
         timeOfDay={timeOfDay}
-        weatherType={weatherType}
         moon={isMoonDiscShown && sceneMeasured ? { x: moonX, y: moonY, r: moonRadius } : null}
         measured={sceneMeasured}
         blueMoon={isBlueMoonEgg && isMoonDiscShown}

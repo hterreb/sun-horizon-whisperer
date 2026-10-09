@@ -396,7 +396,7 @@ export const fr: Record<keyof typeof en, string> = {
   'egg.seasonEquinox': "Équinoxe · le jour et la nuit sont égaux",
   'egg.halloweenPumpkin': "Lune citrouille",
   'egg.halloweenBats': "Chauves-souris d’Halloween",
-  'egg.christmas': "Boules de Noël",
+  'egg.christmas': "Lumières de Noël",
   'egg.santa': "Père Noël",
   'egg.solarEclipse': "Éclipse solaire",
   'egg.lunarEclipse': "Éclipse lunaire",
