@@ -22,7 +22,7 @@ import {
   isNoctilucentTime,
   type AstroInput,
 } from '../src/utils/astroEvents';
-import { getSunPathAround, getSunPosition, getSunTimes } from '../src/utils/sunUtils';
+import { getSunPathAround, getSunPosition, getSunTimes, getTimeOfDay } from '../src/utils/sunUtils';
 
 const base: AstroInput = {
   date: new Date('2026-09-30T12:00:00Z'),
@@ -316,6 +316,14 @@ describe('sky eggs', () => {
       expect(noon.sunTimes.polar).toBe('night');
       expect(getAstroEvent({ ...noon, timeOfDay: 'civil-twilight' })?.kind).toBe('polarNight');
       expect(getAstroEvent({ ...noon, timeOfDay: 'night' })?.kind).toBe('aurora');
+    });
+
+    it('gives the midnight sun, not the aurora, in Tromsø at 00:30 under the midnight sun', () => {
+      const night = at('2027-06-21T22:30:00Z', 69.65, 18.96); // 2027-06-22 00:30 local
+      const timeOfDay = getTimeOfDay(night.date, night.sunTimes, night.sunAltitude);
+      expect(timeOfDay).not.toBe('night');
+      expect(isAuroraTime(69.65, timeOfDay)).toBe(false);
+      expect(getAstroEvent({ ...night, timeOfDay })?.kind).toBe('midnightSun');
     });
 
     it('gives neither on an ordinary day', () => {

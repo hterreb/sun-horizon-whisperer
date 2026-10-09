@@ -550,12 +550,13 @@ const SunTracker: React.FC = () => {
       };
     }
     const times = getSunTimes(date, location.latitude, location.longitude);
+    const sunPosition = getSunPosition(date, location.latitude, location.longitude);
     return {
-      sunPosition: getSunPosition(date, location.latitude, location.longitude),
+      sunPosition,
       moonPosition: getMoonPosition(date, location.latitude, location.longitude),
       sunTimes: times,
       nextGoldenBlueHours: getNextGoldenBlueHours(date, location.latitude, location.longitude),
-      timeOfDay: getTimeOfDay(date, times),
+      timeOfDay: getTimeOfDay(date, times, sunPosition.altitude),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on sunStepKey (the 30 s step), not `date` itself
   }, [sunStepKey, location.loaded, location.latitude, location.longitude]);

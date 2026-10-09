@@ -4,7 +4,7 @@ import CloudLayer, { WeatherType, createFish, createBird, spawnTick, type SceneE
 import { findLane, firstMeeting, xAt, type ScenePath } from '../src/utils/scenePaths';
 import { FISH_WEIGHTS, NIGHT_FISH_WEIGHTS, MAX_FISH, MAX_NIGHT_FISH, getWaterSpeedFactor, getSceneLimit } from '../src/utils/weatherEffectsUtils';
 import { getSceneDensity, getDensityCurve } from '../src/utils/sceneDensity';
-import { getSunTimes, getTimeOfDay } from '../src/utils/sunUtils';
+import { getSunPosition, getSunTimes, getTimeOfDay } from '../src/utils/sunUtils';
 import type { TimeOfDay } from '../src/utils/sunUtils';
 import { DEFAULT_CLOUD_LAYERS, getCloudCentre, getDaySeed, getGliderStartProgress, getSkyClouds, mulberry32 } from '../src/utils/skyCloudUtils';
 
@@ -994,7 +994,7 @@ describe('a calmer sea that is full from the start (ROADMAP item 93)', () => {
     const rulesAt = (ms: number) => {
       const date = new Date(midnight.getTime() + ms);
       return rules(phone, {
-        timeOfDay: getTimeOfDay(date, sunTimes), density: getSceneDensity(date, sunTimes, seed), moonUp: true, moonY: 30,
+        timeOfDay: getTimeOfDay(date, sunTimes, getSunPosition(date, lat, lon).altitude), density: getSceneDensity(date, sunTimes, seed), moonUp: true, moonY: 30,
       });
     };
     const byPhase = new Map<number, { sum: number; n: number }>();

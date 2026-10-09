@@ -246,8 +246,27 @@ export const formatTime = (date: Date | null, locale?: string): string => {
   }
 };
 
-export const getTimeOfDay = (date: Date, sunTimes: SunTimes): TimeOfDay => {
+// At polar day/night the sunrise/sunset fields hold the invented 06:00/18:00, so the phase
+// comes from the sun's real altitude (`sunAltitude`, degrees) instead of those times.
+const POLAR_GOLDEN_ALTITUDE = 6; // below this the low sun gets dawn/evening light
+const POLAR_MIDDAY_MS = 3 * 3600000; // solar noon +-3 h, like an ordinary 24-hour day
+
+const getPolarTimeOfDay = (now: number, sunTimes: SunTimes, sunAltitude: number): TimeOfDay => {
+  if (sunAltitude < -18) return 'night';
+  if (sunAltitude < -12) return 'astronomical-twilight';
+  if (sunAltitude < -6) return 'nautical-twilight';
+  if (sunAltitude < 0 || sunTimes.polar === 'night') return 'civil-twilight';
+  // Time since solar noon, 0..24 h: the first half the sun goes down, the second half it climbs.
+  const sinceNoon = (((now - sunTimes.solarNoon.getTime()) % ONE_DAY_MS) + ONE_DAY_MS) % ONE_DAY_MS;
+  const sinking = sinceNoon < ONE_DAY_MS / 2;
+  if (sunAltitude < POLAR_GOLDEN_ALTITUDE) return sinking ? 'evening' : 'dawn';
+  if (sinceNoon < POLAR_MIDDAY_MS || sinceNoon > ONE_DAY_MS - POLAR_MIDDAY_MS) return 'midday';
+  return sinking ? 'afternoon' : 'morning';
+};
+
+export const getTimeOfDay = (date: Date, sunTimes: SunTimes, sunAltitude: number): TimeOfDay => {
   const now = date.getTime();
+  if (sunTimes.polar) return getPolarTimeOfDay(now, sunTimes, sunAltitude);
 
   if (now < sunTimes.astronomicalDawn.getTime()) return 'night';
   if (now < sunTimes.nauticalDawn.getTime()) return 'astronomical-twilight';
