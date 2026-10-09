@@ -1,6 +1,6 @@
 import { type BoatKind } from '@/utils/weatherEffectsUtils';
 
-// National days (utils/nationalDays): a string of small pennants in the flag colours, on
+// National days (utils/nationalDays): a string of big pennants (big enough to see on a phone) in the flag colours, on
 // SceneBoat's 64 x 37 grid. Each line runs from the bow or the stern up to the mast or funnel
 // top. Static: no flutter (calm-motion rule), so it also shows with reduced motion.
 const LINES: Record<BoatKind, [number, number][]> = {
@@ -10,9 +10,9 @@ const LINES: Record<BoatKind, [number, number][]> = {
   rowboat: [[19, 25.6], [46.5, 30.4]],
   freighter: [[14.6, 5.5], [59.4, 19.5]],
 };
-const GAP = 3.6; // grid units between two pennants
-const HALF_W = 1.3;
-const DROP = 3;
+const GAP = 7.5; // grid units between two pennants
+const HALF_W = 3;
+const DROP = 6.5;
 
 // The pennant tops along each line, about GAP apart, without the line's end points.
 const pennantsOf = (points: [number, number][]): [number, number][] =>
@@ -29,7 +29,7 @@ const BoatBunting = ({ kind, colors, shape = 'pennant' }: { kind: BoatKind; colo
   const line = LINES[kind];
   return (
     <g data-testid="boat-bunting">
-      <polyline points={line.map(p => p.join(',')).join(' ')} fill="none" stroke="hsl(var(--scene-boat-navy))" strokeWidth={0.4} />
+      <polyline points={line.map(p => p.join(',')).join(' ')} fill="none" stroke="hsl(var(--scene-boat-navy))" strokeWidth={0.8} />
       {pennantsOf(line).map(([x, y], i) => (
         shape === 'picado'
           ? <rect key={i} x={x - HALF_W} y={y} width={HALF_W * 2} height={DROP} fill={colors[i % colors.length]} data-testid="bunting-pennant" />

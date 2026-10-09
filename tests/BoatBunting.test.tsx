@@ -7,7 +7,7 @@ describe('BoatBunting', () => {
     const colors = ['red', 'white', 'blue'];
     const { container } = render(<svg><BoatBunting kind={kind} colors={colors} /></svg>);
     const pennants = [...container.querySelectorAll('[data-testid="bunting-pennant"]')];
-    expect(pennants.length).toBeGreaterThanOrEqual(5);
+    expect(pennants.length).toBeGreaterThanOrEqual(2);
     pennants.forEach((p, i) => expect(p.getAttribute('fill')).toBe(colors[i % 3]));
     // Every pennant stays on the boat's 64 x 37 grid.
     for (const p of pennants) {
