@@ -347,7 +347,8 @@ describe('sceneInfo: field guide data (ROADMAP item 107)', () => {
 describe('sceneInfo: easter egg cards (ROADMAP item 113)', () => {
   const info = (kind: EggCardKind, over?: Partial<SceneInfoContext>) => getSceneInfo({ type: 'egg', kind }, ctx(over));
   const eggCard = (kind: EggCardKind, t: Translate = en, over?: Partial<SceneInfoContext>) => read(info(kind, over), t);
-  const kinds: EggCardKind[] = ['ufo', 'ghost', 'dragon', 'santa', 'blackCat', 'halloweenBat', 'pumpkinMoon'];
+  const kinds: EggCardKind[] = ['ufo', 'ghost', 'dragon', 'santa', 'blackCat', 'halloweenBat', 'pumpkinMoon',
+    'matariki', 'conjunction', 'noctilucent', 'midnightSun', 'polarNight'];
 
   it('gives every egg the "ultra rare" tier, a title, a field note and the rarity row', () => {
     for (const kind of kinds) {
@@ -368,7 +369,7 @@ describe('sceneInfo: easter egg cards (ROADMAP item 113)', () => {
   it('names a hidden egg an "Easter egg" and a calendar egg a "Special event"', () => {
     expect(info('ufo')).toMatchObject({ kicker: 'infoKind.easterEgg', icon: 'egg' });
     expect(info('ghost')).toMatchObject({ kicker: 'infoKind.easterEgg', icon: 'egg' });
-    for (const kind of ['dragon', 'santa', 'blackCat', 'halloweenBat', 'pumpkinMoon'] as const) {
+    for (const kind of ['dragon', 'santa', 'blackCat', 'halloweenBat', 'pumpkinMoon', 'matariki', 'conjunction', 'noctilucent', 'midnightSun', 'polarNight'] as const) {
       expect(info(kind), kind).toMatchObject({ kicker: 'infoKind.specialEvent', icon: 'event' });
     }
     expect(info('blackCat').latin).toBe('Felis catus');

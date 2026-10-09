@@ -635,6 +635,9 @@ const SunTracker: React.FC = () => {
         weatherType,
         // The line-of-sight sunset when there is one, like the fireworks.
         sunset: terrainExtras.terrainSunTimes?.sunset ?? sunTimes?.sunset ?? null,
+        // The sky eggs use today's flat-horizon times: after sunset the line-of-sight times
+        // above are already the next pass.
+        sunTimes,
       }, astroEggOverride)
     : null;
 

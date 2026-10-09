@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { Sun, ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp, Mountain, BellOff } from 'lucide-react';
 import { type SunPosition, type SunTimes, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors, getReflectionFade, getSunPathAround } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
@@ -9,6 +9,7 @@ import CloudLayer, { type SceneInfoHandler, type WeatherType } from './CloudLaye
 import Fireworks from './Fireworks';
 import SunSunglasses from './SunSunglasses';
 import CalendarEggs from './CalendarEggs';
+import SkyEggs from './SkyEggs';
 import { type CalendarEvent, getSolsticeTraceDates } from '@/utils/calendarEvents';
 import PremiumBadge from './PremiumBadge';
 import WeatherEffects from './WeatherEffects';
@@ -974,6 +975,11 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     x: sceneWidth * resolveAzimuth(azimuth, latitude, compassHeading).fraction,
     y: altitudeToY(altitude, sceneHeight),
   }), [sceneWidth, sceneHeight, latitude, compassHeading]);
+  // The sky eggs (astroEvents): the sun's mapping with the compass view; null outside it.
+  const projectSkyEgg = useCallback(
+    (altitude: number, azimuth: number) => getArcScreenPosition(altitude, azimuth, sceneWidth, sceneHeight, latitude, compassHeading),
+    [sceneWidth, sceneHeight, latitude, compassHeading]
+  );
   const showLivePlanes = !!livePlanes && sceneWidth > 0 && isPlaneWeather(weatherType);
 
   // Satellites (ROADMAP item 97): azimuth -> x and elevation -> y as for the sun and moon
@@ -1081,8 +1087,9 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             <path
               d={sunArcPath}
               fill="none"
-              stroke="hsl(var(--brand-sunset))"
-              strokeOpacity={0.45}
+              // Midnight sun: the arc of the whole day, above the horizon, is brighter.
+              stroke={astroEvent?.kind === 'midnightSun' ? 'hsl(var(--scene-midnight-sun))' : 'hsl(var(--brand-sunset))'}
+              strokeOpacity={astroEvent?.kind === 'midnightSun' ? 0.75 : 0.45}
               strokeWidth={2}
             />
           )}
@@ -1239,6 +1246,16 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         infoRing={infoRing}
         infoRingTier={infoRingTier}
         santa={santa}
+      />
+      <SkyEggs
+        event={astroEvent}
+        project={projectSkyEgg}
+        latitude={latitude}
+        horizonY={containerDimensions.height * 0.65}
+        opacity={getStarCloudFactor(weatherType, cloudCoverPercent)}
+        onInfo={onSceneInfo}
+        infoRing={infoRing}
+        infoRingTier={infoRingTier}
       />
 
       <svg className="absolute inset-0 w-full h-full pointer-events-none">

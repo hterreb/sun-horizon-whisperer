@@ -423,6 +423,33 @@ describe('SunVisualization (rendered): static cardinal direction labels (ROADMAP
     expect(screen.queryByTestId('solstice-trace')).toBeNull();
   });
 
+  it('draws the midnight sun arc round the whole sky, brighter, with its pill (sky eggs)', () => {
+    setMockedContainerSize(800, 600);
+    const sunPath = Array.from({ length: 25 }, (_, i) => ({ azimuth: (i * 15) % 360, altitude: 8 + 30 * Math.sin((i / 24) * Math.PI) }));
+    const { container } = render(
+      <SunVisualization
+        sunPosition={{ azimuth: 180, altitude: 38 }}
+        moonPosition={{ azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false }}
+        sunPath={sunPath}
+        moonPath={[]}
+        timeOfDay="midday"
+        weatherType="clear"
+        latitude={69.65}
+        astroEvent={{ kind: 'midnightSun', strength: 1 }}
+      />
+    );
+    const arc = container.querySelector('path[stroke="hsl(var(--scene-midnight-sun))"]');
+    expect(arc?.getAttribute('stroke-opacity')).toBe('0.75');
+    // From the left edge (north) to the right edge and on past north (a second segment after
+    // the wrap), never down to the horizon line (y = 600 * 0.65).
+    const d = arc?.getAttribute('d') ?? '';
+    expect(d.match(/M/g)?.length).toBeLessThanOrEqual(2);
+    const ys = Array.from(d.matchAll(/[ML]-?[\d.]+,(-?[\d.]+)/g)).map((m) => parseFloat(m[1]));
+    expect(ys).toHaveLength(25);
+    expect(Math.max(...ys)).toBeLessThan(390);
+    expect(screen.getByTestId('sky-egg-polar').textContent).toBe('Midnight sun');
+  });
+
   it('the sun dot lies on the sun arc path when sunPath includes the current position (ROADMAP item 26)', () => {
     setMockedContainerSize(800, 600);
     const { container } = render(
