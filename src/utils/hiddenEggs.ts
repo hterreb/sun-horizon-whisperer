@@ -4,6 +4,7 @@
 export type HiddenEgg = 'sunglasses' | 'ufo' | 'disco';
 
 // Sun sunglasses: 7 taps on the sun, each within SUN_TAP_GAP_MS of the one before.
+// The disco egg counts taps on the moon with the same rule (registerSunTap).
 export const SUN_TAPS_NEEDED = 7;
 export const SUN_TAP_GAP_MS = 1500;
 export const SUNGLASSES_MS = 60_000;
@@ -20,7 +21,7 @@ export const registerSunTap = (taps: SunTaps, nowMs: number): { taps: SunTaps; t
   return { taps: { count, lastMs: nowMs }, triggered: false };
 };
 
-// Disco sky: the Konami code ↑↑↓↓←→←→BA.
+// Disco sky: 7 taps on the moon (see above), or the Konami code ↑↑↓↓←→←→BA.
 export const KONAMI_SEQUENCE = [
   'ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown',
   'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a',

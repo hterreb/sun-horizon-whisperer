@@ -1031,6 +1031,26 @@ describe('SunTracker', () => {
       expect(newToasts()).toHaveLength(0);
     });
 
+    it('7 quick moon taps start the disco and collect its badge; fewer or slow taps do not', () => {
+      let now = 1_000_000;
+      vi.spyOn(Date, 'now').mockImplementation(() => now);
+      render(<SunTracker />);
+      expect(visProps.current).not.toBeNull();
+      const tapMoon = (gapMs: number) => act(() => {
+        now += gapMs;
+        visProps.current!.onMoonTap!();
+      });
+      // Six quick taps, then a pause longer than 1.5 s: the count starts again.
+      for (let i = 0; i < 6; i++) tapMoon(1000);
+      tapMoon(1501);
+      expect(screen.queryByTestId('disco-sky')).toBeNull();
+      // Six more quick taps make 7 in a row.
+      for (let i = 0; i < 6; i++) tapMoon(1500);
+      expect(screen.getByTestId('disco-sky')).toBeInTheDocument();
+      expect(JSON.parse(localStorage.getItem('collection')!)).toEqual({ 'egg:disco': expect.any(String) });
+      vi.restoreAllMocks();
+    });
+
     it('the InfoPanel button opens the collection; the close button closes it', () => {
       render(<SunTracker />);
       expect(visProps.current).not.toBeNull();
