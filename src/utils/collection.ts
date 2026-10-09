@@ -11,7 +11,7 @@ import { type AstroEventKind } from './astroEvents';
 
 export type EggKind =
   | 'sunglasses' | 'ufo' | 'disco'
-  | 'newYear' | 'friday13' | 'lunarNewYear' | 'solstice' | 'equinox' | 'halloweenPumpkin' | 'halloweenBats' | 'christmas'
+  | 'newYear' | 'friday13' | 'lunarNewYear' | 'solstice' | 'equinox' | 'halloweenPumpkin' | 'halloweenBats' | 'christmas' | 'santa'
   | 'solarEclipse' | 'lunarEclipse' | 'greenFlash' | 'supermoon' | 'blueMoon' | 'meteorShower' | 'aurora';
 export type BadgeGroup = 'fish' | 'flyer' | 'boat' | 'sky' | 'cloud' | 'egg';
 export type BadgeId =
@@ -53,7 +53,7 @@ const EGGS: [EggKind, MessageKey][] = [
   ['sunglasses', 'egg.sunglasses'], ['ufo', 'egg.ufo'], ['disco', 'egg.disco'],
   ['newYear', 'egg.newYear'], ['friday13', 'egg.friday13'], ['lunarNewYear', 'egg.lunarNewYear'],
   ['solstice', 'egg.solstice'], ['equinox', 'egg.equinox'], ['halloweenPumpkin', 'egg.halloweenPumpkin'],
-  ['halloweenBats', 'egg.halloweenBats'], ['christmas', 'egg.christmas'],
+  ['halloweenBats', 'egg.halloweenBats'], ['christmas', 'egg.christmas'], ['santa', 'egg.santa'],
   ['solarEclipse', 'egg.solarEclipse'], ['lunarEclipse', 'egg.lunarEclipse'], ['greenFlash', 'egg.greenFlash'],
   ['supermoon', 'egg.supermoon'], ['blueMoon', 'egg.blueMoon'], ['meteorShower', 'egg.meteorShower'], ['aurora', 'egg.aurora'],
 ];
@@ -147,6 +147,11 @@ export const badgeForCalendarEvent = (event: CalendarEvent | null, o: CalendarBa
     case 'lunar-new-year': return o.reducedMotion ? null : 'egg:lunarNewYear';
   }
 };
+
+// Christmas Eve: Santa's badge when he flies (`santaTime` from calendarEvents.isSantaTime). He
+// flies also when it snows; reduced motion hides him. Never in the time preview.
+export const badgeForSanta = (santaTime: boolean, o: Pick<CalendarBadgeOptions, 'reducedMotion' | 'isTimePreview'>): BadgeId | null =>
+  santaTime && !o.reducedMotion && !o.isTimePreview ? 'egg:santa' : null;
 
 export const badgeForAstroEvent = (kind: AstroEventKind): BadgeId => `egg:${kind}`;
 

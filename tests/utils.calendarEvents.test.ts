@@ -1,4 +1,5 @@
-import { getCalendarEvent, getSeasonInstant } from '@/utils/calendarEvents';
+import { getCalendarEvent, getSeasonInstant, isSantaTime } from '@/utils/calendarEvents';
+import { getSunTimes } from '@/utils/sunUtils';
 
 // vitest pins TZ=UTC, so local dates below are UTC dates.
 describe('getSeasonInstant', () => {
@@ -63,5 +64,40 @@ describe('getCalendarEvent', () => {
     expect(getCalendarEvent(new Date(2026, 11, 23, 12))).toBeNull();
     for (const day of [24, 25, 26]) expect(getCalendarEvent(new Date(2026, 11, day, 12))).toBe('christmas');
     expect(getCalendarEvent(new Date(2026, 11, 27, 12))).toBeNull();
+  });
+});
+
+describe('isSantaTime (Christmas Eve)', () => {
+  const evening = { sunset: new Date(2026, 11, 24, 16, 30), polar: null };
+
+  it('is true on Dec 24 from sunset to midnight only', () => {
+    expect(isSantaTime(new Date(2026, 11, 24, 16, 29), evening)).toBe(false);
+    expect(isSantaTime(new Date(2026, 11, 24, 16, 30), evening)).toBe(true);
+    expect(isSantaTime(new Date(2026, 11, 24, 23, 59, 59), evening)).toBe(true);
+    expect(isSantaTime(new Date(2026, 11, 25, 0, 0), evening)).toBe(false);
+    expect(isSantaTime(new Date(2026, 11, 23, 22), { sunset: new Date(2026, 11, 23, 16, 30), polar: null })).toBe(false);
+    expect(isSantaTime(new Date(2026, 10, 24, 22), { sunset: new Date(2026, 10, 24, 16, 30), polar: null })).toBe(false);
+  });
+
+  it('uses the scene sun times', () => {
+    // vitest runs in UTC: in Lindau (47.55 N, 9.68 E) the sun sets at about 15:30 UTC.
+    const times = getSunTimes(new Date(2026, 11, 24, 12), 47.55, 9.68);
+    expect(isSantaTime(new Date(2026, 11, 24, 15), times)).toBe(false);
+    expect(isSantaTime(new Date(2026, 11, 24, 17), times)).toBe(true);
+  });
+
+  it('has no Santa without sun times or at polar day; at polar night he starts at the 18:00 fallback', () => {
+    expect(isSantaTime(new Date(2026, 11, 24, 22), null)).toBe(false);
+    const polarDay = getSunTimes(new Date(2026, 11, 24, 12), -80, 0);
+    expect(polarDay.polar).toBe('day');
+    expect(isSantaTime(new Date(2026, 11, 24, 22), polarDay)).toBe(false);
+    const polarNight = getSunTimes(new Date(2026, 11, 24, 12), 80, 0);
+    expect(polarNight.polar).toBe('night');
+    expect(isSantaTime(new Date(2026, 11, 24, 17), polarNight)).toBe(false);
+    expect(isSantaTime(new Date(2026, 11, 24, 18), polarNight)).toBe(true);
+  });
+
+  it('falls on a Christmas day every year, so Santa comes with the Christmas snow', () => {
+    for (let year = 2026; year <= 2040; year++) expect(getCalendarEvent(new Date(year, 11, 24, 20))).toBe('christmas');
   });
 });
