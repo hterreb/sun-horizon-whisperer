@@ -516,6 +516,8 @@
     --scene-critter-silhouette: 0 0% 0%;
     /* The dark shore rock the Friday-the-13th cat sits on. */
     --scene-cat-rock: 220 12% 14%;
+    /* The red eyes of the hanging Halloween bat (CalendarEggs). */
+    --scene-bat-eye: 0 85% 50%;
     /* Plane lights at night (ROADMAP item 96): the white strobe and the wing lights. */
     --scene-plane-strobe: 0 0% 100%;
     --scene-plane-red: 0 85% 62%;

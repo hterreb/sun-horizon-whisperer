@@ -227,4 +227,56 @@ describe('CalendarEggs', () => {
     rerender(<CalendarEggs {...base} event="halloween-pumpkin" />);
     expect(screen.getByTestId('pumpkin-moon')).toBeTruthy();
   });
+
+  describe('hanging bat', () => {
+    const tap = (wrapper: Element) => {
+      const hit = wrapper.querySelector('[data-testid="scene-hit"]')!;
+      fireEvent.click(hit, { clientX: 300, clientY: 140 });
+      fireEvent.click(hit, { clientX: 300, clientY: 140 });
+    };
+
+    it('hangs on Halloween-bats nights only, with slowly blinking red eyes', () => {
+      const { rerender } = render(<CalendarEggs {...base} event="halloween-bats" />);
+      const bat = screen.getByTestId('hanging-bat');
+      expect(bat.getAttribute('data-state')).toBe('hang');
+      expect(bat.getAttribute('style')).not.toMatch(/animation/);
+      const eyes = screen.getByTestId('hanging-bat-eyes');
+      expect(eyes.getAttribute('fill')).toBe('hsl(var(--scene-bat-eye))');
+      expect(eyes.getAttribute('style')).toMatch(/egg-bat-blink 5s/);
+      rerender(<CalendarEggs {...base} event="halloween-bats" timeOfDay="midday" />);
+      expect(screen.queryByTestId('hanging-bat')).toBeNull();
+      rerender(<CalendarEggs {...base} event="halloween-pumpkin" />);
+      expect(screen.queryByTestId('hanging-bat')).toBeNull();
+    });
+
+    it('opens its wings on a tap, glides away once and opens its card', () => {
+      const onInfo = vi.fn();
+      const { rerender } = render(<CalendarEggs {...base} event="halloween-bats" onInfo={onInfo} />);
+      const bat = screen.getByTestId('hanging-bat');
+      tap(bat);
+      expect(onInfo).toHaveBeenLastCalledWith({ type: 'egg', kind: 'halloweenBat' }, { x: 300, y: 140 }, 'egg-bat-hang');
+      expect(bat.getAttribute('data-state')).toBe('leave');
+      expect(bat.getAttribute('style')).toMatch(/egg-bat-leave 40s linear/);
+      expect(bat.querySelectorAll('svg')).toHaveLength(2);
+      // The fade-in of the open wings ends first: the bat stays.
+      fireEvent.animationEnd(bat.querySelectorAll('svg')[1]);
+      expect(screen.getByTestId('hanging-bat')).toBe(bat);
+      fireEvent.animationEnd(bat);
+      expect(screen.queryByTestId('hanging-bat')).toBeNull();
+      rerender(<CalendarEggs {...base} event="halloween-bats" onInfo={onInfo} timeOfDay="nautical-twilight" />);
+      expect(screen.queryByTestId('hanging-bat')).toBeNull();
+    });
+
+    it('hangs still under reduced motion: no blink, a tap opens the card only', () => {
+      mockReducedMotion(true);
+      const onInfo = vi.fn();
+      render(<CalendarEggs {...base} event="halloween-bats" onInfo={onInfo} />);
+      const bat = screen.getByTestId('hanging-bat');
+      expect(screen.getByTestId('hanging-bat-eyes').getAttribute('style')).toBeNull();
+      tap(bat);
+      expect(onInfo).toHaveBeenLastCalledWith({ type: 'egg', kind: 'halloweenBat' }, { x: 300, y: 140 }, 'egg-bat-hang');
+      expect(bat.getAttribute('data-state')).toBe('hang');
+      expect(bat.getAttribute('style')).not.toMatch(/animation/);
+    });
+  });
 });
