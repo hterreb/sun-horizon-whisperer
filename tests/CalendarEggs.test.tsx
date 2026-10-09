@@ -1,6 +1,8 @@
 import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import CalendarEggs from '../src/components/CalendarEggs';
+import { LanguageContext } from '@/hooks/useLanguage';
+import { translate } from '@/i18n';
 
 const mockReducedMotion = (matches: boolean) =>
   vi.spyOn(window, 'matchMedia').mockReturnValue({
@@ -27,6 +29,15 @@ describe('CalendarEggs', () => {
   it('shows the hemisphere text in the season badge', () => {
     render(<CalendarEggs {...base} event="solstice-shortest" />);
     expect(screen.getByTestId('season-badge').textContent).toMatch(/shortest day/);
+  });
+
+  it('shows the season badge in the chosen language', () => {
+    render(
+      <LanguageContext.Provider value={{ language: 'de', setLanguage: () => {}, t: (key, vars) => translate('de', key, vars) }}>
+        <CalendarEggs {...base} event="equinox" />
+      </LanguageContext.Provider>
+    );
+    expect(screen.getByTestId('season-badge').textContent).toBe('Tagundnachtgleiche · Tag und Nacht sind gleich lang');
   });
 
   it('draws the pumpkin moon only while the moon is shown', () => {

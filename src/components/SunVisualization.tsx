@@ -960,7 +960,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   }, [satellites, containerDimensions, latitude, compassHeading, horizonProfile]);
 
   return (
-    <div ref={containerRef} className="w-full h-dvh relative overflow-hidden" data-testid="sun-visualization">
+    <div ref={containerRef} className="w-full h-dvh relative overflow-hidden pointer-events-none" data-testid="sun-visualization">
       <Satellites
         width={containerDimensions.width}
         height={containerDimensions.height}
@@ -1087,7 +1087,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             onSceneInfo?.({ type: 'sun' }, tapPoint(event), 'sun');
           }}
           data-testid="sun-dot"
-          className={`absolute rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 ${compassActive ? '' : 'transition-transform duration-1000'} ${getSunColor()} ${getGlowIntensity()} animate-glow`}
+          className={`absolute rounded-full pointer-events-auto focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 ${compassActive ? '' : 'transition-transform duration-1000'} ${getSunColor()} ${getGlowIntensity()} animate-glow`}
           style={{
             left: `${sunX}px`,
             top: `${sunY}px`,
@@ -1150,7 +1150,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           type="button"
           aria-label={t('scene.moon')}
           onClick={event => onSceneInfo?.({ type: 'moon' }, tapPoint(event), 'moon')}
-          className={`absolute flex min-h-11 min-w-11 items-center justify-center rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 ${compassActive ? '' : 'transition-all duration-1000'}`}
+          className={`absolute flex min-h-11 min-w-11 items-center justify-center rounded-full pointer-events-auto focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 ${compassActive ? '' : 'transition-all duration-1000'}`}
           style={{
             left: `${moonX}px`,
             top: `${moonY}px`,
@@ -1420,7 +1420,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
               type="button"
               onClick={onCountdownSoundOn}
               aria-label={t('scene.countdownSoundOn')}
-              className="flex items-center gap-1 tabular-nums cursor-pointer"
+              className="flex items-center gap-1 tabular-nums cursor-pointer pointer-events-auto"
             >
               <BellOff size={12} />
               {sunsetCountdown.lineOfSight && <Mountain size={12} />}

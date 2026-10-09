@@ -36,6 +36,8 @@ describe('Ufo', () => {
     const { rerender } = render(<Ufo onDone={vi.fn()} onInfo={onInfo} />);
     const ufo = screen.getByTestId('ufo');
     expect(ufo.className).toContain('pointer-events-auto');
+    // No z-index: it draws behind the sun, the moon and the clouds (item 113 follow-up).
+    expect(ufo.className).not.toMatch(/\bz-/);
     const hit = ufo.querySelector<HTMLElement>('[data-testid="scene-hit"]')!;
     expect(parseFloat(hit.style.height)).toBeGreaterThanOrEqual(44);
     fireEvent.click(hit, { clientX: 60, clientY: 140 });

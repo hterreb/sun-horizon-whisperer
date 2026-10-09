@@ -171,6 +171,7 @@
   --animate-sun-rise: sun-rise 3s ease-out;
   --animate-sun-set: sun-set 3s ease-out;
   --animate-glow: glow 5s ease-in-out infinite;
+  --animate-ghost-breathe: glow 8s ease-in-out infinite; /* opacity 1 to 0.8 and back: calm (item 113 follow-up) */
   --animate-fade-in: fade-in 0.5s ease-out;
   --animate-mark-rise: mark-rise 2.6s cubic-bezier(0.22, 0.8, 0.3, 1) 0.4s both;
   --animate-mark-sink: mark-sink 1s ease-in-out both;
