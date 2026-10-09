@@ -28,14 +28,14 @@ describe('collection (ROADMAP item 112)', () => {
     expect(BADGES.find(b => b.id === 'plane')?.group).toBe('sky');
   });
 
-  it('gives the rolled kinds their rarity tier, the rest none', () => {
+  it('gives the rolled kinds their rarity tier, the eggs ultra rare, the rest none', () => {
     expect(tier('fish:seahorse')).toBe('rarity.rare');
     expect(tier('fish:shark')).toBe('rarity.veryRare');
     expect(tier('fish:squid')).toBe('rarity.uncommon'); // night only: the night share
     expect(tier('flyer:bat')).toBe('rarity.frequent'); // item 113: 10-25 % is frequent
     expect(tier('boat:sailboat')).toBe('rarity.common');
     expect(tier('cloud:Cb')).toBeNull();
-    expect(tier('egg:ufo')).toBeNull();
+    expect(BADGES.filter(b => b.group === 'egg').every(b => b.rarity === 'rarity.ultraRare')).toBe(true); // item 113
   });
 
   it('adds a badge with its ISO date once; a second add keeps the first date', () => {
