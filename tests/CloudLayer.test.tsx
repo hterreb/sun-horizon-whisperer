@@ -1043,6 +1043,11 @@ describe('CloudLayer info cards (ROADMAP item 95)', () => {
     }
   };
   const hits = (container: HTMLElement) => [...container.querySelectorAll<HTMLElement>('[data-testid="scene-hit"]')];
+  // Item 116: a double tap opens a card (two pointer clicks, detail 1 and 2).
+  const doubleTap = (el: Element, init: MouseEventInit = {}) => {
+    fireEvent.click(el, { ...init, detail: 1 });
+    fireEvent.click(el, { ...init, detail: 2 });
+  };
 
   it('gives each fish, bird and boat a hit area of at least 44 x 44 px; a tap reports the thing and the point', () => {
     const onInfo = vi.fn();
@@ -1052,7 +1057,7 @@ describe('CloudLayer info cards (ROADMAP item 95)', () => {
     for (const hit of hits(container)) {
       expect(parseFloat(hit.style.width)).toBeGreaterThanOrEqual(44);
       expect(parseFloat(hit.style.height)).toBeGreaterThanOrEqual(44);
-      fireEvent.click(hit, { clientX: 120, clientY: 600 });
+      doubleTap(hit, { clientX: 120, clientY: 600 });
       const [target, point] = onInfo.mock.calls.at(-1)!;
       types.add(target.type);
       expect(point).toEqual({ x: 120, y: 600 });
@@ -1081,7 +1086,7 @@ describe('CloudLayer info cards (ROADMAP item 95)', () => {
   it('draws the ring inside the tapped thing, so its own animation moves the ring on', () => {
     const onInfo = vi.fn();
     const view = renderScene({ onInfo });
-    fireEvent.click(hits(view.container)[0]);
+    doubleTap(hits(view.container)[0]);
     const ring = onInfo.mock.calls[0][2] as string;
     expect(view.container.querySelector('[data-testid="scene-info-ring"]')).toBeNull();
     view.rerender(<CloudLayer weatherType="clear" timeOfDay="midday" onInfo={onInfo} infoRing={ring} />);
@@ -1093,7 +1098,7 @@ describe('CloudLayer info cards (ROADMAP item 95)', () => {
   it('colours the ring by the open card\'s rarity tier, and keeps the neutral ring without one (item 107)', () => {
     const onInfo = vi.fn();
     const view = renderScene({ onInfo });
-    fireEvent.click(hits(view.container)[0]);
+    doubleTap(hits(view.container)[0]);
     const ring = onInfo.mock.calls[0][2] as string;
     const ringClass = () => view.container.querySelector('[data-testid="scene-info-ring"]')!.className;
     view.rerender(<CloudLayer weatherType="clear" timeOfDay="midday" onInfo={onInfo} infoRing={ring} infoRingTier="veryRare" />);
@@ -1108,12 +1113,89 @@ describe('CloudLayer info cards (ROADMAP item 95)', () => {
     const { container } = render(<CloudLayer weatherType="cloudy" timeOfDay="midday" onInfo={onInfo} />);
     const cloud = container.querySelector<HTMLElement>('[data-testid="sky-cloud"]')!;
     expect(cloud.className).toContain('pointer-events-auto');
-    fireEvent.click(cloud);
+    doubleTap(cloud);
     expect(onInfo).toHaveBeenCalledWith(
       { type: 'cloud', cloudType: cloud.getAttribute('data-type'), band: expect.stringMatching(/^(low|mid|high)$/) },
       expect.any(Object),
       expect.stringMatching(/^cloud-/),
     );
+  });
+
+  // ROADMAP item 116: only a double tap (two taps on the same thing within 350 ms) opens a card.
+  describe('double tap (ROADMAP item 116)', () => {
+    const tapAt = (el: Element, detail = 1) => fireEvent.click(el, { clientX: 120, clientY: 600, detail });
+    const rings = (container: HTMLElement) => container.querySelectorAll('[data-testid="scene-info-ring"]');
+
+    it('one tap opens nothing; it shows the ring inside the thing for 600 ms', () => {
+      const onInfo = vi.fn();
+      const view = renderScene({ onInfo });
+      vi.useFakeTimers();
+      try {
+        const hit = hits(view.container)[0];
+        tapAt(hit);
+        expect(onInfo).not.toHaveBeenCalled();
+        expect(rings(view.container)).toHaveLength(1);
+        expect(hit.querySelector('[data-testid="scene-info-ring"]')).not.toBeNull();
+        act(() => { vi.advanceTimersByTime(599); });
+        expect(rings(view.container)).toHaveLength(1);
+        act(() => { vi.advanceTimersByTime(1); });
+        expect(rings(view.container)).toHaveLength(0);
+        expect(onInfo).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('two taps within 350 ms open the card once; two taps 500 ms apart open nothing', () => {
+      const onInfo = vi.fn();
+      const view = renderScene({ onInfo });
+      vi.useFakeTimers();
+      try {
+        const hit = hits(view.container)[0];
+        tapAt(hit);
+        act(() => { vi.advanceTimersByTime(350); });
+        tapAt(hit, 2);
+        expect(onInfo).toHaveBeenCalledTimes(1);
+        // A third tap starts a new pair.
+        act(() => { vi.advanceTimersByTime(100); });
+        tapAt(hit);
+        expect(onInfo).toHaveBeenCalledTimes(1);
+        act(() => { vi.advanceTimersByTime(1000); });
+        onInfo.mockClear();
+        tapAt(hit);
+        act(() => { vi.advanceTimersByTime(500); });
+        tapAt(hit);
+        expect(onInfo).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('two taps on different things open nothing', () => {
+      const onInfo = vi.fn();
+      const view = renderScene({ onInfo });
+      const [first, second] = hits(view.container);
+      tapAt(first);
+      tapAt(second, 2);
+      expect(onInfo).not.toHaveBeenCalled();
+    });
+
+    it('a double click with a mouse opens the card too', () => {
+      const onInfo = vi.fn();
+      const view = renderScene({ onInfo });
+      const hit = hits(view.container)[0];
+      tapAt(hit, 1);
+      tapAt(hit, 2);
+      fireEvent.doubleClick(hit, { detail: 2 });
+      expect(onInfo).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops the browser\'s double-tap zoom on each hit area (touch-action: manipulation)', () => {
+      const view = renderScene({ onInfo: vi.fn() });
+      for (const hit of hits(view.container)) {
+        expect(hit.closest('.pointer-events-auto')!.className).toContain('touch-manipulation');
+      }
+    });
   });
 });
 
@@ -1459,7 +1541,9 @@ describe('planes and contrails (ROADMAP item 96)', () => {
     const { container } = planeScene('?plane=short', { onInfo });
     const hit = wrapperOf(container).querySelector<HTMLElement>('[data-testid="scene-hit"]')!;
     expect(parseFloat(hit.style.width)).toBeGreaterThanOrEqual(44);
-    fireEvent.click(hit, { clientX: 50, clientY: 80 });
+    fireEvent.click(hit, { clientX: 50, clientY: 80, detail: 1 });
+    expect(onInfo).not.toHaveBeenCalled(); // item 116: a double tap opens the card
+    fireEvent.click(hit, { clientX: 50, clientY: 80, detail: 2 });
     expect(onInfo).toHaveBeenCalledWith({ type: 'plane', contrail: 'short' }, { x: 50, y: 80 }, expect.stringMatching(/^plane-/));
   });
 });

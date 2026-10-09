@@ -33,6 +33,7 @@ import LivePlanes from './LivePlanes';
 import { type RarityTier } from '@/utils/rarityTier';
 import { type LivePlanesState } from '@/hooks/useLivePlanes';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
+import { useDoubleTap } from '@/hooks/useDoubleTap';
 
 // A fixed fallback seed date for callers that don't pass one (e.g. existing tests) -
 // a stable constant, not `new Date()`, so it never changes identity across renders.
@@ -658,15 +659,18 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     return buildTerrainFillPath(segments, horizonY);
   }, [horizonProfile, containerDimensions, latitude, compassHeading]);
 
+  // Item 116: the sun, the moon and the terrain open their card on a double tap; a single tap
+  // shows the sun's or the moon's ring for a moment. The keyboard (Enter, Space) opens at once.
+  const { tap, hint: tapHint } = useDoubleTap(onSceneInfo);
   // Info cards (item 95): the terrain's card for the azimuth at screen x (px in the container).
-  const openTerrainInfo = (x: number, point: { x: number; y: number }) => {
+  const openTerrainInfo = (x: number, point: { x: number; y: number }, immediate: boolean) => {
     const { width } = containerDimensions;
     if (width === 0) return;
-    onSceneInfo?.({ type: 'terrain', azimuth: getAzimuthAtFraction(x / width, latitude, compassHeading) }, point, 'terrain');
+    tap({ type: 'terrain', azimuth: getAzimuthAtFraction(x / width, latitude, compassHeading) }, point, 'terrain', immediate);
   };
   const handleTerrainTap = (event: React.MouseEvent<SVGPathElement>) => {
     const box = containerRef.current?.getBoundingClientRect();
-    openTerrainInfo(event.clientX - (box?.left ?? 0), { x: event.clientX, y: event.clientY });
+    openTerrainInfo(event.clientX - (box?.left ?? 0), { x: event.clientX, y: event.clientY }, false);
   };
   const handleTerrainKey = (event: React.KeyboardEvent<SVGPathElement>) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -678,7 +682,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       .reduce<{ x: number; y: number } | null>((top, p) => (!top || p.y < top.y ? p : top), null);
     if (!ridge) return;
     const box = containerRef.current?.getBoundingClientRect();
-    openTerrainInfo(ridge.x, { x: (box?.left ?? 0) + ridge.x, y: (box?.top ?? 0) + ridge.y });
+    openTerrainInfo(ridge.x, { x: (box?.left ?? 0) + ridge.x, y: (box?.top ?? 0) + ridge.y }, true);
   };
 
   const getSunPosition = () =>
@@ -1084,13 +1088,14 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         <button
           type="button"
           aria-label={t('scene.sun')}
-          // Each tap counts for the sunglasses egg; the first one also opens the sun's card (item 95).
+          // Each tap counts for the sunglasses egg; a double tap (or a keyboard click, detail 0)
+          // also opens the sun's card (items 95, 116).
           onClick={event => {
             onSunTap?.();
-            onSceneInfo?.({ type: 'sun' }, tapPoint(event), 'sun');
+            tap({ type: 'sun' }, tapPoint(event), 'sun', event.detail === 0);
           }}
           data-testid="sun-dot"
-          className={`absolute rounded-full pointer-events-auto focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 ${compassActive ? '' : 'transition-transform duration-1000'} ${getSunColor()} ${getGlowIntensity()} animate-glow`}
+          className={`absolute rounded-full pointer-events-auto touch-manipulation focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 ${compassActive ? '' : 'transition-transform duration-1000'} ${getSunColor()} ${getGlowIntensity()} animate-glow`}
           style={{
             left: `${sunX}px`,
             top: `${sunY}px`,
@@ -1110,6 +1115,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             }}
           />
           {sunglasses && <SunSunglasses />}
+          {tapHint === 'sun' && <span className="absolute inset-0 rounded-full border border-white/70" data-testid="scene-info-ring" />}
         </button>
       )}
 
@@ -1152,8 +1158,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         <button
           type="button"
           aria-label={t('scene.moon')}
-          onClick={event => onSceneInfo?.({ type: 'moon' }, tapPoint(event), 'moon')}
-          className={`absolute flex min-h-11 min-w-11 items-center justify-center rounded-full pointer-events-auto focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 ${compassActive ? '' : 'transition-all duration-1000'}`}
+          onClick={event => tap({ type: 'moon' }, tapPoint(event), 'moon', event.detail === 0)}
+          className={`absolute flex min-h-11 min-w-11 items-center justify-center rounded-full pointer-events-auto touch-manipulation focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 ${compassActive ? '' : 'transition-all duration-1000'}`}
           style={{
             left: `${moonX}px`,
             top: `${moonY}px`,
@@ -1174,6 +1180,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
               <MoonTint kind={astroEvent.kind} strength={astroEvent.strength} radius={moonRadius - 0.5} />
             )}
           </svg>
+          {tapHint === 'moon' && <span className="absolute inset-0 rounded-full border border-white/70" data-testid="scene-info-ring" />}
         </button>
       )}
 
@@ -1211,7 +1218,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             role="button"
             tabIndex={0}
             aria-label={t('scene.terrain')}
-            className="pointer-events-auto cursor-pointer focus-visible:outline-2 focus-visible:outline-white/70"
+            className="pointer-events-auto cursor-pointer touch-manipulation focus-visible:outline-2 focus-visible:outline-white/70"
             onClick={handleTerrainTap}
             onKeyDown={handleTerrainKey}
             data-testid="terrain-silhouette"

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   Cat, Eclipse, Flame, Glasses, Moon, MoonStar, Mountain, PartyPopper, Rainbow, Satellite,
   Snowflake, Sparkles, Star, Sun, SunMoon, Sunset, X, type LucideIcon,
@@ -14,7 +14,12 @@ import { SantaShape } from '@/components/Santa';
 import { Bat } from '@/components/sceneIcons';
 import { useLanguage } from '@/hooks/useLanguage';
 import { type MessageKey } from '@/i18n';
-import { BADGES, countCollected, type Badge, type BadgeGroup, type Collection, type EggKind } from '@/utils/collection';
+import {
+  BADGES, MOON_STATES, TERRAIN_BANDS, countCollected, type Badge, type BadgeGroup, type BadgeId, type Collection, type EggKind,
+  type MoonState, type StateBase, type SunState, type TerrainBand,
+} from '@/utils/collection';
+import { getMoonPhasePath } from '@/utils/moonUtils';
+import { getSkyGradientStops } from '@/utils/sunUtils';
 import { CLOUD_SHAPES, type CloudType } from '@/utils/cloudShapes';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
 import { type BirdKind, type BoatKind, type FishKind } from '@/utils/weatherEffectsUtils';
@@ -28,6 +33,8 @@ interface CollectionViewProps {
   open: boolean;
   onClose(): void;
   collection: Collection;
+  // Item 114: the badge to scroll to when the view opens (a tap on the "Badge unlocked" card).
+  focusId?: BadgeId | null;
 }
 
 const GROUP_TITLES: Record<BadgeGroup, MessageKey> = {
@@ -39,6 +46,19 @@ const GROUP_TITLES: Record<BadgeGroup, MessageKey> = {
   egg: 'collection.eggs',
 };
 const GROUPS = Object.keys(GROUP_TITLES) as BadgeGroup[];
+const STATE_BASES: StateBase[] = ['sun', 'moon', 'terrain'];
+const isStateRow = (badge: Badge): boolean => badge.base !== undefined || (STATE_BASES as string[]).includes(badge.id);
+
+// The grids of a group. In the sky group, the sun, the moon and the terrain each have their
+// own row: the base badge, then its states (item 115). The order is the BADGES order.
+const groupRows = (group: BadgeGroup): Badge[][] => {
+  const badges = BADGES.filter((badge) => badge.group === group);
+  if (group !== 'sky') return [badges];
+  return [
+    badges.filter((badge) => !isStateRow(badge)),
+    ...STATE_BASES.map((base) => badges.filter((badge) => badge.id === base || badge.base === base)),
+  ];
+};
 
 const OUTLINE_FILTER_ID = 'badge-outline';
 
@@ -69,8 +89,58 @@ const SKY_ICONS: Record<'sun' | 'moon' | 'terrain' | 'satellite', [LucideIcon, s
   satellite: [Satellite, 'text-white'],
 };
 
-const BadgeArt = ({ badge }: { badge: Badge }) => {
+// Item 115: the state badges. The sun in the colours of its time's sky gradient.
+const SunStateArt = ({ state }: { state: SunState }) => {
+  const id = `badge-sun-${state}`;
+  const [top, mid, bottom] = getSkyGradientStops(state);
+  return (
+    <Sun size={36} strokeWidth={2.5} color={`url(#${id})`} aria-hidden="true">
+      <defs>
+        <linearGradient id={id} gradientUnits="userSpaceOnUse" x1={0} y1={2} x2={0} y2={22}>
+          <stop offset="0%" stopColor={top} />
+          <stop offset="50%" stopColor={mid} />
+          <stop offset="100%" stopColor={bottom} />
+        </linearGradient>
+      </defs>
+    </Sun>
+  );
+};
+
+// The moon phase with the scene's own path (getMoonPhasePath), at the middle of each phase.
+const MOON_R = 16;
+const MoonStateArt = ({ state }: { state: MoonState }) => {
+  const phase = MOON_STATES.findIndex(([s]) => s === state) / MOON_STATES.length;
+  const fraction = (1 - Math.cos(2 * Math.PI * phase)) / 2;
+  return (
+    <svg width={MOON_R * 2} height={MOON_R * 2} viewBox={`${-MOON_R} ${-MOON_R} ${MOON_R * 2} ${MOON_R * 2}`} aria-hidden="true">
+      <circle r={MOON_R - 0.5} fill="hsl(var(--scene-moon-dark))" stroke="hsl(var(--scene-moon))" strokeOpacity={0.5} />
+      <path d={getMoonPhasePath(fraction, phase, 0, MOON_R - 0.5)} fill="hsl(var(--scene-moon))" />
+    </svg>
+  );
+};
+
+// A ridge with 1 peak (hills) to 5 peaks (alpine peaks), higher with each band.
+const ridgePath = (peaks: number): string => {
+  const step = 60 / peaks;
+  let d = 'M0 30';
+  for (let k = 0; k < peaks; k++) {
+    const top = 30 - (10 + 3 * peaks) + (k % 2) * 4;
+    d += ` L${(k + 0.5) * step} ${top} L${(k + 1) * step} ${k === peaks - 1 ? 30 : 22}`;
+  }
+  return `${d} Z`;
+};
+const TerrainBandArt = ({ band }: { band: TerrainBand }) => (
+  <svg width={60} height={30} viewBox="0 0 60 30" aria-hidden="true">
+    <path d={ridgePath(TERRAIN_BANDS.findIndex(([b]) => b === band) + 1)} className="fill-white/85" />
+  </svg>
+);
+
+// Also the badge of the "Badge unlocked" card (item 114).
+export const BadgeArt = ({ badge }: { badge: Badge }) => {
   const [prefix, kind] = badge.id.split(':') as [string, string | undefined];
+  if (badge.base === 'sun') return <SunStateArt state={kind as SunState} />;
+  if (badge.base === 'moon') return <MoonStateArt state={kind as MoonState} />;
+  if (badge.base === 'terrain') return <TerrainBandArt band={kind as TerrainBand} />;
   switch (prefix) {
     case 'fish':
       return kind === 'shark' || kind === 'dolphins'
@@ -109,8 +179,15 @@ const formatFoundDate = (iso: string, language: string): string | null => {
   return Number.isNaN(date.getTime()) ? null : new Intl.DateTimeFormat(language, { dateStyle: 'medium' }).format(date);
 };
 
-const CollectionView: React.FC<CollectionViewProps> = ({ open, onClose, collection }) => {
+const CollectionView: React.FC<CollectionViewProps> = ({ open, onClose, collection, focusId }) => {
   const { t, language } = useLanguage();
+  const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open || !focusId) return;
+    const cell = listRef.current?.querySelector(`[data-badge-id="${focusId}"]`);
+    cell?.scrollIntoView?.({ block: 'center' });
+  }, [open, focusId]);
 
   useEffect(() => {
     if (!open) return;
@@ -131,7 +208,7 @@ const CollectionView: React.FC<CollectionViewProps> = ({ open, onClose, collecti
     const artBox = 'flex h-12 w-full items-center justify-center overflow-hidden';
     if (firstSeen === undefined) {
       return (
-        <li key={badge.id} data-missing="" aria-label={t('collection.missing')} className={`${cell} border-white/5 bg-white/5`}>
+        <li key={badge.id} data-badge-id={badge.id} data-missing="" aria-label={t('collection.missing')} className={`${cell} border-white/5 bg-white/5`}>
           {badge.group === 'egg' ? (
             <div className={`${artBox} text-title font-bold text-white/50`} aria-hidden="true">?</div>
           ) : (
@@ -144,7 +221,7 @@ const CollectionView: React.FC<CollectionViewProps> = ({ open, onClose, collecti
     }
     const date = formatFoundDate(firstSeen, language);
     return (
-      <li key={badge.id} className={`${cell} border-white/15 bg-white/10`}>
+      <li key={badge.id} data-badge-id={badge.id} className={`${cell} border-white/15 bg-white/10`}>
         <div className={artBox} aria-hidden="true"><BadgeArt badge={badge} /></div>
         <span className="text-caption font-semibold leading-tight line-clamp-2 w-full">{t(badge.name)}</span>
         {badge.rarity && <span className="text-caption opacity-75">{t(badge.rarity)}</span>}
@@ -186,13 +263,17 @@ const CollectionView: React.FC<CollectionViewProps> = ({ open, onClose, collecti
           </button>
         </div>
         <ScrollArea className="h-[min(70dvh,560px)] max-sm:h-auto max-sm:flex-1 max-sm:min-h-0">
-          <div className="px-4 pb-4 space-y-4">
+          <div ref={listRef} className="px-4 pb-4 space-y-4">
             {GROUPS.map((group) => (
               <section key={group} aria-labelledby={`collection-${group}`}>
                 <h3 id={`collection-${group}`} className="text-body font-semibold opacity-90 mb-2">{t(GROUP_TITLES[group])}</h3>
-                <ul className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                  {BADGES.filter((badge) => badge.group === group).map(renderBadge)}
-                </ul>
+                <div className="space-y-2">
+                  {groupRows(group).map((row) => (
+                    <ul key={row[0].id} className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {row.map(renderBadge)}
+                    </ul>
+                  ))}
+                </div>
               </section>
             ))}
           </div>

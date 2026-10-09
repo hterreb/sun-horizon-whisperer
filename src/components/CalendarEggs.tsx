@@ -4,6 +4,7 @@ import LunarDragon, { DRAGON_RING } from './LunarDragon';
 import Santa, { SANTA_RING } from './Santa';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useDoubleTap } from '@/hooks/useDoubleTap';
 import { type MessageKey } from '@/i18n';
 import { type CalendarEvent } from '@/utils/calendarEvents';
 import { type TimeOfDay } from '@/utils/sunUtils';
@@ -57,13 +58,15 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherTy
   const seasonText = seasonKey && t(seasonKey);
   // Item 113: the wrapper of a tappable egg (pointer only, hidden from screen readers) and its
   // hit area with the ring, a child of the moving wrapper.
+  // Item 116: a double tap opens the card; a single tap shows the ring for a moment.
+  const { tap, hint } = useDoubleTap(onInfo);
   const tapProps = (kind: EggCardKind, ring: string) => onInfo ? {
     'aria-hidden': true,
-    onClick: (e: React.MouseEvent) => onInfo({ type: 'egg', kind }, { x: e.clientX, y: e.clientY }, ring),
+    onClick: (e: React.MouseEvent) => tap({ type: 'egg', kind }, { x: e.clientX, y: e.clientY }, ring),
   } : {};
-  const tapClass = onInfo ? 'pointer-events-auto cursor-pointer' : 'pointer-events-none';
+  const tapClass = onInfo ? 'pointer-events-auto cursor-pointer touch-manipulation' : 'pointer-events-none';
   const hit = (ring: string, w: number, h: number) =>
-    onInfo && <HitArea cx={w / 2} cy={h / 2} width={w} height={h} ring={infoRing === ring} tier={infoRingTier} />;
+    onInfo && <HitArea cx={w / 2} cy={h / 2} width={w} height={h} ring={infoRing === ring || hint === ring} tier={infoRing === ring ? infoRingTier : null} />;
 
   return (
     <>
@@ -164,9 +167,9 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherTy
         <LunarDragon
           timeOfDay={timeOfDay}
           onDone={() => setDragonDone(true)}
-          onInfo={onInfo}
-          ringOn={infoRing === DRAGON_RING}
-          ringTier={infoRingTier}
+          onInfo={onInfo && tap}
+          ringOn={infoRing === DRAGON_RING || hint === DRAGON_RING}
+          ringTier={infoRing === DRAGON_RING ? infoRingTier : null}
         />
       )}
 

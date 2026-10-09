@@ -108,7 +108,12 @@ describe('MidnightGhost', () => {
     const ghost = screen.getByTestId('midnight-ghost');
     expect(ghost.className).toContain('pointer-events-auto');
     expect(ghost.getAttribute('aria-hidden')).toBe('true');
-    fireEvent.click(ghost.querySelector('[data-testid="scene-hit"]')!, { clientX: 200, clientY: 250 });
+    // Item 116: one tap shows the ring only; the second tap opens the card.
+    const hit = ghost.querySelector('[data-testid="scene-hit"]')!;
+    fireEvent.click(hit, { clientX: 200, clientY: 250, detail: 1 });
+    expect(onInfo).not.toHaveBeenCalled();
+    expect(ghost.querySelector('[data-testid="scene-info-ring"]')).not.toBeNull();
+    fireEvent.click(hit, { clientX: 200, clientY: 250, detail: 2 });
     expect(onInfo).toHaveBeenCalledWith({ type: 'egg', kind: 'ghost' }, { x: 200, y: 250 }, GHOST_RING);
     rerender(<MidnightGhost currentTime={midnight} onInfo={onInfo} ringOn ringTier="ultraRare" />);
     expect(ghost.querySelector('[data-testid="scene-info-ring"]')!.className).toContain('border-tier-ultra-rare/80');

@@ -316,7 +316,7 @@ const LunarDragon: React.FC<LunarDragonProps> = ({ timeOfDay, onDone, onInfo, ri
           ref={hitRef}
           aria-hidden="true"
           data-testid="lunar-dragon-hit"
-          className="absolute left-0 top-0 pointer-events-auto cursor-pointer"
+          className="absolute left-0 top-0 pointer-events-auto cursor-pointer touch-manipulation"
           // Off screen until the first frame places it.
           style={{ width: w, height: h, transform: `translate(${-w * 2}px, 0)` }}
           onClick={event => onInfo({ type: 'egg', kind: 'dragon' }, { x: event.clientX, y: event.clientY }, DRAGON_RING)}

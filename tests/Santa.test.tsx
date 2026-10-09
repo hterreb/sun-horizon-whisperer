@@ -56,15 +56,20 @@ describe('Santa', () => {
     expect(x()).toBeCloseTo(390 - 97.5);
   });
 
-  it('a tap opens his info card; the ring shows while the card is open (item 113)', () => {
+  it('a double tap opens his info card; the ring shows while the card is open (items 113, 116)', () => {
     vi.stubGlobal('requestAnimationFrame', vi.fn());
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
     const onInfo = vi.fn();
     const { rerender } = render(<Santa onDone={vi.fn()} onInfo={onInfo} />);
     const santa = screen.getByTestId('santa');
     expect(santa.className).toContain('pointer-events-auto');
+    expect(santa.className).toContain('touch-manipulation');
     const hit = santa.querySelector<HTMLElement>('[data-testid="scene-hit"]')!;
     expect(parseFloat(hit.style.height)).toBeGreaterThanOrEqual(44);
+    fireEvent.click(hit, { clientX: 60, clientY: 90 });
+    // One tap: no card, only the ring for a moment.
+    expect(onInfo).not.toHaveBeenCalled();
+    expect(santa.querySelector('[data-testid="scene-info-ring"]')).not.toBeNull();
     fireEvent.click(hit, { clientX: 60, clientY: 90 });
     expect(onInfo).toHaveBeenCalledWith({ type: 'egg', kind: 'santa' }, { x: 60, y: 90 }, SANTA_RING);
     expect(santa.querySelector('[data-testid="scene-info-ring"]')).toBeNull();

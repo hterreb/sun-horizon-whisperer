@@ -15,6 +15,7 @@ import { getSceneDensity } from '@/utils/sceneDensity';
 import { ringBorderClass, type RarityTier } from '@/utils/rarityTier';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import { useScenePlaybackRate } from '@/hooks/useScenePlaybackRate';
+import { useDoubleTap } from '@/hooks/useDoubleTap';
 import { getScenePlaybackRate, getSpawnGapFactor, type PlayDirection } from '@/utils/timeTravel';
 import { findLane, firstMeeting, getSceneTime, setSceneRate, LIVE_SCENE_CLOCK, type ScenePath } from '@/utils/scenePaths';
 import {
@@ -98,7 +99,7 @@ interface CloudLayerProps {
   // Item 93 (S1): the scene opens full. false: it starts empty and the spawn loop fills it,
   // as before (the tests of the spawn loop use this).
   warmStart?: boolean;
-  // Info cards (ROADMAP item 95): a tap on a fish, a bird, a boat or a cloud calls onInfo with
+  // Info cards (ROADMAP item 95): a double tap (item 116) on a fish, a bird, a boat or a cloud calls onInfo with
   // the tapped point (px in the viewport) and the thing's ring id; `infoRing` is the ring id of
   // the thing whose card is open, which then shows a thin ring.
   onInfo?: SceneInfoHandler;
@@ -997,6 +998,11 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   infoRing = null,
   infoRingTier = null,
 }) => {
+  // Item 116: a double tap opens the card; a single tap shows the ring (`tapHint`) for a moment.
+  const { tap, hint: tapHint } = useDoubleTap(onInfo);
+  // The ring of a thing (its ring id): its card is open, or a single tap hints at it. The tier
+  // colour is only for the open card.
+  const ringOf = (id: string) => ({ ring: infoRing === id || tapHint === id, tier: infoRing === id ? infoRingTier : null });
   // The things that cross the scene. The state renders them; the ref has the latest lists at
   // once, so the spawn loop plans each new lane around all of them (item 92), also around one
   // that spawned in the same check.
@@ -1186,11 +1192,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   }, []);
 
   // Item 95: a moving thing takes taps only on its wrapper and hit area (pointer only, hidden
-  // from screen readers); the scene layer itself stays pointer-events-none.
+  // from screen readers); the scene layer itself stays pointer-events-none. Item 116: a double
+  // tap opens the card; `touch-manipulation` stops the browser's double-tap zoom.
   const tappable = (target: SceneInfoTarget, ring: string) => onInfo ? {
     'aria-hidden': true,
-    className: 'absolute pointer-events-auto cursor-pointer',
-    onClick: (event: React.MouseEvent) => onInfo(target, { x: event.clientX, y: event.clientY }, ring),
+    className: 'absolute pointer-events-auto cursor-pointer touch-manipulation',
+    onClick: (event: React.MouseEvent) => tap(target, { x: event.clientX, y: event.clientY }, ring),
   } : { className: 'absolute' };
 
   // One fish, or a pair (P6): the companion swims `lag` s behind and leaves last, so its
@@ -1257,7 +1264,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             {body}
           </div>
         ) : body}
-        {onInfo && <HitArea {...hitBox} ring={infoRing === `fish-${fishItem.id}-${key}`} tier={infoRingTier} />}
+        {onInfo && <HitArea {...hitBox} {...ringOf(`fish-${fishItem.id}-${key}`)} />}
       </>
     );
     const swimmer = (key: string, lag: number, dy: number, removes: boolean) => (
@@ -1386,7 +1393,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             >
               <ScenePlane width={plane.width} lights={plane.lights} />
             </div>
-            {onInfo && <HitArea cx={plane.width / 2} cy={plane.height / 2} width={plane.width} height={plane.height} ring={infoRing === `plane-${plane.id}`} />}
+            {onInfo && <HitArea cx={plane.width / 2} cy={plane.height / 2} width={plane.width} height={plane.height} ring={ringOf(`plane-${plane.id}`).ring} />}
           </div>
         </div>
       </React.Fragment>
@@ -1508,7 +1515,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             )) : (
               <SceneBird kind={bird.kind} width={bird.size} />
             )}
-            {onInfo && <HitArea cx={bird.width / 2} cy={bird.height / 2} width={bird.width} height={bird.height} ring={infoRing === `bird-${bird.id}`} tier={infoRingTier} />}
+            {onInfo && <HitArea cx={bird.width / 2} cy={bird.height / 2} width={bird.width} height={bird.height} {...ringOf(`bird-${bird.id}`)} />}
           </div>
         </div>
       ))}
@@ -1555,8 +1562,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
                 cy={-(BOAT_HEIGHT_PX * boatScale(ship)) / 2}
                 width={BOAT_WIDTH_PX * boatScale(ship)}
                 height={BOAT_HEIGHT_PX * boatScale(ship)}
-                ring={infoRing === `boat-${ship.id}`}
-                tier={infoRingTier}
+                {...ringOf(`boat-${ship.id}`)}
               />
             )}
           </div>

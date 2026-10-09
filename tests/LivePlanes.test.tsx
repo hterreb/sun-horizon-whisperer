@@ -155,7 +155,10 @@ describe('LivePlanes (ROADMAP item 96)', () => {
     const onSceneInfo = vi.fn();
     renderScene({ onSceneInfo });
     const hit = screen.getByTestId('live-plane').querySelector<HTMLElement>('[data-testid="scene-hit"]')!.parentElement!;
-    fireEvent.click(hit, { clientX: 10, clientY: 20 });
+    // Item 116: a double tap opens the card.
+    fireEvent.click(hit, { clientX: 10, clientY: 20, detail: 1 });
+    expect(onSceneInfo).not.toHaveBeenCalled();
+    fireEvent.click(hit, { clientX: 10, clientY: 20, detail: 2 });
     expect(onSceneInfo).toHaveBeenCalledWith(
       { type: 'livePlane', callsign: 'DLH4KL', airline: 'Lufthansa', aircraftType: 'A320', altM: 10_000, speedKt: 0 },
       { x: 10, y: 20 }, 'live-a1b2c3',
@@ -190,7 +193,9 @@ describe('LivePlanes (ROADMAP item 96)', () => {
       const shown = screen.getAllByTestId('live-plane');
       expect(shown).toHaveLength(2);
       const hexes = shown.map(plane => {
-        fireEvent.click(plane.querySelector<HTMLElement>('[data-testid="scene-hit"]')!.parentElement!);
+        const hit = plane.querySelector<HTMLElement>('[data-testid="scene-hit"]')!.parentElement!;
+        fireEvent.click(hit, { detail: 1 });
+        fireEvent.click(hit, { detail: 2 }); // item 116: a double tap
         return onSceneInfo.mock.lastCall![2];
       });
       expect(hexes.sort()).toEqual(['live-d00001', 'live-d00002']);

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { type RarityTier } from '@/utils/rarityTier';
+import { useDoubleTap } from '@/hooks/useDoubleTap';
 import { HitArea, type SceneInfoHandler } from './CloudLayer';
 
 // Christmas Eve (ROADMAP "Ongoing — Easter eggs", Calendar): Santa in his sleigh with four
@@ -56,6 +57,8 @@ const Santa: React.FC<SantaProps> = ({ onDone, onInfo, ringOn = false, ringTier 
   const ref = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
   const [leftToRight] = useState(() => Math.random() < 0.5);
+  // Item 116: a double tap opens the card; a single tap shows the ring for a moment.
+  const { tap, hint } = useDoubleTap(onInfo);
 
   useEffect(() => {
     let start: number | null = null;
@@ -86,10 +89,10 @@ const Santa: React.FC<SantaProps> = ({ onDone, onInfo, ringOn = false, ringTier 
       aria-hidden="true"
       data-testid="santa"
       data-direction={leftToRight ? 'right' : 'left'}
-      className={`absolute left-0 top-[11%] ${onInfo ? 'pointer-events-auto cursor-pointer' : 'pointer-events-none'}`}
+      className={`absolute left-0 top-[11%] ${onInfo ? 'pointer-events-auto cursor-pointer touch-manipulation' : 'pointer-events-none'}`}
       // Off screen until the first frame places it.
       style={{ transform: `translateX(${-SANTA_WIDTH * 2}px)` }}
-      onClick={onInfo && (event => onInfo({ type: 'egg', kind: 'santa' }, { x: event.clientX, y: event.clientY }, SANTA_RING))}
+      onClick={onInfo && (event => tap({ type: 'egg', kind: 'santa' }, { x: event.clientX, y: event.clientY }, SANTA_RING))}
     >
       {/* The glow and the mirror on the drawing only, so the ring (item 113) stays clean. */}
       <span
@@ -98,7 +101,7 @@ const Santa: React.FC<SantaProps> = ({ onDone, onInfo, ringOn = false, ringTier 
       >
         <SantaShape width={SANTA_WIDTH} />
       </span>
-      {onInfo && <HitArea cx={SANTA_WIDTH / 2} cy={SANTA_HEIGHT / 2} width={SANTA_WIDTH} height={SANTA_HEIGHT} ring={ringOn} tier={ringTier} />}
+      {onInfo && <HitArea cx={SANTA_WIDTH / 2} cy={SANTA_HEIGHT / 2} width={SANTA_WIDTH} height={SANTA_HEIGHT} ring={ringOn || hint === SANTA_RING} tier={ringOn ? ringTier : null} />}
     </div>
   );
 };
