@@ -25,13 +25,15 @@ const pennantsOf = (points: [number, number][]): [number, number][] =>
     });
   });
 
-const BoatBunting = ({ kind, colors }: { kind: BoatKind; colors: readonly string[] }) => {
+const BoatBunting = ({ kind, colors, shape = 'pennant' }: { kind: BoatKind; colors: readonly string[]; shape?: 'pennant' | 'picado' }) => {
   const line = LINES[kind];
   return (
     <g data-testid="boat-bunting">
       <polyline points={line.map(p => p.join(',')).join(' ')} fill="none" stroke="hsl(var(--scene-boat-navy))" strokeWidth={0.4} />
       {pennantsOf(line).map(([x, y], i) => (
-        <path key={i} d={`M${x - HALF_W} ${y}H${x + HALF_W}L${x} ${y + DROP}Z`} fill={colors[i % colors.length]} data-testid="bunting-pennant" />
+        shape === 'picado'
+          ? <rect key={i} x={x - HALF_W} y={y} width={HALF_W * 2} height={DROP} fill={colors[i % colors.length]} data-testid="bunting-pennant" />
+          : <path key={i} d={`M${x - HALF_W} ${y}H${x + HALF_W}L${x} ${y + DROP}Z`} fill={colors[i % colors.length]} data-testid="bunting-pennant" />
       ))}
     </g>
   );

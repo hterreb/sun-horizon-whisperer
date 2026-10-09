@@ -68,7 +68,7 @@ import PremiumDialog from './PremiumDialog';
 import CollectionView from './CollectionView';
 import BadgeUnlocked from './BadgeUnlocked';
 import {
-  BADGES, addToCollection, badgeForAstroEvent, badgeForCalendarEvent, badgeForPlayfulEgg, badgeForSanta, badgeForTarget, countCollected, isCollectionPaused, loadCollection,
+  BADGES, NOWRUZ_ALSO, addToCollection, badgeForAstroEvent, badgeForCalendarEvent, badgeForPlayfulEgg, badgeForSanta, badgeForTarget, countCollected, isCollectionPaused, loadCollection,
   saveCollection, stateBadgeForTarget, type BadgeId, type Collection, type StateBadgeContext,
 } from '@/utils/collection';
 import { watchSunEvent, NO_SUN_EVENT_WATCH, getCountdownTarget } from '../utils/sunEvents';
@@ -78,6 +78,7 @@ import { badgeForNationalDay } from '@/utils/collection';
 import { BuntingContext, type Bunting } from '@/hooks/useBunting';
 import NationalEggs from './NationalEggs';
 import { NO_PATIENT_WATCH, PLAYFUL_EVENT, advancePatientWatch, getPlayfulOverride, isEasterMorning, type PlayfulEgg } from '@/utils/playfulEggs';
+import { parseFestivalOverride } from '@/utils/festivalEvents';
 import { PLAY_SPEED, PLAY_TICK_MS, clampTimeOffset } from '@/utils/timeTravel';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
 import { DISCO_MS, KONAMI_SEQUENCE, SUNGLASSES_MS, advanceKonami, getEggOverride, registerSunTap, rollUfo } from '@/utils/hiddenEggs';
@@ -140,6 +141,9 @@ const loadStoredEyeHeight = (): number => {
 
 // The live radar before its first answer (item 96).
 const NO_LIVE_PLANES: LivePlanesState = { feed: { now: 0, aircraft: [] }, receivedAt: 0 };
+
+// Día de los Muertos papel picado (item 118), on the boats through BuntingContext.
+const PICADO_COLORS = [1, 2, 3, 4, 5].map((n) => `hsl(var(--scene-festival-pastel-${n}))`);
 
 const SunTracker: React.FC = () => {
   const [date, setDate] = useState<Date>(new Date());
@@ -817,21 +821,26 @@ const SunTracker: React.FC = () => {
   const [santaForced] = useState(() => new URLSearchParams(window.location.search).get('egg') === 'santa');
   // Playful pack (ROADMAP item 117): `?egg=aprilFools|easter|valentine|stPatrick` sets that day.
   const [playfulForced] = useState(() => getPlayfulOverride(window.location.search));
+  // Item 118: `?egg=<festival egg kind>` (for example `?egg=diwali`) forces a festival.
+  const [festivalForced] = useState(() => parseFestivalOverride(window.location.search));
+  // National days and Hanami need the place's country: from InfoPanel's reverse-geocode answer,
+  // or `?country=XX`. Unknown country: none.
+  const [detectedCountry, setDetectedCountry] = useState<string | null>(null);
+  const [countryOverride] = useState(() => parseCountryOverride(window.location.search));
+  const country = countryOverride ?? detectedCountry;
   const calendarEvent = useMemo(
     () => (dragonForced ? 'lunar-new-year' : playfulForced ? PLAYFUL_EVENT[playfulForced]
-      : getCalendarEvent(date, location.latitude)),
+      : festivalForced ?? getCalendarEvent(date, location.latitude, country ?? undefined)),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on passMinuteKey, not `date` itself
-    [passMinuteKey, location.latitude]
+    [passMinuteKey, location.latitude, country]
   );
   // Christmas Eve: Santa flies once from sunset to midnight (the scene's sun times).
   const isSanta = santaForced || isSantaTime(date, sunTimes);
   // National days (utils/nationalDays): only in the place's country, from InfoPanel's
   // reverse-geocode answer. Unknown country: none. `?country=XX` sets the country,
   // `?egg=<kind>` (for example `?egg=bastilleDay`) forces the day.
-  const [detectedCountry, setDetectedCountry] = useState<string | null>(null);
-  const [countryOverride] = useState(() => parseCountryOverride(window.location.search));
   const [nationalForced] = useState(() => parseNationalEggOverride(window.location.search));
-  const nationalDay = nationalForced ?? getNationalDay(date, countryOverride ?? detectedCountry, calendarEvent);
+  const nationalDay = nationalForced ?? getNationalDay(date, country, calendarEvent);
   // Easter Sunday from sunrise to 12:00: the empty tomb (item 117). `?egg=easter` shows it at once.
   const easterMorning = playfulForced === 'easter' || isEasterMorning(date, sunTimes);
   // The scene reports a playful egg when it really shows; its badge counts then (not in a preview).
@@ -984,16 +993,22 @@ const SunTracker: React.FC = () => {
   // really shows them (CalendarEggs' rules: dark sky = night or astronomical/nautical twilight).
   // Not for a forced egg (?egg=dragon, ?egg=santa or any ?egg) and not in a time preview.
   const isDarkSky = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
-  const calendarBadge = dragonForced || santaForced ? null : badgeForCalendarEvent(calendarEvent, {
+  const calendarBadge = dragonForced || santaForced || festivalForced ? null : badgeForCalendarEvent(calendarEvent, {
     isNight: isDarkSky,
     moonUp: isDarkSky && moonPosition.visible && getMoonLook(weatherType, cloudCover).disc > 0,
     weatherType,
     reducedMotion: prefersReducedMotion,
     isTimePreview,
+    timeOfDay,
   });
   useEffect(() => {
     if (calendarBadge) collect(calendarBadge);
   }, [calendarBadge, collect]);
+  // Item 118: Nowruz is the March equinox, so it also collects the equinox badge.
+  const nowruzEquinoxBadge = calendarBadge === 'egg:nowruz' ? NOWRUZ_ALSO : null;
+  useEffect(() => {
+    if (nowruzEquinoxBadge) collect(nowruzEquinoxBadge);
+  }, [nowruzEquinoxBadge, collect]);
   const santaBadge = santaForced ? null : badgeForSanta(isSanta, { reducedMotion: prefersReducedMotion, isTimePreview });
   useEffect(() => {
     if (santaBadge) collect(santaBadge);
@@ -1020,8 +1035,11 @@ const SunTracker: React.FC = () => {
     if (buntingBadge) collect(buntingBadge);
   }, [buntingBadge, collect]);
   const bunting = useMemo<Bunting | null>(
-    () => (nationalDay?.style === 'bunting' ? { colors: nationalDay.colors.map((c) => `hsl(var(--national-${c}))`), onShow: handleBuntingShow } : null),
-    [nationalDay, handleBuntingShow]
+    () => (nationalDay?.style === 'bunting' ? { colors: nationalDay.colors.map((c) => `hsl(var(--national-${c}))`), onShow: handleBuntingShow }
+      // Día de los Muertos (item 118): papel picado; its badge counts with the marigolds, so onShow adds nothing.
+      : calendarEvent === 'dia-de-muertos' ? { colors: PICADO_COLORS, shape: 'picado', onShow: handleBuntingShow }
+      : null),
+    [nationalDay, calendarEvent, handleBuntingShow]
   );
   // The forecast rain amount (ROADMAP item 77); manual weather uses the type's middle value.
   const rainMmH = useRealWeather ? weatherData?.precipitationMmH ?? null : null;

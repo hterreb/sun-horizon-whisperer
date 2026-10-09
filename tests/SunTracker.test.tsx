@@ -1172,6 +1172,13 @@ describe('SunTracker', () => {
       vi.restoreAllMocks();
     });
 
+    it('?egg=<festival> forces that festival (item 118), and collects nothing', () => {
+      window.history.pushState({}, '', '/?egg=loyKrathong');
+      render(<SunTracker />);
+      expect(visProps.current).toMatchObject({ calendarEvent: 'loy-krathong' });
+      expect(localStorage.getItem('collection')).toBeNull();
+    });
+
     it('the InfoPanel button opens the collection; the close button closes it', () => {
       render(<SunTracker />);
       expect(visProps.current).not.toBeNull();

@@ -10,6 +10,7 @@ import Fireworks from './Fireworks';
 import SunSunglasses from './SunSunglasses';
 import CalendarEggs from './CalendarEggs';
 import SkyEggs from './SkyEggs';
+import FestivalEggs from './FestivalEggs';
 import PlayfulEggs from './PlayfulEggs';
 import { useAprilFoolsSwap } from '@/hooks/useAprilFoolsSwap';
 import { type PlayfulEgg } from '@/utils/playfulEggs';
@@ -1079,6 +1080,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         cloudEgg={cloudEgg}
         heartCloud={calendarEvent === 'valentine'}
         onEggShown={onEggShown}
+        calendarEvent={calendarEvent}
         sunTimes={sunTimes}
         onInfo={onSceneInfo}
         infoRing={infoRing}
@@ -1302,6 +1304,19 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         infoRing={infoRing}
         infoRingTier={infoRingTier}
         onShown={onEggShown}
+      />
+
+      <FestivalEggs
+        event={calendarEvent}
+        timeOfDay={timeOfDay}
+        weatherType={weatherType}
+        latitude={latitude}
+        date={date}
+        moon={isMoonDiscShown ? { x: moonX, y: moonY, r: moonRadius } : null}
+        horizonY={containerDimensions.height * 0.65}
+        onInfo={onSceneInfo}
+        infoRing={infoRing}
+        infoRingTier={infoRingTier}
       />
 
       <svg className="absolute inset-0 w-full h-full pointer-events-none">

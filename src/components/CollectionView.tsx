@@ -3,6 +3,7 @@ import {
   ArrowLeftRight, Cat, Coins, Eclipse, Flame, Glasses, Heart, Hourglass, Moon, MoonStar, Mountain, PartyPopper, Rainbow, Satellite,
   Sparkles, Star, Sun, SunMoon, Sunrise, Sunset, TreePine, X, type LucideIcon,
   CloudMoon, Orbit, Sparkle, SunDim,
+  Cherry, Drama, FlameKindling, Flower, Lamp, Palette, Rabbit, Sprout,
 } from 'lucide-react';
 import { Crown, Flag, Plane } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
@@ -103,6 +104,19 @@ const EGG_ICONS: Record<Exclude<EggKind, 'ufo' | 'santa'>, [LucideIcon, string]>
   valentine: [Heart, 'text-brand-coral'],
   stPatrick: [Coins, 'text-brand-gold'],
   patientWatcher: [Hourglass, 'text-brand-peach'],
+  // Item 118: cultural festivals.
+  loyKrathong: [Flower, 'text-brand-gold-light'],
+  diwali: [Lamp, 'text-brand-gold'],
+  eidAlFitr: [MoonStar, 'text-brand-gold-light'],
+  midAutumn: [Rabbit, 'text-brand-coral'],
+  hanami: [Cherry, 'text-pink-300'],
+  tanabata: [Star, 'text-brand-sky'],
+  diaDeMuertos: [Flag, 'text-brand-sunset'],
+  holi: [Palette, 'text-pink-300'],
+  hanukkah: [Sparkle, 'text-brand-gold-light'],
+  nowruz: [Sprout, 'text-green-400'],
+  midsummer: [FlameKindling, 'text-brand-sunset'],
+  carnival: [Drama, 'text-brand-cyan'],
 };
 
 const SKY_ICONS: Record<'sun' | 'moon' | 'terrain' | 'satellite', [LucideIcon, string]> = {

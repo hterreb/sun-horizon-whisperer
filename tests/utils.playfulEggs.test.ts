@@ -64,7 +64,7 @@ describe('playful calendar days', () => {
     expect(getCalendarEvent(new Date(2027, 2, 17, 12))).toBe('st-patrick');
     expect(getCalendarEvent(new Date(2027, 3, 1, 12))).toBe('april-fools');
     expect(getCalendarEvent(new Date(2027, 2, 28, 7))).toBe('easter');
-    expect(getCalendarEvent(new Date(2027, 2, 29, 7))).toBeNull(); // Easter Monday
+    expect(getCalendarEvent(new Date(2027, 2, 29, 7))).not.toBe('easter'); // Easter Monday (Hanami then, item 118)
     expect(getCalendarEvent(new Date(2027, 1, 15, 12))).toBeNull();
   });
 
@@ -74,7 +74,7 @@ describe('playful calendar days', () => {
 
   it('gives each day 1 day a year (the egg cards)', () => {
     expect(getEventDaysPerYear('easter')).toBe(1);
-    expect(getEventDaysPerYear('valentine')).toBe(1);
+    expect(getEventDaysPerYear('valentine')).toBeCloseTo(8 / 9); // Eid al-Fitr wins Feb 14 2029 (item 118)
     expect(getEventDaysPerYear('st-patrick')).toBe(1);
   });
 

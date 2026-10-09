@@ -2303,6 +2303,57 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Built:** `src/utils/playfulEggs.ts` (Easter, the morning rule, the override, the April Fools phases, the pot position, the patient watch), `src/hooks/useAprilFoolsSwap.ts` (one timeout per phase), `src/components/PlayfulEggs.tsx` (tomb, pot), `HEART_SHAPE` in `cloudShapes.ts`, `getHeartGliderId` in `skyCloudUtils.ts`. 92 badges, 24 eggs.
 - **Checked:** `tests/utils.playfulEggs.test.ts` (Easter 2026-04-05, 2027-03-28, 2028-04-16, 2029-04-01, the limits 2038-04-25 and 2285-03-22; the morning rule; the day rules; the override; the April Fools phases; the pot ends; the patient watch: earned from −2 to +10 min, not when late, early, hidden or after a gap, not without a sunset; the badges; the heart cloud choice). `tests/PlayfulEggs.test.tsx` (tomb on Easter morning only; pot at the rainbow end only; static with reduced motion; double tap opens the card; the April Fools swap in `SunVisualization` with fake timers, none with reduced motion or with the moon down; the heart in `SkyClouds` by day only, its card, also with reduced motion). The egg cards in `utils.sceneInfo`. In the browser at 390 × 844 (Konstanz, `?egg=easter`, 08:30): the tomb on the shore. Not checked in the browser: the heart, the pot and the swap (the live weather had rain and no single clouds).
 - **Open:** the swap repeats on a reload on Apr 1 (once per page view, no storage). On a phone the rainbow is often wider than the screen, so the pot shows mostly when the sun is higher (a smaller rainbow).
+
+### 118. Cultural festivals: an easter-egg pack — M — **✅ Done**
+
+> summary: 12 calendar eggs for festivals of communities around the world (Loy Krathong, Diwali, Eid al-Fitr, Mid-Autumn, Hanami, Tanabata, Día de los Muertos, Holi, Hanukkah, Nowruz, Midsummer, Carnival). Each egg has a date rule, a calm scene effect, a badge, an info card and a `?egg=` test link. This item gives the rules, the priority and what was built.
+
+- **Request (2026-10-09):** a "Cultural festivals" egg pack. The eggs show for everyone, as Lunar New Year does. Exception: Hanami shows only in Japan when the country is known.
+- **Why:** the app is used around the world. A festival of the user's own community in the scene makes the day special; a festival of another community is a small discovery, and the info card tells what it is.
+- **Rules for all festival eggs:**
+  - The trigger logic is in the pure util `festivalEvents.ts` (tables and rules) and in `easterDate.ts` (Easter). `getCalendarEvent` returns the festival id. Local time, the whole local day.
+  - The tables give the main day for 2026–2035. Extend them in 2035, with the Lunar New Year list.
+  - The drawing is in `FestivalEggs.tsx`. Holi tints the clouds in `SkyClouds`; Día de los Muertos adds bunting to the boats in `SceneBoat` (`CloudLayer` gives both the event).
+  - Calm motion: slow straight drifts, rises and falls, a soft glow of 4 s or longer. Nothing jumps, flaps, rotates or flickers fast.
+  - Reduced motion: things that float or glow stay, without motion (krathongs, diyas, lanterns, marigolds, bonfires). Things that only drift or fall are hidden (cherry petals, confetti).
+  - Badge: `egg:<kind>`, ultra rare, in `EGGS` of `collection.ts`. It counts only when the scene really draws the egg (`isFestivalShown`, the same rule for the drawing and the badge). Not in a time preview, not with a `?egg=` link.
+  - Info card: a "Special event" card with a field note and the days a year (`getEventDaysPerYear`). A double tap (item 116) on a krathong, diya, the Eid moon glow, a lantern, a petal, Vega or Altair, a marigold, a Hanukkah light, a Nowruz blossom, a bonfire or a confetti piece opens it. Holi has no card: its clouds keep their cloud cards (like the Christmas snow, item 113).
+  - Test link: `?egg=<kind>` with the kind of the table below (any case), for example `?egg=diwali`. It forces the festival and collects nothing.
+  - Colours: tokens `--scene-festival-*` in `src/index.css`.
+  - Texts: names, facts and the two pills in `en`, `de`, `es`, `it`, `fr`. The facts for religious festivals give the meaning in neutral words, without a judgement.
+
+| Egg (`?egg=`) | Trigger | Scene | Shows when (badge counts) |
+|---|---|---|---|
+| Loy Krathong (`loyKrathong`) | Table: the full moon of the 12th Thai lunar month (TAT dates to 2030, later years from the full moon in Thai time and the 19-year moon cycle) | 5 candle-lit krathongs drift slowly on the sea (±36 px over 70–114 s) | Dark sky |
+| Diwali (`diwali`) | Table: the Lakshmi Puja day (Drik Panchang, New Delhi) | 9 diyas along the far shore at the horizon, soft glow 4–6 s | Dark sky |
+| Eid al-Fitr (`eidAlFitr`) | Table: 1 Shawwal, Umm al-Qura calendar (the local day can differ by 1 day where the moon sighting decides; 2033 has two) | A soft golden glow over the moon disc; the pill "Eid al-Fitr · Eid Mubarak" on the water | All day (the pill) |
+| Mid-Autumn (`midAutumn`) | Table: 15th day of the 8th Chinese lunar month | 6 red lanterns rise slowly (150–200 s to the top); a faint rabbit shape on the moon | Dark sky |
+| Hanami (`hanami`) | Mar 25 – Apr 10. With a country code: Japan (`JP`) only. Without one: everyone | 14 cherry petals drift across the day sky (110 vw in 70–100 s) | Not a dark sky, no reduced motion |
+| Tanabata (`tanabata`) | Jul 7 | Vega and Altair bright, a faint Milky Way band between them (fixed places, not the real sky positions) | Dark sky |
+| Día de los Muertos (`diaDeMuertos`) | Nov 1–2 | 14 marigolds float on the water; papel picado on the boats with a mast (not the rowboat) | All day |
+| Holi (`holi`) | Table: the day of colours (Dhulandi), after the Phalguna full moon | The day clouds get soft pink, yellow and green washes | Not a dark sky, weather not `clear` |
+| Hanukkah (`hanukkah`) | Table: from the eve of 25 Kislev, 8 days | 1 to 8 warm lights in a row above the horizon: one more each night; static | Dark sky |
+| Nowruz (`nowruz`) | The March equinox day (`getSeasonEvent`) | The equinox pill stays; 5 spring blossoms under it | All day. Also collects the equinox badge (`NOWRUZ_ALSO`) |
+| Midsummer (`midsummer`) | Midsummer Eve (the Friday of Jun 19–25) and the Saturday after it | 3 small bonfires on the far shore, soft glow; the pill "Midnight sun" at latitude 60° N or more | Evening, twilight or night (at 60° N in June the sky does not get dark) |
+| Carnival (`carnival`) | Easter − 52 to Easter − 47 (the Thursday before Shrove Tuesday to Shrove Tuesday; `getEasterSunday`, anonymous Gregorian algorithm) | 18 pastel confetti pieces fall slowly (110 vh in 50–71 s) | Not a dark sky, no reduced motion |
+
+- **Priority (one event a day, `getCalendarEvent`):** the shortest event wins; on a tie, the first in this list wins.
+  1. The New Year minute.
+  2. Lunar New Year.
+  3. The one-day festivals, in this order: Eid al-Fitr, Diwali, Holi, Loy Krathong, Mid-Autumn, Tanabata.
+  4. Friday the 13th.
+  5. Solstice, equinox, Nowruz (the March equinox).
+  6. Halloween.
+  7. Christmas (3 days).
+  8. The festivals of several days, shortest first: Midsummer (2), Día de los Muertos (2), Carnival (6), Hanukkah (8), Hanami (17).
+- **Known collisions 2026–2035:** Eid al-Fitr and the March equinox on 2026-03-20 (Eid shows); Holi and the March equinox on 2030-03-20 (Holi shows; no Nowruz that year); Holi in Hanami on 2032-03-27 (Holi); Diwali on 2032-11-02 and Loy Krathong on 2028-11-02, the second day of Día de los Muertos (Diwali, Loy Krathong); Lunar New Year in Carnival on 2027-02-06 (Lunar New Year); Hanukkah and Christmas on 2027-12-24 to 26 and 2035-12-25 to 26 (Christmas; Hanukkah shows the nights after with the right count); the June solstice on a Midsummer day (the solstice; Midsummer shows on the other day).
+- **Country:** `getCalendarEvent(date, latitude, country?)` takes an optional ISO 3166 code. `SunTracker` has no country yet, so Hanami shows for everyone. Pass the code there when the place's country is known (another branch adds it).
+- **Other egg packs:** `getEasterSunday` (`src/utils/easterDate.ts`) is shared, for example for an Easter Sunday egg.
+- **Done when:** util tests for every table (each year 2026–2035), the rules and the priority; Easter against published dates; the badge rules; a render test per egg; reduced motion; `tests/i18n.test.ts` passes.
+- **Built:** `src/utils/festivalEvents.ts`, `src/utils/easterDate.ts`, `src/components/FestivalEggs.tsx`; changes in `calendarEvents.ts` (12 new ids, priority), `collection.ts` (12 badges: 99 in all, 31 eggs), `sceneInfo.ts` (11 cards), `CollectionView.tsx` (lucide icons), `CalendarEggs.tsx` (the equinox pill on Nowruz), `SkyClouds.tsx`, `SceneBoat.tsx`, `CloudLayer.tsx`, `SunVisualization.tsx`, `SunTracker.tsx`, the 5 dictionaries, `index.css`.
+- **Checked:** `utils.festivalEvents`, `utils.easterDate`, `utils.calendarEvents`, `utils.collection`, `utils.sceneInfo`, `FestivalEggs`, `SkyClouds`, `SceneBoat` and `SunTracker` tests. Typecheck, lint and all tests pass.
+- **Open:** a check of the Loy Krathong dates after 2030 and the Holi dates against an official calendar (they can be one day off); real sky positions for Vega and Altair; the look of each egg in the browser and on a phone; a native-speaker review of the new de/es/it/fr texts (item 67).
+
 ---
 
 ## Ongoing — Easter eggs and special events (S each, pick any time)
@@ -2313,7 +2364,7 @@ Rules for all items:
 - Keep the rAF id in a `useRef`.
 - Put the trigger logic (date and astronomy checks) in a pure util with tests.
 - Show at most one special event at a time.
-- Test override: `?egg=<kind>` forces one astronomy event (`solarEclipse`, `lunarEclipse`, `greenFlash`, `supermoon`, `blueMoon`, `meteorShower`, `aurora`, and the sky eggs `matariki`, `conjunction`, `noctilucent`, `midnightSun`, `polarNight`).
+- Test override: `?egg=<kind>` forces one astronomy event (`solarEclipse`, `lunarEclipse`, `greenFlash`, `supermoon`, `blueMoon`, `meteorShower`, `aurora`, and the sky eggs `matariki`, `conjunction`, `noctilucent`, `midnightSun`, `polarNight`), or one festival (item 118).
 
 Items:
 
@@ -2324,7 +2375,7 @@ Items:
   - ✅ Christmas: light snow on Dec 25–26 (changed 2026-10-09 from Dec 24–26: Christmas Eve is Santa's), even when the weather is clear. Done: slow small flakes, off when it already snows. Changed 2026-10-09: falling Christmas ornaments (baubles and a few stars) instead of snow; same days and rules; badge id `egg:christmas` kept.
   - ✅ Friday the 13th: a black cat walks along the horizon once. Done: a 45 s straight glide, no bounce. Redesigned as "Moon-watcher": the cat sits on a shore rock on the left of the horizon all day, seen from behind; only its tail sways (6 s, ±6°). Reduced motion: the cat stays, without the tail sway, and its badge counts.
   - ✅ Christmas Eve: Santa in his sleigh with his reindeer flies once across the night sky on Dec 24, between sunset and midnight. A slow straight glide high in the sky, like the UFO (no bounce, no flapping legs; calm-motion speed limit). No snow on Christmas Eve (decision 2026-10-09): Santa flies without the `christmas` event, and `?egg=santa` forces only Santa. A tap opens an info card. Collection: a new "Santa" egg badge (item 112), counted when he shows. `?egg=santa`. Done: `Santa.tsx`, a dark sleigh and 4 reindeer with Rudolph's red nose; one glide per page view at 11 % height, random direction, 2.5 %/s capped at 9.75 px/s (about 52 s on a 390 px phone); `isSantaTime` in `calendarEvents.ts` (the sunset must be on Dec 24); also when it snows; a flight that is on at midnight ends at the edge.
-  - ✅ Playful pack (item 117): April Fools (the sun and the moon swap places for one minute), Easter Sunday morning (the empty tomb), Valentine's Day (a heart cloud), St Patrick's Day (a pot of gold at the rainbow's end) and the patient-watcher badge.
+  - ✅ Playful pack (item 118): April Fools (the sun and the moon swap places for one minute), Easter Sunday morning (the empty tomb), Valentine's Day (a heart cloud), St Patrick's Day (a pot of gold at the rainbow's end) and the patient-watcher badge.
 - **National days** (`nationalDays.ts`, `NationalEggs.tsx`, `BoatBunting.tsx`): ✅ Done 2026-10-09.
   - **Summary:** each national day shows only in its own country, on its local day. One row per country in `NATIONAL_DAYS` (country code, date, style, flag colours). A new country is one row.
   - **Country source:** the `countryCode` of the BigDataCloud reverse-geocode answer that `InfoPanel` already gets for the place name. `InfoPanel` passes it up with `onCountryChange`; `SunTracker` keeps it in state. No second call and no new CSP host. Unknown country (no answer, an error, a searched place): no national egg. The app does not guess the country from the language.
@@ -2366,6 +2417,8 @@ Items:
   - **Input:** `AstroInput.sunTimes` (today's `sunrise`, `sunset`, `polar`) is new and optional. It is not the line-of-sight `sunset`: after sunset the line-of-sight times are already the next pass.
   - **Checked:** `utils.astroEvents` (Matariki dates are Fridays, the ±3-day week, the 90-min window, Wellington before sunrise on 10 Jul 2026; Venus–Jupiter 12 Aug 2025, Jupiter–Saturn 21 Dec 2020, Mars–Jupiter 14 Aug 2024, none by day or when no pair is close; noctilucent windows, months, latitudes, weather, Edinburgh 90 min after a June sunset; Tromsø midnight sun 21 Jun and polar night 21 Dec; the 24-h midnight-sun path stays above the horizon; overrides), `utils.planets`, `utils.collection` (92 badges, the 5 badge ids), `utils.sceneInfo` (5 egg cards), `SkyEggs` (drawing, pills, compass/cloud hiding, double tap), `SunVisualization` (midnight-sun arc).
   - **Open:** (1) After midnight, the noctilucent window uses today's sunset, so a window that runs past midnight (above ~57° N) ends at 00:00. (2) The Pleiades and the noctilucent clouds use a fixed sky position, not a computed one. (3) The conjunction ignores Mercury and the moon.
+- **Cultural festivals (item 118):**
+  - ✅ Loy Krathong, Diwali, Eid al-Fitr, Mid-Autumn, Hanami, Tanabata, Día de los Muertos, Holi, Hanukkah, Nowruz, Midsummer, Carnival. Done: rules, priority and looks in [item 118](#117-cultural-festivals-an-easter-egg-pack--m--done); `?egg=<kind>`.
 - **Hidden:**
   - ✅ Tap the sun 7 times: it wears sunglasses for one minute. (The sun is now a button; `?egg=sunglasses`.)
   - ✅ A UFO crosses the night sky (1 in 200 chance per night view). (40 s straight glide; `?egg=ufo`.)

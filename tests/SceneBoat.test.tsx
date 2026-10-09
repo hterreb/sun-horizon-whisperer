@@ -43,4 +43,13 @@ describe('SceneBoat bunting on a national day', () => {
     expect(screen.getAllByTestId('bunting-pennant')[1].getAttribute('fill')).toBe('hsl(var(--national-de-red))');
     expect(onShow).toHaveBeenCalledTimes(1);
   });
+  });
+
+  it('hangs papel picado (square flags) on Día de los Muertos (item 118)', () => {
+    render(
+      <BuntingContext.Provider value={{ colors: ['hsl(var(--scene-festival-pastel-1))'], shape: 'picado', onShow: () => {} }}>
+        <SceneBoat kind="sailboat" tone="day" lit={false} wake={false} />
+      </BuntingContext.Provider>
+    );
+    expect(screen.getByTestId('boat-bunting').querySelectorAll('rect').length).toBeGreaterThan(2);
 });

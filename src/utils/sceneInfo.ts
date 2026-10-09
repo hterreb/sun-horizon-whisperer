@@ -22,13 +22,16 @@ import { type LiveRoute, type RouteAirport } from './planeFeed';
 import { UFO_CHANCE } from './hiddenEggs';
 import { SANTA_DAYS_PER_YEAR, getEventDaysPerYear, type CalendarEvent } from './calendarEvents';
 import { NATIONAL_DAY_DAYS_PER_YEAR, type NationalDayKind } from './nationalDays';
+import { type FestivalEgg } from './festivalEvents';
 
 // Item 113: the easter eggs and special events that are one thing in the scene and take taps.
 // Not the collection's EggKind (item 112), which has one badge per egg or event.
 export type EggCardKind = 'ufo' | 'ghost' | 'dragon' | 'santa' | 'blackCat' | 'halloweenBat' | 'pumpkinMoon'
   | 'matariki' | 'conjunction' | 'noctilucent' | 'midnightSun' | 'polarNight'
   | NationalDayKind
-  | 'emptyTomb' | 'potOfGold' | 'heartCloud'; // item 117
+  | 'emptyTomb' | 'potOfGold' | 'heartCloud' // item 117
+  // Item 118: the festival eggs (FestivalEggs). Holi tints the clouds, which keep their cloud cards.
+  | Exclude<FestivalEgg, 'holi'>;
 
 export type SceneInfoTarget =
   | { type: 'fish'; kind: FishKind }
@@ -204,6 +207,18 @@ const EGGS: Record<EggCardKind, { name: MessageKey; fact: MessageKey; hidden: bo
   emptyTomb: { name: 'egg.easter', fact: 'eggFact.emptyTomb', hidden: false, chance: { event: 'easter' } },
   potOfGold: { name: 'egg.stPatrick', fact: 'eggFact.potOfGold', hidden: false, chance: { event: 'st-patrick' } },
   heartCloud: { name: 'egg.valentine', fact: 'eggFact.heartCloud', hidden: false, chance: { event: 'valentine' } },
+  // Item 118: cultural festivals.
+  loyKrathong: { name: 'egg.loyKrathong', fact: 'eggFact.loyKrathong', hidden: false, chance: { event: 'loy-krathong' } },
+  diwali: { name: 'egg.diwali', fact: 'eggFact.diwali', hidden: false, chance: { event: 'diwali' } },
+  eidAlFitr: { name: 'egg.eidAlFitr', fact: 'eggFact.eidAlFitr', hidden: false, chance: { event: 'eid-al-fitr' } },
+  midAutumn: { name: 'egg.midAutumn', fact: 'eggFact.midAutumn', hidden: false, chance: { event: 'mid-autumn' } },
+  hanami: { name: 'egg.hanami', fact: 'eggFact.hanami', hidden: false, chance: { event: 'hanami' } },
+  tanabata: { name: 'egg.tanabata', fact: 'eggFact.tanabata', hidden: false, chance: { event: 'tanabata' } },
+  diaDeMuertos: { name: 'egg.diaDeMuertos', fact: 'eggFact.diaDeMuertos', hidden: false, chance: { event: 'dia-de-muertos' } },
+  hanukkah: { name: 'egg.hanukkah', fact: 'eggFact.hanukkah', hidden: false, chance: { event: 'hanukkah' } },
+  nowruz: { name: 'egg.nowruz', fact: 'eggFact.nowruz', hidden: false, chance: { event: 'nowruz' } },
+  midsummer: { name: 'egg.midsummer', fact: 'eggFact.midsummer', hidden: false, chance: { event: 'midsummer' } },
+  carnival: { name: 'egg.carnival', fact: 'eggFact.carnival', hidden: false, chance: { event: 'carnival' } },
 };
 
 const DIRECTIONS: MessageKey[] = [

@@ -112,7 +112,7 @@ interface SceneBoatProps {
 const SceneBoat = ({ kind, tone, lit, wake, seaWindKmh = UNKNOWN_SEA_WIND_KMH }: SceneBoatProps) => {
   const id = useId().replace(/:/g, '');
   const boat = FLEET[kind];
-  // National days: a decorated boat reports that it shows, so the egg's badge counts.
+  // National days and Día de los Muertos: a decorated boat reports that it shows, so the egg's badge counts.
   const bunting = useBunting();
   useEffect(() => bunting?.onShow(), [bunting]);
   const height = BOAT_HEIGHT_PX;
@@ -163,7 +163,7 @@ const SceneBoat = ({ kind, tone, lit, wake, seaWindKmh = UNKNOWN_SEA_WIND_KMH }:
           </g>
         )}
         {parts}
-        {bunting && <BoatBunting kind={kind} colors={bunting.colors} />}
+        {bunting && <BoatBunting kind={kind} colors={bunting.colors} shape={bunting.shape} />}
       </svg>
       {/* X1: a faint, still mirror image below the waterline, fading out downward: sharp in
           calm water, striped and fainter in wind (item 79, X2). */}
