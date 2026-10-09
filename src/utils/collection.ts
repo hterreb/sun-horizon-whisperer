@@ -8,6 +8,7 @@ import { getBoatShare, getFishShare, getFlyerShare, type BirdKind, type BoatKind
 import { type CloudType } from './skyCloudUtils';
 import { type CalendarEvent } from './calendarEvents';
 import { type AstroEventKind } from './astroEvents';
+import { type NationalDay, type NationalDayKind } from './nationalDays';
 import { type TimeOfDay } from './sunUtils';
 import { getMoonPhaseIndex } from './moonUtils';
 import { ridgeAt, type HorizonProfile } from './horizonUtils';
@@ -16,7 +17,8 @@ export type EggKind =
   | 'sunglasses' | 'ufo' | 'disco'
   | 'newYear' | 'friday13' | 'lunarNewYear' | 'solstice' | 'equinox' | 'halloweenPumpkin' | 'halloweenBats' | 'christmas' | 'santa'
   | 'solarEclipse' | 'lunarEclipse' | 'greenFlash' | 'supermoon' | 'blueMoon' | 'meteorShower' | 'aurora'
-  | 'matariki' | 'conjunction' | 'noctilucent' | 'midnightSun' | 'polarNight';
+  | 'matariki' | 'conjunction' | 'noctilucent' | 'midnightSun' | 'polarNight'
+  | NationalDayKind;
 // Item 115: the states of the sun, the moon and the terrain.
 export type SunState = 'dawn' | 'morning' | 'midday' | 'afternoon' | 'evening';
 export type MoonState =
@@ -88,6 +90,10 @@ const EGGS: [EggKind, MessageKey][] = [
   // Sky eggs.
   ['matariki', 'egg.matariki'], ['conjunction', 'egg.conjunction'], ['noctilucent', 'egg.noctilucent'],
   ['midnightSun', 'egg.midnightSun'], ['polarNight', 'egg.polarNight'],
+  // National days (nationalDays.ts), one badge each.
+  ['festaRepubblica', 'egg.festaRepubblica'], ['bastilleDay', 'egg.bastilleDay'], ['independenceDay', 'egg.independenceDay'],
+  ['guyFawkes', 'egg.guyFawkes'], ['germanUnity', 'egg.germanUnity'], ['fiestaNacional', 'egg.fiestaNacional'],
+  ['canadaDay', 'egg.canadaDay'], ['australiaDay', 'egg.australiaDay'], ['kingsDay', 'egg.kingsDay'],
 ];
 
 // The grid order. A fish's tier is its day share; getFishShare falls back to the night share
@@ -234,10 +240,30 @@ export const badgeForSanta = (santaTime: boolean, o: Pick<CalendarBadgeOptions, 
 
 export const badgeForAstroEvent = (kind: AstroEventKind): BadgeId => `egg:${kind}`;
 
-// Test links (?egg=, ?fish=, ?hunt=) force a scene, so nothing counts while one is set.
+export interface NationalBadgeOptions {
+  isDay: boolean; // the sun is up (dawn to evening)
+  isNight: boolean; // dark sky: night or astronomical/nautical twilight
+  reducedMotion: boolean;
+  isTimePreview: boolean;
+}
+
+// National days: the badge when the scene really shows the egg (NationalEggs' rules). The jets
+// fly by day and the fireworks burst at night; reduced motion hides both, but the Guy Fawkes
+// bonfire glow stays. Bunting gives null here: a decorated boat reports itself (useBunting),
+// as a bunting day without a boat on screen shows nothing. Never in the time preview.
+export const badgeForNationalDay = (day: NationalDay | null, o: NationalBadgeOptions): BadgeId | null => {
+  if (!day || o.isTimePreview) return null;
+  switch (day.style) {
+    case 'jets': return o.isDay && !o.reducedMotion ? `egg:${day.kind}` : null;
+    case 'fireworks': return o.isNight && (!o.reducedMotion || day.bonfire) ? `egg:${day.kind}` : null;
+    case 'bunting': return null;
+  }
+};
+
+// Test links (?egg=, ?fish=, ?hunt=, ?country=) force a scene, so nothing counts while one is set.
 export const isCollectionPaused = (search: string): boolean => {
   const params = new URLSearchParams(search);
-  return params.has('egg') || params.has('fish') || params.has('hunt');
+  return params.has('egg') || params.has('fish') || params.has('hunt') || params.has('country');
 };
 
 export const countCollected = (collection: Collection): number =>

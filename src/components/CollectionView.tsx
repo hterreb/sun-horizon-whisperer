@@ -4,6 +4,7 @@ import {
   Sparkles, Star, Sun, SunMoon, Sunset, TreePine, X, type LucideIcon,
   CloudMoon, Orbit, Sparkle, SunDim,
 } from 'lucide-react';
+import { Crown, Flag, Plane } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import SceneFish from '@/components/SceneFish';
 import { VisitorShape } from '@/components/SceneVisitor';
@@ -86,6 +87,16 @@ const EGG_ICONS: Record<Exclude<EggKind, 'ufo' | 'santa'>, [LucideIcon, string]>
   noctilucent: [CloudMoon, 'text-brand-cyan'],
   midnightSun: [SunDim, 'text-brand-gold'],
   polarNight: [MoonStar, 'text-brand-sky'],
+  // National days (nationalDays.ts).
+  festaRepubblica: [Plane, 'text-green-400'],
+  bastilleDay: [Sparkles, 'text-brand-sky'],
+  independenceDay: [Sparkles, 'text-brand-coral'],
+  guyFawkes: [Flame, 'text-brand-sunset'],
+  germanUnity: [Flag, 'text-brand-gold'],
+  fiestaNacional: [Flag, 'text-brand-coral'],
+  canadaDay: [Flag, 'text-red-500'],
+  australiaDay: [Flag, 'text-brand-sky'],
+  kingsDay: [Crown, 'text-brand-sunset'],
 };
 
 const SKY_ICONS: Record<'sun' | 'moon' | 'terrain' | 'satellite', [LucideIcon, string]> = {

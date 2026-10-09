@@ -5,6 +5,9 @@ interface FireworksProps {
   // Start time (ms) of the current show; 0 = none. A new value starts a new show.
   // The show runs to its end, however long the prop keeps this value (ROADMAP item 41).
   trigger: number;
+  // Burst colours (CSS colours); keep the array stable, a new one restarts the show. National
+  // days pass the flag colours (NationalEggs).
+  palette?: readonly string[];
 }
 
 // Burst colours that stand out on a sunset sky (no yellow or orange), plus a
@@ -44,8 +47,8 @@ interface Spark {
   rocket?: PlannedBurst; // set while it is a rising rocket
 }
 
-const burst = (x: number, y: number, big: boolean): Spark[] => {
-  const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+const burst = (x: number, y: number, big: boolean, colors: readonly string[]): Spark[] => {
+  const color = colors[Math.floor(Math.random() * colors.length)];
   const n = big ? 110 : 60;
   return Array.from({ length: n }, (_, i) => {
     const angle = (i / n) * Math.PI * 2 + Math.random() * 0.1;
@@ -58,7 +61,7 @@ const burst = (x: number, y: number, big: boolean): Spark[] => {
   });
 };
 
-const Fireworks: React.FC<FireworksProps> = ({ trigger }) => {
+const Fireworks: React.FC<FireworksProps> = ({ trigger, palette = COLORS }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sparksRef = useRef<Spark[]>([]);
   const rafRef = useRef<number | null>(null);
@@ -98,7 +101,7 @@ const Fireworks: React.FC<FireworksProps> = ({ trigger }) => {
         s.life -= dt;
         if (s.rocket) {
           s.y += s.vy * dt;
-          if (s.life <= 0) next.push(...burst(s.x, s.y, s.rocket.big));
+          if (s.life <= 0) next.push(...burst(s.x, s.y, s.rocket.big, palette));
           else next.push(s);
           continue;
         }
@@ -136,7 +139,7 @@ const Fireworks: React.FC<FireworksProps> = ({ trigger }) => {
       rafRef.current = null;
       sparksRef.current = [];
     };
-  }, [trigger, prefersReducedMotion]);
+  }, [trigger, prefersReducedMotion, palette]);
 
   if (prefersReducedMotion) return null;
   return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />;

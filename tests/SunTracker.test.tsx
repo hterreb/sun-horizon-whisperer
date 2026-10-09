@@ -1341,3 +1341,65 @@ describe('SunTracker', () => {
     });
   });
 });
+
+// National days (utils/nationalDays): the country comes from InfoPanel's reverse-geocode answer.
+describe('SunTracker national days', () => {
+  const BERLIN = { latitude: 52.52, longitude: 13.4 };
+  const answer = (countryCode: string) => {
+    global.fetch = vi.fn((url: string) => String(url).includes('bigdatacloud')
+      ? Promise.resolve({ json: () => Promise.resolve({ city: 'Berlin', countryName: 'Germany', countryCode }) })
+      : Promise.reject(new Error('offline'))) as unknown as typeof fetch;
+  };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    localStorage.clear();
+    sessionStorage.clear();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-03T10:00:00Z')); // German Unity Day, noon in Berlin
+    vi.stubGlobal('navigator', { ...navigator, geolocation: { getCurrentPosition: (ok: PositionCallback) => ok({ coords: BERLIN } as GeolocationPosition) } });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    window.history.pushState({}, '', '/');
+  });
+
+  it('dresses the boats with bunting in the detected country, and the badge counts when a boat shows', async () => {
+    answer('DE');
+    render(<SunTracker />);
+    await waitFor(() => expect(screen.getAllByTestId('boat-bunting').length).toBeGreaterThan(0));
+    await waitFor(() => expect(JSON.parse(localStorage.getItem('collection') ?? '{}')).toHaveProperty('egg:germanUnity'));
+  });
+
+  it('shows no national egg in another country', async () => {
+    answer('AT');
+    render(<SunTracker />);
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('bigdatacloud')));
+    await waitFor(() => expect(screen.getAllByTestId('scene-boat').length).toBeGreaterThan(0));
+    expect(screen.queryByTestId('boat-bunting')).toBeNull();
+  });
+
+  it('shows no national egg when the country is unknown (no answer)', async () => {
+    global.fetch = vi.fn(() => Promise.reject(new Error('offline'))) as unknown as typeof fetch;
+    render(<SunTracker />);
+    await waitFor(() => expect(screen.getAllByTestId('scene-boat').length).toBeGreaterThan(0));
+    expect(screen.queryByTestId('boat-bunting')).toBeNull();
+  });
+
+  it('?country=DE sets the country and counts no badge', async () => {
+    window.history.pushState({}, '', '/?country=DE');
+    global.fetch = vi.fn(() => Promise.reject(new Error('offline'))) as unknown as typeof fetch;
+    render(<SunTracker />);
+    await waitFor(() => expect(screen.getAllByTestId('boat-bunting').length).toBeGreaterThan(0));
+    expect(localStorage.getItem('collection')).toBeNull();
+  });
+
+  it('?egg=festaRepubblica flies the jets on any day and counts no badge', async () => {
+    window.history.pushState({}, '', '/?egg=festaRepubblica');
+    global.fetch = vi.fn(() => Promise.reject(new Error('offline'))) as unknown as typeof fetch;
+    render(<SunTracker />);
+    await waitFor(() => expect(screen.getByTestId('national-jets')).toBeInTheDocument());
+    expect(localStorage.getItem('collection')).toBeNull();
+  });
+});
