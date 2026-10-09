@@ -2222,6 +2222,55 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Checked:** tests for the thresholds (25 / 10 / 3 / 1 %, bats frequent, gull common), no share gives ultra rare, the 6 classes and tokens, each egg card (kicker, title, fact, tier, chance text in English and German), the days a year, and taps on the UFO, the ghost, the dragon, the cat, a bat and the pumpkin (component tests, and the UFO card in `SunTracker`). Typecheck, lint and all tests pass. In the browser at 390 × 844 (Konstanz): the UFO (`?egg=ufo`), the dragon (`?egg=dragon`), the cat (clock on 2026-11-13), a Halloween bat (2026-10-31), the pumpkin moon (2028-10-31) and the ghost (00:00) each take a tap and show their card with the violet ring. On a phone the chance text can wrap to a second line.
 - **Follow-up (2026-10-09):** (1) The solstice and equinox badge text is in the 5 languages (keys `egg.seasonLongest`, `egg.seasonShortest`, `egg.seasonEquinox`). (2) The midnight ghost does not pulse. It breathes slowly: `animate-ghost-breathe` (opacity 1 to 0.8 and back, 8 s cycle). With reduced motion it is static. (3) The UFO has no z-index again, so it draws behind the sun, the moon, the arcs and the clouds. Cause of the old `z-1`: the `SunVisualization` root (full screen) took the tap. The root is now `pointer-events-none`; the sun, moon and countdown buttons are `pointer-events-auto`. Checked in the browser at 390 × 844 with `?egg=ufo`: the sun button is above the UFO, and a tap on the UFO opens its card. (4) The collection's egg badges are ultra rare (`rarity.ultraRare`), like the egg cards.
 
+### 114. Collection: a new badge shows like a game achievement — S — [SUN-CHASER-15](https://ainabler.sentry.io/issues/SUN-CHASER-15)
+
+- **Feedback (2026-10-09, release `e8e9f21`, Ravensburg):** "The new collection popup should look more like a game achievement maybe with a little animation".
+- **Now:** a first find shows the plain shadcn toast "New: Seahorse" (`SunTracker.collect`, `toast({ title: t('collection.new') })`).
+- **Spec:**
+  1. A new component `BadgeUnlocked` replaces the toast for a new badge. Other toasts (weather, location) do not change.
+  2. **Look:** a glass card (the glass style, 18 px corners) at the top centre, below the safe area. Left: the badge as in the collection grid (item 112), in colour, with the tier ring (item 113). Right: the kicker "Badge unlocked" (lucide `Award`), the badge name, the tier word in the tier colour, and the counter "24 / 68".
+  3. **Animation (calm, see the scene-motion rule):** the card slides down 12 px and fades in (400 ms, ease-out). Then one soft light sweep crosses the badge (800 ms, once). The tier ring glows once in the tier colour (fade in and out, 1.2 s). No bounce, no shake, no confetti, no sound. With `prefers-reduced-motion`: fade in only, no sweep, no glow.
+  4. **Close:** after 4 s it fades out (300 ms). A tap on the card opens the collection view at that badge. A swipe up or Escape closes it.
+  5. Two new badges in a short time show one after the other, not stacked (a queue in `SunTracker`, one card at a time).
+  6. **Accessibility:** `role="status"`, `aria-live="polite"`. The text is "Badge unlocked: Seahorse, rare".
+  7. Every text in `en.ts`, `de.ts`, `es.ts`, `it.ts`, `fr.ts`.
+- **Done when:** component tests (shows name, tier and counter; closes after 4 s; a tap opens the collection; two badges show in sequence; reduced motion has no sweep class). `tests/i18n.test.ts` passes. Browser check at 390 × 844. Frame budget (item 91): CSS animation only, no rAF.
+- **Open:** a lookbook with 2–3 looks before the build, or build this spec directly.
+
+### 115. Collection: terrain heights, sun and moon states — M — [SUN-CHASER-16](https://ainabler.sentry.io/issues/SUN-CHASER-16)
+
+- **Feedback (2026-10-09, release `e8e9f21`, Ravensburg):** "Terrain shouldn't just be terrain but also at which height as a. Collection item. So should the sun and the moon in different states".
+- **Now:** the sun, the moon and the terrain have one badge each (`BADGES` in `collection.ts`, `rarity: null`).
+- **Assumption:** "height" is the height of the ridge point that the tap hits (the terrain card's height row, `ridgeHeights`), not the eye height.
+- **Spec:**
+  1. The three base badges (`sun`, `moon`, `terrain`) stay, so no saved badge is lost. The first tap still collects the base badge.
+  2. **Terrain heights:** a tap on the terrain also collects the badge of the height band of the ridge point. Bands: hills < 500 m, low mountains 500–1000 m, mountains 1000–2000 m, high mountains 2000–3000 m, alpine peaks ≥ 3000 m. Ids `terrain:hills` … `terrain:alpine`. The badge shows the ridge shape with 1–5 peaks.
+  3. **Sun states:** a tap on the sun collects the badge of the time of day (`getTimeOfDay`): dawn, morning, midday, afternoon, evening. Ids `sun:dawn` … `sun:evening`. The badge shows the sun in the colour of that time's sky gradient.
+  4. **Moon states:** a tap on the moon collects the badge of the phase (`getMoonPhaseIndex`, 8 phases). Ids `moon:new` … `moon:waningCrescent`. The badge uses `getMoonPhasePath`, so no new artwork.
+  5. A tap can collect two badges (base and state). The pop-up (item 114) shows them one after the other.
+  6. The grid groups the states under their base badge (one row each for sun, moon, terrain). A missing state shows a grey outline, by the item 112 rules.
+  7. The time preview and test links do not collect (item 112 rules).
+  8. Badge total: 68 + 5 + 5 + 8 = 86.
+- **Check in the build:** a new moon is dark. If the moon button does not take a tap then, the new-moon badge cannot be collected. Fix: the button stays tappable at a new moon (the card exists already).
+- **Done when:** util tests (band per height at the limits 500 / 1000 / 2000 / 3000 m; state per time of day and per phase; base and state on one tap; old saves load). Component test: a sun tap at midday collects `sun` and `sun:midday`. `tests/i18n.test.ts` passes.
+- **Depends on:** items 112, 95. Item 114 is good to have first (two badges on one tap).
+
+### 116. Info cards and collecting work only on a double tap — S
+
+- **Request (2026-10-09):** "the infopanel and collection should only work on doubletap".
+- **Assumption:** "infopanel" means the info cards of item 95 (a tap on a thing in the scene), not the InfoPanel buttons. "Collection" means collecting a badge on that tap (item 112).
+- **Why:** a single touch (phone in the hand, a scroll, a child) opens a card and collects a badge by accident.
+- **Spec:**
+  1. A double tap opens the card and collects: two taps on the same target within 350 ms. One shared hook (`useDoubleTap`) in all scene hit areas (fish, birds, bats, boats, planes, satellites, clouds, eggs, sun, moon, terrain), so the rule is in one place.
+  2. A single tap opens nothing and collects nothing. It shows the thin ring (item 95) for 600 ms, so the user sees that the thing takes taps.
+  3. The second tap must hit the same target. A moving thing keeps its hit area in its moving wrapper, so this holds.
+  4. The hit areas get `touch-action: manipulation`, so the browser does not zoom on a double tap.
+  5. With a mouse, a double click works in the same way.
+  6. Keyboard (sun, moon, terrain buttons): Enter and Space still open the card at once (accessibility).
+  7. The sun egg (7 taps for the sunglasses) counts each single tap, as now. A double tap counts 2 taps.
+  8. The InfoPanel row "Collection" and the buttons in the InfoPanel do not change (one tap).
+- **Done when:** component tests (one tap: no card, no badge, ring shows; two taps in 350 ms: card and badge; two taps 500 ms apart: nothing; two taps on different targets: nothing; Enter opens at once; the sun egg still counts 7). In the browser at 390 × 844: no zoom on a double tap.
+
 ---
 
 ## Ongoing — Easter eggs and special events (S each, pick any time)
