@@ -65,6 +65,43 @@ describe('CalendarEggs', () => {
     expect(screen.queryByTestId('christmas-flake')).toBeNull();
   });
 
+  it('flies Santa once on Christmas Eve, also when it snows, then removes him', () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => frames.push(cb));
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    const { rerender } = render(<CalendarEggs {...base} event="christmas" />);
+    expect(screen.queryByTestId('santa')).toBeNull();
+    rerender(<CalendarEggs {...base} event="christmas" weatherType="snow" santa />);
+    expect(screen.getByTestId('santa')).toBeTruthy();
+    // jsdom's window is 1024 px wide: at the phone's 9.75 px/s, 1024 + 120 px take about 117 s.
+    act(() => { frames.shift()!(0); frames.shift()!(120_000); });
+    expect(screen.queryByTestId('santa')).toBeNull();
+    rerender(<CalendarEggs {...base} event="christmas" santa />);
+    expect(screen.queryByTestId('santa')).toBeNull();
+  });
+
+  it('keeps Santa in the sky until he is done when midnight ends Christmas Eve mid-flight', () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => frames.push(cb));
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    const { rerender } = render(<CalendarEggs {...base} event="christmas" santa />);
+    act(() => { frames.shift()!(0); frames.shift()!(30_000); });
+    const santa = screen.getByTestId('santa');
+    // 00:00: no longer Santa time, he flies on from where he is.
+    rerender(<CalendarEggs {...base} event="christmas" />);
+    expect(screen.getByTestId('santa')).toBe(santa);
+    act(() => { frames.shift()!(60_000); });
+    expect(screen.getByTestId('santa')).toBe(santa);
+    act(() => { frames.shift()!(120_000); });
+    expect(screen.queryByTestId('santa')).toBeNull();
+  });
+
+  it('shows Santa only with the Christmas event', () => {
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
+    render(<CalendarEggs {...base} event="friday-13" santa />);
+    expect(screen.queryByTestId('santa')).toBeNull();
+  });
+
   it('walks the black cat once, then removes it', () => {
     render(<CalendarEggs {...base} event="friday-13" />);
     const cat = screen.getByTestId('black-cat');
@@ -144,6 +181,16 @@ describe('CalendarEggs', () => {
       expect(hit.querySelector('[data-testid="scene-info-ring"]')!.className).toContain('border-tier-ultra-rare/80');
     });
 
+    it('opens the Santa card', () => {
+      vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
+      const onInfo = vi.fn();
+      render(<CalendarEggs {...base} event="christmas" santa onInfo={onInfo} infoRing="egg-santa" infoRingTier="ultraRare" />);
+      const santa = screen.getByTestId('santa');
+      tap(santa);
+      expect(onInfo).toHaveBeenLastCalledWith({ type: 'egg', kind: 'santa' }, { x: 120, y: 300 }, 'egg-santa');
+      expect(santa.querySelector('[data-testid="scene-info-ring"]')!.className).toContain('border-tier-ultra-rare/80');
+    });
+
     it('takes no taps without onInfo', () => {
       render(<CalendarEggs {...base} event="friday-13" />);
       expect(screen.getByTestId('black-cat').className).toContain('pointer-events-none');
@@ -159,8 +206,9 @@ describe('CalendarEggs', () => {
     expect(screen.queryByTestId('lunar-dragon')).toBeNull();
     rerender(<CalendarEggs {...base} event="halloween-bats" />);
     expect(screen.queryByTestId('halloween-bat')).toBeNull();
-    rerender(<CalendarEggs {...base} event="christmas" />);
+    rerender(<CalendarEggs {...base} event="christmas" santa />);
     expect(screen.queryByTestId('christmas-flake')).toBeNull();
+    expect(screen.queryByTestId('santa')).toBeNull();
     rerender(<CalendarEggs {...base} event="halloween-pumpkin" />);
     expect(screen.getByTestId('pumpkin-moon')).toBeTruthy();
   });

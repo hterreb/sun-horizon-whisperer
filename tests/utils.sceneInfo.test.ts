@@ -347,7 +347,7 @@ describe('sceneInfo: field guide data (ROADMAP item 107)', () => {
 describe('sceneInfo: easter egg cards (ROADMAP item 113)', () => {
   const info = (kind: EggCardKind, over?: Partial<SceneInfoContext>) => getSceneInfo({ type: 'egg', kind }, ctx(over));
   const eggCard = (kind: EggCardKind, t: Translate = en, over?: Partial<SceneInfoContext>) => read(info(kind, over), t);
-  const kinds: EggCardKind[] = ['ufo', 'ghost', 'dragon', 'blackCat', 'halloweenBat', 'pumpkinMoon'];
+  const kinds: EggCardKind[] = ['ufo', 'ghost', 'dragon', 'santa', 'blackCat', 'halloweenBat', 'pumpkinMoon'];
 
   it('gives every egg the "ultra rare" tier, a title, a field note and the rarity row', () => {
     for (const kind of kinds) {
@@ -368,7 +368,7 @@ describe('sceneInfo: easter egg cards (ROADMAP item 113)', () => {
   it('names a hidden egg an "Easter egg" and a calendar egg a "Special event"', () => {
     expect(info('ufo')).toMatchObject({ kicker: 'infoKind.easterEgg', icon: 'egg' });
     expect(info('ghost')).toMatchObject({ kicker: 'infoKind.easterEgg', icon: 'egg' });
-    for (const kind of ['dragon', 'blackCat', 'halloweenBat', 'pumpkinMoon'] as const) {
+    for (const kind of ['dragon', 'santa', 'blackCat', 'halloweenBat', 'pumpkinMoon'] as const) {
       expect(info(kind), kind).toMatchObject({ kicker: 'infoKind.specialEvent', icon: 'event' });
     }
     expect(info('blackCat').latin).toBe('Felis catus');
@@ -395,6 +395,15 @@ describe('sceneInfo: easter egg cards (ROADMAP item 113)', () => {
     expect(eggCard('halloweenBat')[2]).toBe('Rarity: Ultra rare · 0.8 days a year');
     expect(eggCard('pumpkinMoon')[2]).toBe('Rarity: Ultra rare · 1 day in 5 years');
     expect(eggCard('blackCat', de, { language: 'de' })[2]).toBe('Seltenheit: Ultraselten · 1,6 Tage im Jahr');
+  });
+
+  it('gives Santa 1 day a year (Dec 24 only, not the 3 Christmas days)', () => {
+    expect(getEventDaysPerYear('christmas')).toBe(3);
+    expect(eggCard('santa')).toEqual([
+      'Santa Claus', 'A misprinted phone number in a 1955 advert led US air defence to track Santa; NORAD still does it every Christmas Eve.',
+      'Rarity: Ultra rare · 1 day a year',
+    ]);
+    expect(eggCard('santa', de, { language: 'de' })[0]).toBe('Weihnachtsmann');
   });
 
   it('shows the tier alone for the midnight ghost (no chance in the code)', () => {

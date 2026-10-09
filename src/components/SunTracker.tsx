@@ -67,11 +67,11 @@ import { PremiumContext, usePremium } from '@/hooks/usePremium';
 import PremiumDialog from './PremiumDialog';
 import CollectionView from './CollectionView';
 import {
-  BADGES, addToCollection, badgeForAstroEvent, badgeForCalendarEvent, badgeForTarget, isCollectionPaused, loadCollection,
+  BADGES, addToCollection, badgeForAstroEvent, badgeForCalendarEvent, badgeForSanta, badgeForTarget, isCollectionPaused, loadCollection,
   saveCollection, type BadgeId, type Collection,
 } from '@/utils/collection';
 import { watchSunEvent, NO_SUN_EVENT_WATCH, getCountdownTarget } from '../utils/sunEvents';
-import { getCalendarEvent } from '@/utils/calendarEvents';
+import { getCalendarEvent, isSantaTime } from '@/utils/calendarEvents';
 import { PLAY_SPEED, PLAY_TICK_MS, clampTimeOffset } from '@/utils/timeTravel';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
 import { DISCO_MS, KONAMI_SEQUENCE, SUNGLASSES_MS, advanceKonami, getEggOverride, registerSunTap, rollUfo } from '@/utils/hiddenEggs';
@@ -757,13 +757,16 @@ const SunTracker: React.FC = () => {
   const [cloudEggForced] = useState(() => isCloudEggForced(window.location.search));
   const cloudEgg = cloudEggForced || isCloudEggDay(date, location.latitude, location.longitude);
   // Calendar easter eggs (ROADMAP "Ongoing"): one event id per minute. `?egg=dragon`
-  // forces Lunar New Year (item 100).
+  // forces Lunar New Year (item 100), `?egg=santa` Christmas with Santa's flight.
   const [dragonForced] = useState(() => new URLSearchParams(window.location.search).get('egg') === 'dragon');
+  const [santaForced] = useState(() => new URLSearchParams(window.location.search).get('egg') === 'santa');
   const calendarEvent = useMemo(
-    () => (dragonForced ? 'lunar-new-year' : getCalendarEvent(date, location.latitude)),
+    () => (dragonForced ? 'lunar-new-year' : santaForced ? 'christmas' : getCalendarEvent(date, location.latitude)),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on passMinuteKey, not `date` itself
     [passMinuteKey, location.latitude]
   );
+  // Christmas Eve: Santa flies once from sunset to midnight (the scene's sun times).
+  const isSanta = santaForced || isSantaTime(date, sunTimes);
 
   // Sunset countdown (ROADMAP item 43): 10 s of ticks and a chime at the next sunset
   // (line of sight when there is one). Live time only; the tap that turns it on
@@ -907,9 +910,9 @@ const SunTracker: React.FC = () => {
 
   // Collection badges (ROADMAP item 112) of the calendar and astronomy eggs, when the scene
   // really shows them (CalendarEggs' rules: dark sky = night or astronomical/nautical twilight).
-  // Not for a forced egg (?egg=dragon or any ?egg) and not in a time preview.
+  // Not for a forced egg (?egg=dragon, ?egg=santa or any ?egg) and not in a time preview.
   const isDarkSky = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
-  const calendarBadge = dragonForced ? null : badgeForCalendarEvent(calendarEvent, {
+  const calendarBadge = dragonForced || santaForced ? null : badgeForCalendarEvent(calendarEvent, {
     isNight: isDarkSky,
     moonUp: isDarkSky && moonPosition.visible && getMoonLook(weatherType, cloudCover).disc > 0,
     weatherType,
@@ -919,6 +922,10 @@ const SunTracker: React.FC = () => {
   useEffect(() => {
     if (calendarBadge) collect(calendarBadge);
   }, [calendarBadge, collect]);
+  const santaBadge = santaForced ? null : badgeForSanta(isSanta, { reducedMotion: prefersReducedMotion, isTimePreview });
+  useEffect(() => {
+    if (santaBadge) collect(santaBadge);
+  }, [santaBadge, collect]);
   // Reduced motion draws no shooting stars, so the meteor shower does not count then.
   const astroKind = astroEggOverride || isTimePreview ? null : astroEvent?.kind ?? null;
   const astroBadge = astroKind && !(astroKind === 'meteorShower' && prefersReducedMotion) ? badgeForAstroEvent(astroKind) : null;
@@ -1078,6 +1085,7 @@ const SunTracker: React.FC = () => {
             infoRing={infoCard?.ring ?? null}
             infoRingTier={infoCardInfo?.tier ?? null}
             calendarEvent={calendarEvent}
+            santa={isSanta}
             playDirection={playDirection}
             satellites={satelliteTracking.sky}
             sunsetCountdown={countdownSeconds === null ? null : { seconds: countdownSeconds, lineOfSight: !!countdownTarget?.lineOfSight }}

@@ -1031,6 +1031,27 @@ describe('SunTracker', () => {
       expect(newToasts()).toHaveLength(0);
     });
 
+    it('on Christmas Eve after sunset, Santa flies with the snow and his badge counts', () => {
+      vi.useFakeTimers();
+      // 21:00 UTC: about 5.5 h after sunset in Ravensburg (the tests run in UTC).
+      vi.setSystemTime(new Date('2026-12-24T21:00:00Z'));
+      try {
+        render(<SunTracker />);
+        expect(visProps.current).toMatchObject({ calendarEvent: 'christmas', santa: true });
+        expect(JSON.parse(localStorage.getItem('collection')!)).toHaveProperty('egg:santa');
+        expect(newToasts()).toContainEqual([{ title: 'New: Santa Claus' }]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('?egg=santa forces Santa and the Christmas snow, and collects nothing', () => {
+      window.history.pushState({}, '', '/?egg=santa');
+      render(<SunTracker />);
+      expect(visProps.current).toMatchObject({ calendarEvent: 'christmas', santa: true });
+      expect(localStorage.getItem('collection')).toBeNull();
+    });
+
     it('the InfoPanel button opens the collection; the close button closes it', () => {
       render(<SunTracker />);
       expect(visProps.current).not.toBeNull();

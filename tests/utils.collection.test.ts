@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  BADGES, COLLECTION_STORAGE_KEY, addToCollection, badgeForAstroEvent, badgeForCalendarEvent, badgeForTarget,
+  BADGES, COLLECTION_STORAGE_KEY, addToCollection, badgeForAstroEvent, badgeForCalendarEvent, badgeForSanta, badgeForTarget,
   countCollected, isCollectionPaused, loadCollection, saveCollection, type BadgeId, type CalendarBadgeOptions,
 } from '@/utils/collection';
 import { FISH_WEIGHTS, BIRD_WEIGHTS, type FishKind } from '@/utils/weatherEffectsUtils';
@@ -16,15 +16,15 @@ describe('collection (ROADMAP item 112)', () => {
     vi.restoreAllMocks();
   });
 
-  it('has 68 badges with unique ids, one for every fish, flyer, boat and cloud type', () => {
+  it('has 69 badges with unique ids, one for every fish, flyer, boat and cloud type', () => {
     const ids = BADGES.map(b => b.id);
-    expect(ids).toHaveLength(68);
-    expect(new Set(ids).size).toBe(68);
+    expect(ids).toHaveLength(69);
+    expect(new Set(ids).size).toBe(69);
     for (const kind of [...FISH_WEIGHTS.map(([k]) => k), ...NIGHT_ONLY]) expect(ids).toContain(`fish:${kind}`);
     for (const kind of [...BIRD_WEIGHTS.map(([k]) => k), 'bat']) expect(ids).toContain(`flyer:${kind}`);
     for (const kind of ['sailboat', 'ferry', 'fishing', 'rowboat', 'freighter']) expect(ids).toContain(`boat:${kind}`);
     for (const type of ['Ci', 'Cs', 'Ac', 'As', 'Cu', 'Sc', 'St', 'Ns', 'Cb', 'Len', 'Mam']) expect(ids).toContain(`cloud:${type}`);
-    expect(BADGES.filter(b => b.group === 'egg')).toHaveLength(18);
+    expect(BADGES.filter(b => b.group === 'egg')).toHaveLength(19);
     expect(BADGES.find(b => b.id === 'plane')?.group).toBe('sky');
   });
 
@@ -102,6 +102,14 @@ describe('collection (ROADMAP item 112)', () => {
     expect(badgeForCalendarEvent('friday-13', shown)).toBe('egg:friday13');
     expect(badgeForCalendarEvent('friday-13', { ...shown, reducedMotion: true })).toBeNull();
     expect(badgeForCalendarEvent('lunar-new-year', { ...shown, reducedMotion: true })).toBeNull();
+  });
+
+  it('gives Santa his badge when he flies: also in snow, not with reduced motion or in a time preview', () => {
+    const live = { reducedMotion: false, isTimePreview: false };
+    expect(badgeForSanta(true, live)).toBe('egg:santa');
+    expect(badgeForSanta(false, live)).toBeNull();
+    expect(badgeForSanta(true, { ...live, reducedMotion: true })).toBeNull();
+    expect(badgeForSanta(true, { ...live, isTimePreview: true })).toBeNull();
   });
 
   it('maps an astro event to its egg badge', () => {
