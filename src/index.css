@@ -473,7 +473,8 @@
     /* Scene palette — moon, water (the water's gradient comes from the sky, ROADMAP item 53) */
     --scene-moon: 216 12.2% 83.9%;
     --scene-moon-dark: 224 14.9% 19.8%; /* the moon disc's unlit-side fill */
-    --scene-solstice-trace: 43 90% 55%; /* the solstice/equinox egg's faint golden sun-path trace */
+    --scene-solstice-trace: 43 90% 55%; /* the solstice/equinox fan: today's bold golden sun path and pill */
+    --scene-solstice-fan: 0 0% 100%; /* the solstice/equinox fan: the other two dashed sun paths and pills */
     --scene-water: 194.3 86.3% 57.1%;
 
     /* Glass panel (InfoPanel restyle target, item 15) */
