@@ -1407,7 +1407,9 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             role="button"
             tabIndex={0}
             aria-label={t('scene.terrain')}
-            className="pointer-events-auto cursor-pointer touch-manipulation focus-visible:outline-2 focus-visible:outline-white/70"
+            // No tap highlight and no focus outline on a tap: on a phone they drew a bar across the
+            // screen (the box of the path). The keyboard focus keeps its outline.
+            className="pointer-events-auto cursor-pointer touch-manipulation outline-none [-webkit-tap-highlight-color:transparent] focus-visible:outline-2 focus-visible:outline-white/70"
             onClick={handleTerrainTap}
             onKeyDown={handleTerrainKey}
             data-testid="terrain-silhouette"
