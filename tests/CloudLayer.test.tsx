@@ -1090,6 +1090,19 @@ describe('CloudLayer info cards (ROADMAP item 95)', () => {
     expect(ringEl[0].closest('[aria-hidden="true"]')!.getAttribute('style')).toContain('moveAcrossX');
   });
 
+  it('colours the ring by the open card\'s rarity tier, and keeps the neutral ring without one (item 107)', () => {
+    const onInfo = vi.fn();
+    const view = renderScene({ onInfo });
+    fireEvent.click(hits(view.container)[0]);
+    const ring = onInfo.mock.calls[0][2] as string;
+    const ringClass = () => view.container.querySelector('[data-testid="scene-info-ring"]')!.className;
+    view.rerender(<CloudLayer weatherType="clear" timeOfDay="midday" onInfo={onInfo} infoRing={ring} infoRingTier="veryRare" />);
+    expect(ringClass()).toContain('border-tier-very-rare/80');
+    expect(ringClass()).not.toContain('border-white/70');
+    view.rerender(<CloudLayer weatherType="clear" timeOfDay="midday" onInfo={onInfo} infoRing={ring} infoRingTier={null} />);
+    expect(ringClass()).toContain('border-white/70');
+  });
+
   it('a tap on a cloud reports its type and its layer', () => {
     const onInfo = vi.fn();
     const { container } = render(<CloudLayer weatherType="cloudy" timeOfDay="midday" onInfo={onInfo} />);

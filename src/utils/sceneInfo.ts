@@ -1,18 +1,20 @@
 // Info cards (ROADMAP item 95): what the card shows for each thing in the scene. Pure: it
 // returns dictionary keys and values already formatted for the language; the card
-// (SceneInfoCard) translates them. No React, no DOM.
+// (SceneInfoCard) translates them. No React, no DOM. Item 107 (field guide look): also the
+// kicker (type name and icon), the Latin name, the fact and the rarity tier.
 
 import { formatNumber, type MessageKey, type Translate } from '@/i18n';
 import { type Language } from './language';
-import { formatTime, type NextGoldenBlueHours, type SunPosition, type TimeOfDay } from './sunUtils';
+import { formatTime, type NextGoldenBlueHours, type SunPosition, type SunTimes, type TimeOfDay } from './sunUtils';
 import { getMoonPhaseLabel, type MoonPosition, type MoonTimes } from './moonUtils';
 import { getMoonEclipticGeocentric } from './lunarEphemeris';
 import { isSupermoon } from './astroEvents';
 import { horizonAngleAt, ridgeAt, type HorizonProfile } from './horizonUtils';
 import { getCloudLayers, type CloudBand, type CloudLayers, type CloudType } from './skyCloudUtils';
 import {
-  getBoatShare, getFishShare, getFlyerShare, isNightWater, type BirdKind, type BoatKind, type FishKind,
+  getBatShare, getBoatShare, getFishShare, getFlyerShare, isNightWater, type BirdKind, type BoatKind, type FishKind,
 } from './weatherEffectsUtils';
+import { type RarityTier } from './rarityTier';
 import { type WeatherType } from '@/components/CloudLayer';
 import { type SatelliteCard } from './satelliteUtils';
 import { type ContrailKind } from './planes';
@@ -36,13 +38,23 @@ export interface InfoText {
   vars?: Record<string, string | number | InfoText>;
 }
 // One row: an optional label on the left, the value (a dictionary text or a formatted value).
+// The rarity row has its tier, for the card's tier meter.
 export interface InfoLine {
   label?: MessageKey;
   value: InfoText | string;
+  tier?: RarityTier;
 }
+// The kicker's icon; SceneInfoCard has the drawing and the colour for each.
+export type SceneIconId =
+  | 'water' | 'visitor' | 'bird' | 'bat' | 'boat' | 'plane' | 'cloud' | 'sun' | 'moon' | 'terrain' | 'satellite';
 export interface SceneInfo {
+  kicker: MessageKey; // the type name over the title
+  icon: SceneIconId;
   title: MessageKey;
+  latin?: string; // the scientific name; not translated
   lines: InfoLine[];
+  fact?: { label: MessageKey; text: MessageKey }; // the "Field note" at the end
+  tier: RarityTier | null; // null: no rarity row
 }
 
 // What the sun, moon, cloud and terrain cards read; SunTracker has all of it.
@@ -51,6 +63,9 @@ export interface SceneInfoContext {
   now: Date;
   // Day or night fish pool (item 105).
   timeOfDay: TimeOfDay;
+  // The day's sun and twilight times of the scene (CloudLayer's time of day), for the bats'
+  // share of the flying time (item 107). Null before the place is known.
+  sceneSunTimes: SunTimes | null;
   sunPosition: SunPosition;
   // The sunrise and sunset of the pass the arc draws, and the line-of-sight times.
   sunTimes: { sunrise: Date | null; sunset: Date | null } | null;
@@ -67,25 +82,28 @@ export interface SceneInfoContext {
   route?: LiveRoute | null;
 }
 
-const FISH: Record<FishKind, { name: MessageKey; fact: MessageKey }> = {
+// Item 107: the Latin name where the kind is one species. Group names (fish, ray, sea turtle,
+// jellyfish, seahorse, whale, pufferfish, lanternfish, anglerfish, shark, dolphins) have none.
+// The catfish of a European lake is the wels; the glowing squid is the firefly squid.
+const FISH: Record<FishKind, { name: MessageKey; fact: MessageKey; latin?: string }> = {
   classic: { name: 'fish.classic', fact: 'fishFact.classic' },
-  minnow: { name: 'fish.minnow', fact: 'fishFact.minnow' },
-  perch: { name: 'fish.perch', fact: 'fishFact.perch' },
-  pike: { name: 'fish.pike', fact: 'fishFact.pike' },
-  carp: { name: 'fish.carp', fact: 'fishFact.carp' },
-  catfish: { name: 'fish.catfish', fact: 'fishFact.catfish' },
-  trout: { name: 'fish.trout', fact: 'fishFact.trout' },
+  minnow: { name: 'fish.minnow', fact: 'fishFact.minnow', latin: 'Phoxinus phoxinus' },
+  perch: { name: 'fish.perch', fact: 'fishFact.perch', latin: 'Perca fluviatilis' },
+  pike: { name: 'fish.pike', fact: 'fishFact.pike', latin: 'Esox lucius' },
+  carp: { name: 'fish.carp', fact: 'fishFact.carp', latin: 'Cyprinus carpio' },
+  catfish: { name: 'fish.catfish', fact: 'fishFact.catfish', latin: 'Silurus glanis' },
+  trout: { name: 'fish.trout', fact: 'fishFact.trout', latin: 'Salmo trutta' },
   ray: { name: 'fish.ray', fact: 'fishFact.ray' },
   turtle: { name: 'fish.turtle', fact: 'fishFact.turtle' },
   jellyfish: { name: 'fish.jellyfish', fact: 'fishFact.jellyfish' },
   seahorse: { name: 'fish.seahorse', fact: 'fishFact.seahorse' },
   whale: { name: 'fish.whale', fact: 'fishFact.whale' },
   pufferfish: { name: 'fish.pufferfish', fact: 'fishFact.pufferfish' },
-  burbot: { name: 'fish.burbot', fact: 'fishFact.burbot' },
-  eel: { name: 'fish.eel', fact: 'fishFact.eel' },
+  burbot: { name: 'fish.burbot', fact: 'fishFact.burbot', latin: 'Lota lota' },
+  eel: { name: 'fish.eel', fact: 'fishFact.eel', latin: 'Anguilla anguilla' },
   lanternfish: { name: 'fish.lanternfish', fact: 'fishFact.lanternfish' },
   anglerfish: { name: 'fish.anglerfish', fact: 'fishFact.anglerfish' },
-  squid: { name: 'fish.squid', fact: 'fishFact.squid' },
+  squid: { name: 'fish.squid', fact: 'fishFact.squid', latin: 'Watasenia scintillans' },
   shark: { name: 'fish.shark', fact: 'fishFact.shark' },
   dolphins: { name: 'fish.dolphins', fact: 'fishFact.dolphins' },
 };
@@ -96,15 +114,17 @@ const DAY_AND_NIGHT: FishKind[] = ['jellyfish', 'shark', 'dolphins'];
 
 // Item 74's seasons (BIRD_MONTHS in weatherEffectsUtils), as words, so they hold in both
 // hemispheres. The bats fly at dusk all year.
-const BIRDS: Record<BirdKind | 'bat', { name: MessageKey; fact: MessageKey; season: MessageKey }> = {
+// Item 107: the Latin name of the common species at Lake Constance (item 74). Gulls, geese and
+// bats are several common species there, so they have none.
+const BIRDS: Record<BirdKind | 'bat', { name: MessageKey; fact: MessageKey; season: MessageKey; latin?: string }> = {
   gull: { name: 'bird.gull', fact: 'birdFact.gull', season: 'info.allYear' },
-  heron: { name: 'bird.heron', fact: 'birdFact.heron', season: 'info.allYear' },
-  stork: { name: 'bird.stork', fact: 'birdFact.stork', season: 'info.springSummer' },
-  swan: { name: 'bird.swan', fact: 'birdFact.swan', season: 'info.allYear' },
+  heron: { name: 'bird.heron', fact: 'birdFact.heron', season: 'info.allYear', latin: 'Ardea cinerea' },
+  stork: { name: 'bird.stork', fact: 'birdFact.stork', season: 'info.springSummer', latin: 'Ciconia ciconia' },
+  swan: { name: 'bird.swan', fact: 'birdFact.swan', season: 'info.allYear', latin: 'Cygnus olor' },
   geese: { name: 'bird.geese', fact: 'birdFact.geese', season: 'info.migration' },
-  cormorant: { name: 'bird.cormorant', fact: 'birdFact.cormorant', season: 'info.allYear' },
-  kestrel: { name: 'bird.kestrel', fact: 'birdFact.kestrel', season: 'info.allYear' },
-  starlings: { name: 'bird.starlings', fact: 'birdFact.starlings', season: 'info.autumn' },
+  cormorant: { name: 'bird.cormorant', fact: 'birdFact.cormorant', season: 'info.allYear', latin: 'Phalacrocorax carbo' },
+  kestrel: { name: 'bird.kestrel', fact: 'birdFact.kestrel', season: 'info.allYear', latin: 'Falco tinnunculus' },
+  starlings: { name: 'bird.starlings', fact: 'birdFact.starlings', season: 'info.autumn', latin: 'Sturnus vulgaris' },
   bat: { name: 'bird.bat', fact: 'birdFact.bat', season: 'info.dusk' },
 };
 
@@ -130,6 +150,12 @@ const CLOUD_FACTS: Record<CloudType, MessageKey> = {
   Ci: 'cloudFact.Ci', Cs: 'cloudFact.Cs', Ac: 'cloudFact.Ac', As: 'cloudFact.As', Cu: 'cloudFact.Cu', Sc: 'cloudFact.Sc',
   St: 'cloudFact.St', Ns: 'cloudFact.Ns', Cb: 'cloudFact.Cb', Len: 'cloudFact.Len', Mam: 'cloudFact.Mam',
 };
+// Item 107: the WMO Latin name. The card shows it only when the title differs (in English most
+// titles are the Latin genus). Mammatus is a feature, not a genus or species, so it has none.
+const CLOUD_LATIN: Partial<Record<CloudType, string>> = {
+  Ci: 'Cirrus', Cs: 'Cirrostratus', Ac: 'Altocumulus', As: 'Altostratus', Cu: 'Cumulus', Sc: 'Stratocumulus',
+  St: 'Stratus', Ns: 'Nimbostratus', Cb: 'Cumulonimbus', Len: 'Altocumulus lenticularis',
+};
 const LAYERS: Record<CloudBand, MessageKey> = { low: 'info.layerLow', mid: 'info.layerMid', high: 'info.layerHigh' };
 
 const DIRECTIONS: MessageKey[] = [
@@ -154,18 +180,25 @@ const percent = (fraction: number, language: Language): string =>
   new Intl.NumberFormat(language, { style: 'percent', maximumFractionDigits: 0 }).format(fraction);
 
 // Item 105: the rarity tier of a spawn share (percent): the first tier whose minimum it reaches.
-export const RARITY_TIERS: [minShare: number, tier: MessageKey][] = [
-  [10, 'rarity.common'], [3, 'rarity.uncommon'], [1, 'rarity.rare'], [0, 'rarity.veryRare'],
+export const RARITY_TIERS: [minShare: number, tier: RarityTier][] = [
+  [10, 'common'], [3, 'uncommon'], [1, 'rare'], [0, 'veryRare'],
 ];
+const RARITY_NAMES: Record<RarityTier, MessageKey> = {
+  common: 'rarity.common', uncommon: 'rarity.uncommon', rare: 'rarity.rare', veryRare: 'rarity.veryRare',
+};
+
+export const rarityTier = (share: number): RarityTier => RARITY_TIERS.find(([min]) => share >= min)?.[1] ?? 'veryRare';
 
 // "Very rare · 0.5 %": the tier and the share, with at most one decimal ("<0.1" below that).
-const rarityLine = (share: number, language: Language): InfoLine => {
-  const tier = RARITY_TIERS.find(([min]) => share >= min)?.[1] ?? 'rarity.veryRare';
+const rarityLine = (share: number, language: Language): InfoLine & { tier: RarityTier } => {
+  const tier = rarityTier(share);
   const rounded = Math.round(share * 10) / 10;
   const value = rounded < 0.1 ? `<${formatNumber(language, 0.1, 1)}`
     : formatNumber(language, rounded, Number.isInteger(rounded) ? 0 : 1);
-  return { label: 'info.rarity', value: { key: 'info.rarityValue', vars: { tier: { key: tier }, share: value } } };
+  return { label: 'info.rarity', value: { key: 'info.rarityValue', vars: { tier: { key: RARITY_NAMES[tier] }, share: value } }, tier };
 };
+
+const fieldNote = (text: MessageKey) => ({ label: 'info.fieldNote' as const, text });
 
 // "2 h 13 min", or "45 min" under an hour.
 export const durationText = (ms: number): InfoText => {
@@ -241,42 +274,61 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
       const fish = FISH[target.kind];
       const when: MessageKey = NIGHT_ONLY.includes(target.kind) ? 'info.nightFish'
         : DAY_AND_NIGHT.includes(target.kind) ? 'info.dayAndNight' : 'info.dayFish';
+      const rarity = rarityLine(getFishShare(target.kind, isNightWater(ctx.timeOfDay)), language);
+      const visitor = target.kind === 'shark' || target.kind === 'dolphins';
       return {
+        kicker: visitor ? 'infoKind.seaVisitor' : 'infoKind.water',
+        icon: visitor ? 'visitor' : 'water',
         title: fish.name,
-        lines: [
-          { value: { key: fish.fact } }, { value: { key: when } },
-          rarityLine(getFishShare(target.kind, isNightWater(ctx.timeOfDay)), language),
-        ],
+        latin: fish.latin,
+        lines: [{ value: { key: when } }, rarity],
+        fact: fieldNote(fish.fact),
+        tier: rarity.tier,
       };
     }
     case 'bird': {
       const bird = BIRDS[target.kind];
+      const bat = target.kind === 'bat';
+      // Without the day's sun times there is no bat share, so no flyer has a rarity row.
+      const rarity = ctx.sceneSunTimes
+        ? rarityLine(getFlyerShare(target.kind, getBatShare(ctx.sceneSunTimes)), language) : null;
       return {
+        kicker: bat ? 'infoKind.bat' : 'infoKind.bird',
+        icon: bat ? 'bat' : 'bird',
         title: bird.name,
-        lines: [
-          { value: { key: bird.fact } }, { label: 'info.season', value: { key: bird.season } },
-          rarityLine(getFlyerShare(target.kind), language),
-        ],
+        latin: bird.latin,
+        lines: [{ label: 'info.season', value: { key: bird.season } }, ...(rarity ? [rarity] : [])],
+        fact: fieldNote(bird.fact),
+        tier: rarity?.tier ?? null,
       };
     }
     case 'boat': {
       const boat = BOATS[target.kind];
-      return { title: boat.name, lines: [{ value: { key: boat.fact } }, rarityLine(getBoatShare(target.kind), language)] };
+      const rarity = rarityLine(getBoatShare(target.kind), language);
+      return {
+        kicker: 'infoKind.boat', icon: 'boat', title: boat.name, lines: [rarity], fact: fieldNote(boat.fact), tier: rarity.tier,
+      };
     }
     case 'plane':
       return {
+        kicker: 'infoKind.plane',
+        icon: 'plane',
         title: 'plane.airliner',
         lines: [
-          { value: { key: 'planeFact.airliner' } },
           { label: 'info.altitude', value: { key: 'info.cruiseAltitude' } },
           { label: 'info.contrail', value: { key: CONTRAILS[target.contrail] } },
         ],
+        fact: fieldNote('planeFact.airliner'),
+        tier: null,
       };
     case 'livePlane':
       // Item 96 (Premium): an aircraft of the live feed. The feed has no airline: it comes from
       // the callsign (liveRadar). The route comes later, from its own request (item 111).
       return {
+        kicker: 'infoKind.plane',
+        icon: 'plane',
         title: 'plane.live',
+        tier: null,
         lines: [
           { label: 'info.callsign', value: target.callsign ?? '—' },
           { label: 'info.airline', value: target.airline ?? '—' },
@@ -289,18 +341,25 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
     case 'cloud': {
       const cover = getCloudLayers(ctx.weatherType, ctx.cloudLayers)[target.band];
       return {
+        kicker: 'infoKind.cloud',
+        icon: 'cloud',
         title: CLOUDS[target.cloudType],
+        latin: CLOUD_LATIN[target.cloudType],
         lines: [
-          { value: { key: CLOUD_FACTS[target.cloudType] } },
           { label: 'info.layer', value: { key: LAYERS[target.band] } },
           { label: 'info.cover', value: percent(cover / 100, language) },
         ],
+        fact: { label: 'info.cloudFact', text: CLOUD_FACTS[target.cloudType] },
+        tier: null,
       };
     }
     case 'sun': {
       const next = nextSunEvent(ctx);
       return {
+        kicker: 'infoKind.sky',
+        icon: 'sun',
         title: 'scene.sun',
+        tier: null,
         lines: [
           { label: 'info.altitude', value: signedDegrees(ctx.sunPosition.altitude, language) },
           { label: 'info.direction', value: directionText(ctx.sunPosition.azimuth) },
@@ -315,7 +374,10 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
       const riseSet = (time: Date | null): InfoText | string =>
         time ? formatTime(time, language) : moonTimes.alwaysUp ? { key: 'moon.upAllDay' } : moonTimes.alwaysDown ? { key: 'moon.downAllDay' } : '—';
       return {
+        kicker: 'infoKind.sky',
+        icon: 'moon',
         title: 'scene.moon',
+        tier: null,
         lines: [
           { label: 'info.phase', value: { key: getMoonPhaseLabel(moonPosition.phase) } },
           { label: 'info.lit', value: percent(moonPosition.illumination, language) },
@@ -330,7 +392,10 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
       const profile = ctx.horizonProfile;
       const ridge = profile ? ridgeAt(profile, target.azimuth) : null;
       return {
+        kicker: 'infoKind.horizon',
+        icon: 'terrain',
         title: 'scene.terrain',
+        tier: null,
         lines: [
           { label: 'info.direction', value: directionText(target.azimuth) },
           ...(profile ? [{ label: 'info.horizonAngle' as const, value: signedDegrees(horizonAngleAt(profile, target.azimuth), language) }] : []),
@@ -342,7 +407,7 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
       };
     }
     case 'satellite':
-      return { title: 'scene.satellite', lines: satelliteLines(target.name, ctx) };
+      return { kicker: 'infoKind.orbit', icon: 'satellite', title: 'scene.satellite', lines: satelliteLines(target.name, ctx), tier: null };
   }
 };
 

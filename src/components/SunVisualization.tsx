@@ -30,6 +30,7 @@ import Satellites, { type SatelliteDot } from './Satellites';
 import { ISS_NORAD_ID, getDotGapMs, getTwilightFade, isSatelliteWeather, type SkySatellite } from '@/utils/satelliteUtils';
 import { getTrailColour, isPlaneWeather, showsPlaneLights, type ContrailKind } from '@/utils/planes';
 import LivePlanes from './LivePlanes';
+import { type RarityTier } from '@/utils/rarityTier';
 import { type LivePlanesState } from '@/hooks/useLivePlanes';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 
@@ -108,6 +109,8 @@ interface SunVisualizationProps {
   // Info cards (ROADMAP item 95): a tap on anything in the scene, and the ring id of the open card.
   onSceneInfo?: SceneInfoHandler;
   infoRing?: string | null;
+  // Item 107: the rarity tier of the open card, for the ring's colour; null: the neutral ring.
+  infoRingTier?: RarityTier | null;
   // Today's calendar easter egg from SunTracker (utils/calendarEvents), or null.
   calendarEvent?: CalendarEvent | null;
   // Time-travel play from SunTracker (ROADMAP item 83): the scene follows it.
@@ -577,6 +580,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   onSunTap,
   onSceneInfo,
   infoRing = null,
+  infoRingTier = null,
   calendarEvent = null,
   playDirection = 0,
   satellites = null
@@ -1015,6 +1019,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         sunTimes={sunTimes}
         onInfo={onSceneInfo}
         infoRing={infoRing}
+        infoRingTier={infoRingTier}
       />
       <WeatherEffects
         weatherType={weatherType}

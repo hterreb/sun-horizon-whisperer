@@ -905,6 +905,25 @@ const SunTracker: React.FC = () => {
     fetchWeatherData();
   };
 
+  // The open info card's content (item 95); its rarity tier also colours the ring (item 107).
+  const infoCardInfo = infoCard && location.loaded ? getSceneInfo(infoCard.target, {
+    language,
+    now: date,
+    timeOfDay,
+    sceneSunTimes: sunTimes,
+    sunPosition,
+    sunTimes: passTimes ?? sunTimes,
+    terrainSunTimes: terrainExtras.terrainSunTimes,
+    nextGoldenBlueHours,
+    moonPosition,
+    moonTimes: panelMoonTimes,
+    horizonProfile,
+    weatherType,
+    cloudLayers,
+    satellite: satelliteCard,
+    route: liveRoute,
+  }) : null;
+
   return (
     <LanguageContext.Provider value={languageContext}>
     <PremiumContext.Provider value={premium}>
@@ -988,6 +1007,7 @@ const SunTracker: React.FC = () => {
             onSunTap={handleSunTap}
             onSceneInfo={handleSceneInfo}
             infoRing={infoCard?.ring ?? null}
+            infoRingTier={infoCardInfo?.tier ?? null}
             calendarEvent={calendarEvent}
             playDirection={playDirection}
             satellites={satelliteTracking.sky}
@@ -1057,25 +1077,10 @@ const SunTracker: React.FC = () => {
           {t('time.backToNow')}
         </button>
       )}
-      {infoCard && location.loaded && (
+      {infoCard && infoCardInfo && (
         <SceneInfoCard
           key={infoCard.id}
-          info={getSceneInfo(infoCard.target, {
-            language,
-            now: date,
-            timeOfDay,
-            sunPosition,
-            sunTimes: passTimes ?? sunTimes,
-            terrainSunTimes: terrainExtras.terrainSunTimes,
-            nextGoldenBlueHours,
-            moonPosition,
-            moonTimes: panelMoonTimes,
-            horizonProfile,
-            weatherType,
-            cloudLayers,
-            satellite: satelliteCard,
-            route: liveRoute,
-          })}
+          info={infoCardInfo}
           x={infoCard.x}
           y={infoCard.y}
           onClose={handleInfoClose}

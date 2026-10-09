@@ -129,6 +129,24 @@
   --color-panel-background: hsl(var(--panel-background));
   --color-panel-border: hsl(var(--panel-border));
 
+  /* Rarity tiers (ROADMAP item 107): the info card's outline and the ring of the tapped thing. */
+  --color-tier-common: #cbd5e1;
+  --color-tier-uncommon: #5eead4;
+  --color-tier-rare: #60a5fa;
+  --color-tier-very-rare: #f5b82e;
+
+  /* The info card's kicker, one colour per type (item 107, lookbook K4). */
+  --color-kind-sun: #fde047;
+  --color-kind-moon: #e5deff;
+  --color-kind-cloud: #e0f2fe;
+  --color-kind-bird: #fec6a1;
+  --color-kind-water: #3ec5ef;
+  --color-kind-visitor: #a5b4c8;
+  --color-kind-boat: #7dd3fc;
+  --color-kind-plane: #cbd5e1;
+  --color-kind-terrain: #bbf7d0;
+  --color-kind-satellite: #c7d2fe;
+
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
@@ -157,6 +175,7 @@
   --animate-mark-glint-out: fade-out 1s ease-in-out both;
   --animate-scene-iris: scene-iris 1s cubic-bezier(0.65, 0, 0.25, 1) both;
   --animate-scene-fade: fade-in 0.2s ease-out both;
+  --animate-card-in: card-in 0.2s ease-out both;
   --animate-aurora-drift: aurora-drift 40s ease-in-out infinite;
   --animate-green-flash: green-flash 2.5s ease-in-out both;
 
@@ -207,6 +226,16 @@
     }
     to {
       opacity: 1;
+    }
+  }
+  @keyframes card-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
     }
   }
   @keyframes fade-out {
@@ -610,5 +639,10 @@
   /* The loading screen's hand-off keeps its short fade (ROADMAP item 39). */
   .animate-scene-fade {
     animation-duration: 0.2s !important;
+  }
+
+  /* The info card fades in, without the scale (ROADMAP item 107). */
+  .animate-card-in {
+    animation: fade-in 0.2s ease-out both !important;
   }
 }

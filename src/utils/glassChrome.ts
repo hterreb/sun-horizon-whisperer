@@ -10,6 +10,11 @@
 export const GLASS_SURFACE =
   'bg-[hsl(var(--panel-background)/0.45)] backdrop-blur-md border border-[hsl(var(--panel-border)/0.14)] shadow-[0_8px_30px_rgba(0,0,0,0.25)]';
 
+// The info card's glass (ROADMAP item 107): 58 % instead of 45 %, so its small text stays
+// readable on a bright day sky. No border colour: the card sets it (rarityTier).
+export const GLASS_CARD_SURFACE =
+  'bg-[hsl(var(--panel-background)/0.58)] backdrop-blur-md border shadow-[0_8px_30px_rgba(0,0,0,0.25)]';
+
 // A round, ≥40px glass icon button (FullscreenButton, CompassToggle): same
 // glass surface, always fully rounded, with a hover state and a visible
 // keyboard focus ring. `hover:text-white` replaces the shadcn ghost variant's
