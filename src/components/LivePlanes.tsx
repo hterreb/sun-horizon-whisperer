@@ -4,7 +4,8 @@ import { HitArea, type SceneInfoHandler } from './CloudLayer';
 import { type LivePlanesState } from '@/hooks/useLivePlanes';
 import { type LiveAircraft } from '@/utils/planeFeed';
 import {
-  LIVE_MAX_AGE_MS, getAircraftView, getAirlineName, getLiveContrail, getLivePlaneWidth, pickNearestVisible, type Observer,
+  LIVE_MAX_AGE_MS, getAircraftView, getAirlineName, getLiveContrail, getLivePlaneWidth, pickNearestVisible, pickShownPlanes,
+  type Observer,
 } from '@/utils/liveRadar';
 import { CONTRAIL_LOOK, TRAIL_PX, PLANE_WIDTH_PX, type ContrailKind } from '@/utils/planes';
 import { type HorizonProfile } from '@/utils/horizonUtils';
@@ -20,8 +21,8 @@ import { type HorizonProfile } from '@/utils/horizonUtils';
 const TICK_MS = 250;
 const STROBE_MS = 2000;
 // A trail longer than this (s at the plane's screen speed) is not drawn: a persistent trail
-// moves with the plane here, as a long band, and does not stay in the sky.
-const MAX_TRAIL_SEC = 120;
+// moves with the plane here, as a long band, and does not stay in the sky (5 min, item 109).
+const MAX_TRAIL_SEC = 300;
 
 // A plane's trail, silhouette (or lights) and tap area. Memoized: the 4 Hz tick moves the
 // plane's wrapper, and the body renders again only when its look changes.
@@ -99,6 +100,7 @@ interface LivePlanesProps {
   // mode included), unclamped.
   project: (altitude: number, azimuth: number) => { x: number; y: number };
   width: number;
+  compass: boolean; // compass mode: every plane in the field of view, else the 2 nearest that move
   profile: HorizonProfile | null;
   lights: boolean; // night: only the lights show
   contrail: ContrailKind; // the forecast's contrail, for the aircraft above 8 km
@@ -109,7 +111,7 @@ interface LivePlanesProps {
 }
 
 const LivePlanes: React.FC<LivePlanesProps> = ({
-  state, observer, project, width, profile, lights, contrail, trailColour, reducedMotion, onInfo, infoRing = null,
+  state, observer, project, width, compass, profile, lights, contrail, trailColour, reducedMotion, onInfo, infoRing = null,
 }) => {
   const { feed, receivedAt } = state;
   const [now, setNow] = useState(() => Date.now());
@@ -123,20 +125,23 @@ const LivePlanes: React.FC<LivePlanesProps> = ({
   const lag = Math.min(30, Math.max(0, (receivedAt - feed.now) / 1000));
   // Never further than the oldest answer the feed keeps (a minute).
   const sec = lag + (reducedMotion ? 0 : Math.min(LIVE_MAX_AGE_MS, Math.max(0, now - receivedAt)) / 1000);
-  // The 12 nearest aircraft by slant distance among the visible ones (Lutz, 2026-10-06).
+  // The visible aircraft, nearest first by slant distance, with their place and their way
+  // across the screen; then the ones to show (item 110).
+  const nearest = pickNearestVisible(
+    feed.aircraft.map(ac => ({ ac, view: getAircraftView(observer, ac, sec) })), observer.elevationM, profile,
+  ).map(({ ac, view }) => {
+    const p = project(view.elevation, view.azimuth);
+    // The way across the screen: where it is 1 s later.
+    const next = getAircraftView(observer, ac, sec + 1);
+    const q = project(next.elevation, next.azimuth);
+    // Across the edge of the 360° view the next point is on the other side: keep the way.
+    const dx = Math.abs(q.x - p.x) > width / 2 ? 0 : q.x - p.x;
+    const dy = q.y - p.y;
+    return { ac, view, p, dx, dy, inView: p.x >= -50 && p.x <= width + 50, screenSpeedPxS: Math.hypot(dx, dy) };
+  });
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none" data-testid="live-planes">
-      {pickNearestVisible(
-        feed.aircraft.map(ac => ({ ac, view: getAircraftView(observer, ac, sec) })), observer.elevationM, profile,
-      ).map(({ ac, view }) => {
-        const p = project(view.elevation, view.azimuth);
-        if (p.x < -50 || p.x > width + 50) return null; // outside the compass field of view
-        // The way across the screen: where it is 1 s later.
-        const next = getAircraftView(observer, ac, sec + 1);
-        const q = project(next.elevation, next.azimuth);
-        // Across the edge of the 360° view the next point is on the other side: keep the way.
-        const dx = Math.abs(q.x - p.x) > width / 2 ? 0 : q.x - p.x;
-        const dy = q.y - p.y;
+      {pickShownPlanes(nearest, compass).map(({ ac, view, p, dx, dy }) => {
         const planeWidth = getLivePlaneWidth(view.distanceM);
         const kind = getLiveContrail(ac.altM, contrail);
         const look = kind === 'none' ? null : CONTRAIL_LOOK[kind];

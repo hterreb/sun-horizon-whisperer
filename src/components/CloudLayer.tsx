@@ -422,15 +422,18 @@ export const createPlane = (
 ): PlaneEntity => {
   const look = getPlaneLook(random());
   const startX = -(look.width / viewportWidth) * 100 - 1;
-  const dx = 101 - startX;
   const speed = look.speed * getWaterSpeedFactor(viewportWidth); // the phone's px/s on wide screens (item 66)
   const life = contrail === 'none' ? 0 : CONTRAIL_LOOK[contrail].lifeSec[0] +
     random() * (CONTRAIL_LOOK[contrail].lifeSec[1] - CONTRAIL_LOOK[contrail].lifeSec[0]);
+  const trailLength = getTrailLength(speed, life);
+  // A short or medium trail moves with the plane: the plane flies on past the edge until the
+  // trail's end is off the screen too, so the long trail (item 109) does not go at once.
+  const dx = 101 - startX + (contrail === 'persistent' ? 0 : trailLength);
   return {
     id: Date.now() + Math.random(),
     x: startX, y: look.y, dx, duration: dx / speed,
     depth: look.depth, width: look.width, height: look.width * PLANE_ASPECT,
-    contrail, lifeSec: life, trailLength: getTrailLength(speed, life),
+    contrail, lifeSec: life, trailLength,
     lights: lights ? (random() < 0.5 ? 'red' : 'green') : undefined,
   };
 };

@@ -30,9 +30,11 @@ export const getContrail = (tempC: number | null | undefined, rhPercent: number 
 
 // How long a point of the trail lasts (s) and how wide it spreads (× its first width). A
 // persistent trail stays, spreads to a band and fades over 5-10 min (a random life per plane).
+// Short 30 s and medium 3 min (item 109, SUN-CHASER-13: "longer and last a long time before it
+// fades away"): a long band that fades slowly along its length.
 export const CONTRAIL_LOOK: Record<Exclude<ContrailKind, 'none'>, { lifeSec: [number, number]; spread: number }> = {
-  short: { lifeSec: [10, 10], spread: 1.5 },
-  medium: { lifeSec: [60, 60], spread: 2.5 },
+  short: { lifeSec: [30, 30], spread: 1.5 },
+  medium: { lifeSec: [180, 180], spread: 2.5 },
   persistent: { lifeSec: [300, 600], spread: 8 },
 };
 

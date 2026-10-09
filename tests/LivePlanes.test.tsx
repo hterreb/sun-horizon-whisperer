@@ -29,6 +29,8 @@ afterEach(() => {
   if (originalClientHeight) Object.defineProperty(HTMLElement.prototype, 'clientHeight', originalClientHeight);
 });
 
+// Compass mode facing south by default: it shows every plane in the field of view, also a still
+// one (item 110), and puts due south in the middle as the 360° view does.
 const renderScene = (props: Partial<React.ComponentProps<typeof SunVisualization>> = {}) => {
   Object.defineProperty(HTMLElement.prototype, 'clientWidth', { value: WIDTH, configurable: true });
   Object.defineProperty(HTMLElement.prototype, 'clientHeight', { value: HEIGHT, configurable: true });
@@ -43,6 +45,7 @@ const renderScene = (props: Partial<React.ComponentProps<typeof SunVisualization
       latitude={PLACE.lat}
       longitude={PLACE.lon}
       livePlanes={feed([south])}
+      compassHeading={180}
       {...props}
     />,
   );
@@ -74,9 +77,9 @@ describe('LivePlanes (ROADMAP item 96)', () => {
       expect(x1).toBeLessThan(x0);
       expect(x0 - x1).toBeLessThan(1);
       act(() => { vi.advanceTimersByTime(15_000); });
-      // 450 kt for 15.25 s is 3.5 km: at 50 km about 4° of azimuth, 9 px of the 800 px 360° view.
-      expect(x0 - plane().x).toBeGreaterThan(7);
-      expect(x0 - plane().x).toBeLessThan(11);
+      // 450 kt for 15.25 s is 3.5 km: at 50 km about 4° of azimuth, 36 px of the 800 px 90° view.
+      expect(x0 - plane().x).toBeGreaterThan(28);
+      expect(x0 - plane().x).toBeLessThan(44);
       expect(screen.getByTestId('live-plane').getAnimations?.().length ?? 0).toBe(0);
     } finally {
       vi.useRealTimers();
@@ -115,12 +118,15 @@ describe('LivePlanes (ROADMAP item 96)', () => {
     expect(start(screen.getByTestId('live-plane')).x).toBeCloseTo(WIDTH * 0.75, 0);
   });
 
-  it('hides an aircraft behind the terrain and below 1°', () => {
+  it('hides an aircraft behind the terrain and below 5° (item 110)', () => {
     const ridge: HorizonProfile = { angles: Array(360).fill(12), observerElevation: 450, eyeHeight: 1.7 };
     renderScene({ horizonProfile: ridge });
     expect(screen.queryByTestId('live-plane')).toBeNull();
     // 300 km away at 10 km: below the horizon.
     renderScene({ livePlanes: feed([{ ...south, lat: PLACE.lat - 300 / KM_PER_DEG, hex: 'ffffff' }]) });
+    expect(screen.queryAllByTestId('live-plane')).toHaveLength(0);
+    // 120 km away at 10 km: 4.3° up, too near the horizon.
+    renderScene({ livePlanes: feed([{ ...south, lat: PLACE.lat - 120 / KM_PER_DEG, hex: 'fffffe' }]) });
     expect(screen.queryAllByTestId('live-plane')).toHaveLength(0);
   });
 
@@ -156,24 +162,40 @@ describe('LivePlanes (ROADMAP item 96)', () => {
     );
   });
 
-  it('shows the 12 nearest of the visible aircraft (Lutz, 2026-10-06)', () => {
-    // 20 aircraft due south at 30-87 km, all at 10 km.
+  it('in compass mode shows every visible aircraft in the field of view (item 110)', () => {
+    // 20 still aircraft due south at 30-87 km, all at 10 km, and one due north (behind).
     const many = Array.from({ length: 20 }, (_, i) => ({
       ...south, hex: (0xb00000 + i).toString(16), lat: PLACE.lat - (30 + i * 3) / KM_PER_DEG,
     }));
-    const first = renderScene({ livePlanes: feed(many) });
-    const ys = (container: HTMLElement) =>
-      [...container.querySelectorAll<HTMLElement>('[data-testid="live-plane"]')].map(plane => start(plane).y);
-    // All due south, the same height: the nearest are the highest on the screen.
-    const all = ys(first.container);
-    expect(all).toHaveLength(12);
-    // The lowest one shown is the 12th nearest, at 63 km.
-    const yAt = (km: number) => 390 - Math.sin(Math.atan((10_000 - 1.7 - ((km * 1000) ** 2 / (2 * 6_371_000)) * 0.87) / (km * 1000))) * 360;
-    expect(Math.max(...all)).toBeCloseTo(yAt(63), 0);
-    expect(Math.min(...all)).toBeCloseTo(yAt(30), 0);
-    first.unmount();
-    // The nearest flies at 400 m, below 1°: the 13th takes its place, so 12 still show.
-    const { container } = renderScene({ livePlanes: feed([{ ...many[0], altM: 400 }, ...many.slice(1)]) });
-    expect(ys(container)).toHaveLength(12);
+    const north = { ...south, hex: 'c00000', lat: PLACE.lat + 30 / KM_PER_DEG };
+    renderScene({ livePlanes: feed([...many, north]) });
+    expect(screen.getAllByTestId('live-plane')).toHaveLength(20);
+  });
+
+  it('in the normal view shows only the 2 nearest that visibly move (item 110)', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    try {
+      // Low and near, flying east at 450 kt: 2-4 px/s across the 800 px 360° view.
+      const near = (hex: string, km: number, extra: Partial<LiveAircraft> = {}): LiveAircraft => ({
+        ...south, hex, altM: 3_000, speedKt: 450, track: 90, lat: PLACE.lat - km / KM_PER_DEG, ...extra,
+      });
+      const still = near('d00000', 6, { speedKt: 0 }); // the nearest, but it hangs in the air
+      const a = near('d00001', 8);
+      const b = near('d00002', 10);
+      const c = near('d00003', 12);
+      const far = { ...south, hex: 'd00004', speedKt: 450, track: 90 }; // 50 km: under 1 px/s
+      const onSceneInfo = vi.fn();
+      renderScene({ compassHeading: null, onSceneInfo, livePlanes: feed([c, far, still, b, a]) });
+      const shown = screen.getAllByTestId('live-plane');
+      expect(shown).toHaveLength(2);
+      const hexes = shown.map(plane => {
+        fireEvent.click(plane.querySelector<HTMLElement>('[data-testid="scene-hit"]')!.parentElement!);
+        return onSceneInfo.mock.lastCall![2];
+      });
+      expect(hexes.sort()).toEqual(['live-d00001', 'live-d00002']);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
