@@ -12,8 +12,14 @@ import {
   getAstroEvent,
   SOLAR_ECLIPSES,
   LUNAR_ECLIPSES,
+  MATARIKI_DATES,
+  isMatarikiWeek,
+  isMatarikiTime,
+  getConjunction,
+  isNoctilucentTime,
   type AstroInput,
 } from '../src/utils/astroEvents';
+import { getSunPathAround, getSunPosition, getSunTimes } from '../src/utils/sunUtils';
 
 const base: AstroInput = {
   date: new Date('2026-09-30T12:00:00Z'),
@@ -152,5 +158,139 @@ describe('getAstroEvent', () => {
   it('gives the solar eclipse before anything else', () => {
     const e = { ...base, date: new Date('2026-08-12T17:45:51Z'), latitude: 65, longitude: -22, sunAltitude: 20 };
     expect(getAstroEvent(e)?.kind).toBe('solarEclipse');
+  });
+});
+
+// Sky eggs (ROADMAP "Easter eggs and special events", Sky).
+describe('sky eggs', () => {
+  const at = (iso: string, latitude: number, longitude: number) => {
+    const date = new Date(iso);
+    return {
+      ...base,
+      date,
+      latitude,
+      longitude,
+      sunAltitude: getSunPosition(date, latitude, longitude).altitude,
+      timeOfDay: 'night' as const,
+      sunTimes: getSunTimes(date, latitude, longitude),
+    };
+  };
+
+  it('reads the new ?egg= overrides', () => {
+    expect(parseEggOverride('?egg=matariki')).toBe('matariki');
+    expect(parseEggOverride('?egg=CONJUNCTION')).toBe('conjunction');
+    expect(parseEggOverride('?egg=noctilucent')).toBe('noctilucent');
+    expect(parseEggOverride('?egg=midnightsun')).toBe('midnightSun');
+    expect(parseEggOverride('?egg=polarNight')).toBe('polarNight');
+    expect(getAstroEvent(base, 'conjunction')).toEqual({ kind: 'conjunction', strength: 1 });
+  });
+
+  describe('Matariki', () => {
+    it('has the 10 NZ holiday dates 2026-2035, all Fridays', () => {
+      expect(MATARIKI_DATES).toHaveLength(10);
+      for (const iso of MATARIKI_DATES) expect(new Date(`${iso}T12:00:00Z`).getUTCDay(), iso).toBe(5);
+    });
+
+    it('covers the holiday week: 3 days before to 3 days after', () => {
+      expect(isMatarikiWeek(new Date(2026, 6, 10, 6))).toBe(true);
+      expect(isMatarikiWeek(new Date(2026, 6, 7, 6))).toBe(true);
+      expect(isMatarikiWeek(new Date(2026, 6, 13, 6))).toBe(true);
+      expect(isMatarikiWeek(new Date(2026, 6, 14, 6))).toBe(false);
+      expect(isMatarikiWeek(new Date(2026, 7, 10, 6))).toBe(false);
+    });
+
+    it('shows in the last 90 min before sunrise, with a dark sky', () => {
+      const sunrise = new Date(2026, 6, 10, 7, 45);
+      expect(isMatarikiTime(new Date(2026, 6, 10, 6, 45), sunrise, -8)).toBe(true);
+      expect(isMatarikiTime(new Date(2026, 6, 10, 6, 0), sunrise, -14)).toBe(false); // 105 min before
+      expect(isMatarikiTime(new Date(2026, 6, 10, 7, 40), sunrise, -1)).toBe(false); // too light
+      expect(isMatarikiTime(new Date(2026, 6, 10, 8, 0), sunrise, 2)).toBe(false); // after sunrise
+      expect(isMatarikiTime(new Date(2026, 6, 10, 6, 45), null, -8)).toBe(false);
+    });
+
+    it('gives Matariki in Wellington an hour before sunrise on the holiday', () => {
+      const day = getSunTimes(new Date('2026-07-10T00:00:00Z'), -41.29, 174.78);
+      const input = at(new Date(day.sunrise.getTime() - 60 * 60_000).toISOString(), -41.29, 174.78);
+      expect(getAstroEvent(input)?.kind).toBe('matariki');
+    });
+  });
+
+  describe('planet conjunction', () => {
+    it('finds the Venus-Jupiter conjunction of 12 Aug 2025 before dawn (0.9°)', () => {
+      const pair = getConjunction(new Date('2025-08-12T02:30:00Z'), 47.78, 9.61, -14);
+      expect(pair?.map((p) => p.name).sort()).toEqual(['jupiter', 'venus']);
+      expect(pair?.[0].azimuth).toBeGreaterThan(45); // low in the east
+      expect(pair?.[0].azimuth).toBeLessThan(110);
+    });
+
+    it('finds the Jupiter-Saturn great conjunction of 21 Dec 2020 and Mars-Jupiter on 14 Aug 2024', () => {
+      expect(getConjunction(new Date('2020-12-21T16:45:00Z'), 47.78, 9.61, -10)?.map((p) => p.name)).toEqual(['jupiter', 'saturn']);
+      expect(getConjunction(new Date('2024-08-14T02:30:00Z'), 47.78, 9.61, -10)?.map((p) => p.name)).toEqual(['mars', 'jupiter']);
+    });
+
+    it('gives nothing by day, below the horizon, or when no two planets are close', () => {
+      expect(getConjunction(new Date('2025-08-12T02:30:00Z'), 47.78, 9.61, 10)).toBeNull(); // sun up
+      expect(getConjunction(new Date('2025-08-12T14:30:00Z'), -33.87, 151.21, -30)).toBeNull(); // planets set in Sydney
+      expect(getConjunction(new Date('2026-09-30T21:00:00Z'), 47.78, 9.61, -30)).toBeNull();
+    });
+
+    it('puts the conjunction with its planets into getAstroEvent', () => {
+      const event = getAstroEvent(at('2025-08-12T02:30:00Z', 47.78, 9.61));
+      expect(event?.kind).toBe('conjunction');
+      expect(event?.planets).toHaveLength(2);
+    });
+  });
+
+  describe('noctilucent clouds', () => {
+    const sunset = new Date(2026, 5, 25, 22, 0);
+    const sunrise = new Date(2026, 5, 26, 4, 30);
+    it('show 1-2 h after sunset or before sunrise, in June and July, at 50-65° N, under a clear sky', () => {
+      expect(isNoctilucentTime(new Date(2026, 5, 25, 23, 30), 56, sunset, sunrise, 'clear')).toBe(true);
+      expect(isNoctilucentTime(new Date(2026, 5, 26, 3, 0), 56, sunset, sunrise, 'clear')).toBe(true);
+      expect(isNoctilucentTime(new Date(2026, 5, 25, 22, 30), 56, sunset, sunrise, 'clear')).toBe(false); // 30 min
+      expect(isNoctilucentTime(new Date(2026, 5, 26, 0, 30), 56, sunset, sunrise, 'clear')).toBe(false); // 150 min
+      expect(isNoctilucentTime(new Date(2026, 5, 25, 23, 30), 56, sunset, sunrise, 'cloudy')).toBe(false);
+      expect(isNoctilucentTime(new Date(2026, 5, 25, 23, 30), 47, sunset, sunrise, 'clear')).toBe(false);
+      expect(isNoctilucentTime(new Date(2026, 5, 25, 23, 30), 67, sunset, sunrise, 'clear')).toBe(false);
+      expect(isNoctilucentTime(new Date(2026, 8, 25, 23, 30), 56, new Date(2026, 8, 25, 22), sunrise, 'clear')).toBe(false); // September
+    });
+
+    it('use December and January in the south', () => {
+      const s = new Date(2026, 11, 20, 22, 0);
+      expect(isNoctilucentTime(new Date(2026, 11, 20, 23, 30), -55, s, null, 'clear')).toBe(true);
+      expect(isNoctilucentTime(new Date(2026, 5, 25, 23, 30), -55, sunset, null, 'clear')).toBe(false);
+    });
+
+    it('give noctilucent clouds in Edinburgh 90 min after a June sunset', () => {
+      const day = getSunTimes(new Date('2026-06-25T12:00:00Z'), 55.95, -3.19);
+      const input = at(new Date(day.sunset.getTime() + 90 * 60_000).toISOString(), 55.95, -3.19);
+      expect(getAstroEvent(input)?.kind).toBe('noctilucent');
+    });
+  });
+
+  describe('midnight sun and polar night', () => {
+    it('gives the midnight sun in Tromsø in June, all day', () => {
+      for (const iso of ['2026-06-21T00:00:00Z', '2026-06-21T11:00:00Z']) {
+        expect(getAstroEvent({ ...at(iso, 69.65, 18.96), timeOfDay: 'midday' })?.kind).toBe('midnightSun');
+      }
+    });
+
+    it('draws the whole midnight-sun day as one arc above the horizon', () => {
+      const path = getSunPathAround(new Date('2026-06-21T00:00:00Z'), 69.65, 18.96);
+      expect(path.every((p) => p.altitude > 0)).toBe(true);
+      const azimuths = path.map((p) => p.azimuth);
+      expect(Math.max(...azimuths) - Math.min(...azimuths)).toBeGreaterThan(300); // round the sky
+    });
+
+    it('gives polar night in Tromsø in December, with the aurora first at night', () => {
+      const noon = at('2026-12-21T11:00:00Z', 69.65, 18.96);
+      expect(noon.sunTimes.polar).toBe('night');
+      expect(getAstroEvent({ ...noon, timeOfDay: 'civil-twilight' })?.kind).toBe('polarNight');
+      expect(getAstroEvent({ ...noon, timeOfDay: 'night' })?.kind).toBe('aurora');
+    });
+
+    it('gives neither on an ordinary day', () => {
+      expect(getAstroEvent({ ...base, sunTimes: getSunTimes(base.date, base.latitude, base.longitude) })).toBeNull();
+    });
   });
 });

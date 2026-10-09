@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import {
   Cat, Eclipse, Flame, Glasses, Moon, MoonStar, Mountain, PartyPopper, Rainbow, Satellite,
   Snowflake, Sparkles, Star, Sun, SunMoon, Sunset, X, type LucideIcon,
+  CloudMoon, Orbit, Sparkle, SunDim,
 } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import SceneFish from '@/components/SceneFish';
@@ -80,6 +81,11 @@ const EGG_ICONS: Record<Exclude<EggKind, 'ufo' | 'santa'>, [LucideIcon, string]>
   blueMoon: [Moon, 'text-brand-sky'],
   meteorShower: [Star, 'text-brand-gold-light'],
   aurora: [Rainbow, 'text-brand-cyan'],
+  matariki: [Sparkle, 'text-brand-sky'],
+  conjunction: [Orbit, 'text-brand-gold-light'],
+  noctilucent: [CloudMoon, 'text-brand-cyan'],
+  midnightSun: [SunDim, 'text-brand-gold'],
+  polarNight: [MoonStar, 'text-brand-sky'],
 };
 
 const SKY_ICONS: Record<'sun' | 'moon' | 'terrain' | 'satellite', [LucideIcon, string]> = {

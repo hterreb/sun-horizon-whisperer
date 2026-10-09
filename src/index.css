@@ -525,6 +525,12 @@
     --scene-green-flash: 130 90% 60%;
     --scene-eclipse-moon: 12 75% 38%;
     --scene-blue-moon: 205 90% 72%;
+    /* Sky eggs (astroEvents.ts, SkyEggs.tsx): the blue-white Pleiades (Matariki), the
+       planets of a conjunction, the electric-blue noctilucent clouds, the midnight-sun arc. */
+    --scene-pleiades: 210 100% 90%;
+    --scene-planet: 45 100% 90%;
+    --scene-noctilucent: 192 100% 68%;
+    --scene-midnight-sun: 38 100% 62%;
     /* Fish (ROADMAP item 85, FS1): two tones per species, a dark back over a pale belly,
        from the item 62 tints: back = the tint at 0.85 x saturation and 0.55 x lightness
        (at least 16 %), belly = 0.6 x saturation, lightness 55 % of the way to white (at
