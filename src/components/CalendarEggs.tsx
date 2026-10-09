@@ -38,6 +38,14 @@ const SEASON_TEXT: Partial<Record<CalendarEvent, MessageKey>> = {
 // Fixed layouts (share of the width/height, s), so a render never re-rolls them.
 const BATS = [0, 1, 2, 3, 4].map((i) => ({ top: 12 + i * 7, duration: 50 + i * 9, delay: -i * 13, dir: i % 2 ? -1 : 1 }));
 const BAT_PX = 30;
+// The hanging bat: hangs from the bottom edge of the collapsed InfoPanel (82 px high at night,
+// measured at 390 px; 10rem lower below 364 px), a quarter of the panel's width from its
+// right edge, clear of the arc's top label. On wide screens the panel is a tall column, so it
+// hangs from the top edge, left of the badge toast (top centre).
+const HANG_CLASS =
+  'top-[calc(80px+env(safe-area-inset-top))] max-[363px]:top-[calc(10rem+80px+env(safe-area-inset-top))] right-[calc(min(300px,calc(100vw-2rem))/4)] sm:top-0 sm:right-auto sm:left-[22%]';
+const BAT_SHAPE = { fill: 'hsl(var(--scene-critter-silhouette))', stroke: 'hsl(var(--scene-glow-white) / 0.35)', strokeWidth: 0.75 };
+const BAT_EYE = 'hsl(var(--scene-bat-eye))';
 const FLAKES = Array.from({ length: 28 }, (_, i) => ({ left: (i * 37) % 100, duration: 14 + (i % 5) * 2, delay: -(i * 1.7) }));
 
 // The calendar easter eggs (the New Year one is SunTracker's fireworks). All motion is
@@ -47,6 +55,8 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherTy
   const [catDone, setCatDone] = useState(false);
   const [dragonDone, setDragonDone] = useState(false);
   const [santaDone, setSantaDone] = useState(false);
+  // The hanging bat: 'hang', then on a tap 'leave' (one slow glide away), then 'gone'.
+  const [hangBat, setHangBat] = useState<'hang' | 'leave' | 'gone'>('hang');
   const handleSantaDone = useCallback(() => setSantaDone(true), []);
   // Once he starts, Santa flies to the edge, also when `santa` turns false at midnight (no jump).
   // Set during render, like SunTracker's night roll.
@@ -124,6 +134,46 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherTy
         </div>
       ))}
 
+      {event === 'halloween-bats' && isNight && hangBat !== 'gone' && (
+        // Hangs wrapped in its wings, red eyes blink every 5 s. A tap opens its wings, and it
+        // glides away once (no flapping). Reduced motion: it hangs still, a tap opens the card only.
+        <div
+          data-testid="hanging-bat"
+          data-state={hangBat}
+          className={`absolute ${HANG_CLASS} ${tapClass}`}
+          style={{ width: 28, height: 60, animation: hangBat === 'leave' ? 'egg-bat-leave 14s ease-in 1.2s forwards' : undefined }}
+          {...tapProps('halloweenBat', 'egg-bat-hang')}
+          onClickCapture={() => { if (onInfo && !prefersReducedMotion) setHangBat('leave'); }}
+          onAnimationEnd={(e) => { if (e.target === e.currentTarget) setHangBat('gone'); }}
+        >
+          <svg aria-hidden="true" className="absolute inset-0 block transition-opacity duration-1000" style={{ opacity: hangBat === 'leave' ? 0 : 1 }} width={28} height={60} viewBox="-2 -1 28 60">
+            <path d="M12,0 L12,4" stroke={BAT_SHAPE.fill} strokeWidth={2} />
+            <g {...BAT_SHAPE}>
+              <path d="M12,4 C0,7 -1,32 12,44 C25,32 24,7 12,4 Z" />
+              <path d="M7,49 L5.5,57 L10,51 Z M17,49 L18.5,57 L14,51 Z" />
+              <circle cx={12} cy={46} r={6.5} />
+            </g>
+            <g fill={BAT_EYE} style={{ animation: prefersReducedMotion ? undefined : 'egg-bat-blink 5s linear infinite' }} data-testid="hanging-bat-eyes">
+              <circle cx={9.6} cy={45} r={1.3} />
+              <circle cx={14.4} cy={45} r={1.3} />
+            </g>
+          </svg>
+          {hangBat === 'leave' && (
+            <svg aria-hidden="true" className="absolute block" style={{ left: -21, top: 12, animation: 'egg-fade-in 1.2s ease-out' }} width={70} height={28} viewBox="0 0 100 40">
+              <g {...BAT_SHAPE} strokeWidth={1}>
+                <path d="M46,20 L30,8 L2,14 Q10,17 14,26 Q20,21 26,30 Q32,24 40,30 L46,26 Z M54,20 L70,8 L98,14 Q90,17 86,26 Q80,21 74,30 Q68,24 60,30 L54,26 Z" />
+                <ellipse cx={50} cy={24} rx={6} ry={9} />
+                <circle cx={50} cy={13} r={5.2} />
+              </g>
+              <circle cx={48.2} cy={12.2} r={1} fill={BAT_EYE} />
+              <circle cx={51.8} cy={12.2} r={1} fill={BAT_EYE} />
+              <path d="M48.6,16.6 L49.2,19 L49.8,16.6 Z M50.2,16.6 L50.8,19 L51.4,16.6 Z" fill="white" />
+            </svg>
+          )}
+          {hit('egg-bat-hang', 28, 60)}
+        </div>
+      )}
+
       {event === 'christmas' && weatherType !== 'snow' && !prefersReducedMotion && FLAKES.map((f, i) => (
         <div
           key={i}
@@ -181,6 +231,9 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherTy
       <style>{`
         @keyframes egg-glide { to { transform: translateX(var(--dx)); } }
         @keyframes egg-snow { to { transform: translateY(110vh) translateX(30px); } }
+        @keyframes egg-bat-blink { 0%, 93%, 100% { opacity: 1; } 96.5% { opacity: 0; } }
+        @keyframes egg-fade-in { from { opacity: 0; } }
+        @keyframes egg-bat-leave { to { transform: translate(-240px, -320px); } }
       `}</style>
     </>
   );

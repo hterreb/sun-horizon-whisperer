@@ -513,6 +513,8 @@
     /* Bird/bat silhouette (CloudLayer) — matches the style book's D bird, a soft
        dark flock shape. */
     --scene-critter-silhouette: 0 0% 0%;
+    /* The red eyes of the hanging Halloween bat (CalendarEggs). */
+    --scene-bat-eye: 0 85% 50%;
     /* Plane lights at night (ROADMAP item 96): the white strobe and the wing lights. */
     --scene-plane-strobe: 0 0% 100%;
     --scene-plane-red: 0 85% 62%;
