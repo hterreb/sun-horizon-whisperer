@@ -40,6 +40,13 @@ describe('CalendarEggs', () => {
     expect(screen.getByTestId('season-badge').textContent).toBe('Tagundnachtgleiche · Tag und Nacht sind gleich lang');
   });
 
+  it('shows the blue moon label in the badge, and the season text wins on the same night', () => {
+    const { rerender } = render(<CalendarEggs {...base} event={null} blueMoon />);
+    expect(screen.getByTestId('season-badge').textContent).toBe('Blue moon · second full moon this month');
+    rerender(<CalendarEggs {...base} event="equinox" blueMoon />);
+    expect(screen.getByTestId('season-badge').textContent).toMatch(/Equinox/);
+  });
+
   it('draws the pumpkin moon only while the moon is shown', () => {
     const { rerender } = render(<CalendarEggs {...base} event="halloween-pumpkin" />);
     expect(screen.getByTestId('pumpkin-moon')).toBeTruthy();

@@ -403,6 +403,7 @@ export const en = {
   'egg.greenFlash': 'Green flash',
   'egg.supermoon': 'Supermoon',
   'egg.blueMoon': 'Blue moon',
+  'egg.blueMoonLabel': 'Blue moon · second full moon this month',
   'egg.meteorShower': 'Meteor shower',
   'egg.aurora': 'Aurora',
   'rarity.frequent': 'Frequent',
