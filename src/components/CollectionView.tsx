@@ -18,7 +18,7 @@ import { Bat } from '@/components/sceneIcons';
 import { useLanguage } from '@/hooks/useLanguage';
 import { type MessageKey } from '@/i18n';
 import {
-  BADGES, MOON_STATES, TERRAIN_BANDS, badgeTier, countCollected, type Badge, type BadgeGroup, type BadgeId, type Collection, type EggKind,
+  BADGES, MOON_STATES, PLANE_HAULS, SATELLITE_SIZES, TERRAIN_BANDS, badgeTier, countCollected, type Badge, type BadgeGroup, type BadgeId, type Collection, type EggKind,
   type MoonState, type StateBase, type SunState, type TerrainBand,
 } from '@/utils/collection';
 import { getMoonPhasePath } from '@/utils/moonUtils';
@@ -51,18 +51,19 @@ const GROUP_TITLES: Record<BadgeGroup, MessageKey> = {
   egg: 'collection.eggs',
 };
 const GROUPS = Object.keys(GROUP_TITLES) as BadgeGroup[];
-const STATE_BASES: StateBase[] = ['sun', 'moon', 'terrain'];
+const STATE_BASES: StateBase[] = ['plane', 'satellite', 'sun', 'moon', 'terrain'];
 const isStateRow = (badge: Badge): boolean => badge.base !== undefined || (STATE_BASES as string[]).includes(badge.id);
 
-// The grids of a group. In the sky group, the sun, the moon and the terrain each have their
-// own row: the base badge, then its states (item 115). The order is the BADGES order.
+// The grids of a group. In the sky group, the plane, the satellite, the sun, the moon and the
+// terrain each have their own row: the base badge, then its states (items 115, 120). The order
+// is the BADGES order; an empty row is left out.
 const groupRows = (group: BadgeGroup): Badge[][] => {
   const badges = BADGES.filter((badge) => badge.group === group);
   if (group !== 'sky') return [badges];
   return [
     badges.filter((badge) => !isStateRow(badge)),
     ...STATE_BASES.map((base) => badges.filter((badge) => badge.id === base || badge.base === base)),
-  ];
+  ].filter((row) => row.length > 0);
 };
 
 const OUTLINE_FILTER_ID = 'badge-outline';
@@ -174,12 +175,18 @@ const TerrainBandArt = ({ band }: { band: TerrainBand }) => (
   </svg>
 );
 
+// Item 120: the plane grows with the haul, the satellite with its size.
+const PlaneHaulArt = ({ step }: { step: number }) => <span className="text-white"><ScenePlane width={30 + 8 * step} /></span>;
+const SatelliteSizeArt = ({ step }: { step: number }) => <Satellite size={20 + 6 * step} className="text-white" aria-hidden="true" />;
+
 // Also the badge of the "Badge unlocked" card (item 114).
 export const BadgeArt = ({ badge }: { badge: Badge }) => {
   const [prefix, kind] = badge.id.split(':') as [string, string | undefined];
   if (badge.base === 'sun') return <SunStateArt state={kind as SunState} />;
   if (badge.base === 'moon') return <MoonStateArt state={kind as MoonState} />;
   if (badge.base === 'terrain') return <TerrainBandArt band={kind as TerrainBand} />;
+  if (badge.base === 'plane') return <PlaneHaulArt step={PLANE_HAULS.findIndex(([h]) => h === kind)} />;
+  if (badge.base === 'satellite') return <SatelliteSizeArt step={SATELLITE_SIZES.findIndex(([s]) => s === kind)} />;
   switch (prefix) {
     case 'fish':
       return kind === 'shark' || kind === 'dolphins'

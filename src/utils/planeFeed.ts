@@ -125,6 +125,7 @@ export interface RouteAirport {
 export interface LiveRoute {
   from: RouteAirport;
   to: RouteAirport;
+  km: number; // item 120: the great-circle length of the leg, for the plane's badge
 }
 
 const distanceKm = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -151,16 +152,16 @@ const mapAirport = (raw: unknown): Airport | null => {
 export const mapRoute = (body: unknown, place: { lat: number; lon: number }): LiveRoute | null => {
   const data = (body && typeof body === 'object' ? body : {}) as Raw;
   const airports = Array.isArray(data._airports) ? data._airports.map(mapAirport) : [];
-  let best: { from: Airport; to: Airport; detour: number } | null = null;
+  let best: { from: Airport; to: Airport; detour: number; leg: number } | null = null;
   for (let i = 0; i + 1 < airports.length; i++) {
     const from = airports[i];
     const to = airports[i + 1];
     if (!from || !to) continue;
     const leg = distanceKm(from.lat, from.lon, to.lat, to.lon);
     const detour = distanceKm(from.lat, from.lon, place.lat, place.lon) + distanceKm(place.lat, place.lon, to.lat, to.lon) - leg;
-    if (detour <= leg * ROUTE_DETOUR_FACTOR + ROUTE_DETOUR_KM && (!best || detour < best.detour)) best = { from, to, detour };
+    if (detour <= leg * ROUTE_DETOUR_FACTOR + ROUTE_DETOUR_KM && (!best || detour < best.detour)) best = { from, to, detour, leg };
   }
-  return best && { from: { code: best.from.code, name: best.from.name }, to: { code: best.to.code, name: best.to.name } };
+  return best && { from: { code: best.from.code, name: best.from.name }, to: { code: best.to.code, name: best.to.name }, km: Math.round(best.leg) };
 };
 
 // GET /api/planes?route=<callsign>&lat=..&lon=.. → { route: LiveRoute | null } (null: no route

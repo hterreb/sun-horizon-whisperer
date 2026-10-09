@@ -2377,6 +2377,12 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Checked:** util tests (no rain or off gives 0; 0.25× / 0.6× at a storm; grows with `t`; slider 0 gives 0). `MusicPlayer` tests with a fake `AudioContext` (button only while it rains; the radio switch presses it and starts the noise, off stops both with a 3 s fade; the button alone plays the rain, louder than with the radio; the button off with the radio on stops only the rain; no rain, no noise). Typecheck, lint and all tests pass. Browser at 390 × 844 (live rain, Ravensburg): the button shows in the pill, a tap presses it and the `AudioContext` runs. Not checked: the sound by ear on a phone.
 ---
 
+### 120. Collection: rarer terrain, plane hauls and satellite sizes — M — **✅ Done**
+
+- **Request (2026-10-09):** "terrain should get a rarity for higher = rarer, and planes and satellites should have different badges for further destinations and bigger satellites with different rarities".
+- **Built:** fixed tiers in `sceneInfo.ts` (these things are not rolled): `TERRAIN_TIERS` (hills common → alpine very rare), `HAUL_TIERS` with `getPlaneHaul` (route leg < 1500 km short, < 4000 medium, < 8000 long, else ultra long: common → rare), `SATELLITE_TIERS` with `getSatelliteSize` (from the CelesTrak name: Starlink/OneWeb small, ISS/CSS station, Hubble and rocket bodies large, the rest medium: common → rare). `getTerrainBand` moved to `sceneInfo` (re-exported by `collection`). The terrain, live-plane (once the route is known) and satellite cards have a rarity row and the tier ring. `LiveRoute` has `km` (the leg length, `planeFeed.mapRoute`). 8 new state badges (`plane:*`, `satellite:*`, item 115 rows), 126 in all; the haul badge counts when the route comes (`badgeForRoute`, SunTracker), the size badge on the satellite double tap (`stateBadgeForTarget`). Art: the plane and the satellite icon grow with the step. Keys `badge.plane*`, `badge.satellite*` in 5 languages.
+- **Checked:** tests for the limits, the badges, the card rows and the route km; typecheck, lint, 1611 tests. Browser at 390 × 844: the plane and satellite rows and the tier outlines. Not checked: a real live-plane route or satellite tap in the scene. Satellite size by name is an approximation (no size data in the GP records).
+
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 
 Rules for all items:

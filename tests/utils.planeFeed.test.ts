@@ -110,7 +110,7 @@ const RAVENSBURG = { lat: 47.8, lon: 9.6 };
 
 describe('mapRoute', () => {
   it('gives the two airports with their place when the place is near the path', () => {
-    expect(mapRoute(upstreamRoute, RAVENSBURG)).toEqual({ from: { code: 'CDG', name: 'Paris' }, to: { code: 'TLV', name: 'Tel Aviv' } });
+    expect(mapRoute(upstreamRoute, RAVENSBURG)).toEqual({ from: { code: 'CDG', name: 'Paris' }, to: { code: 'TLV', name: 'Tel Aviv' }, km: 3284 });
   });
 
   it('gives null when the place is far from the path (a stale or wrong route)', () => {
@@ -121,7 +121,7 @@ describe('mapRoute', () => {
   it('gives the leg nearest the place of a route with stops', () => {
     const route = { _airports: [airport('LHR', 'EGLL', 'London', 51.47, -0.46), airport('DUB', 'EIDW', 'Dublin', 53.42, -6.27), ZRH, TLV] };
     // Over Rhodes: only Zurich - Tel Aviv passes near.
-    expect(mapRoute(route, { lat: 36.4, lon: 28.2 })).toEqual({ from: { code: 'ZRH', name: 'Zurich' }, to: { code: 'TLV', name: 'Tel Aviv' } });
+    expect(mapRoute(route, { lat: 36.4, lon: 28.2 })).toEqual({ from: { code: 'ZRH', name: 'Zurich' }, to: { code: 'TLV', name: 'Tel Aviv' }, km: 2809 });
     // Near Zurich both legs pass near: the one with the smaller detour.
     expect(mapRoute(route, RAVENSBURG)!.from.code).toBe('ZRH');
   });
@@ -147,7 +147,7 @@ describe('handlePlanesRequest with route=<callsign>', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe(ROUTE_CACHE_CONTROL);
     expect(ROUTE_CACHE_CONTROL).toContain('s-maxage=3600');
-    expect(await response.json()).toEqual({ route: { from: { code: 'CDG', name: 'Paris' }, to: { code: 'TLV', name: 'Tel Aviv' } } });
+    expect(await response.json()).toEqual({ route: { from: { code: 'CDG', name: 'Paris' }, to: { code: 'TLV', name: 'Tel Aviv' }, km: 3284 } });
   });
 
   it('answers { route: null } for a callsign adsb.lol does not know', async () => {
