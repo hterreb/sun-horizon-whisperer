@@ -186,26 +186,32 @@ export const TERRAIN_TIERS: Record<TerrainBand, RarityTier> = {
   hills: 'common', lowMountains: 'frequent', mountains: 'uncommon', highMountains: 'rare', alpine: 'veryRare',
 };
 // The great-circle length of a live plane's route leg (planeFeed.mapRoute).
-export type PlaneHaul = 'short' | 'medium' | 'long' | 'ultraLong';
+export type PlaneHaul = 'regional' | 'short' | 'medium' | 'long' | 'ultraLong';
 export const getPlaneHaul = (km: number): PlaneHaul => {
-  if (km < 1500) return 'short';
-  if (km < 4000) return 'medium';
-  if (km < 8000) return 'long';
+  if (km < 800) return 'regional';
+  if (km < 2000) return 'short';
+  if (km < 4500) return 'medium';
+  if (km < 9000) return 'long';
   return 'ultraLong';
 };
-export const HAUL_TIERS: Record<PlaneHaul, RarityTier> = { short: 'common', medium: 'frequent', long: 'uncommon', ultraLong: 'rare' };
-// The size of a tracked satellite, from its CelesTrak name: the crewed stations, the bus-sized
-// rocket bodies and Hubble, the small constellation satellites, and the rest.
+export const HAUL_TIERS: Record<PlaneHaul, RarityTier> = {
+  regional: 'common', short: 'frequent', medium: 'uncommon', long: 'rare', ultraLong: 'veryRare',
+};
+// The size of a tracked satellite, from its CelesTrak name: the small constellation satellites,
+// the rest, the bus-sized rocket bodies, the giants (Hubble, the Chinese station) and the ISS.
 // ponytail: name rules, no size data in the GP records; add CelesTrak's SATCAT RCS size if they misfit.
-export type SatelliteSize = 'small' | 'medium' | 'large' | 'station';
+export type SatelliteSize = 'small' | 'medium' | 'large' | 'giant' | 'iss';
 export const HUBBLE_NORAD_ID = 20580;
 export const getSatelliteSize = (id: number, name: string): SatelliteSize => {
-  if (/^(ISS|CSS)\b/.test(name)) return 'station';
-  if (id === HUBBLE_NORAD_ID || /\bR\/B\b/.test(name)) return 'large';
+  if (/^ISS\b/.test(name)) return 'iss';
+  if (id === HUBBLE_NORAD_ID || /^CSS\b/.test(name)) return 'giant';
+  if (/\bR\/B\b/.test(name)) return 'large';
   if (/^(STARLINK|ONEWEB)/.test(name)) return 'small';
   return 'medium';
 };
-export const SATELLITE_TIERS: Record<SatelliteSize, RarityTier> = { small: 'common', medium: 'frequent', large: 'uncommon', station: 'rare' };
+export const SATELLITE_TIERS: Record<SatelliteSize, RarityTier> = {
+  small: 'common', medium: 'frequent', large: 'uncommon', giant: 'rare', iss: 'veryRare',
+};
 
 // The rarity row of a thing with a fixed tier: the tier alone.
 const tierLine = (tier: RarityTier): InfoLine & { tier: RarityTier } => ({ label: 'info.rarity', value: { key: RARITY_NAMES[tier] }, tier });

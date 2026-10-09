@@ -176,8 +176,8 @@ const TerrainBandArt = ({ band }: { band: TerrainBand }) => (
 );
 
 // Item 120: the plane grows with the haul, the satellite with its size.
-const PlaneHaulArt = ({ step }: { step: number }) => <span className="text-white"><ScenePlane width={30 + 8 * step} /></span>;
-const SatelliteSizeArt = ({ step }: { step: number }) => <Satellite size={20 + 6 * step} className="text-white" aria-hidden="true" />;
+const PlaneHaulArt = ({ step }: { step: number }) => <span className="text-white"><ScenePlane width={28 + 7 * step} /></span>;
+const SatelliteSizeArt = ({ step }: { step: number }) => <Satellite size={18 + 5 * step} className="text-white" aria-hidden="true" />;
 
 // Also the badge of the "Badge unlocked" card (item 114).
 export const BadgeArt = ({ badge }: { badge: Badge }) => {

@@ -157,9 +157,9 @@ describe('sceneInfo (ROADMAP item 95)', () => {
     const target: SceneInfoTarget = { type: 'livePlane', callsign: 'ELY326', airline: 'El Al', aircraftType: 'B738', altM: 11_000, speedKt: 450 };
     const route = { from: { code: 'CDG', name: 'Paris' }, to: { code: 'TLV', name: 'Tel Aviv' }, km: 3284 };
     expect(card(target, { route }).at(-2)).toBe('Route: Paris (CDG) → Tel Aviv (TLV)');
-    // Item 120: the haul tier (3284 km: medium haul, frequent).
-    expect(card(target, { route }).at(-1)).toBe('Rarity: Frequent');
-    expect(getSceneInfo(target, ctx({ route: { ...route, km: 9000 } })).tier).toBe('rare');
+    // Item 120: the haul tier (3284 km: medium haul, uncommon).
+    expect(card(target, { route }).at(-1)).toBe('Rarity: Uncommon');
+    expect(getSceneInfo(target, ctx({ route: { ...route, km: 9000 } })).tier).toBe('veryRare');
     expect(card(target, { route }, de).at(-2)).toBe('Route: Paris (CDG) → Tel Aviv (TLV)');
     const long = { ...route, to: { code: 'CFU', name: 'Kerkyra Island' } };
     expect(card(target, { route: long }).at(-2)).toBe('Route: CDG → CFU');
@@ -251,7 +251,7 @@ describe('sceneInfo (ROADMAP item 95)', () => {
     const satellite = { details: { heightKm: 418.4, speedKmS: 7.66, sunlit: true, shadowInMs: 3 * 60_000 }, nextPass: pass };
     expect(card({ type: 'satellite', id: 25544, name: 'ISS (ZARYA)' }, { satellite })).toEqual([
       'Satellite', 'ISS (ZARYA)', 'Altitude: 418 km', 'Speed: 7.7 km/s', "Into Earth's shadow: in 3 min",
-      `Next pass: ${formatTime(pass.start, 'en')}`, 'Rarity: Rare',
+      `Next pass: ${formatTime(pass.start, 'en')}`, 'Rarity: Very rare',
     ]);
     // In the shadow now, and the next pass on another day.
     const tomorrow = { ...pass, start: at('2026-10-07T12:30:00Z') };

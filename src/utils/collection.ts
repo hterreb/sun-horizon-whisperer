@@ -91,10 +91,12 @@ export const TERRAIN_BANDS: [TerrainBand, MessageKey][] = [
 ];
 // Item 120: from short to far, from small to big.
 export const PLANE_HAULS: [PlaneHaul, MessageKey][] = [
-  ['short', 'badge.planeShort'], ['medium', 'badge.planeMedium'], ['long', 'badge.planeLong'], ['ultraLong', 'badge.planeUltraLong'],
+  ['regional', 'badge.planeRegional'], ['short', 'badge.planeShort'], ['medium', 'badge.planeMedium'], ['long', 'badge.planeLong'],
+  ['ultraLong', 'badge.planeUltraLong'],
 ];
 export const SATELLITE_SIZES: [SatelliteSize, MessageKey][] = [
-  ['small', 'badge.satelliteSmall'], ['medium', 'badge.satelliteMedium'], ['large', 'badge.satelliteLarge'], ['station', 'badge.satelliteStation'],
+  ['small', 'badge.satelliteSmall'], ['medium', 'badge.satelliteMedium'], ['large', 'badge.satelliteLarge'], ['giant', 'badge.satelliteGiant'],
+  ['iss', 'badge.satelliteIss'],
 ];
 
 const EGGS: [EggKind, MessageKey][] = [
