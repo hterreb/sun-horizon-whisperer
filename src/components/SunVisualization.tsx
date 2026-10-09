@@ -718,9 +718,6 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   const aprilFools = useAprilFoolsSwap(calendarEvent === 'april-fools' && !prefersReducedMotion);
   const [sunDrawX, sunDrawY, moonDrawX, moonDrawY] = aprilFools.swapped ? [moonX, moonY, sunX, sunY] : [sunX, sunY, moonX, moonY];
   const aprilTransition: React.CSSProperties | undefined = aprilFools.running ? { transition: 'opacity 3s ease-in-out' } : undefined;
-  useEffect(() => {
-    if (aprilFools.swapped) onEggShown?.('aprilFools');
-  }, [aprilFools.swapped, onEggShown]);
 
   // Whether each body is up at all, on altitude/weather/time-of-day grounds alone -
   // independent of the compass field of view, so the off-FOV hint below can tell "it's
@@ -750,6 +747,15 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   const moonFade = aprilFools.faded || !moonDrawn ? 0 : 1;
   const sunMounted = sunDrawn || aprilFools.running;
   const moonMounted = moonDrawn || aprilFools.running;
+  // The badge counts only when at least one swapped body can really be seen: its place is above
+  // the horizon (not under the sea) and on the screen, and clouds do not hide its disc.
+  const aprilSeen = aprilFools.swapped && (
+    (moonPosition.altitude > 0 && moonDotVisible && sunVisibility.disc > 0) ||
+    (sunPosition.altitude > 0 && sunDotVisible && moonLook.disc > 0)
+  );
+  useEffect(() => {
+    if (aprilSeen) onEggShown?.('aprilFools');
+  }, [aprilSeen, onEggShown]);
   // Before the first measure getScreenPosition gives every body (0, 0): not a real place yet.
   const sceneMeasured = containerDimensions.width > 0 && containerDimensions.height > 0;
   // The pool of moonlight for the night fish (ROADMAP item 65, NR3): as bright as the moon

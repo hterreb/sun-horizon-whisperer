@@ -174,6 +174,27 @@ describe('April Fools swap (SunVisualization)', () => {
     expect(screen.queryByTestId('moon-disc')).toBeNull();
   });
 
+  it('swaps but gives no badge when neither body can be seen', () => {
+    const onEggShown = vi.fn();
+    const night = {
+      ...dayProps,
+      sunPosition: { azimuth: 330, altitude: -30 },
+      moonPosition: { ...dayProps.moonPosition, altitude: -20, visible: false },
+      timeOfDay: 'night' as const,
+    };
+    render(<SunVisualization {...night} calendarEvent="april-fools" onEggShown={onEggShown} />);
+    act(() => { vi.advanceTimersByTime(APRIL_FOOLS_DELAY_MS + APRIL_FOOLS_FADE_MS + 1000); });
+    expect(screen.getByTestId('moon-disc').style.opacity).toBe('0'); // the swap runs
+    expect(onEggShown).not.toHaveBeenCalled();
+  });
+
+  it('gives no badge when clouds hide both swapped bodies', () => {
+    const onEggShown = vi.fn();
+    render(<SunVisualization {...dayProps} weatherType="fog" cloudCoverPercent={100} calendarEvent="april-fools" onEggShown={onEggShown} />);
+    act(() => { vi.advanceTimersByTime(APRIL_FOOLS_DELAY_MS + APRIL_FOOLS_FADE_MS + 1000); });
+    expect(onEggShown).not.toHaveBeenCalled();
+  });
+
   it('does not swap on another day', () => {
     const onEggShown = vi.fn();
     render(<SunVisualization {...dayProps} calendarEvent={null} onEggShown={onEggShown} />);
