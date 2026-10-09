@@ -1129,28 +1129,47 @@ describe('SunTracker', () => {
       expect(unlocked()).toBeNull();
     });
 
-    it('on Christmas Eve after sunset, Santa flies with the snow and his badge counts', () => {
+    it('on Christmas Eve after sunset, Santa flies without the snow and his badge counts', () => {
       vi.useFakeTimers();
       // 21:00 UTC: about 5.5 h after sunset in Ravensburg (the tests run in UTC).
       vi.setSystemTime(new Date('2026-12-24T21:00:00Z'));
       try {
         render(<SunTracker />);
-        expect(visProps.current).toMatchObject({ calendarEvent: 'christmas', santa: true });
+        expect(visProps.current).toMatchObject({ calendarEvent: null, santa: true });
         expect(JSON.parse(localStorage.getItem('collection')!)).toHaveProperty('egg:santa');
-        // Item 114: the snow badge shows first, then Santa's.
-        expect(unlocked()).toHaveTextContent('Badge unlocked: Christmas snow');
-        closeCard();
-        expect(unlocked()).toHaveTextContent('Badge unlocked: Santa Claus');
+        expect(JSON.parse(localStorage.getItem('collection')!)).not.toHaveProperty('egg:christmas');
+        expect(unlocked()).toHaveTextContent('Badge unlocked: Santa Claus'); // item 114
       } finally {
         vi.useRealTimers();
       }
     });
 
-    it('?egg=santa forces Santa and the Christmas snow, and collects nothing', () => {
+    it('?egg=santa forces Santa without the snow, and collects nothing', () => {
       window.history.pushState({}, '', '/?egg=santa');
       render(<SunTracker />);
-      expect(visProps.current).toMatchObject({ calendarEvent: 'christmas', santa: true });
+      expect(visProps.current).toMatchObject({ santa: true });
+      expect(visProps.current!.calendarEvent).not.toBe('christmas');
       expect(localStorage.getItem('collection')).toBeNull();
+    });
+
+    it('7 quick moon taps start the disco and collect its badge; fewer or slow taps do not', () => {
+      let now = 1_000_000;
+      vi.spyOn(Date, 'now').mockImplementation(() => now);
+      render(<SunTracker />);
+      expect(visProps.current).not.toBeNull();
+      const tapMoon = (gapMs: number) => act(() => {
+        now += gapMs;
+        visProps.current!.onMoonTap!();
+      });
+      // Six quick taps, then a pause longer than 1.5 s: the count starts again.
+      for (let i = 0; i < 6; i++) tapMoon(1000);
+      tapMoon(1501);
+      expect(screen.queryByTestId('disco-sky')).toBeNull();
+      // Six more quick taps make 7 in a row.
+      for (let i = 0; i < 6; i++) tapMoon(1500);
+      expect(screen.getByTestId('disco-sky')).toBeInTheDocument();
+      expect(JSON.parse(localStorage.getItem('collection')!)).toEqual({ 'egg:disco': expect.any(String) });
+      vi.restoreAllMocks();
     });
 
     it('the InfoPanel button opens the collection; the close button closes it', () => {

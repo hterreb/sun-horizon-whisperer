@@ -1,4 +1,4 @@
-import { getCalendarEvent, getSeasonInstant, isSantaTime } from '@/utils/calendarEvents';
+import { getCalendarEvent, getSeasonInstant, getSolsticeTraceDates, isSantaTime } from '@/utils/calendarEvents';
 import { getSunTimes } from '@/utils/sunUtils';
 
 // vitest pins TZ=UTC, so local dates below are UTC dates.
@@ -60,9 +60,9 @@ describe('getCalendarEvent', () => {
     expect(getCalendarEvent(new Date(2026, 9, 30, 22))).toBeNull();
   });
 
-  it('returns christmas on Dec 24-26 only', () => {
-    expect(getCalendarEvent(new Date(2026, 11, 23, 12))).toBeNull();
-    for (const day of [24, 25, 26]) expect(getCalendarEvent(new Date(2026, 11, day, 12))).toBe('christmas');
+  it('returns christmas on Dec 25-26 only (Santa has Dec 24)', () => {
+    for (const day of [23, 24]) expect(getCalendarEvent(new Date(2026, 11, day, 12))).toBeNull();
+    for (const day of [25, 26]) expect(getCalendarEvent(new Date(2026, 11, day, 12))).toBe('christmas');
     expect(getCalendarEvent(new Date(2026, 11, 27, 12))).toBeNull();
   });
 });
@@ -107,7 +107,27 @@ describe('isSantaTime (Christmas Eve)', () => {
     expect(isSantaTime(new Date(2026, 11, 24, 18), polarNight)).toBe(true);
   });
 
-  it('falls on a Christmas day every year, so Santa comes with the Christmas snow', () => {
-    for (let year = 2026; year <= 2040; year++) expect(getCalendarEvent(new Date(year, 11, 24, 20))).toBe('christmas');
+  it('has no snow on Christmas Eve and snow on Dec 25, every year', () => {
+    for (let year = 2026; year <= 2040; year++) {
+      expect(getCalendarEvent(new Date(year, 11, 24, 20))).toBeNull();
+      expect(getCalendarEvent(new Date(year, 11, 25, 12))).toBe('christmas');
+    }
+  });
+});
+
+describe('getSolsticeTraceDates', () => {
+  const iso = (d: Date) => d.toISOString();
+  it('gives the other solstice day at the same clock time', () => {
+    expect(getSolsticeTraceDates('solstice-longest', new Date(2027, 5, 21, 12)).map(iso)).toEqual(['2027-12-22T12:00:00.000Z']);
+    expect(getSolsticeTraceDates('solstice-shortest', new Date(2027, 11, 22, 9)).map(iso)).toEqual(['2027-06-21T09:00:00.000Z']);
+  });
+
+  it('gives both solstice days on an equinox', () => {
+    expect(getSolsticeTraceDates('equinox', new Date(2027, 2, 20, 12)).map(iso)).toEqual(['2027-06-21T12:00:00.000Z', '2027-12-22T12:00:00.000Z']);
+  });
+
+  it('gives none for other events', () => {
+    expect(getSolsticeTraceDates(null, new Date(2027, 5, 21, 12))).toEqual([]);
+    expect(getSolsticeTraceDates('christmas', new Date(2027, 11, 24, 12))).toEqual([]);
   });
 });

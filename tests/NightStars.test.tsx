@@ -152,6 +152,36 @@ describe('NightStars', () => {
     expect(countDrawnFrames(1, 60)).toBe(60);
   });
 
+  // Runs the loop at 60 Hz and records the line widths of the streaks drawn with a gradient.
+  const meteorWidths = (meteorShower: boolean) => {
+    const widths: number[] = [];
+    const ctx = {
+      clearRect: () => {}, beginPath: () => {}, arc: () => {}, fill: () => {}, moveTo: () => {}, lineTo: () => {},
+      createLinearGradient: () => ({ addColorStop: () => {} }),
+      stroke: () => { if (typeof ctx.strokeStyle !== 'string') widths.push(ctx.lineWidth); },
+      strokeStyle: '' as unknown, lineWidth: 1,
+    };
+    const ctxSpy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx as unknown as CanvasRenderingContext2D);
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.0001);
+    let next: FrameRequestCallback | null = null;
+    const rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => { next = cb; return 1; });
+    const { unmount } = render(<NightStars timeOfDay="night" shootingStarRate={0} meteorShower={meteorShower} />);
+    const t0 = performance.now();
+    for (let i = 1; i <= 60; i++) next?.(t0 + i * (1000 / 60));
+    unmount();
+    rafSpy.mockRestore();
+    randomSpy.mockRestore();
+    ctxSpy.mockRestore();
+    return widths;
+  };
+
+  it('draws meteor streaks 3 px wide during a meteor shower only', () => {
+    const widths = meteorWidths(true);
+    expect(widths.length).toBeGreaterThan(0);
+    expect(new Set(widths)).toEqual(new Set([3]));
+    expect(meteorWidths(false)).toEqual([]);
+  });
+
   it('draws stars statically without starting the animation loop when reduced motion is preferred (A-2)', () => {
     const ctxSpy = mockCanvasContext();
     const mediaSpy = mockReducedMotion(true);

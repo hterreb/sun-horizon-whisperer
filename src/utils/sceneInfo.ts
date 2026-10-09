@@ -24,7 +24,8 @@ import { SANTA_DAYS_PER_YEAR, getEventDaysPerYear, type CalendarEvent } from './
 
 // Item 113: the easter eggs and special events that are one thing in the scene and take taps.
 // Not the collection's EggKind (item 112), which has one badge per egg or event.
-export type EggCardKind = 'ufo' | 'ghost' | 'dragon' | 'santa' | 'blackCat' | 'halloweenBat' | 'pumpkinMoon';
+export type EggCardKind = 'ufo' | 'ghost' | 'dragon' | 'santa' | 'blackCat' | 'halloweenBat' | 'pumpkinMoon'
+  | 'matariki' | 'conjunction' | 'noctilucent' | 'midnightSun' | 'polarNight';
 
 export type SceneInfoTarget =
   | { type: 'fish'; kind: FishKind }
@@ -184,6 +185,12 @@ const EGGS: Record<EggCardKind, { name: MessageKey; fact: MessageKey; hidden: bo
   blackCat: { name: 'egg.blackCat', fact: 'eggFact.blackCat', hidden: false, chance: { event: 'friday-13' }, latin: 'Felis catus' },
   halloweenBat: { name: 'egg.halloweenBat', fact: 'eggFact.halloweenBat', hidden: false, chance: { event: 'halloween-bats' } },
   pumpkinMoon: { name: 'egg.halloweenPumpkin', fact: 'eggFact.pumpkinMoon', hidden: false, chance: { event: 'halloween-pumpkin' } },
+  // Sky eggs: real sky events, so no chance text (the tier alone).
+  matariki: { name: 'egg.matariki', fact: 'eggFact.matariki', hidden: false, chance: null },
+  conjunction: { name: 'egg.conjunction', fact: 'eggFact.conjunction', hidden: false, chance: null },
+  noctilucent: { name: 'egg.noctilucent', fact: 'eggFact.noctilucent', hidden: false, chance: null },
+  midnightSun: { name: 'egg.midnightSun', fact: 'eggFact.midnightSun', hidden: false, chance: null },
+  polarNight: { name: 'egg.polarNight', fact: 'eggFact.polarNight', hidden: false, chance: null },
 };
 
 const DIRECTIONS: MessageKey[] = [

@@ -18,15 +18,15 @@ describe('collection (ROADMAP item 112)', () => {
     vi.restoreAllMocks();
   });
 
-  it('has 87 badges with unique ids, one for every fish, flyer, boat and cloud type', () => {
+  it('has 92 badges with unique ids, one for every fish, flyer, boat and cloud type', () => {
     const ids = BADGES.map(b => b.id);
-    expect(ids).toHaveLength(87); // item 115: 69 + 5 sun + 5 terrain + 8 moon states
-    expect(new Set(ids).size).toBe(87);
+    expect(ids).toHaveLength(92); // item 115: 69 + 5 sun + 5 terrain + 8 moon states; + 5 sky eggs
+    expect(new Set(ids).size).toBe(92);
     for (const kind of [...FISH_WEIGHTS.map(([k]) => k), ...NIGHT_ONLY]) expect(ids).toContain(`fish:${kind}`);
     for (const kind of [...BIRD_WEIGHTS.map(([k]) => k), 'bat']) expect(ids).toContain(`flyer:${kind}`);
     for (const kind of ['sailboat', 'ferry', 'fishing', 'rowboat', 'freighter']) expect(ids).toContain(`boat:${kind}`);
     for (const type of ['Ci', 'Cs', 'Ac', 'As', 'Cu', 'Sc', 'St', 'Ns', 'Cb', 'Len', 'Mam']) expect(ids).toContain(`cloud:${type}`);
-    expect(BADGES.filter(b => b.group === 'egg')).toHaveLength(19);
+    expect(BADGES.filter(b => b.group === 'egg')).toHaveLength(24);
     expect(BADGES.find(b => b.id === 'plane')?.group).toBe('sky');
   });
 
@@ -102,7 +102,7 @@ describe('collection (ROADMAP item 112)', () => {
     expect(badgeForCalendarEvent('christmas', shown)).toBe('egg:christmas');
     expect(badgeForCalendarEvent('christmas', { ...shown, weatherType: 'snow' })).toBeNull();
     expect(badgeForCalendarEvent('friday-13', shown)).toBe('egg:friday13');
-    expect(badgeForCalendarEvent('friday-13', { ...shown, reducedMotion: true })).toBeNull();
+    expect(badgeForCalendarEvent('friday-13', { ...shown, reducedMotion: true })).toBe('egg:friday13');
     expect(badgeForCalendarEvent('lunar-new-year', { ...shown, reducedMotion: true })).toBeNull();
   });
 
@@ -116,6 +116,11 @@ describe('collection (ROADMAP item 112)', () => {
 
   it('maps an astro event to its egg badge', () => {
     expect(badgeForAstroEvent('greenFlash')).toBe('egg:greenFlash');
+    // Sky eggs: one ultra rare badge each.
+    for (const kind of ['matariki', 'conjunction', 'noctilucent', 'midnightSun', 'polarNight'] as const) {
+      expect(badgeForAstroEvent(kind)).toBe(`egg:${kind}`);
+      expect(tier(`egg:${kind}`)).toBe('rarity.ultraRare');
+    }
   });
 
   it('pauses while a test link forces the scene', () => {
