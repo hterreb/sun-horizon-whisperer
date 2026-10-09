@@ -73,6 +73,10 @@ import {
 } from '@/utils/collection';
 import { watchSunEvent, NO_SUN_EVENT_WATCH, getCountdownTarget } from '../utils/sunEvents';
 import { getCalendarEvent, isSantaTime } from '@/utils/calendarEvents';
+import { getNationalDay, parseCountryOverride, parseNationalEggOverride } from '@/utils/nationalDays';
+import { badgeForNationalDay } from '@/utils/collection';
+import { BuntingContext, type Bunting } from '@/hooks/useBunting';
+import NationalEggs from './NationalEggs';
 import { PLAY_SPEED, PLAY_TICK_MS, clampTimeOffset } from '@/utils/timeTravel';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
 import { DISCO_MS, KONAMI_SEQUENCE, SUNGLASSES_MS, advanceKonami, getEggOverride, registerSunTap, rollUfo } from '@/utils/hiddenEggs';
@@ -783,6 +787,13 @@ const SunTracker: React.FC = () => {
   );
   // Christmas Eve: Santa flies once from sunset to midnight (the scene's sun times).
   const isSanta = santaForced || isSantaTime(date, sunTimes);
+  // National days (utils/nationalDays): only in the place's country, from InfoPanel's
+  // reverse-geocode answer. Unknown country: none. `?country=XX` sets the country,
+  // `?egg=<kind>` (for example `?egg=bastilleDay`) forces the day.
+  const [detectedCountry, setDetectedCountry] = useState<string | null>(null);
+  const [countryOverride] = useState(() => parseCountryOverride(window.location.search));
+  const [nationalForced] = useState(() => parseNationalEggOverride(window.location.search));
+  const nationalDay = nationalForced ?? getNationalDay(date, countryOverride ?? detectedCountry, calendarEvent);
 
   // Sunset countdown (ROADMAP item 43): 10 s of ticks and a chime at the next sunset
   // (line of sight when there is one). Live time only; the tap that turns it on
@@ -948,6 +959,25 @@ const SunTracker: React.FC = () => {
   useEffect(() => {
     if (astroBadge) collect(astroBadge);
   }, [astroBadge, collect]);
+  // National days: the jets and fireworks badges by NationalEggs' rules; a bunting badge when a
+  // decorated boat shows (SceneBoat calls `onShow`).
+  const nationalBadge = nationalForced ? null : badgeForNationalDay(nationalDay, {
+    isDay: timeOfDay === 'dawn' || timeOfDay === 'morning' || timeOfDay === 'midday' || timeOfDay === 'afternoon' || timeOfDay === 'evening',
+    isNight: isDarkSky,
+    reducedMotion: prefersReducedMotion,
+    isTimePreview,
+  });
+  useEffect(() => {
+    if (nationalBadge) collect(nationalBadge);
+  }, [nationalBadge, collect]);
+  const buntingBadge = !nationalForced && !isTimePreview && nationalDay?.style === 'bunting' ? (`egg:${nationalDay.kind}` as const) : null;
+  const handleBuntingShow = useCallback(() => {
+    if (buntingBadge) collect(buntingBadge);
+  }, [buntingBadge, collect]);
+  const bunting = useMemo<Bunting | null>(
+    () => (nationalDay?.style === 'bunting' ? { colors: nationalDay.colors.map((c) => `hsl(var(--national-${c}))`), onShow: handleBuntingShow } : null),
+    [nationalDay, handleBuntingShow]
+  );
   // The forecast rain amount (ROADMAP item 77); manual weather uses the type's middle value.
   const rainMmH = useRealWeather ? weatherData?.precipitationMmH ?? null : null;
   // The cover per layer for the cloud types (ROADMAP item 84); manual weather uses the type's own.
@@ -1016,6 +1046,7 @@ const SunTracker: React.FC = () => {
         onSelectPlace={handleLocationChange}
       />
     )}
+    <BuntingContext.Provider value={bunting}>
     <div 
       data-share-root
       className={`relative min-h-dvh w-full overflow-hidden ${REVEAL_CLASS[reveal]} ${
@@ -1034,6 +1065,9 @@ const SunTracker: React.FC = () => {
       {discoOn && <DiscoSky />}
       {ufoOn && (
         <Ufo onDone={handleUfoDone} onInfo={handleSceneInfo} ringOn={infoCard?.ring === UFO_RING} ringTier={infoCardInfo?.tier ?? null} />
+      )}
+      {nationalDay && (
+        <NationalEggs key={nationalDay.kind} day={nationalDay} timeOfDay={timeOfDay} onInfo={handleSceneInfo} infoRing={infoCard?.ring ?? null} infoRingTier={infoCardInfo?.tier ?? null} />
       )}
       {reveal === 'done' && (
         <>
@@ -1155,6 +1189,7 @@ const SunTracker: React.FC = () => {
             isLivePlanesOn={isLivePlanesOn}
             onLivePlanesToggle={handleLivePlanesToggle}
             onCollectionOpen={handleCollectionOpen}
+            onCountryChange={setDetectedCountry}
           />
         </>
       )}
@@ -1181,6 +1216,7 @@ const SunTracker: React.FC = () => {
         />
       )}
     </div>
+    </BuntingContext.Provider>
     <PremiumDialog />
     <CollectionView open={isCollectionOpen} onClose={handleCollectionClose} collection={collection} focusId={collectionFocus} />
     {unlockedQueue.length > 0 && (

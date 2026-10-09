@@ -21,10 +21,12 @@ import { type ContrailKind } from './planes';
 import { type LiveRoute, type RouteAirport } from './planeFeed';
 import { UFO_CHANCE } from './hiddenEggs';
 import { SANTA_DAYS_PER_YEAR, getEventDaysPerYear, type CalendarEvent } from './calendarEvents';
+import { NATIONAL_DAY_DAYS_PER_YEAR, type NationalDayKind } from './nationalDays';
 
 // Item 113: the easter eggs and special events that are one thing in the scene and take taps.
 // Not the collection's EggKind (item 112), which has one badge per egg or event.
-export type EggCardKind = 'ufo' | 'ghost' | 'dragon' | 'santa' | 'blackCat' | 'halloweenBat' | 'pumpkinMoon';
+export type EggCardKind = 'ufo' | 'ghost' | 'dragon' | 'santa' | 'blackCat' | 'halloweenBat' | 'pumpkinMoon'
+  | NationalDayKind;
 
 export type SceneInfoTarget =
   | { type: 'fish'; kind: FishKind }
@@ -180,6 +182,16 @@ const EGGS: Record<EggCardKind, { name: MessageKey; fact: MessageKey; hidden: bo
   blackCat: { name: 'egg.blackCat', fact: 'eggFact.blackCat', hidden: false, chance: { event: 'friday-13' }, latin: 'Felis catus' },
   halloweenBat: { name: 'egg.halloweenBat', fact: 'eggFact.halloweenBat', hidden: false, chance: { event: 'halloween-bats' } },
   pumpkinMoon: { name: 'egg.halloweenPumpkin', fact: 'eggFact.pumpkinMoon', hidden: false, chance: { event: 'halloween-pumpkin' } },
+  // National days (nationalDays.ts): one day a year in one country.
+  festaRepubblica: { name: 'egg.festaRepubblica', fact: 'eggFact.festaRepubblica', hidden: false, chance: { daysPerYear: NATIONAL_DAY_DAYS_PER_YEAR } },
+  bastilleDay: { name: 'egg.bastilleDay', fact: 'eggFact.bastilleDay', hidden: false, chance: { daysPerYear: NATIONAL_DAY_DAYS_PER_YEAR } },
+  independenceDay: { name: 'egg.independenceDay', fact: 'eggFact.independenceDay', hidden: false, chance: { daysPerYear: NATIONAL_DAY_DAYS_PER_YEAR } },
+  guyFawkes: { name: 'egg.guyFawkes', fact: 'eggFact.guyFawkes', hidden: false, chance: { daysPerYear: NATIONAL_DAY_DAYS_PER_YEAR } },
+  germanUnity: { name: 'egg.germanUnity', fact: 'eggFact.germanUnity', hidden: false, chance: { daysPerYear: NATIONAL_DAY_DAYS_PER_YEAR } },
+  fiestaNacional: { name: 'egg.fiestaNacional', fact: 'eggFact.fiestaNacional', hidden: false, chance: { daysPerYear: NATIONAL_DAY_DAYS_PER_YEAR } },
+  canadaDay: { name: 'egg.canadaDay', fact: 'eggFact.canadaDay', hidden: false, chance: { daysPerYear: NATIONAL_DAY_DAYS_PER_YEAR } },
+  australiaDay: { name: 'egg.australiaDay', fact: 'eggFact.australiaDay', hidden: false, chance: { daysPerYear: NATIONAL_DAY_DAYS_PER_YEAR } },
+  kingsDay: { name: 'egg.kingsDay', fact: 'eggFact.kingsDay', hidden: false, chance: { daysPerYear: NATIONAL_DAY_DAYS_PER_YEAR } },
 };
 
 const DIRECTIONS: MessageKey[] = [

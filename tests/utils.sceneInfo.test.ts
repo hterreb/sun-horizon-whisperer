@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { NATIONAL_DAYS } from '@/utils/nationalDays';
 import { translate, type Translate } from '@/i18n';
 import {
   getSceneInfo, resolveInfoText, directionText, durationText, distanceText, rarityTier, getRarityTier, RARITY_TIERS,
@@ -404,6 +405,20 @@ describe('sceneInfo: easter egg cards (ROADMAP item 113)', () => {
       'Rarity: Ultra rare · 1 day a year',
     ]);
     expect(eggCard('santa', de, { language: 'de' })[0]).toBe('Weihnachtsmann');
+  });
+
+  it('gives each national day a "Special event" card: title, fact and 1 day a year', () => {
+    for (const { kind } of NATIONAL_DAYS) {
+      expect(info(kind), kind).toMatchObject({ kicker: 'infoKind.specialEvent', icon: 'event', tier: 'ultraRare' });
+      for (const t of [en, de]) {
+        const [title, fact] = eggCard(kind, t);
+        expect(title, kind).not.toMatch(/^egg\./);
+        expect(fact, kind).toMatch(/\.$/);
+      }
+      expect(eggCard(kind)[2], kind).toBe('Rarity: Ultra rare · 1 day a year');
+    }
+    expect(eggCard('festaRepubblica')[0]).toBe('Italian Republic Day');
+    expect(eggCard('festaRepubblica', de, { language: 'de' })[1]).toMatch(/Frecce Tricolori/);
   });
 
   it('shows the tier alone for the midnight ghost (no chance in the code)', () => {

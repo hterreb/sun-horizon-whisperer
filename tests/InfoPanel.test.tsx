@@ -294,6 +294,43 @@ describe('InfoPanel', () => {
     vi.unstubAllGlobals();
   });
 
+  describe('country code for the national days', () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('passes the country code of the reverse-geocode answer up, with no second call', async () => {
+      const fetchMock = vi.fn(() =>
+        Promise.resolve({ json: () => Promise.resolve({ city: 'Roma', countryName: 'Italia', countryCode: 'IT' }) })
+      );
+      vi.stubGlobal('fetch', fetchMock);
+      const onCountryChange = vi.fn();
+      render(<InfoPanel {...defaultProps} onCountryChange={onCountryChange} />);
+      await waitFor(() => expect(onCountryChange).toHaveBeenCalledWith('IT'));
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('passes null when the answer has no code or the call fails', async () => {
+      const onCountryChange = vi.fn();
+      vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ json: () => Promise.resolve({ countryName: 'Testland' }) })));
+      const { unmount } = render(<InfoPanel {...defaultProps} onCountryChange={onCountryChange} />);
+      await waitFor(() => expect(onCountryChange).toHaveBeenCalledWith(null));
+      unmount();
+      onCountryChange.mockClear();
+      vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('network down'))));
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      render(<InfoPanel {...defaultProps} onCountryChange={onCountryChange} />);
+      await waitFor(() => expect(onCountryChange).toHaveBeenCalledWith(null));
+    });
+
+    it('passes null for a searched place (no reverse-geocode call)', async () => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+      const onCountryChange = vi.fn();
+      render(<InfoPanel {...defaultProps} manualPlaceName="Roma, Italia" onCountryChange={onCountryChange} />);
+      await waitFor(() => expect(onCountryChange).toHaveBeenCalledWith(null));
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
   describe('coordinates and weather update time (ROADMAP item 25)', () => {
     afterEach(() => {
       vi.unstubAllGlobals();

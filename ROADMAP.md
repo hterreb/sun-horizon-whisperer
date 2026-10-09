@@ -2299,6 +2299,28 @@ Items:
   - ✅ Christmas: light snow on Dec 24–26, even when the weather is clear. Done: slow small flakes, off when it already snows.
   - ✅ Friday the 13th: a black cat walks along the horizon once. Done: a 45 s straight glide, no bounce.
   - ✅ Christmas Eve: Santa in his sleigh with his reindeer flies once across the night sky on Dec 24, between sunset and midnight. A slow straight glide high in the sky, like the UFO (no bounce, no flapping legs; calm-motion speed limit). It shows with the Christmas snow. A tap opens an info card. Collection: a new "Santa" egg badge (item 112), counted when he shows. `?egg=santa`. Done: `Santa.tsx`, a dark sleigh and 4 reindeer with Rudolph's red nose; one glide per page view at 11 % height, random direction, 2.5 %/s capped at 9.75 px/s (about 52 s on a 390 px phone); `isSantaTime` in `calendarEvents.ts` (the sunset must be on Dec 24); also when it snows; a flight that is on at midnight ends at the edge.
+- **National days** (`nationalDays.ts`, `NationalEggs.tsx`, `BoatBunting.tsx`): ✅ Done 2026-10-09.
+  - **Summary:** each national day shows only in its own country, on its local day. One row per country in `NATIONAL_DAYS` (country code, date, style, flag colours). A new country is one row.
+  - **Country source:** the `countryCode` of the BigDataCloud reverse-geocode answer that `InfoPanel` already gets for the place name. `InfoPanel` passes it up with `onCountryChange`; `SunTracker` keeps it in state. No second call and no new CSP host. Unknown country (no answer, an error, a searched place): no national egg. The app does not guess the country from the language.
+  - **Eggs:**
+
+    | Country | Day | Egg | Style |
+    |---|---|---|---|
+    | IT | Jun 2, Festa della Repubblica | `festaRepubblica` | Frecce Tricolori: nine small jets fly once across the day sky (dawn to evening), 2 %/s capped at 7.8 px/s. Each jet trails smoke: the top three green, the middle three white, the bottom three red. The smoke stays, then fades out over 40 s. |
+    | FR | Jul 14, Bastille Day | `bastilleDay` | One `Fireworks` show in the flag colours per night view (dark sky). |
+    | US | Jul 4, Independence Day | `independenceDay` | The same, in red, white and blue. |
+    | GB | Nov 5, Guy Fawkes Night | `guyFawkes` | The same, and a soft, still bonfire glow on the shore at night. |
+    | DE | Oct 3, Tag der Deutschen Einheit | `germanUnity` | Bunting: a static string of small pennants in the flag colours on every boat. |
+    | ES | Oct 12, Fiesta Nacional | `fiestaNacional` | Bunting. |
+    | CA | Jul 1, Canada Day | `canadaDay` | Bunting. |
+    | AU | Jan 26, Australia Day | `australiaDay` | Bunting. |
+    | NL | Apr 27, Koningsdag (Apr 26 when Apr 27 is a Sunday) | `kingsDay` | Bunting, mostly orange. |
+
+  - **Rules:** a calendar event wins the day (Lunar New Year on Australia Day 2028): one special event at a time. The flag colours are the `--national-*` tokens in `src/index.css`. `Fireworks` takes a `palette` prop. The sky eggs draw behind the scene, like the UFO. A double tap on the jets or the bonfire opens the egg card (Special event, 1 day a year).
+  - **Reduced motion:** no jets and no fireworks, and their badges do not count. The bunting and the bonfire are static, so they stay and count.
+  - **Collection:** one ultra rare badge `egg:<kind>` per national day. The jets count by day, the fireworks at night (`badgeForNationalDay`). The bunting counts when a decorated boat shows (`useBunting`: `SceneBoat` calls `onShow`), because a bunting day without a boat on the screen shows nothing. Never in a time preview.
+  - **Test links:** `?egg=<kind>` (for example `?egg=bastilleDay`) forces that day in any country on any date; the time-of-day rules still apply. `?country=XX` sets the country. Both pause the collection.
+  - **Open:** the bunting and the French and US fireworks have no tap target, so their cards do not open yet. A searched place has no country code (Open-Meteo gives `country_code`, but the saved place keeps only the name).
 - **Astronomy:**
   - ✅ Solar and lunar eclipses: a darkened sun or red moon at the correct time (hardcoded date list for 10 years). Done: NASA GSFC list 2026–2035 in `astroEvents.ts`; solar only within ~3500 km of the greatest-eclipse point.
   - ✅ Supermoon: a bigger moon when the full moon is near perigee. Done: 14 % bigger moon when the full moon is closer than 360 000 km (Meeus distance).

@@ -525,6 +525,31 @@
     --scene-green-flash: 130 90% 60%;
     --scene-eclipse-moon: 12 75% 38%;
     --scene-blue-moon: 205 90% 72%;
+    /* National-day easter eggs (nationalDays.ts): the flag colours of the jets' smoke, the
+       fireworks and the bunting. The blues are lighter than the flags, so a burst shows on
+       the night sky. The bonfire is the soft glow on the shore on Guy Fawkes Night; the jet is
+       the Frecce Tricolori's blue. */
+    --national-white: 0 0% 100%;
+    --national-it-green: 146 100% 32%;
+    --national-it-red: 356 65% 49%;
+    --national-fr-blue: 211 100% 50%;
+    --national-fr-red: 4 85% 57%;
+    --national-us-blue: 230 70% 60%;
+    --national-us-red: 352 75% 50%;
+    --national-gb-blue: 222 85% 58%;
+    --national-gb-red: 350 85% 48%;
+    --national-de-black: 0 0% 8%;
+    --national-de-red: 0 100% 43%;
+    --national-de-gold: 48 100% 50%;
+    --national-es-red: 358 78% 40%;
+    --national-es-yellow: 48 100% 47%;
+    --national-ca-red: 353 95% 44%;
+    --national-au-blue: 240 75% 45%;
+    --national-au-red: 0 90% 50%;
+    --national-nl-orange: 28 100% 50%;
+    --national-nl-blue: 221 62% 34%;
+    --national-bonfire: 28 100% 55%;
+    --national-jet: 222 55% 32%;
     /* Fish (ROADMAP item 85, FS1): two tones per species, a dark back over a pale belly,
        from the item 62 tints: back = the tint at 0.85 x saturation and 0.55 x lightness
        (at least 16 %), belly = 0.6 x saturation, lightness 55 % of the way to white (at
