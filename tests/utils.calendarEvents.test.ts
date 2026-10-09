@@ -86,6 +86,16 @@ describe('isSantaTime (Christmas Eve)', () => {
     expect(isSantaTime(new Date(2026, 11, 24, 17), times)).toBe(true);
   });
 
+  it('has no Santa in the first hour of Dec 24, when the sun times still hold the Dec 23 sunset', () => {
+    // vitest pins TZ=UTC. Lisbon is on UTC in winter, so UTC is its local time. West of the
+    // zone meridian, solar midnight comes after 00:00 (here about 00:36), so SunCalc's times
+    // for 00:20 belong to the solar day of Dec 23 and hold its sunset.
+    const now = new Date(2026, 11, 24, 0, 20);
+    const times = getSunTimes(now, 38.72, -9.14);
+    expect(times.sunset.getDate()).toBe(23);
+    expect(isSantaTime(now, times)).toBe(false);
+  });
+
   it('has no Santa without sun times or at polar day; at polar night he starts at the 18:00 fallback', () => {
     expect(isSantaTime(new Date(2026, 11, 24, 22), null)).toBe(false);
     const polarDay = getSunTimes(new Date(2026, 11, 24, 12), -80, 0);

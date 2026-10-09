@@ -80,6 +80,22 @@ describe('CalendarEggs', () => {
     expect(screen.queryByTestId('santa')).toBeNull();
   });
 
+  it('keeps Santa in the sky until he is done when midnight ends Christmas Eve mid-flight', () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => frames.push(cb));
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    const { rerender } = render(<CalendarEggs {...base} event="christmas" santa />);
+    act(() => { frames.shift()!(0); frames.shift()!(30_000); });
+    const santa = screen.getByTestId('santa');
+    // 00:00: no longer Santa time, he flies on from where he is.
+    rerender(<CalendarEggs {...base} event="christmas" />);
+    expect(screen.getByTestId('santa')).toBe(santa);
+    act(() => { frames.shift()!(60_000); });
+    expect(screen.getByTestId('santa')).toBe(santa);
+    act(() => { frames.shift()!(120_000); });
+    expect(screen.queryByTestId('santa')).toBeNull();
+  });
+
   it('shows Santa only with the Christmas event', () => {
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
     render(<CalendarEggs {...base} event="friday-13" santa />);
