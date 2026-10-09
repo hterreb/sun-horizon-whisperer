@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { Sun, ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp, Mountain, BellOff } from 'lucide-react';
-import { type SunPosition, type SunTimes, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors, getReflectionFade, getSunPathAround } from '../utils/sunUtils';
+import { type SunPosition, type SunTimes, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors, getReflectionFade, getSunPathAround, getDayLengthMinutes } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
 import { getSunArcLabels, getMoonArcLabels, getTerrainArcLabels, getTerrainMoonArcLabels, type ArcLabels, type ArcLabelPoint } from '../utils/arcLabels';
 import { shortestHeadingDelta } from '../utils/compassUtils';
@@ -14,7 +14,7 @@ import FestivalEggs from './FestivalEggs';
 import PlayfulEggs from './PlayfulEggs';
 import { useAprilFoolsSwap } from '@/hooks/useAprilFoolsSwap';
 import { type PlayfulEgg } from '@/utils/playfulEggs';
-import { type CalendarEvent, getSolsticeTraceDates } from '@/utils/calendarEvents';
+import { type CalendarEvent, type SeasonPath, getSolsticeTraceDates } from '@/utils/calendarEvents';
 import PremiumBadge from './PremiumBadge';
 import WeatherEffects from './WeatherEffects';
 import SolarEclipse from '@/components/SolarEclipse';
@@ -521,6 +521,13 @@ const ARC_LABEL_HALF_WIDTH = 32;
 const ARC_LABEL_HEIGHT = 22;
 // Half the widest cardinal pill ("NW"), so a label at the 0°/360° edge stays whole (AUDIT A-8).
 const CARDINAL_LABEL_HALF_WIDTH = 18;
+// Half the solstice fan's day-length pill ("Equinox · 12 h 8 min").
+const FAN_PILL_HALF_WIDTH = 70;
+const FAN_PILL_NAMES: Record<SeasonPath, MessageKey> = {
+  june: 'egg.fanJune',
+  equinox: 'egg.fanEquinox',
+  december: 'egg.fanDecember',
+};
 const COLLAPSED_PANEL_HEIGHT = 112;
 
 // The collapsed InfoPanel's box (InfoPanel.tsx root classes): top-right, 300 px wide or
@@ -711,20 +718,13 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   const { x: sunX, y: sunY, visible: sunDotVisible } = getSunPosition();
   const { x: moonX, y: moonY, visible: moonDotVisible } = getMoonPosition();
 
-  // April Fools (ROADMAP item 117): when the sun and the moon are both up and on the screen,
-  // they swap their drawn places for one minute with a slow cross-fade. Only the sun and the
-  // moon themselves move; their light on the water and the clouds stays. Reduced motion: no swap.
+  // April Fools (ROADMAP item 117): on Apr 1 the sun and the moon swap their sky places for
+  // one minute with a slow cross-fade, whether they are up or not. Only the sun and the moon
+  // themselves move; their light on the water and the clouds stays. Reduced motion: no swap.
   const prefersReducedMotion = usePrefersReducedMotion();
-  const aprilFools = useAprilFoolsSwap(
-    calendarEvent === 'april-fools' && !prefersReducedMotion && sunPosition.altitude > 0 && moonPosition.visible &&
-    sunDotVisible && moonDotVisible && getSunVisibility(weatherType).disc > 0 && getMoonLook(weatherType, cloudCoverPercent).disc > 0
-  );
+  const aprilFools = useAprilFoolsSwap(calendarEvent === 'april-fools' && !prefersReducedMotion);
   const [sunDrawX, sunDrawY, moonDrawX, moonDrawY] = aprilFools.swapped ? [moonX, moonY, sunX, sunY] : [sunX, sunY, moonX, moonY];
-  const aprilFade = aprilFools.faded ? 0 : 1;
   const aprilTransition: React.CSSProperties | undefined = aprilFools.running ? { transition: 'opacity 3s ease-in-out' } : undefined;
-  useEffect(() => {
-    if (aprilFools.swapped) onEggShown?.('aprilFools');
-  }, [aprilFools.swapped, onEggShown]);
 
   // Whether each body is up at all, on altitude/weather/time-of-day grounds alone -
   // independent of the compass field of view, so the off-FOV hint below can tell "it's
@@ -735,9 +735,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   const moonAltitudeVisible = moonPosition.visible && (
     timeOfDay === 'night' ||
     timeOfDay === 'astronomical-twilight' ||
-    timeOfDay === 'nautical-twilight' ||
-    // April Fools: the moon shows by day while the swap fades or holds.
-    aprilFools.swapped || aprilFools.faded
+    timeOfDay === 'nautical-twilight'
   );
 
   const isSunVisible = sunAltitudeVisible && sunDotVisible;
@@ -747,6 +745,24 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   const moonLook = getMoonLook(weatherType, cloudCoverPercent);
   const moonBright = moonPosition.illumination * 0.8 + 0.2;
   const isMoonDiscShown = isMoonVisible && moonLook.disc > 0;
+  // April Fools: swapped, each body is drawn at the other's sky place and shows when that place
+  // passes its own rule (the sun above -18°, the moon above -6°) and is on the screen; below the
+  // horizon the sea hides it. While the swap runs, both stay mounted, so they only fade.
+  const sunDrawn = aprilFools.swapped ? moonPosition.altitude > -18 && sunVisibility.halo > 0 && moonDotVisible : isSunVisible;
+  const moonDrawn = aprilFools.swapped ? sunPosition.altitude > -6 && sunDotVisible : isMoonVisible;
+  const sunFade = aprilFools.faded || !sunDrawn ? 0 : 1;
+  const moonFade = aprilFools.faded || !moonDrawn ? 0 : 1;
+  const sunMounted = sunDrawn || aprilFools.running;
+  const moonMounted = moonDrawn || aprilFools.running;
+  // The badge counts only when at least one swapped body can really be seen: its place is above
+  // the horizon (not under the sea) and on the screen, and clouds do not hide its disc.
+  const aprilSeen = aprilFools.swapped && (
+    (moonPosition.altitude > 0 && moonDotVisible && sunVisibility.disc > 0) ||
+    (sunPosition.altitude > 0 && sunDotVisible && moonLook.disc > 0)
+  );
+  useEffect(() => {
+    if (aprilSeen) onEggShown?.('aprilFools');
+  }, [aprilSeen, onEggShown]);
   // Before the first measure getScreenPosition gives every body (0, 0): not a real place yet.
   const sceneMeasured = containerDimensions.width > 0 && containerDimensions.height > 0;
   // The pool of moonlight for the night fish (ROADMAP item 65, NR3): as bright as the moon
@@ -799,18 +815,27 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     [arcLabelMinuteKey, latitude, longitude]
   );
 
-  // Solstice/equinox egg: faint traces of the other solstice day's sun path (both on an
-  // equinox), drawn like the sun arc, so today's arc reads as long or short.
+  // Solstice/equinox egg: the sun-path fan, like a sundial chart - the June solstice,
+  // equinox and December solstice paths, drawn like the sun arc, today's bold and gold.
+  // Each gets its day length and the screen point of its apex (null outside the view).
   const solsticeTracePaths = useMemo(() => {
     const { width, height } = containerDimensions;
     if (width === 0 || height === 0) return [];
+    const toXY = (p: { altitude: number; azimuth: number }) =>
+      getArcScreenPosition(p.altitude, p.azimuth, width, height, latitude, compassHeading);
     return getSolsticeTraceDates(calendarEvent, date)
-      .map((d) => buildArcPath(
-        getSunPathAround(d, latitude, longitude),
-        (p) => getArcScreenPosition(p.altitude, p.azimuth, width, height, latitude, compassHeading),
-        width
-      ))
-      .filter(Boolean);
+      .map(({ season, date: day, today }) => {
+        const path = getSunPathAround(day, latitude, longitude);
+        const top = path.reduce((a, b) => (b.altitude > a.altitude ? b : a), path[0]);
+        return {
+          season,
+          today,
+          d: buildArcPath(path, toXY, width),
+          minutes: getDayLengthMinutes(day, latitude, longitude),
+          apex: top && top.altitude > 0 ? toXY(top) : null,
+        };
+      })
+      .filter((trace) => trace.d);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on arcLabelMinuteKey, not `date` itself
   }, [calendarEvent, arcLabelMinuteKey, containerDimensions, latitude, longitude, compassHeading]);
 
@@ -972,6 +997,26 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     .map(offSunLabels)
     .filter(notCoveredBy(moonTerrainArcLabelPositions));
 
+  // Day-length pills of the sun-path fan: just above each apex (the noon label sits below
+  // it), today's first. A pill that would cover an arc label or an earlier fan pill steps
+  // down into the arc (ponytail: max 2 steps), else it is hidden.
+  const arcLabelsShown = [...sunArcLabelPositions, ...terrainArcLabelPositions, ...moonArcLabelPositions, ...moonTerrainArcLabelPositions];
+  const fanPillPositions = solsticeTracePaths
+    .filter((trace) => trace.apex)
+    .sort((a, b) => Number(b.today) - Number(a.today))
+    .reduce<Array<(typeof solsticeTracePaths)[number] & { x: number; y: number }>>((kept, trace) => {
+      const { width } = containerDimensions;
+      const x = Math.max(FAN_PILL_HALF_WIDTH, Math.min(width - FAN_PILL_HALF_WIDTH, trace.apex!.x));
+      const top = avoidCollapsedPanel({ ...trace, x, y: trace.apex!.y - ARC_LABEL_HEIGHT }, width);
+      const isClear = (pill: { x: number; y: number }) => {
+        const hits = (other: { x: number; y: number }, halfWidth: number) =>
+          Math.abs(other.x - pill.x) < halfWidth + FAN_PILL_HALF_WIDTH && Math.abs(other.y - pill.y) < ARC_LABEL_HEIGHT;
+        return !arcLabelsShown.some((l) => hits(l, ARC_LABEL_HALF_WIDTH)) && !kept.some((k) => hits(k, FAN_PILL_HALF_WIDTH));
+      };
+      const pill = [0, 1, 2].map((step) => ({ ...top, y: top.y + step * ARC_LABEL_HEIGHT })).find(isClear);
+      return pill ? [...kept, pill] : kept;
+    }, []);
+
   // Rainbow (ROADMAP item 10): raining/drizzling, opposite the sun's azimuth, using the
   // same azimuth->x mapping as the sun/moon.
   const rainbowGeometry = useMemo(
@@ -1105,18 +1150,6 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
       {(sunArcPath || moonArcPath || solsticeTracePaths.length > 0) && (
         <svg className="absolute inset-0 w-full h-full pointer-events-none">
-          {solsticeTracePaths.map((d) => (
-            <path
-              key={d}
-              data-testid="solstice-trace"
-              d={d}
-              fill="none"
-              stroke="hsl(var(--scene-solstice-trace))"
-              strokeOpacity={0.35}
-              strokeWidth={1}
-              strokeDasharray="4 6"
-            />
-          ))}
           {sunArcPath && (
             <path
               d={sunArcPath}
@@ -1127,6 +1160,26 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
               strokeWidth={2}
             />
           )}
+          {/* Solstice/equinox fan, over the sun arc: today's path bold and gold on a soft
+              glow, the other two thin white dashes. */}
+          {solsticeTracePaths.map(({ season, today, d }) => (
+            <g key={season}>
+              {today && (
+                <path d={d} fill="none" stroke="hsl(var(--scene-solstice-trace))" strokeOpacity={0.25} strokeWidth={9} strokeLinecap="round" />
+              )}
+              <path
+                data-testid="solstice-trace"
+                data-today={today}
+                d={d}
+                fill="none"
+                stroke={today ? 'hsl(var(--scene-solstice-trace))' : 'hsl(var(--scene-solstice-fan))'}
+                strokeOpacity={today ? 1 : 0.8}
+                strokeWidth={today ? 3 : 1.4}
+                strokeDasharray={today ? undefined : '5 5'}
+                strokeLinecap="round"
+              />
+            </g>
+          ))}
           {moonArcPath && (
             <path
               d={moonArcPath}
@@ -1139,7 +1192,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         </svg>
       )}
 
-      {isSunVisible && getSunGlowToken() && (
+      {sunMounted && getSunGlowToken() && (
         // Soft glowing sun (ROADMAP item 15 D polish): a radial halo behind the sun
         // icon, colored by the same altitude band as getGlowIntensity's drop-shadow.
         <div
@@ -1151,7 +1204,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             width: (sunPosition.altitude > 0 ? 200 : 160) * sunVisibility.haloScale,
             height: (sunPosition.altitude > 0 ? 200 : 160) * sunVisibility.haloScale,
             transform: 'translate(-50%, -50%)',
-            opacity: sunVisibility.halo * aprilFade,
+            opacity: sunVisibility.halo * sunFade,
             ...aprilTransition,
             // Faint or no disc (overcast, fog, rain): a white light patch, not a yellow glow on grey.
             background: `radial-gradient(circle, hsl(var(${sunShines ? getSunGlowToken() : '--scene-glow-white'}) / 0.55) 0%, transparent 70%)`
@@ -1159,7 +1212,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         />
       )}
 
-      {isSunVisible && sunVisibility.disc > 0 && (
+      {sunMounted && sunVisibility.disc > 0 && (
         // The line sun with rays (item 46's filled disc was rolled back to it on request).
         // A button, so the sun is a tap target for the sunglasses egg (ROADMAP "Ongoing — Easter eggs").
         <button
@@ -1176,7 +1229,9 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           style={{
             left: `${sunDrawX}px`,
             top: `${sunDrawY}px`,
-            transform: 'translate(-50%, -50%)'
+            transform: 'translate(-50%, -50%)',
+            // Hidden while the April Fools swap runs: not a tap target.
+            pointerEvents: sunDrawn ? undefined : 'none',
           }}
         >
           {/* Drizzle, snow and overcast: the line colour mixes toward the overcast grey (ROADMAP
@@ -1187,7 +1242,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             size={sunPosition.altitude > 0 ? 96 : 80}
             strokeWidth={1}
             style={{
-              opacity: sunVisibility.disc * aprilFade,
+              opacity: sunVisibility.disc * sunFade,
               ...aprilTransition,
               ...(sunVisibility.pale > 0 && { color: `color-mix(in srgb, currentColor, hsl(var(--scene-sky-overcast)) ${sunVisibility.pale * 100}%)` }),
             }}
@@ -1215,7 +1270,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         </div>
       )}
 
-      {isMoonVisible && moonLook.corona > 0 && (
+      {moonMounted && moonLook.corona > 0 && (
         // MV4 (item 76): a soft glow in the moon's colour where it sits behind clouds or fog.
         <div
           className={`absolute pointer-events-none rounded-full ${compassActive ? '' : 'transition-all duration-1000'}`}
@@ -1225,7 +1280,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             width: moonRadius * moonLook.coronaRadius * 2,
             height: moonRadius * moonLook.coronaRadius * 2,
             transform: 'translate(-50%, -50%)',
-            opacity: aprilFade,
+            opacity: moonFade,
             ...aprilTransition,
             background: `radial-gradient(circle closest-side, hsl(var(${moonLightVar}) / ${0.32 * moonLook.corona * moonBright}) 0%, hsl(var(${moonLightVar}) / ${0.13 * moonLook.corona * moonBright}) 40%, transparent 100%)`,
           }}
@@ -1233,7 +1288,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         />
       )}
 
-      {isMoonDiscShown && (
+      {moonMounted && moonLook.disc > 0 && (
         // A button for the moon's info card (ROADMAP item 95), at least 44 px wide.
         // Each tap also counts for the disco egg (ROADMAP "Ongoing — Easter eggs").
         <button
@@ -1248,7 +1303,9 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             left: `${moonDrawX}px`,
             top: `${moonDrawY}px`,
             transform: 'translate(-50%, -50%)',
-            opacity: moonBright * moonLook.disc * aprilFade,
+            opacity: moonBright * moonLook.disc * moonFade,
+            // Hidden while the swap runs: not a tap target.
+            pointerEvents: moonDrawn ? undefined : 'none',
             ...aprilTransition,
             // A supermoon gets a soft, static warm halo, a blue moon a blue one, instead of the white glow.
             filter: isSupermoonEgg
@@ -1277,7 +1334,6 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       <CalendarEggs
         event={calendarEvent}
         timeOfDay={timeOfDay}
-        weatherType={weatherType}
         moon={isMoonDiscShown && sceneMeasured ? { x: moonX, y: moonY, r: moonRadius } : null}
         measured={sceneMeasured}
         blueMoon={isBlueMoonEgg && isMoonDiscShown}
@@ -1333,6 +1389,11 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             <stop offset="0%" stopColor={water.surface} />
             <stop offset="100%" stopColor={water.deep} />
           </linearGradient>
+          {/* St Patrick's Day (item 117): the sky's green, also on the water, stronger in the deep. */}
+          <linearGradient id="stPatrickWater" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="hsl(var(--scene-st-patrick))" stopOpacity={0.08} />
+            <stop offset="100%" stopColor="hsl(var(--scene-st-patrick))" stopOpacity={0.22} />
+          </linearGradient>
         </defs>
         {terrainFillPath && (
           // Line-of-sight ridge (ROADMAP item 13), colored per time-of-day like the
@@ -1362,6 +1423,10 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           className="transition-all duration-1000"
           data-testid="sea"
         />
+        {calendarEvent === 'st-patrick' && svgPath && (
+          // Static, under the wave canvas, so reduced motion shows it too.
+          <path d={svgPath} fill="url(#stPatrickWater)" data-testid="st-patrick-water" />
+        )}
       </svg>
 
       <SeaCanvas
@@ -1475,6 +1540,34 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
               <span className="text-caption text-white/90 bg-panel-background border border-panel-border px-2 py-0.5 rounded-full">
                 {t(DIRECTION_LABELS[label])}
               </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {fanPillPositions.length > 0 && (
+        // Day lengths of the solstice/equinox fan, styled like the arc labels below.
+        <div
+          className={`absolute inset-0 z-9 pointer-events-none transition-opacity duration-300 ${
+            cardinalLabelsVisible ? 'opacity-100' : 'opacity-0'
+          }`}
+          aria-hidden="true"
+        >
+          {fanPillPositions.map((pill) => (
+            <div
+              key={pill.season}
+              data-testid="solstice-pill"
+              data-today={pill.today}
+              className="absolute whitespace-nowrap text-caption tabular-nums bg-panel-background/70 border border-panel-border/40 px-1.5 py-0.5 rounded-full"
+              style={{
+                left: `${pill.x}px`,
+                top: `${pill.y}px`,
+                transform: 'translate(-50%, -50%)',
+                color: pill.today ? 'hsl(var(--scene-solstice-trace))' : 'hsl(var(--scene-solstice-fan))',
+              }}
+            >
+              {t(pill.today ? 'egg.fanToday' : FAN_PILL_NAMES[pill.season])} ·{' '}
+              {t('egg.fanDayLength', { hours: Math.floor(pill.minutes / 60), minutes: pill.minutes % 60 })}
             </div>
           ))}
         </div>

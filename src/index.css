@@ -294,7 +294,7 @@
   @keyframes badge-in {
     from {
       opacity: 0;
-      transform: translateY(-12px);
+      transform: translateY(12px);
     }
     to {
       opacity: 1;
@@ -473,7 +473,8 @@
     /* Scene palette — moon, water (the water's gradient comes from the sky, ROADMAP item 53) */
     --scene-moon: 216 12.2% 83.9%;
     --scene-moon-dark: 224 14.9% 19.8%; /* the moon disc's unlit-side fill */
-    --scene-solstice-trace: 43 90% 55%; /* the solstice/equinox egg's faint golden sun-path trace */
+    --scene-solstice-trace: 43 90% 55%; /* the solstice/equinox fan: today's bold golden sun path and pill */
+    --scene-solstice-fan: 0 0% 100%; /* the solstice/equinox fan: the other two dashed sun paths and pills */
     --scene-water: 194.3 86.3% 57.1%;
 
     /* Glass panel (InfoPanel restyle target, item 15) */
@@ -532,12 +533,15 @@
     --scene-eclipse-moon: 12 75% 38%;
     --scene-blue-moon: 210 86% 70%;
     --scene-supermoon-glow: 40 90% 78%;
-    /* Christmas ornaments (CalendarEggs, Dec 25-26): the bauble colours; gold is also
-       the caps and the stars. */
-    --scene-ornament-red: 0 78% 50%;
-    --scene-ornament-gold: 45 92% 55%;
-    --scene-ornament-green: 142 62% 38%;
-    --scene-ornament-silver: 210 40% 80%;
+    /* Christmas lights on the boats (BoatBunting 'lights', Dec 25-26): the warm bulbs
+       (warm white, amber, soft red, gold), the star at the masthead or funnel top, and
+       the bulbs' glow at night. */
+    --scene-xmas-bulb-1: 42 100% 86%;
+    --scene-xmas-bulb-2: 32 100% 60%;
+    --scene-xmas-bulb-3: 6 85% 62%;
+    --scene-xmas-bulb-4: 48 100% 64%;
+    --scene-xmas-star: 45 92% 55%;
+    --scene-xmas-glow: 38 100% 70%;
     /* Sky eggs (astroEvents.ts, SkyEggs.tsx): the blue-white Pleiades (Matariki), the
        planets of a conjunction, the electric-blue noctilucent clouds, the midnight-sun arc. */
     --scene-pleiades: 210 100% 90%;
@@ -571,22 +575,29 @@
     --national-jet: 222 55% 32%;
     --scene-blue-moon: 205 90% 72%;
     /* Playful pack (ROADMAP item 117): the empty tomb's rock, its dark entrance and the
-       soft morning light on it; the St Patrick's pot and its gold. */
+       soft morning light on it, the warm glow out of it; the St Patrick's green tint (sky and water), the pot
+       and its gold. */
     --scene-tomb-rock: 30 8% 42%;
     --scene-tomb-entrance: 25 15% 8%;
     --scene-tomb-light: 32 95% 78%;
+    --scene-tomb-glow: 40 100% 75%;
+    --scene-st-patrick: 140 70% 45%;
     --scene-pot: 220 10% 12%;
     --scene-gold: 45 95% 58%;
     --scene-gold-dark: 38 85% 40%;
     /* Festival eggs (item 118, FestivalEggs): warm flame light (krathong candles, diyas,
-       Hanukkah lights, bonfires), the Eid moon glow, red lanterns, petals and blossoms,
-       marigolds, leaf green, and the soft pastels of Holi, papel picado and confetti. */
+       Hanukkah lights, bonfires), the cream wax of the Hanukkah candles, the Eid moon glow,
+       red lanterns, petals and blossoms, marigolds, leaf green, and the soft pastels of Holi,
+       papel picado and confetti. */
     --scene-festival-flame: 38 100% 62%;
     --scene-festival-flame-core: 48 100% 85%;
     --scene-festival-gold: 45 95% 65%;
+    --scene-festival-wax: 45 60% 90%;
     --scene-festival-lantern: 4 80% 52%;
     --scene-festival-petal: 340 80% 88%;
     --scene-festival-blossom: 330 70% 80%;
+    --scene-festival-blossom-light: 340 60% 96%;
+    --scene-festival-blossom-edge: 335 45% 42%;
     --scene-festival-marigold: 30 100% 55%;
     --scene-festival-leaf: 130 40% 35%;
     --scene-festival-clay: 20 55% 40%;

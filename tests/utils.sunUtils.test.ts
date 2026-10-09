@@ -1,4 +1,4 @@
-import { getSunPosition, getSunTimes, getTimeOfDay, getRelevantTwilightTimes, formatTime, getGoldenHourTimes, getBlueHourTimes, getNextGoldenBlueHours, mixGradientTowardOvercast, getSunPathAround, getBackgroundGradient, findSunPass, getWaterColors, getReflectionFade } from '../src/utils/sunUtils';
+import { getSunPosition, getSunTimes, getTimeOfDay, getRelevantTwilightTimes, formatTime, getGoldenHourTimes, getBlueHourTimes, getNextGoldenBlueHours, mixGradientTowardOvercast, getSunPathAround, getBackgroundGradient, findSunPass, getWaterColors, getReflectionFade, getDayLengthMinutes } from '../src/utils/sunUtils';
 describe('sunUtils', () => {
   it('calculates sun position', () => {
     const pos = getSunPosition(new Date(), 0, 0);
@@ -12,8 +12,38 @@ describe('sunUtils', () => {
   });
   it('returns correct time of day', () => {
     const times = getSunTimes(new Date(), 0, 0);
-    const tod = getTimeOfDay(new Date(), times);
+    const tod = getTimeOfDay(new Date(), times, 0);
     expect(typeof tod).toBe('string');
+  });
+  it('keeps the time of day of an ordinary day at a normal latitude', () => {
+    // Friedrichshafen, 2026-06-21 (TZ is UTC in tests): the times decide, the altitude does not.
+    const times = getSunTimes(new Date('2026-06-21T12:00:00Z'), 47.65, 9.48);
+    expect(times.polar).toBeNull();
+    const at = (iso: string) => getTimeOfDay(new Date(iso), times, -90);
+    expect(at('2026-06-21T11:20:00Z')).toBe('midday');
+    expect(at('2026-06-21T00:00:00Z')).toBe('night');
+    expect(at(new Date(times.sunset.getTime() - 30 * 60000).toISOString())).toBe('evening');
+  });
+  it('follows the sun altitude at the midnight sun: Tromsø 2027-06-22 00:30 is low evening sun, not night', () => {
+    const date = new Date('2027-06-21T22:30:00Z'); // 00:30 in Tromsø (CEST)
+    const times = getSunTimes(date, 69.65, 18.96);
+    expect(times.polar).toBe('day');
+    const altitude = getSunPosition(date, 69.65, 18.96).altitude;
+    expect(altitude).toBeGreaterThan(0);
+    expect(getTimeOfDay(date, times, altitude)).toBe('evening');
+    const noon = new Date('2027-06-21T10:45:00Z');
+    expect(getTimeOfDay(noon, times, getSunPosition(noon, 69.65, 18.96).altitude)).toBe('midday');
+  });
+  it('follows the sun altitude at polar night: Tromsø 2026-12-21 12:00 is civil twilight, not midday', () => {
+    const date = new Date('2026-12-21T11:00:00Z'); // 12:00 in Tromsø (CET)
+    const times = getSunTimes(date, 69.65, 18.96);
+    expect(times.polar).toBe('night');
+    const altitude = getSunPosition(date, 69.65, 18.96).altitude;
+    expect(altitude).toBeLessThan(0);
+    expect(altitude).toBeGreaterThan(-6);
+    expect(getTimeOfDay(date, times, altitude)).toBe('civil-twilight');
+    const midnight = new Date('2026-12-20T23:00:00Z');
+    expect(getTimeOfDay(midnight, times, getSunPosition(midnight, 69.65, 18.96).altitude)).toBe('night');
   });
   it('handles polar day/night edge cases', () => {
     // Provide latitudes near poles and check results
@@ -446,5 +476,19 @@ describe('sunUtils', () => {
         expect(pass!.end.getTime() - pass!.start.getTime()).toBeGreaterThan(6 * 60 * 60 * 1000);
       }
     });
+  });
+});
+
+describe('getDayLengthMinutes', () => {
+  it('is sunset - sunrise: about 16 h, 12 h and 8 h 20 min in Ravensburg in June, September and December', () => {
+    expect(getDayLengthMinutes(new Date(2027, 5, 21, 12), 47.78, 9.61)).toBeGreaterThan(15 * 60 + 50);
+    expect(getDayLengthMinutes(new Date(2027, 5, 21, 12), 47.78, 9.61)).toBeLessThan(16 * 60 + 30);
+    expect(Math.abs(getDayLengthMinutes(new Date(2027, 8, 23, 12), 47.78, 9.61) - 12 * 60)).toBeLessThan(20);
+    expect(Math.abs(getDayLengthMinutes(new Date(2027, 11, 22, 12), 47.78, 9.61) - (8 * 60 + 20))).toBeLessThan(15);
+  });
+
+  it('is 24 h on a polar day and 0 on a polar night', () => {
+    expect(getDayLengthMinutes(new Date(2027, 5, 21, 12), 78.2, 15.6)).toBe(24 * 60);
+    expect(getDayLengthMinutes(new Date(2027, 11, 22, 12), 78.2, 15.6)).toBe(0);
   });
 });

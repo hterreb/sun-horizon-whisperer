@@ -94,12 +94,12 @@ describe('BadgeUnlocked (ROADMAP item 114)', () => {
     expect(onOpen).not.toHaveBeenCalled();
   });
 
-  it('a swipe up closes it and does not open the collection', () => {
+  it('a swipe down closes it and does not open the collection', () => {
     const { onOpen, onDone, card } = renderCard();
     const button = screen.getByRole('button', { name: 'Show in the collection' });
     // jsdom has no PointerEvent: a MouseEvent of the pointer type carries clientY.
-    fireEvent(button, new MouseEvent('pointerdown', { bubbles: true, clientY: 100 }));
-    fireEvent(button, new MouseEvent('pointerup', { bubbles: true, clientY: 40 }));
+    fireEvent(button, new MouseEvent('pointerdown', { bubbles: true, clientY: 40 }));
+    fireEvent(button, new MouseEvent('pointerup', { bubbles: true, clientY: 100 }));
     fireEvent.click(button);
     expect(onOpen).not.toHaveBeenCalled();
     expect(card()).toHaveClass('animate-badge-out');
