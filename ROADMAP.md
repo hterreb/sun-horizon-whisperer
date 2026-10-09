@@ -2354,6 +2354,22 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Checked:** `utils.festivalEvents`, `utils.easterDate`, `utils.calendarEvents`, `utils.collection`, `utils.sceneInfo`, `FestivalEggs`, `SkyClouds`, `SceneBoat` and `SunTracker` tests. Typecheck, lint and all tests pass.
 - **Open:** a check of the Loy Krathong dates after 2030 and the Holi dates against an official calendar (they can be one day off); real sky positions for Vega and Altair; the look of each egg in the browser and on a phone; a native-speaker review of the new de/es/it/fr texts (item 67).
 
+
+### 119. A calm rain sound when it rains — S
+
+- **Request (2026-10-09):** "lo-fi calm low rain sound when it is raining".
+- **Now:** the rain is only seen (item 77). The only sounds are the radio (`MusicPlayer`, lo-fi streams) and the countdown (`useSunsetCountdown`, Web Audio tones).
+- **Assumption:** the rain sound goes with the radio. It plays only while the radio plays, so it needs no new button, and the browser's autoplay rule is met (the radio's play tap is the user gesture). A rain sound without the radio is an open question.
+- **Spec:**
+  1. **Sound:** synthesized with Web Audio, no audio file: a looped noise buffer (pink or brown noise) through a low-pass filter (about 1–2 kHz), so it is a soft, low hiss and not a white-noise rush. No thunder, no single drop clicks. No new host, so no CSP change and no licence.
+  2. **When:** the weather type is `drizzle`, `rain` or `thunderstorm` (live or manual weather, and the time-travel forecast of item 86), and the radio plays. Snow and hail: no sound.
+  3. **Level:** quiet under the music. The rain gain is a fixed share of the radio slider volume (start at 0.25×), and the radio mute mutes it too. More rain is a little louder: the gain follows item 77's `t` (0.6× at drizzle up to 1× at a storm). Keep it calm: no level jumps.
+  4. **Fades:** 3 s fade in when rain starts or the radio starts, 3 s fade out when it stops. A change of amount ramps over 3 s.
+  5. **Shared context:** use one `AudioContext` for the app. Move `getAudioContext` from `useSunsetCountdown.ts` to a small util and use it in both places.
+  6. **Background (item 90):** the rain sound follows the radio. When the radio keeps playing in the background, the rain goes on too; when the radio pauses, the rain fades out.
+  7. No new UI text, so no i18n keys. If the open question adds a toggle, it needs keys in the 5 languages.
+- **Done when:** util tests (rain types give a gain, the other types give 0; the gain grows with `t`; it is a share of the radio volume; mute gives 0). A `MusicPlayer` (or hook) test with a mocked `AudioContext`: radio on + rain starts the noise and ramps the gain up over 3 s; radio off ramps it down; no rain, no noise node. By ear on a phone: calm, low, under the music, no clicks at the loop point.
+- **Open:** should the rain sound also play without the radio (its own small toggle, off by default)?
 ---
 
 ## Ongoing — Easter eggs and special events (S each, pick any time)
