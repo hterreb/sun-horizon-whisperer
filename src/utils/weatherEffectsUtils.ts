@@ -3,7 +3,7 @@
 // separate from the components that render them so the rules are unit-testable
 // without mounting anything.
 import { type WeatherType } from '../components/CloudLayer';
-import { type TimeOfDay } from './sunUtils';
+import { type SunTimes, type TimeOfDay } from './sunUtils';
 import { getRainMmH, getRainSkyMix } from './rainUtils';
 
 export interface WeatherEffectsInput {
@@ -210,9 +210,21 @@ export const pickBird = (r: number, month: number, latitude: number, evening: bo
   pickWeighted(BIRD_WEIGHTS.filter(([kind]) =>
     isBirdInSeason(kind, month, latitude) && (kind !== 'starlings' || evening)), r);
 
-// Info cards (item 105): the bird's share of all day birds, all seasons together. After
-// sunset all flyers are bats.
-export const getFlyerShare = (kind: BirdKind | 'bat'): number => (kind === 'bat' ? 100 : shareOf(BIRD_WEIGHTS, kind));
+// Info cards (item 107): the bats' share of the day's flying time, in percent. CloudLayer
+// sends bats instead of birds while the sun is down (civil, nautical and astronomical
+// twilight, at dawn and at dusk), birds from sunrise to sunset, and no flyers in full night.
+// So the bats fly from astronomical dawn to sunrise and from sunset to astronomical dusk.
+export const getBatShare = (times: SunTimes): number => {
+  const span = (from: Date, to: Date) => Math.max(0, to.getTime() - from.getTime());
+  const bats = span(times.astronomicalDawn, times.sunrise) + span(times.sunset, times.astronomicalDusk);
+  const flying = bats + span(times.sunrise, times.sunset);
+  return flying > 0 ? (100 * bats) / flying : 0;
+};
+
+// Info cards (item 105): a flyer's share of all flyers. `batShare` is getBatShare; the birds
+// share the rest of the flying time by their weights, all seasons together.
+export const getFlyerShare = (kind: BirdKind | 'bat', batShare: number): number =>
+  kind === 'bat' ? batShare : (shareOf(BIRD_WEIGHTS, kind) * (100 - batShare)) / 100;
 
 // At most five birds or groups in the sky (item 103; C3: four), per phone width like the fish (item 70).
 export const MAX_BIRDS = 5;
