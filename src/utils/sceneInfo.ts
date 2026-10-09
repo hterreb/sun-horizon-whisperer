@@ -16,6 +16,7 @@ import {
 import { type WeatherType } from '@/components/CloudLayer';
 import { type SatelliteCard } from './satelliteUtils';
 import { type ContrailKind } from './planes';
+import { type LiveRoute, type RouteAirport } from './planeFeed';
 
 export type SceneInfoTarget =
   | { type: 'fish'; kind: FishKind }
@@ -62,6 +63,8 @@ export interface SceneInfoContext {
   cloudLayers: CloudLayers | null;
   // The tracked satellite's card values (item 97), for a satellite card only.
   satellite?: SatelliteCard | null;
+  // The live plane's route (item 111), once the proxy has answered; null leaves it out.
+  route?: LiveRoute | null;
 }
 
 const FISH: Record<FishKind, { name: MessageKey; fact: MessageKey }> = {
@@ -195,6 +198,14 @@ const dayTime = (time: Date, now: Date, language: Language): string =>
     ? formatTime(time, language)
     : `${new Intl.DateTimeFormat(language, { weekday: 'short' }).format(time)} ${formatTime(time, language)}`;
 
+// "Paris (CDG) → Tel Aviv (TLV)" when both places are short, else "CDG → TLV".
+const ROUTE_NAME_MAX = 12;
+const routeText = ({ from, to }: LiveRoute): string => {
+  const named = [from, to].every(a => a.name && a.name.length <= ROUTE_NAME_MAX);
+  const airport = (a: RouteAirport) => (named ? `${a.name} (${a.code})` : a.code);
+  return `${airport(from)} → ${airport(to)}`;
+};
+
 // The satellite card (item 97): the name, the height, the speed, the time until it enters the
 // Earth's shadow ("now" when it is in the shadow) and the next pass.
 const satelliteLines = (name: string, ctx: SceneInfoContext): InfoLine[] => {
@@ -262,8 +273,8 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
         ],
       };
     case 'livePlane':
-      // Item 96 (Premium): an aircraft of the live feed. adsb.lol has no airline and no route:
-      // the airline comes from the callsign (liveRadar), and the feed has no routes today.
+      // Item 96 (Premium): an aircraft of the live feed. The feed has no airline: it comes from
+      // the callsign (liveRadar). The route comes later, from its own request (item 111).
       return {
         title: 'plane.live',
         lines: [
@@ -272,7 +283,7 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
           { label: 'info.aircraftType', value: target.aircraftType ?? '—' },
           { label: 'info.altitude', value: { key: 'info.km', vars: { value: formatNumber(language, target.altM / 1000, 1) } } },
           { label: 'info.speed', value: { key: 'info.kmh', vars: { value: formatNumber(language, Math.round(target.speedKt * 1.852), 0) } } },
-          { value: { key: 'info.dataAdsbLol' } },
+          ...(ctx.route ? [{ label: 'info.route' as const, value: routeText(ctx.route) }] : []),
         ],
       };
     case 'cloud': {

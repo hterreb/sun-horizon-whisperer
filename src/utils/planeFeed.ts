@@ -101,13 +101,99 @@ const json = (status: number, body: unknown, cacheControl: string): Response =>
     headers: { 'Content-Type': 'application/json', 'Cache-Control': cacheControl },
   });
 
+// The route of a callsign (item 111). adsb.lol's POST /api/0/routeset answers 201 with an
+// empty body (checked 2026-10-07), and its GET /api/0/route/<callsign> redirects here: the
+// static route data, one JSON file per callsign under its first two letters, 404 when unknown.
+// Only the callsign goes to adsb.lol, not the place.
+export const ADSB_LOL_ROUTES = 'https://vrs-standing-data.adsb.lol/routes';
+// Routes change rarely: one hour at the edge and in the browser.
+export const ROUTE_CACHE_CONTROL = 'public, max-age=3600, s-maxage=3600';
+// A callsign as the feed gives it (mapAircraft): upper-case letters and digits, at most 8.
+// It becomes part of the upstream URL, so nothing else passes.
+const CALLSIGN = /^[A-Z0-9]{3,8}$/;
+// The route is plausible when the place is near the straight path between the two airports:
+// the detour through the place is at most 20 % of the leg plus 250 km (the planes are up to
+// 100 km from the place, and they climb, turn and hold near the airports).
+const ROUTE_DETOUR_FACTOR = 0.2;
+const ROUTE_DETOUR_KM = 250;
+const EARTH_RADIUS_KM = 6371;
+
+export interface RouteAirport {
+  code: string; // IATA, else ICAO
+  name: string | null; // the place, e.g. "Frankfurt am Main"
+}
+export interface LiveRoute {
+  from: RouteAirport;
+  to: RouteAirport;
+}
+
+const distanceKm = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const rad = Math.PI / 180;
+  const a = Math.sin(((lat2 - lat1) * rad) / 2) ** 2
+    + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(((lon2 - lon1) * rad) / 2) ** 2;
+  return 2 * EARTH_RADIUS_KM * Math.asin(Math.min(1, Math.sqrt(a)));
+};
+
+interface Airport extends RouteAirport { lat: number; lon: number }
+const mapAirport = (raw: unknown): Airport | null => {
+  if (!raw || typeof raw !== 'object') return null;
+  const a = raw as Raw;
+  const code = [a.iata, a.icao].find((c): c is string => typeof c === 'string' && /^[A-Z0-9]{3,4}$/.test(c));
+  const lat = num(a.lat);
+  const lon = num(a.lon);
+  if (!code || lat === null || lon === null) return null;
+  const name = typeof a.location === 'string' && a.location.trim() ? a.location.trim().slice(0, 40) : null;
+  return { code, name, lat, lon };
+};
+
+// The leg (two airports in a row; a route can have stops) whose path passes nearest the place,
+// or null when no leg passes near it or the data has another shape.
+export const mapRoute = (body: unknown, place: { lat: number; lon: number }): LiveRoute | null => {
+  const data = (body && typeof body === 'object' ? body : {}) as Raw;
+  const airports = Array.isArray(data._airports) ? data._airports.map(mapAirport) : [];
+  let best: { from: Airport; to: Airport; detour: number } | null = null;
+  for (let i = 0; i + 1 < airports.length; i++) {
+    const from = airports[i];
+    const to = airports[i + 1];
+    if (!from || !to) continue;
+    const leg = distanceKm(from.lat, from.lon, to.lat, to.lon);
+    const detour = distanceKm(from.lat, from.lon, place.lat, place.lon) + distanceKm(place.lat, place.lon, to.lat, to.lon) - leg;
+    if (detour <= leg * ROUTE_DETOUR_FACTOR + ROUTE_DETOUR_KM && (!best || detour < best.detour)) best = { from, to, detour };
+  }
+  return best && { from: { code: best.from.code, name: best.from.name }, to: { code: best.to.code, name: best.to.name } };
+};
+
+// GET /api/planes?route=<callsign>&lat=..&lon=.. → { route: LiveRoute | null } (null: no route
+// known, or none plausible here). 400 for a bad callsign or place, 502 when adsb.lol fails.
+const handleRouteRequest = async (
+  callsign: string, params: URLSearchParams, fetchFn: typeof fetch, timeoutMs: number,
+): Promise<Response> => {
+  const place = parsePlaceQuery(params);
+  if (!CALLSIGN.test(callsign) || !place) return json(400, null, 'no-store');
+  try {
+    const response = await fetchFn(`${ADSB_LOL_ROUTES}/${callsign.slice(0, 2)}/${callsign}.json`, {
+      headers: { Accept: 'application/json', 'User-Agent': UPSTREAM_USER_AGENT },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (response.status === 404) return json(200, { route: null }, ROUTE_CACHE_CONTROL);
+    if (!response.ok) return json(502, null, 'no-store');
+    return json(200, { route: mapRoute(await response.json(), place) }, ROUTE_CACHE_CONTROL);
+  } catch {
+    return json(502, null, 'no-store');
+  }
+};
+
 // GET /api/planes?lat=..&lon=.. → { now, aircraft } from adsb.lol. 400 for a bad place, 405
-// for another method, 502 (no body) when adsb.lol fails or does not answer in time.
+// for another method, 502 (no body) when adsb.lol fails or does not answer in time. With
+// `route=<callsign>`: the route of that aircraft (handleRouteRequest).
 export const handlePlanesRequest = async (
   request: Request, fetchFn: typeof fetch = fetch, timeoutMs = UPSTREAM_TIMEOUT_MS,
 ): Promise<Response> => {
   if (request.method !== 'GET') return json(405, null, 'no-store');
-  const place = parsePlaceQuery(new URL(request.url).searchParams);
+  const params = new URL(request.url).searchParams;
+  const callsign = params.get('route');
+  if (callsign !== null) return handleRouteRequest(callsign, params, fetchFn, timeoutMs);
+  const place = parsePlaceQuery(params);
   if (!place) return json(400, null, 'no-store');
   const upstream = `${ADSB_LOL_POINT}/${place.lat.toFixed(1)}/${place.lon.toFixed(1)}/${RADAR_RADIUS_NM}`;
   try {

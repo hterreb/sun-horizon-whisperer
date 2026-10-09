@@ -312,7 +312,7 @@ export const fr: Record<keyof typeof en, string> = {
   'info.airline': "Compagnie",
   'info.aircraftType': "Type d'avion",
   'info.kmh': "{value} km/h",
-  'info.dataAdsbLol': "Données : adsb.lol (ODbL)",
+  'info.route': "Trajet",
   'radar.livePlanes': "Avions en direct",
   'radar.hint': "Avions réels dans un rayon de 100 km. Envoie votre lieu, arrondi à environ 11 km, à adsb.lol.",
   'cloud.Ci': "Cirrus",

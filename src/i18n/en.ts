@@ -312,7 +312,7 @@ export const en = {
   'info.airline': 'Airline',
   'info.aircraftType': 'Aircraft type',
   'info.kmh': '{value} km/h',
-  'info.dataAdsbLol': 'Data: adsb.lol (ODbL)',
+  'info.route': 'Route',
   'radar.livePlanes': 'Live planes',
   'radar.hint': 'Real aircraft within 100 km. Sends your place, rounded to about 11 km, to adsb.lol.',
   'cloud.Ci': 'Cirrus',
