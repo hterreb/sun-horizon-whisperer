@@ -23,7 +23,7 @@ describe('CalendarEggs', () => {
 
   it('renders nothing visible without an event', () => {
     render(<CalendarEggs {...base} event={null} />);
-    expect(screen.queryByTestId(/season-badge|pumpkin-moon|halloween-bat|christmas-flake|black-cat/)).toBeNull();
+    expect(screen.queryByTestId(/season-badge|pumpkin-moon|halloween-bat|christmas-ornament|black-cat/)).toBeNull();
   });
 
   it('shows the hemisphere text in the season badge', () => {
@@ -58,11 +58,12 @@ describe('CalendarEggs', () => {
     expect(screen.queryByTestId('halloween-bat')).toBeNull();
   });
 
-  it('adds Christmas snow unless it already snows', () => {
-    const { rerender } = render(<CalendarEggs {...base} event="christmas" />);
-    expect(screen.getAllByTestId('christmas-flake').length).toBeGreaterThan(0);
+  it('drops Christmas ornaments unless it already snows', () => {
+    const { container, rerender } = render(<CalendarEggs {...base} event="christmas" />);
+    expect(screen.getAllByTestId('christmas-ornament').length).toBeGreaterThan(0);
+    expect(container.textContent).not.toContain('❄');
     rerender(<CalendarEggs {...base} event="christmas" weatherType="snow" />);
-    expect(screen.queryByTestId('christmas-flake')).toBeNull();
+    expect(screen.queryByTestId('christmas-ornament')).toBeNull();
   });
 
   it('walks the black cat once, then removes it', () => {
@@ -160,7 +161,7 @@ describe('CalendarEggs', () => {
     rerender(<CalendarEggs {...base} event="halloween-bats" />);
     expect(screen.queryByTestId('halloween-bat')).toBeNull();
     rerender(<CalendarEggs {...base} event="christmas" />);
-    expect(screen.queryByTestId('christmas-flake')).toBeNull();
+    expect(screen.queryByTestId('christmas-ornament')).toBeNull();
     rerender(<CalendarEggs {...base} event="halloween-pumpkin" />);
     expect(screen.getByTestId('pumpkin-moon')).toBeTruthy();
   });

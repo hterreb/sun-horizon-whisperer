@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import {
   Cat, Eclipse, Flame, Glasses, Moon, MoonStar, Mountain, PartyPopper, Rainbow, Satellite,
-  Snowflake, Sparkles, Star, Sun, SunMoon, Sunset, X, type LucideIcon,
+  Sparkles, Star, Sun, SunMoon, Sunset, TreePine, X, type LucideIcon,
 } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import SceneFish from '@/components/SceneFish';
@@ -51,7 +51,7 @@ const EGG_ICONS: Record<Exclude<EggKind, 'ufo'>, [LucideIcon, string]> = {
   equinox: [Sunset, 'text-brand-peach'],
   halloweenPumpkin: [MoonStar, 'text-brand-sunset'],
   halloweenBats: [Bat, 'text-white'],
-  christmas: [Snowflake, 'text-white'],
+  christmas: [TreePine, 'text-green-400'],
   solarEclipse: [Eclipse, 'text-brand-gold'],
   lunarEclipse: [Moon, 'text-brand-coral'],
   greenFlash: [Sunset, 'text-green-400'],

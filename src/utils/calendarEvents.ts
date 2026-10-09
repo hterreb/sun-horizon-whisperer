@@ -11,7 +11,7 @@ export type CalendarEvent =
   | 'equinox'
   | 'halloween-pumpkin' // Oct 31, full moon within 3 days: a pumpkin moon
   | 'halloween-bats' // Oct 31, else: bats all night
-  | 'christmas'; // Dec 24-26: light snow
+  | 'christmas'; // Dec 24-26: falling Christmas ornaments
 
 // Mean solstice/equinox instants, Meeus "Astronomical Algorithms" table 27.B
 // (years 2000-3000). No periodic terms, so the error is up to about 30 min; this

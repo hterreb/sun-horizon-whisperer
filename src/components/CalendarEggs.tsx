@@ -34,7 +34,16 @@ const SEASON_TEXT: Partial<Record<CalendarEvent, MessageKey>> = {
 // Fixed layouts (share of the width/height, s), so a render never re-rolls them.
 const BATS = [0, 1, 2, 3, 4].map((i) => ({ top: 12 + i * 7, duration: 50 + i * 9, delay: -i * 13, dir: i % 2 ? -1 : 1 }));
 const BAT_PX = 30;
-const FLAKES = Array.from({ length: 28 }, (_, i) => ({ left: (i * 37) % 100, duration: 14 + (i % 5) * 2, delay: -(i * 1.7) }));
+// Christmas: baubles in 4 colours, every 6th one a small gold star.
+const ORNAMENT_COLOURS = ['--scene-ornament-red', '--scene-ornament-gold', '--scene-ornament-green', '--scene-ornament-silver'];
+const ORNAMENTS = Array.from({ length: 20 }, (_, i) => ({
+  left: (i * 37) % 100,
+  duration: 16 + (i % 5) * 2,
+  delay: -(i * 2.1),
+  star: i % 6 === 5,
+  colour: ORNAMENT_COLOURS[i % 4],
+}));
+const ORNAMENT_STROKE = 'hsl(var(--scene-critter-silhouette) / 0.35)';
 
 // The calendar easter eggs (the New Year one is SunTracker's fireworks). All motion is
 // slow straight CSS glides; reduced motion turns the moving ones off.
@@ -112,15 +121,27 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherTy
         </div>
       ))}
 
-      {event === 'christmas' && weatherType !== 'snow' && !prefersReducedMotion && FLAKES.map((f, i) => (
-        <div
+      {event === 'christmas' && weatherType !== 'snow' && !prefersReducedMotion && ORNAMENTS.map((o, i) => (
+        <svg
           key={i}
-          data-testid="christmas-flake"
-          className="absolute top-[-5%] text-white opacity-70 pointer-events-none"
-          style={{ left: `${f.left}%`, fontSize: '0.7rem', animation: `egg-snow ${f.duration}s linear ${f.delay}s infinite` }}
+          data-testid="christmas-ornament"
+          aria-hidden="true"
+          className="absolute top-[-5%] opacity-90 pointer-events-none"
+          style={{ left: `${o.left}%`, animation: `egg-snow ${o.duration}s linear ${o.delay}s infinite` }}
+          width={14}
+          height={18}
+          viewBox="0 0 14 18"
         >
-          ❄
-        </div>
+          {o.star ? (
+            <path d="M7,3 L8.8,7.6 L13.5,7.8 L9.8,10.8 L11.1,15.5 L7,12.8 L2.9,15.5 L4.2,10.8 L0.5,7.8 L5.2,7.6 Z" fill="hsl(var(--scene-ornament-gold))" stroke={ORNAMENT_STROKE} strokeWidth={0.6} />
+          ) : (
+            <>
+              <rect x={5} y={1} width={4} height={3} rx={0.8} fill="hsl(var(--scene-ornament-gold))" stroke={ORNAMENT_STROKE} strokeWidth={0.5} />
+              <circle cx={7} cy={10.5} r={6} fill={`hsl(var(${o.colour}))`} stroke={ORNAMENT_STROKE} strokeWidth={0.6} />
+              <circle cx={5} cy={8.5} r={1.5} fill="hsl(var(--scene-glow-white) / 0.6)" />
+            </>
+          )}
+        </svg>
       ))}
 
       {event === 'friday-13' && !catDone && !prefersReducedMotion && (
