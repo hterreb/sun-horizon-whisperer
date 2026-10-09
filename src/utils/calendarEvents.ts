@@ -62,3 +62,22 @@ export const getCalendarEvent = (date: Date, latitude = 0): CalendarEvent | null
   if (month === 11 && day >= 24 && day <= 26) return 'christmas';
   return null;
 };
+
+// Item 113 (egg info cards): the mean number of days a year that show this event, over the
+// years of the Lunar New Year list. It asks getCalendarEvent at noon of each day, so it follows
+// the rules above (the most specific event wins a day). The New Year minute gives 0.
+const STATS_YEARS = LUNAR_NEW_YEAR.map(day => Number(day.slice(0, 4)));
+const daysPerYear = new Map<CalendarEvent, number>();
+export const getEventDaysPerYear = (event: CalendarEvent): number => {
+  const cached = daysPerYear.get(event);
+  if (cached !== undefined) return cached;
+  let days = 0;
+  for (const year of STATS_YEARS) {
+    for (let d = new Date(year, 0, 1, 12); d.getFullYear() === year; d = new Date(year, d.getMonth(), d.getDate() + 1, 12)) {
+      if (getCalendarEvent(d) === event) days += 1;
+    }
+  }
+  const mean = days / STATS_YEARS.length;
+  daysPerYear.set(event, mean);
+  return mean;
+};

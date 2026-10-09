@@ -129,11 +129,14 @@
   --color-panel-background: hsl(var(--panel-background));
   --color-panel-border: hsl(var(--panel-border));
 
-  /* Rarity tiers (ROADMAP item 107): the info card's outline and the ring of the tapped thing. */
+  /* Rarity tiers (ROADMAP items 107, 113): the info card's outline and the ring of the tapped
+     thing. From common to ultra rare: grey, sage, teal, blue, gold, violet. */
   --color-tier-common: #cbd5e1;
+  --color-tier-frequent: #a7d3b5;
   --color-tier-uncommon: #5eead4;
   --color-tier-rare: #60a5fa;
   --color-tier-very-rare: #f5b82e;
+  --color-tier-ultra-rare: #d8a0f5;
 
   /* The info card's kicker, one colour per type (item 107, lookbook K4). */
   --color-kind-sun: #fde047;

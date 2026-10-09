@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { translate, type Translate } from '@/i18n';
 import {
-  getSceneInfo, resolveInfoText, directionText, durationText, distanceText, rarityTier, getRarityTier,
-  type SceneInfo, type SceneInfoContext, type SceneInfoTarget,
+  getSceneInfo, resolveInfoText, directionText, durationText, distanceText, rarityTier, getRarityTier, RARITY_TIERS,
+  type EggCardKind, type SceneInfo, type SceneInfoContext, type SceneInfoTarget,
 } from '@/utils/sceneInfo';
+import { UFO_CHANCE } from '@/utils/hiddenEggs';
+import { getEventDaysPerYear } from '@/utils/calendarEvents';
 import { FISH_WEIGHTS, BIRD_WEIGHTS, type BoatKind, type FishKind } from '@/utils/weatherEffectsUtils';
 import { type CloudType } from '@/utils/skyCloudUtils';
 import { type HorizonProfile } from '@/utils/horizonUtils';
@@ -60,7 +62,7 @@ describe('sceneInfo (ROADMAP item 95)', () => {
       card(target, over, t).find(row => /^(Rarity|Seltenheit):/.test(row));
     expect(rarity({ type: 'fish', kind: 'shark' })).toBe('Rarity: Very rare · 0.5 %');
     expect(rarity({ type: 'fish', kind: 'shark' }, { timeOfDay: 'night' })).toBe('Rarity: Very rare · 0.5 %');
-    expect(rarity({ type: 'fish', kind: 'classic' })).toBe('Rarity: Common · 24 %');
+    expect(rarity({ type: 'fish', kind: 'classic' })).toBe('Rarity: Frequent · 24 %');
     expect(rarity({ type: 'fish', kind: 'ray' })).toBe('Rarity: Rare · 2 %');
     expect(rarity({ type: 'fish', kind: 'jellyfish' }, { timeOfDay: 'night' })).toBe('Rarity: Uncommon · 8 %');
     // A day fish at night is a moonlit fish: 24 % of the night spawns, perch 14 of 72 of those.
@@ -69,8 +71,10 @@ describe('sceneInfo (ROADMAP item 95)', () => {
     expect(rarity({ type: 'fish', kind: 'squid' })).toBe('Rarity: Uncommon · 5 %');
     expect(rarity({ type: 'fish', kind: 'shark' }, { language: 'de' }, de)).toBe('Seltenheit: Sehr selten · 0,5 %');
     // Item 107: the bats have 22.8 % of the flying time; the birds share the other 77.2 %.
+    // Item 113: the bats are "frequent", the gulls stay "common".
     expect(rarity({ type: 'bird', kind: 'gull' })).toBe('Rarity: Common · 29.3 %');
-    expect(rarity({ type: 'bird', kind: 'bat' })).toBe('Rarity: Common · 22.8 %');
+    expect(rarity({ type: 'bird', kind: 'bat' })).toBe('Rarity: Frequent · 22.8 %');
+    expect(rarity({ type: 'bird', kind: 'bat' }, { language: 'de' }, de)).toBe('Seltenheit: Verbreitet · 22,8 %');
     expect(rarity({ type: 'bird', kind: 'stork' })).toBe('Rarity: Uncommon · 6.2 %');
     expect(rarity({ type: 'boat', kind: 'freighter' })).toBe('Rarity: Uncommon · 6.3 %');
     const boats: BoatKind[] = ['sailboat', 'ferry', 'fishing', 'rowboat', 'freighter'];
@@ -122,7 +126,7 @@ describe('sceneInfo (ROADMAP item 95)', () => {
 
   it('gives a boat its type and one fact', () => {
     expect(card({ type: 'boat', kind: 'fishing' })).toEqual([
-      'Fishing boat', 'Gulls often follow fishing boats for scraps.', 'Rarity: Common · 18.8 %',
+      'Fishing boat', 'Gulls often follow fishing boats for scraps.', 'Rarity: Frequent · 18.8 %',
     ]);
     expect(card({ type: 'boat', kind: 'freighter' }, {}, de)[0]).toBe('Frachter');
   });
@@ -321,12 +325,82 @@ describe('sceneInfo: field guide data (ROADMAP item 107)', () => {
     ] as SceneInfoTarget[]) expect(info(target).tier, target.type).toBeNull();
   });
 
-  it('maps a share to its tier at the thresholds', () => {
-    expect(rarityTier(10)).toBe('common');
+  it('maps a share to its tier at the thresholds (item 113: 25 / 10 / 3 / 1 %)', () => {
+    expect(rarityTier(100)).toBe('common');
+    expect(rarityTier(25)).toBe('common');
+    expect(rarityTier(24.99)).toBe('frequent');
+    expect(rarityTier(10)).toBe('frequent');
     expect(rarityTier(9.99)).toBe('uncommon');
     expect(rarityTier(3)).toBe('uncommon');
+    expect(rarityTier(2.99)).toBe('rare');
     expect(rarityTier(1)).toBe('rare');
-    expect(rarityTier(0.5)).toBe('veryRare');
+    expect(rarityTier(0.99)).toBe('veryRare');
+    expect(rarityTier(0)).toBe('veryRare');
+  });
+
+  it('never gives "ultra rare" from a share (item 113)', () => {
+    expect(RARITY_TIERS.map(([, tier]) => tier)).not.toContain('ultraRare');
+    expect(RARITY_TIERS.map(([min]) => min)).toEqual([25, 10, 3, 1, 0]);
+  });
+});
+
+describe('sceneInfo: easter egg cards (ROADMAP item 113)', () => {
+  const info = (kind: EggCardKind, over?: Partial<SceneInfoContext>) => getSceneInfo({ type: 'egg', kind }, ctx(over));
+  const eggCard = (kind: EggCardKind, t: Translate = en, over?: Partial<SceneInfoContext>) => read(info(kind, over), t);
+  const kinds: EggCardKind[] = ['ufo', 'ghost', 'dragon', 'blackCat', 'halloweenBat', 'pumpkinMoon'];
+
+  it('gives every egg the "ultra rare" tier, a title, a field note and the rarity row', () => {
+    for (const kind of kinds) {
+      const egg = info(kind);
+      expect(egg.tier, kind).toBe('ultraRare');
+      expect(egg.lines).toHaveLength(1);
+      expect(egg.lines[0]).toMatchObject({ label: 'info.rarity', tier: 'ultraRare' });
+      expect(egg.fact?.label, kind).toBe('info.fieldNote');
+      for (const t of [en, de]) {
+        const [title, fact, rarity] = eggCard(kind, t);
+        expect(title, kind).not.toMatch(/^egg\./);
+        expect(fact, kind).toMatch(/\.$/);
+        expect(rarity, kind).toMatch(/^(Rarity: Ultra rare|Seltenheit: Ultraselten)/);
+      }
+    }
+  });
+
+  it('names a hidden egg an "Easter egg" and a calendar egg a "Special event"', () => {
+    expect(info('ufo')).toMatchObject({ kicker: 'infoKind.easterEgg', icon: 'egg' });
+    expect(info('ghost')).toMatchObject({ kicker: 'infoKind.easterEgg', icon: 'egg' });
+    for (const kind of ['dragon', 'blackCat', 'halloweenBat', 'pumpkinMoon'] as const) {
+      expect(info(kind), kind).toMatchObject({ kicker: 'infoKind.specialEvent', icon: 'event' });
+    }
+    expect(info('blackCat').latin).toBe('Felis catus');
+  });
+
+  it('gives the UFO its chance per night from UFO_CHANCE', () => {
+    expect(UFO_CHANCE).toBe(1 / 200);
+    expect(eggCard('ufo')).toEqual([
+      'UFO', 'Most UFO reports turn out to be planets, planes or balloons; Venus is a top suspect.',
+      'Rarity: Ultra rare · 0.5 % per night',
+    ]);
+    expect(eggCard('ufo', de, { language: 'de' })[2]).toBe('Seltenheit: Ultraselten · 0,5 % pro Nacht');
+  });
+
+  it('gives a calendar egg its days a year from the calendar rules', () => {
+    // Over the years of the Lunar New Year list (2027-2035): 9 Lunar New Years, 14 Fridays the
+    // 13th, 7 Halloweens with bats and 2 with a pumpkin moon.
+    expect(getEventDaysPerYear('lunar-new-year')).toBe(1);
+    expect(getEventDaysPerYear('friday-13')).toBeCloseTo(14 / 9);
+    expect(getEventDaysPerYear('halloween-bats')).toBeCloseTo(7 / 9);
+    expect(getEventDaysPerYear('halloween-pumpkin')).toBeCloseTo(2 / 9);
+    expect(eggCard('dragon')[2]).toBe('Rarity: Ultra rare · 1 day a year');
+    expect(eggCard('blackCat')[2]).toBe('Rarity: Ultra rare · 1.6 days a year');
+    expect(eggCard('halloweenBat')[2]).toBe('Rarity: Ultra rare · 0.8 days a year');
+    expect(eggCard('pumpkinMoon')[2]).toBe('Rarity: Ultra rare · 1 day in 5 years');
+    expect(eggCard('blackCat', de, { language: 'de' })[2]).toBe('Seltenheit: Ultraselten · 1,6 Tage im Jahr');
+  });
+
+  it('shows the tier alone for the midnight ghost (no chance in the code)', () => {
+    expect(eggCard('ghost')).toEqual([
+      'Midnight ghost', 'Old folklore calls midnight the witching hour, when ghosts are said to walk.', 'Rarity: Ultra rare',
+    ]);
   });
 });
 
@@ -343,8 +417,10 @@ describe('sceneInfo formatting', () => {
     expect(resolveInfoText(de, distanceText(12_345, 'de'))).toBe('12,3 km');
   });
 
-  it('gives the rarity tier of a share at the tier boundaries (item 112)', () => {
-    expect(getRarityTier(10)).toBe('rarity.common');
+  it('gives the rarity tier of a share at the tier boundaries (item 112; 6 tiers since item 113)', () => {
+    expect(getRarityTier(25)).toBe('rarity.common');
+    expect(getRarityTier(24.9)).toBe('rarity.frequent');
+    expect(getRarityTier(10)).toBe('rarity.frequent');
     expect(getRarityTier(9.9)).toBe('rarity.uncommon');
     expect(getRarityTier(3)).toBe('rarity.uncommon');
     expect(getRarityTier(2.9)).toBe('rarity.rare');

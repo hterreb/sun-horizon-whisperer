@@ -1,8 +1,8 @@
 import React, { useEffect, useLayoutEffect, useRef } from 'react';
-import { Bird, Cloud, Fish, Moon, Mountain, Plane, Sailboat, Satellite, Sun, type LucideIcon } from 'lucide-react';
+import { Bird, Cloud, Egg, Fish, Moon, Mountain, PartyPopper, Plane, Sailboat, Satellite, Sun, type LucideIcon } from 'lucide-react';
 import { useLanguage } from '@/hooks/useLanguage';
 import { GLASS_CARD_SURFACE } from '@/utils/glassChrome';
-import { cardBorderClass, type RarityTier } from '@/utils/rarityTier';
+import { cardBorderClass, TIER_ORDER, type RarityTier } from '@/utils/rarityTier';
 import { resolveInfoText, type SceneIconId, type SceneInfo } from '@/utils/sceneInfo';
 import { Bat } from './sceneIcons';
 
@@ -31,12 +31,16 @@ const KICKER: Record<SceneIconId, { Icon: LucideIcon; colour: string }> = {
   moon: { Icon: Moon, colour: 'text-kind-moon' },
   terrain: { Icon: Mountain, colour: 'text-kind-terrain' },
   satellite: { Icon: Satellite, colour: 'text-kind-satellite' },
+  // Item 113: the easter eggs and special events, in the "ultra rare" colour.
+  egg: { Icon: Egg, colour: 'text-tier-ultra-rare' },
+  event: { Icon: PartyPopper, colour: 'text-tier-ultra-rare' },
 };
 
 // The rarity meter: one bar per tier, lit up to the card's tier.
-const TIER_STEPS: RarityTier[] = ['common', 'uncommon', 'rare', 'veryRare'];
+const TIER_STEPS = TIER_ORDER;
 const METER_ON: Record<RarityTier, string> = {
-  common: 'bg-tier-common', uncommon: 'bg-tier-uncommon', rare: 'bg-tier-rare', veryRare: 'bg-tier-very-rare',
+  common: 'bg-tier-common', frequent: 'bg-tier-frequent', uncommon: 'bg-tier-uncommon',
+  rare: 'bg-tier-rare', veryRare: 'bg-tier-very-rare', ultraRare: 'bg-tier-ultra-rare',
 };
 const Meter: React.FC<{ tier: RarityTier }> = ({ tier }) => (
   <span className="inline-flex gap-0.5" aria-hidden="true" data-testid="rarity-meter">

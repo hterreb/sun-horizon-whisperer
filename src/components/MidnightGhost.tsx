@@ -1,12 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { Ghost } from 'lucide-react';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
+import { type RarityTier } from '@/utils/rarityTier';
+import { HitArea, type SceneInfoHandler } from './CloudLayer';
 
 interface MidnightGhostProps {
   currentTime: Date;
+  // Item 113: a tap opens its info card (item 95 pattern); the ring shows while it is open.
+  onInfo?: SceneInfoHandler;
+  ringOn?: boolean;
+  ringTier?: RarityTier | null;
 }
 
-const MidnightGhost: React.FC<MidnightGhostProps> = ({ currentTime }) => {
+export const GHOST_RING = 'egg-ghost';
+const GHOST_PX = 64;
+
+const MidnightGhost: React.FC<MidnightGhostProps> = ({ currentTime, onInfo, ringOn = false, ringTier = null }) => {
   // Check if it's exactly midnight (00:00)
   const isMidnight = currentTime.getHours() === 0 && currentTime.getMinutes() === 0;
 
@@ -71,19 +80,22 @@ const MidnightGhost: React.FC<MidnightGhostProps> = ({ currentTime }) => {
 
   return (
     <div 
-      className="fixed pointer-events-none z-10 transition-all duration-1000"
+      className={`fixed z-10 transition-all duration-1000 ${onInfo ? 'pointer-events-auto cursor-pointer' : 'pointer-events-none'}`}
       style={{
         left: `${position.x}%`,
         top: `${position.y}%`,
         transform: 'translate(-50%, -50%)',
         opacity: isVisible ? 0.8 : 0
       }}
+      aria-hidden={onInfo ? true : undefined}
+      data-testid="midnight-ghost"
+      onClick={onInfo && (event => onInfo({ type: 'egg', kind: 'ghost' }, { x: event.clientX, y: event.clientY }, GHOST_RING))}
     >
       {/* Ghost Icon with effects - the style book's D ghost: a soft white glow
           (ROADMAP item 15 D polish, ghostTile('d')). */}
       <div className="relative animate-pulse">
         <Ghost
-          size={64}
+          size={GHOST_PX}
           className="drop-shadow-lg"
           style={{
             color: 'hsl(var(--scene-glow-white))',
@@ -101,6 +113,8 @@ const MidnightGhost: React.FC<MidnightGhostProps> = ({ currentTime }) => {
         />
       </div>
       
+      {onInfo && <HitArea cx={GHOST_PX / 2} cy={GHOST_PX / 2} width={GHOST_PX} height={GHOST_PX} ring={ringOn} tier={ringTier} />}
+
       {/* Floating particles around ghost */}
       <div className="absolute inset-0">
         {[...Array(6)].map((_, i) => (

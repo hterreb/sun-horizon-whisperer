@@ -2112,6 +2112,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   - Boats: the share of the fair-weather mix (all boats). The weather and wind filter of `pickBoat` is not applied, because `SceneInfoContext` has no wind.
   - No time estimate ("one every N min"): the spawn gap depends on the screen width and the density. Planes, live planes, satellites, clouds, sun, moon and terrain have no rarity row.
 - **Checked:** 2 new tests, the fish, bird and boat card tests updated: shark very rare 0.5 % (day and night), classic fish common 24 %, perch at night uncommon 4.7 %, German "Sehr selten · 0,5 %"; no row on the cloud, sun, moon, plane and terrain cards. All tests pass.
+- **Changed in item 113:** six tiers now: common ≥ 25 %, frequent 10–25 %, uncommon 3–10 %, rare 1–3 %, very rare < 1 %, and ultra rare for the easter eggs only. The tiers in the table below are the old ones.
 - **Changed in item 107:** the bats are no longer 100 %. `getBatShare` gives their share of the day's flying time (astronomical dawn to sunrise and sunset to astronomical dusk, against sunrise to sunset), and the birds share the rest by their weights. At Lake Constance this is about 23 % (common), so the bird rows in the table below are now 77 % of the values shown.
 
 | Kind | Share | Tier |
@@ -2197,6 +2198,28 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Depends on:** item 95 (cards), item 105 (tiers). Item 107 (card redesign) can set the badge style.
 - **Built:** 68 badges in `collection.ts` (`BADGES`): 20 fish, 8 birds + bat, 5 boats, plane, sun, moon, terrain, satellite, 11 cloud types, 18 eggs. Halloween gives 2 badges (pumpkin, bats); both solstices give 1. `SunTracker.collect(id)` adds a new badge, saves it and shows one toast. It runs on a card tap (`badgeForTarget`), on the 7th sun tap, on the Konami code, when the UFO shows, when a calendar egg shows (`badgeForCalendarEvent`, the `CalendarEggs` rules) and when an astronomy event shows. New Year counts where the fireworks start. A test link (`?egg=`, `?fish=`, `?hunt=`) pauses the collection. Calendar and astronomy badges do not count in a time preview. An egg that reduced motion hides (UFO, fireworks, cat, dragon, Halloween bats, Christmas flakes, meteor shower) does not count then. `CollectionView` opens from the InfoPanel row "Collection". `getRarityTier` in `sceneInfo`; `UfoShape` from `Ufo`.
 - **Checked:** `utils.collection`, `utils.sceneInfo`, `CollectionView`, `SunTracker` (a fish tap collects with one toast "New: Seahorse"; `?egg=ufo` collects nothing; the InfoPanel button opens the view) and `InfoPanel` tests. Dev server at 390 × 844: grid, outlines, toast. All tests pass.
+
+### 113. Easter egg info cards; tiers "frequent" and "ultra rare" — M — **✅ Done**
+
+- **Feedback (2026-10-09):** "bats for me would be uncommon because only during dusk and dawn…", "maybe another category then between common and rare", "are eastereggs ultra-rare?"
+- **Decision:** 6 tiers. Common ≥ 25 %, frequent 10–25 %, uncommon 3–10 %, rare 1–3 %, very rare < 1 % (`RARITY_TIERS` in `sceneInfo`). Ultra rare is only for the easter eggs; no share gives it. Colours (static, no shimmer): common `#cbd5e1` grey, frequent `#a7d3b5` sage (new), uncommon `#5eead4` teal, rare `#60a5fa` blue, very rare `#f5b82e` gold, ultra rare `#d8a0f5` violet (new).
+- **Built:**
+  - Tiers: `RarityTier` has `frequent` and `ultraRare`; `TIER_ORDER` in `rarityTier.ts`; tokens `--color-tier-frequent` and `--color-tier-ultra-rare` in `index.css`. The card meter has 6 bars. New tier results: bats 22.8 % frequent; gull 29.3 % common; heron, geese, cormorant 7.7 % uncommon; classic fish, minnow, perch, trout, carp frequent; burbot, eel frequent; lanternfish common; ferry, fishing boat, rowboat frequent; sailboat common.
+  - Egg cards: `SceneInfoTarget` has `{ type: 'egg', kind }`. The kicker is "Easter egg" (lucide `Egg`) for a hidden egg and "Special event" (lucide `PartyPopper`) for a calendar egg, in the ultra rare colour. Each card has a title, one field note and the row "Ultra rare · <chance>". The chance comes from the code: `UFO_CHANCE` per night, or `getEventDaysPerYear` (`calendarEvents`), which counts the days that `getCalendarEvent` gives over the years of the Lunar New Year list (2027–2035).
+  - Each egg thing takes taps like a fish (item 95): `pointer-events-auto` wrapper, `aria-hidden`, a hit area of at least 44 × 44 px with the ring inside the moving wrapper, and the thing moves on. The UFO is now `z-1`, so it is above the scene layer and takes taps. The dragon's hit area is a box that its rAF loop moves with it. The pumpkin moon takes the tap over the moon button.
+
+| Egg | Kicker | Chance text |
+|---|---|---|
+| UFO | Easter egg | 0.5 % per night |
+| Midnight ghost | Easter egg | none (it shows each night at 00:00): the tier alone |
+| Lunar New Year dragon | Special event | 1 day a year |
+| Black cat (Friday the 13th) | Special event | 1.6 days a year |
+| Halloween bat | Special event | 0.8 days a year |
+| Pumpkin moon | Special event | 1 day in 5 years |
+
+  - With the collection (item 112): the collection badges use the same tiers (`getRarityTier`), so the bat badge is now frequent. An egg card adds no badge (`badgeForTarget` gives null): the egg's badge counts when the egg shows, by the item 112 rules, and the ghost has no badge. The egg badges have no tier (`rarity: null`), while the egg cards show "Ultra rare"; open question for the user.
+  - No card: the fireworks (a sky-wide canvas, also at each sunrise and sunset), the disco sky, the Christmas snow, the solstice and equinox badge (text), the sunglasses (7 taps on the sun) and the Konami code (hidden triggers; the sun keeps its own card). The astronomy events (eclipses, supermoon, blue moon, meteor showers, aurora, green flash) are real sky events, not eggs: the sun and moon cards cover them. The whale (item 62) and the lenticular and mammatus clouds (item 84) keep their fish and cloud cards. The frost iceberg is weather, not an egg.
+- **Checked:** tests for the thresholds (25 / 10 / 3 / 1 %, bats frequent, gull common), no share gives ultra rare, the 6 classes and tokens, each egg card (kicker, title, fact, tier, chance text in English and German), the days a year, and taps on the UFO, the ghost, the dragon, the cat, a bat and the pumpkin (component tests, and the UFO card in `SunTracker`). Typecheck, lint and all tests pass. In the browser at 390 × 844 (Konstanz): the UFO (`?egg=ufo`), the dragon (`?egg=dragon`), the cat (clock on 2026-11-13), a Halloween bat (2026-10-31), the pumpkin moon (2028-10-31) and the ghost (00:00) each take a tap and show their card with the violet ring. On a phone the chance text can wrap to a second line.
 
 ---
 

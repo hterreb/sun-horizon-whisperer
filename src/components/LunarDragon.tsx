@@ -1,5 +1,7 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { type TimeOfDay } from '@/utils/sunUtils';
+import { type RarityTier } from '@/utils/rarityTier';
+import { HitArea, type SceneInfoHandler } from './CloudLayer';
 
 // Lunar New Year dragon (ROADMAP item 100, lookbook picks RD1, M2, M3, F1, F2): a Chinese
 // lóng flies once across the sky, from left to right, with a slow wave along its body, a
@@ -13,6 +15,9 @@ const UNIT = 0.66; // px per creature unit
 const CREATURE_W = 340 * UNIT; // tail fin to pearl
 const WAVE_S = 5; // M2: one body wave per 5 s
 const TRAIL_S = 20; // F1: a wisp fades over 20 s
+// Item 113: the tap box around the creature, in creature units (tail fin to pearl, crest to legs).
+const BOX = { left: -45, top: -38, width: 350, height: 76 };
+export const DRAGON_RING = 'egg-dragon';
 
 type Tod = 'day' | 'sunset' | 'night';
 const toTod = (t: TimeOfDay): Tod =>
@@ -238,11 +243,17 @@ const makeDragon = (g: SVGGElement, pal: Palette, tod: Tod, uid: string) => {
 interface LunarDragonProps {
   timeOfDay: TimeOfDay;
   onDone: () => void;
+  // Item 113: a tap opens its info card (item 95 pattern); the ring shows while it is open.
+  onInfo?: SceneInfoHandler;
+  ringOn?: boolean;
+  ringTier?: RarityTier | null;
 }
 
 // One flight across the scene, then onDone. The parent leaves it out under reduced motion.
-const LunarDragon: React.FC<LunarDragonProps> = ({ timeOfDay, onDone }) => {
+const LunarDragon: React.FC<LunarDragonProps> = ({ timeOfDay, onDone, onInfo, ringOn = false, ringTier = null }) => {
   const svgRef = useRef<SVGSVGElement>(null);
+  // The hit area (item 113) follows the creature: the same loop moves it.
+  const hitRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef(0);
   const [palette] = useState(() => (['red', 'jade', 'gold'] as const)[Math.floor(Math.random() * 3)]);
   const tod = toTod(timeOfDay);
@@ -274,6 +285,7 @@ const LunarDragon: React.FC<LunarDragonProps> = ({ timeOfDay, onDone }) => {
       const y = H * 0.23 - A * Math.sin(2 * Math.PI * prog);
       const tilt = Math.atan(-A * 2 * Math.PI / span * Math.cos(2 * Math.PI * prog)) * 180 / Math.PI;
       outer.setAttribute('transform', `translate(${f(x)} ${f(y)}) rotate(${f(tilt)}) scale(${UNIT})`);
+      if (hitRef.current) hitRef.current.style.transform = `translate(${f(x + BOX.left * UNIT)}px, ${f(y + BOX.top * UNIT)}px)`;
       const tailPt = update(t);
       // F1: a cloud wisp every 18 px of travel, fading over TRAIL_S.
       if (x - lastPuffX > 18 && x < W) {
@@ -295,7 +307,25 @@ const LunarDragon: React.FC<LunarDragonProps> = ({ timeOfDay, onDone }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return <svg ref={svgRef} data-testid="lunar-dragon" data-palette={palette} aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" />;
+  const w = BOX.width * UNIT, h = BOX.height * UNIT;
+  return (
+    <>
+      <svg ref={svgRef} data-testid="lunar-dragon" data-palette={palette} aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" />
+      {onInfo && (
+        <div
+          ref={hitRef}
+          aria-hidden="true"
+          data-testid="lunar-dragon-hit"
+          className="absolute left-0 top-0 pointer-events-auto cursor-pointer"
+          // Off screen until the first frame places it.
+          style={{ width: w, height: h, transform: `translate(${-w * 2}px, 0)` }}
+          onClick={event => onInfo({ type: 'egg', kind: 'dragon' }, { x: event.clientX, y: event.clientY }, DRAGON_RING)}
+        >
+          <HitArea cx={w / 2} cy={h / 2} width={w} height={h} ring={ringOn} tier={ringTier} />
+        </div>
+      )}
+    </>
+  );
 };
 
 export default LunarDragon;

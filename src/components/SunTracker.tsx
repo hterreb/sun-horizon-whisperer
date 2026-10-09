@@ -40,7 +40,7 @@ import Aurora from '@/components/Aurora';
 import MusicPlayer from './MusicPlayer';
 import TopLeftButtons from './TopLeftButtons';
 import PWAInstallPrompt from './PWAInstallPrompt';
-import MidnightGhost from './MidnightGhost';
+import MidnightGhost, { GHOST_RING } from './MidnightGhost';
 import TemperatureIceberg from './TemperatureIceberg';
 import LoadingScreen, { FAST_START_MS } from './LoadingScreen';
 import { type WeatherType } from './CloudLayer';
@@ -79,7 +79,7 @@ import { isCloudEggDay, isCloudEggForced } from '@/utils/skyCloudUtils';
 import { isInstalledApp } from '@/utils/installedApp';
 import { getStartReveal, isFastReturn, loadLastVisible, saveLastVisible } from '@/utils/fastReturn';
 import DiscoSky from './DiscoSky';
-import Ufo from './Ufo';
+import Ufo, { UFO_RING } from './Ufo';
 import { loadTemperatureUnit, saveTemperatureUnit, type TemperatureUnit } from '@/utils/temperatureUnit';
 import { loadLanguage, saveLanguage, type Language } from '@/utils/language';
 import { translate, type Translate } from '@/i18n';
@@ -748,7 +748,8 @@ const SunTracker: React.FC = () => {
   const handleSceneInfo = useCallback((target: SceneInfoTarget, point: { x: number; y: number }, ring: string) => {
     infoCardCount.current += 1;
     setInfoCard({ target, ...point, ring, id: infoCardCount.current });
-    collect(badgeForTarget(target));
+    const badge = badgeForTarget(target);
+    if (badge) collect(badge);
   }, [collect]);
   const handleInfoClose = useCallback(() => setInfoCard(null), []);
   // Rare lenticular and mammatus clouds (ROADMAP item 84, X1): one day in 30 per place;
@@ -1008,7 +1009,9 @@ const SunTracker: React.FC = () => {
       />
       {astroEvent?.kind === 'aurora' && <Aurora opacity={getStarCloudFactor(weatherType, cloudCover)} />}
       {discoOn && <DiscoSky />}
-      {ufoOn && <Ufo onDone={handleUfoDone} />}
+      {ufoOn && (
+        <Ufo onDone={handleUfoDone} onInfo={handleSceneInfo} ringOn={infoCard?.ring === UFO_RING} ringTier={infoCardInfo?.tier ?? null} />
+      )}
       {reveal === 'done' && (
         <>
           <MusicPlayer isFullscreen={isFullscreen} duck={isCountdownSounding} />
@@ -1024,7 +1027,14 @@ const SunTracker: React.FC = () => {
       )}
       <PWAInstallPrompt />
       {/* One special event at a time: New Year's fireworks replace the midnight ghost. */}
-      {calendarEvent !== 'new-year' && <MidnightGhost currentTime={date} />}
+      {calendarEvent !== 'new-year' && (
+        <MidnightGhost
+          currentTime={date}
+          onInfo={handleSceneInfo}
+          ringOn={infoCard?.ring === GHOST_RING}
+          ringTier={infoCardInfo?.tier ?? null}
+        />
+      )}
       <TemperatureIceberg 
         temperature={weatherData?.temperature || 20} 
         isVisible={location.loaded && weatherData !== null} 

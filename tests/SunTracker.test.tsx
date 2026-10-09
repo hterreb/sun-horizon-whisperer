@@ -942,9 +942,10 @@ describe('SunTracker', () => {
       fireEvent.click(fishHit, { clientX: 150, clientY: 650 });
       expect(screen.getByRole('dialog', { name: 'Perch' })).toHaveTextContent('Its dark stripes hide the perch among water plants.');
       expect(fishHit.querySelector('[data-testid="scene-info-ring"]')).not.toBeNull();
-      // Item 107: a perch is common (14 % of the day fish), so the card and the ring have the common tier colour.
-      expect(card()!.className).toContain('border-tier-common/50');
-      expect(fishHit.querySelector('[data-testid="scene-info-ring"]')!.className).toContain('border-tier-common/80');
+      // Item 107: the card and the ring have the tier colour. Item 113: a perch (14 % of the day
+      // fish) is frequent.
+      expect(card()!.className).toContain('border-tier-frequent/50');
+      expect(fishHit.querySelector('[data-testid="scene-info-ring"]')!.className).toContain('border-tier-frequent/80');
       // The fish swims on: its wrapper keeps the crossing animation.
       expect(fishHit.closest<HTMLElement>('[aria-hidden="true"]')!.style.animation).toContain('moveAcrossX');
 
@@ -966,6 +967,21 @@ describe('SunTracker', () => {
       }
       expect(screen.getByTestId('sun-sunglasses')).toBeInTheDocument();
       expect(screen.getAllByTestId('scene-info-card')).toHaveLength(1);
+    });
+
+    it('a tap on the UFO opens its easter egg card with the ultra rare ring (item 113)', () => {
+      window.history.pushState({}, '', '/?egg=ufo');
+      vi.setSystemTime(NOON);
+      saveManualLocation(RAVENSBURG.latitude, RAVENSBURG.longitude, 'Ravensburg');
+      render(<SunTracker />);
+      advance(300);
+      const ufo = screen.getByTestId('ufo');
+      fireEvent.click(ufo.querySelector('[data-testid="scene-hit"]')!, { clientX: 100, clientY: 130 });
+      const dialog = screen.getByRole('dialog', { name: 'UFO' });
+      expect(dialog).toHaveTextContent('Easter egg');
+      expect(dialog).toHaveTextContent('Ultra rare · 0.5 % per night');
+      expect(card()!.className).toContain('border-tier-ultra-rare/50');
+      expect(ufo.querySelector('[data-testid="scene-info-ring"]')!.className).toContain('border-tier-ultra-rare/80');
     });
 
     it('closes the card after 15 s', () => {
