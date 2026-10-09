@@ -141,7 +141,7 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherTy
           data-testid="hanging-bat"
           data-state={hangBat}
           className={`absolute ${HANG_CLASS} ${tapClass}`}
-          style={{ width: 28, height: 60, animation: hangBat === 'leave' ? 'egg-bat-leave 14s ease-in 1.2s forwards' : undefined }}
+          style={{ width: 28, height: 60, animation: hangBat === 'leave' ? 'egg-bat-leave 40s linear 1.2s forwards' : undefined }}
           {...tapProps('halloweenBat', 'egg-bat-hang')}
           onClickCapture={() => { if (onInfo && !prefersReducedMotion) setHangBat('leave'); }}
           onAnimationEnd={(e) => { if (e.target === e.currentTarget) setHangBat('gone'); }}
@@ -233,6 +233,7 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, weatherTy
         @keyframes egg-snow { to { transform: translateY(110vh) translateX(30px); } }
         @keyframes egg-bat-blink { 0%, 93%, 100% { opacity: 1; } 96.5% { opacity: 0; } }
         @keyframes egg-fade-in { from { opacity: 0; } }
+        /* 400 px in 40 s: 10 px/s, the calm cap for scene bats. */
         @keyframes egg-bat-leave { to { transform: translate(-240px, -320px); } }
       `}</style>
     </>

@@ -245,7 +245,7 @@ describe('CalendarEggs', () => {
       tap(bat);
       expect(onInfo).toHaveBeenLastCalledWith({ type: 'egg', kind: 'halloweenBat' }, { x: 300, y: 140 }, 'egg-bat-hang');
       expect(bat.getAttribute('data-state')).toBe('leave');
-      expect(bat.getAttribute('style')).toMatch(/egg-bat-leave 14s ease-in/);
+      expect(bat.getAttribute('style')).toMatch(/egg-bat-leave 40s linear/);
       expect(bat.querySelectorAll('svg')).toHaveLength(2);
       // The fade-in of the open wings ends first: the bat stays.
       fireEvent.animationEnd(bat.querySelectorAll('svg')[1]);
