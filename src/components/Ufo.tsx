@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
+import { useDoubleTap } from '@/hooks/useDoubleTap';
 import { type RarityTier } from '@/utils/rarityTier';
 import { HitArea, type SceneInfoHandler } from './CloudLayer';
 
@@ -36,6 +37,8 @@ const Ufo: React.FC<UfoProps> = ({ onDone, onInfo, ringOn = false, ringTier = nu
   const prefersReducedMotion = usePrefersReducedMotion();
   const ref = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
+  // Item 116: a double tap opens the card; a single tap shows the ring for a moment.
+  const { tap, hint } = useDoubleTap(onInfo);
 
   useEffect(() => {
     if (prefersReducedMotion) {
@@ -70,15 +73,15 @@ const Ufo: React.FC<UfoProps> = ({ onDone, onInfo, ringOn = false, ringTier = nu
       ref={ref}
       aria-hidden="true"
       data-testid="ufo"
-      className={`fixed left-0 top-[16%] ${onInfo ? 'pointer-events-auto cursor-pointer' : 'pointer-events-none'}`}
+      className={`fixed left-0 top-[16%] ${onInfo ? 'pointer-events-auto cursor-pointer touch-manipulation' : 'pointer-events-none'}`}
       style={{ transform: `translateX(${-UFO_WIDTH}px)` }}
-      onClick={onInfo && (event => onInfo({ type: 'egg', kind: 'ufo' }, { x: event.clientX, y: event.clientY }, UFO_RING))}
+      onClick={onInfo && (event => tap({ type: 'egg', kind: 'ufo' }, { x: event.clientX, y: event.clientY }, UFO_RING))}
     >
       {/* The glow on the drawing only, so the ring (item 113) stays clean. */}
       <span className="block" style={{ filter: 'drop-shadow(0 0 8px hsl(var(--brand-cyan) / 0.6))' }}>
         <UfoShape width={UFO_WIDTH} />
       </span>
-      {onInfo && <HitArea cx={UFO_WIDTH / 2} cy={UFO_WIDTH / 4} width={UFO_WIDTH} height={UFO_WIDTH / 2} ring={ringOn} tier={ringTier} />}
+      {onInfo && <HitArea cx={UFO_WIDTH / 2} cy={UFO_WIDTH / 4} width={UFO_WIDTH} height={UFO_WIDTH / 2} ring={ringOn || hint === UFO_RING} tier={ringOn ? ringTier : null} />}
     </div>
   );
 };

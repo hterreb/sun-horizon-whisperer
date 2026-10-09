@@ -41,10 +41,23 @@ describe('Satellites (ROADMAP item 97)', () => {
   it('opens the info card of a tracked satellite, with its ring', () => {
     const onInfo = vi.fn();
     const { rerender } = render(<Satellites {...base} tracked={[iss]} gapMs={null} onInfo={onInfo} />);
-    fireEvent.click(screen.getByRole('button', { name: 'ISS (ZARYA)' }));
+    // Item 116: a pointer tap shows the ring only; the second tap opens the card.
+    const button = screen.getByRole('button', { name: 'ISS (ZARYA)' });
+    expect(button.className).toContain('touch-manipulation');
+    fireEvent.click(button, { detail: 1 });
+    expect(onInfo).not.toHaveBeenCalled();
+    expect(screen.getByTestId('scene-info-ring')).toBeInTheDocument();
+    fireEvent.click(button, { detail: 2 });
     expect(onInfo).toHaveBeenCalledWith({ type: 'satellite', id: 25544, name: 'ISS (ZARYA)' }, expect.any(Object), 'satellite-25544');
     rerender(<Satellites {...base} tracked={[iss]} gapMs={null} onInfo={onInfo} infoRing="satellite-25544" />);
     expect(screen.getByTestId('scene-info-ring')).toBeInTheDocument();
+  });
+
+  it('a keyboard click (Enter, Space: detail 0) opens the card at once (item 116)', () => {
+    const onInfo = vi.fn();
+    render(<Satellites {...base} tracked={[iss]} gapMs={null} onInfo={onInfo} />);
+    fireEvent.click(screen.getByRole('button', { name: 'ISS (ZARYA)' }), { detail: 0 });
+    expect(onInfo).toHaveBeenCalledTimes(1);
   });
 
   it('has no move transition in compass mode (step 0)', () => {

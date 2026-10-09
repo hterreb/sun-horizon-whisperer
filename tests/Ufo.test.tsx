@@ -40,7 +40,11 @@ describe('Ufo', () => {
     expect(ufo.className).not.toMatch(/\bz-/);
     const hit = ufo.querySelector<HTMLElement>('[data-testid="scene-hit"]')!;
     expect(parseFloat(hit.style.height)).toBeGreaterThanOrEqual(44);
-    fireEvent.click(hit, { clientX: 60, clientY: 140 });
+    // Item 116: one tap shows the ring only; the second tap opens the card.
+    fireEvent.click(hit, { clientX: 60, clientY: 140, detail: 1 });
+    expect(onInfo).not.toHaveBeenCalled();
+    expect(ufo.querySelector('[data-testid="scene-info-ring"]')).not.toBeNull();
+    fireEvent.click(hit, { clientX: 60, clientY: 140, detail: 2 });
     expect(onInfo).toHaveBeenCalledWith({ type: 'egg', kind: 'ufo' }, { x: 60, y: 140 }, UFO_RING);
     expect(ufo.querySelector('[data-testid="scene-info-ring"]')).toBeNull();
     rerender(<Ufo onDone={vi.fn()} onInfo={onInfo} ringOn ringTier="ultraRare" />);

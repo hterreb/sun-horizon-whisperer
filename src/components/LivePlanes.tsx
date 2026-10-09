@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import ScenePlane, { PLANE_ASPECT } from './ScenePlane';
 import { HitArea, type SceneInfoHandler } from './CloudLayer';
 import { type LivePlanesState } from '@/hooks/useLivePlanes';
+import { useDoubleTap } from '@/hooks/useDoubleTap';
 import { type LiveAircraft } from '@/utils/planeFeed';
 import {
   LIVE_MAX_AGE_MS, getAircraftView, getAirlineName, getLiveContrail, getLivePlaneWidth, pickNearestVisible, pickShownPlanes,
@@ -77,7 +78,7 @@ const PlaneBody = React.memo(({
       </div>
       {onInfo && (
         <span
-          className="absolute pointer-events-auto cursor-pointer"
+          className="absolute pointer-events-auto cursor-pointer touch-manipulation"
           style={{ left: 0, top: 0 }}
           aria-hidden
           onClick={event => onInfo({
@@ -114,6 +115,8 @@ const LivePlanes: React.FC<LivePlanesProps> = ({
   state, observer, project, width, compass, profile, lights, contrail, trailColour, reducedMotion, onInfo, infoRing = null,
 }) => {
   const { feed, receivedAt } = state;
+  // Item 116: a double tap opens the card; a single tap shows the ring for a moment.
+  const { tap, hint } = useDoubleTap(onInfo);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (reducedMotion) return;
@@ -169,8 +172,8 @@ const LivePlanes: React.FC<LivePlanesProps> = ({
               band={Math.round(band * 10) / 10}
               spread={look?.spread ?? 1}
               trailColour={trailColour}
-              ringOn={infoRing === `live-${ac.hex}`}
-              onInfo={onInfo}
+              ringOn={infoRing === `live-${ac.hex}` || hint === `live-${ac.hex}`}
+              onInfo={onInfo && tap}
             />
           </div>
         );
