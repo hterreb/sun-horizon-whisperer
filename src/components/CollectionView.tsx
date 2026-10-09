@@ -152,7 +152,8 @@ const CollectionView: React.FC<CollectionViewProps> = ({ open, onClose, collecti
   };
 
   return (
-    <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    // Full screen on phones, a card on wider screens.
+    <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 max-sm:p-0" onClick={onClose}>
       {/* Grey outline of a shape (missing badges): the shape's alpha grown by 1 px, minus the shape. */}
       <svg width={0} height={0} className="absolute" aria-hidden="true">
         <filter id={OUTLINE_FILTER_ID}>
@@ -166,7 +167,7 @@ const CollectionView: React.FC<CollectionViewProps> = ({ open, onClose, collecti
         role="dialog"
         aria-modal="true"
         aria-labelledby="collection-title"
-        className={`${GLASS_SURFACE} rounded-panel w-full max-w-md text-white flex flex-col`}
+        className={`${GLASS_SURFACE} rounded-panel w-full max-w-md text-white flex flex-col max-sm:h-dvh max-sm:max-w-none max-sm:rounded-none max-sm:pt-[env(safe-area-inset-top)] max-sm:pb-[env(safe-area-inset-bottom)]`}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center gap-2 p-4 pb-2">
@@ -182,7 +183,7 @@ const CollectionView: React.FC<CollectionViewProps> = ({ open, onClose, collecti
             <X size={20} aria-hidden="true" />
           </button>
         </div>
-        <ScrollArea className="h-[min(70dvh,560px)]">
+        <ScrollArea className="h-[min(70dvh,560px)] max-sm:h-auto max-sm:flex-1 max-sm:min-h-0">
           <div className="px-4 pb-4 space-y-4">
             {GROUPS.map((group) => (
               <section key={group} aria-labelledby={`collection-${group}`}>

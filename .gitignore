@@ -33,3 +33,6 @@ vite.config.ts.timestamp-*
 
 # Output of scripts/perf-trace.mjs (ROADMAP item 91).
 /scripts/perf-results/
+
+# Claude Code: local settings and agent worktrees.
+/.claude/
