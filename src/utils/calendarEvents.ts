@@ -1,4 +1,5 @@
 import { getNextFullMoon } from './moonUtils';
+import { type SunTimes } from './sunUtils';
 
 // Calendar easter eggs (ROADMAP "Ongoing - Easter eggs", Calendar list). Pure date
 // checks in local time; the scene shows at most one event at a time.
@@ -80,4 +81,18 @@ export const getEventDaysPerYear = (event: CalendarEvent): number => {
   const mean = days / STATS_YEARS.length;
   daysPerYear.set(event, mean);
   return mean;
+};
+
+// Christmas Eve (ROADMAP "Ongoing", Calendar): Santa flies once on Dec 24, from sunset to local
+// midnight. He is part of the 'christmas' event (no more specific event falls on Dec 24).
+// `sunTimes` are the scene's sun times for this day. At polar day there is no night, so no Santa.
+// At polar night the sunset field holds the 18:00 fallback, so he flies from 18:00.
+// Between 00:00 and solar midnight the sun times can hold the Dec 23 sunset (SunCalc takes the
+// nearest solar noon), so the sunset must be on the same local day.
+export const SANTA_DAYS_PER_YEAR = 1;
+export const isSantaTime = (date: Date, sunTimes: Pick<SunTimes, 'sunset' | 'polar'> | null): boolean => {
+  if (date.getMonth() !== 11 || date.getDate() !== 24) return false;
+  if (!sunTimes || sunTimes.polar === 'day') return false;
+  if (!sameLocalDay(sunTimes.sunset, date)) return false;
+  return date.getTime() >= sunTimes.sunset.getTime();
 };

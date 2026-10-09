@@ -20,11 +20,11 @@ import { type SatelliteCard } from './satelliteUtils';
 import { type ContrailKind } from './planes';
 import { type LiveRoute, type RouteAirport } from './planeFeed';
 import { UFO_CHANCE } from './hiddenEggs';
-import { getEventDaysPerYear, type CalendarEvent } from './calendarEvents';
+import { SANTA_DAYS_PER_YEAR, getEventDaysPerYear, type CalendarEvent } from './calendarEvents';
 
 // Item 113: the easter eggs and special events that are one thing in the scene and take taps.
 // Not the collection's EggKind (item 112), which has one badge per egg or event.
-export type EggCardKind = 'ufo' | 'ghost' | 'dragon' | 'blackCat' | 'halloweenBat' | 'pumpkinMoon';
+export type EggCardKind = 'ufo' | 'ghost' | 'dragon' | 'santa' | 'blackCat' | 'halloweenBat' | 'pumpkinMoon';
 
 export type SceneInfoTarget =
   | { type: 'fish'; kind: FishKind }
@@ -168,13 +168,15 @@ const LAYERS: Record<CloudBand, MessageKey> = { low: 'info.layerLow', mid: 'info
 
 // Item 113: the egg cards. A hidden egg is an "Easter egg", a calendar egg a "Special event".
 // The chance comes from the code: the UFO's roll per night (hiddenEggs), or the days a year of
-// the calendar event (calendarEvents). The ghost shows every night at 00:00, so it has no
-// chance: its card shows the tier alone.
-type EggChance = { perNight: number } | { event: CalendarEvent } | null;
+// the calendar event (calendarEvents). Santa flies on one of the 3 Christmas days (Dec 24), so
+// he has his own days a year. The ghost shows every night at 00:00, so it has no chance: its
+// card shows the tier alone.
+type EggChance = { perNight: number } | { event: CalendarEvent } | { daysPerYear: number } | null;
 const EGGS: Record<EggCardKind, { name: MessageKey; fact: MessageKey; hidden: boolean; chance: EggChance; latin?: string }> = {
   ufo: { name: 'egg.ufo', fact: 'eggFact.ufo', hidden: true, chance: { perNight: UFO_CHANCE } },
   ghost: { name: 'egg.ghost', fact: 'eggFact.ghost', hidden: true, chance: null },
   dragon: { name: 'egg.dragon', fact: 'eggFact.dragon', hidden: false, chance: { event: 'lunar-new-year' } },
+  santa: { name: 'egg.santa', fact: 'eggFact.santa', hidden: false, chance: { daysPerYear: SANTA_DAYS_PER_YEAR } },
   blackCat: { name: 'egg.blackCat', fact: 'eggFact.blackCat', hidden: false, chance: { event: 'friday-13' }, latin: 'Felis catus' },
   halloweenBat: { name: 'egg.halloweenBat', fact: 'eggFact.halloweenBat', hidden: false, chance: { event: 'halloween-bats' } },
   pumpkinMoon: { name: 'egg.halloweenPumpkin', fact: 'eggFact.pumpkinMoon', hidden: false, chance: { event: 'halloween-pumpkin' } },
@@ -234,7 +236,7 @@ const eggChanceText = (chance: EggChance, language: Language): InfoText | null =
     return formatNumber(language, rounded, Number.isInteger(rounded) ? 0 : 1);
   };
   if ('perNight' in chance) return { key: 'eggChance.perNight', vars: { share: oneDecimal(chance.perNight * 100) } };
-  const days = getEventDaysPerYear(chance.event);
+  const days = 'daysPerYear' in chance ? chance.daysPerYear : getEventDaysPerYear(chance.event);
   if (days <= 0) return null;
   const years = Math.round(1 / days);
   if (days < 1 && years >= 2) return { key: 'eggChance.oneDayInYears', vars: { years } };

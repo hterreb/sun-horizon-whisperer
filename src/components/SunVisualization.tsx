@@ -114,6 +114,8 @@ interface SunVisualizationProps {
   infoRingTier?: RarityTier | null;
   // Today's calendar easter egg from SunTracker (utils/calendarEvents), or null.
   calendarEvent?: CalendarEvent | null;
+  // Christmas Eve from sunset to midnight, or ?egg=santa: Santa flies once (CalendarEggs).
+  santa?: boolean;
   // Time-travel play from SunTracker (ROADMAP item 83): the scene follows it.
   playDirection?: PlayDirection;
   // Satellite tracking (ROADMAP item 97): the tracked satellites in the sky, or null for
@@ -583,6 +585,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   infoRing = null,
   infoRingTier = null,
   calendarEvent = null,
+  santa = false,
   playDirection = 0,
   satellites = null
 }) => {
@@ -1190,6 +1193,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         onInfo={onSceneInfo}
         infoRing={infoRing}
         infoRingTier={infoRingTier}
+        santa={santa}
       />
 
       <svg className="absolute inset-0 w-full h-full pointer-events-none">
