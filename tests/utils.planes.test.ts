@@ -32,9 +32,9 @@ describe('getContrail', () => {
     expect(getContrail(Number.NaN, 70)).toBe('none');
   });
 
-  it('lets a short trail fade in about 10 s, a medium one in about 1 min, a persistent one over 5-10 min', () => {
-    expect(CONTRAIL_LOOK.short.lifeSec).toEqual([10, 10]);
-    expect(CONTRAIL_LOOK.medium.lifeSec).toEqual([60, 60]);
+  it('lets a short trail fade in about 30 s, a medium one in about 3 min (item 109), a persistent one over 5-10 min', () => {
+    expect(CONTRAIL_LOOK.short.lifeSec).toEqual([30, 30]);
+    expect(CONTRAIL_LOOK.medium.lifeSec).toEqual([180, 180]);
     expect(CONTRAIL_LOOK.persistent.lifeSec).toEqual([300, 600]);
     expect(CONTRAIL_LOOK.persistent.spread).toBeGreaterThan(CONTRAIL_LOOK.medium.spread);
   });

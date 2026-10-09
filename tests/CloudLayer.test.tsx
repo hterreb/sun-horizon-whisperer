@@ -1337,8 +1337,10 @@ describe('planes and contrails (ROADMAP item 96)', () => {
       expect(speed).toBeGreaterThanOrEqual(0.3 * getWaterSpeedFactor(phone.width) - 1e-9);
       expect(speed).toBeLessThanOrEqual(0.6 * getWaterSpeedFactor(phone.width) + 1e-9);
       expect(plane.contrail).toBe('medium');
-      expect(plane.lifeSec).toBe(60);
-      expect(plane.trailLength).toBeCloseTo(speed * 60);
+      expect(plane.lifeSec).toBe(180);
+      expect(plane.trailLength).toBeCloseTo(speed * 180);
+      // It flies on past the edge until the end of its trail is off the screen too (item 109).
+      expect(plane.x + plane.dx - plane.trailLength).toBeCloseTo(101);
       expect(plane.lights).toBeUndefined(); // by day the silhouette
       expect(plane.path).toBeDefined(); // a lane, planned with the birds
     }

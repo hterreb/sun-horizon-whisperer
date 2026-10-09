@@ -12,7 +12,9 @@ export const LIVE_POLL_MS = 15_000;
 export const LIVE_LEAD_SEC = 20;
 // An answer older than this is dropped (the radar shows nothing rather than old planes).
 export const LIVE_MAX_AGE_MS = 60_000;
-export const MIN_ELEVATION_DEG = 1;
+// Lower than this a plane is too near the horizon to show (item 110, SUN-CHASER-13: "don't show
+// planes that are too close to the horizon"; was 1°). In both modes.
+export const MIN_ELEVATION_DEG = 5;
 export const CONTRAIL_MIN_ALT_M = 8000;
 
 const EARTH_RADIUS_M = 6_371_000;
@@ -73,22 +75,29 @@ export const getAircraftView = (observer: Observer, ac: LiveAircraft, sec: numbe
   return { azimuth: bearing, elevation, distanceM };
 };
 
-// An aircraft shows at 1° or more above the horizon and above the terrain (item 13).
+// An aircraft shows at 5° or more above the horizon and above the terrain (item 13).
 export const isAircraftVisible = (view: SkyView, profile: HorizonProfile | null): boolean =>
   view.elevation >= MIN_ELEVATION_DEG && (!profile || view.elevation > horizonAngleAt(profile, view.azimuth));
 
-// The radar shows at most this many aircraft (Lutz, 2026-10-06: "the 12 nearest"); 60 read as
-// a swarm.
-export const MAX_LIVE_PLANES = 12;
+// Which visible aircraft show (item 110, SUN-CHASER-13). In compass mode: every one in the field
+// of view, up to a cap for the frame cost (each plane is a few elements moved 4 times per second;
+// 40 is far above a normal sky within 100 km). In the normal 360° view: the 2 nearest that
+// visibly move.
+export const MAX_COMPASS_PLANES = 40;
+export const MAX_NORMAL_PLANES = 2;
+// The screen speed (px/s) under which a plane seems to hang in the air. Most real planes move
+// slower than this in the 360° view (a far one about 0.2 px/s on a phone), so the normal view
+// often shows none or one.
+export const MIN_SCREEN_SPEED_PX_S = 1;
 
 // The straight-line distance from the eye to the aircraft (m): along the ground and up.
 export const slantDistanceM = (view: SkyView, altM: number, observerElevationM: number): number =>
   Math.hypot(view.distanceM, altM - observerElevationM);
 
-// The aircraft that pass the visibility rules (1° or more, not behind the terrain), nearest
+// The aircraft that pass the visibility rules (5° or more, not behind the terrain), nearest
 // first by slant distance, at most `max`.
 export const pickNearestVisible = <T extends { ac: Pick<LiveAircraft, 'altM'>; view: SkyView }>(
-  items: T[], observerElevationM: number, profile: HorizonProfile | null, max = MAX_LIVE_PLANES,
+  items: T[], observerElevationM: number, profile: HorizonProfile | null, max = Infinity,
 ): T[] =>
   items
     .filter(item => isAircraftVisible(item.view, profile))
@@ -96,6 +105,15 @@ export const pickNearestVisible = <T extends { ac: Pick<LiveAircraft, 'altM'>; v
     .sort((a, b) => a.slant - b.slant)
     .slice(0, max)
     .map(({ item }) => item);
+
+// From the visible aircraft, nearest first (pickNearestVisible) and with their place on the
+// screen: the ones to show. A plane that fails a rule leaves its place to the next nearest.
+export const pickShownPlanes = <T extends { inView: boolean; screenSpeedPxS: number }>(
+  nearestVisible: T[], compass: boolean,
+): T[] =>
+  compass
+    ? nearestVisible.filter(item => item.inView).slice(0, MAX_COMPASS_PLANES)
+    : nearestVisible.filter(item => item.inView && item.screenSpeedPxS >= MIN_SCREEN_SPEED_PX_S).slice(0, MAX_NORMAL_PLANES);
 
 // The contrail rule of the free part, for each aircraft above 8 km.
 export const getLiveContrail = (altM: number, forecast: ContrailKind): ContrailKind =>

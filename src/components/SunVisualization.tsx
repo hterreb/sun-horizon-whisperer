@@ -979,6 +979,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           }}
           project={projectSky}
           width={sceneWidth}
+          compass={compassActive}
           profile={horizonProfile}
           lights={showsPlaneLights(timeOfDay)}
           contrail={contrail}

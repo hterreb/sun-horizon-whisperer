@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  AIRLINE_COUNT, MAX_LIVE_PLANES, deadReckon, distanceAndBearing, getAircraftView, getAirlineName, getLiveContrail, getLivePlaneWidth, pickNearestVisible, slantDistanceM,
+  AIRLINE_COUNT, MAX_COMPASS_PLANES, MAX_NORMAL_PLANES, MIN_ELEVATION_DEG, MIN_SCREEN_SPEED_PX_S, deadReckon, distanceAndBearing, getAircraftView, getAirlineName, getLiveContrail, getLivePlaneWidth, pickNearestVisible, pickShownPlanes, slantDistanceM,
   isAircraftVisible, planeFeedUrl,
 } from '@/utils/liveRadar';
 import { type LiveAircraft } from '@/utils/planeFeed';
@@ -80,24 +80,25 @@ describe('getAircraftView', () => {
 });
 
 describe('isAircraftVisible', () => {
-  it('hides an aircraft below 1° or behind the terrain', () => {
-    expect(isAircraftVisible({ azimuth: 10, elevation: 0.9, distanceM: 1 }, null)).toBe(false);
-    expect(isAircraftVisible({ azimuth: 10, elevation: 1, distanceM: 1 }, null)).toBe(true);
-    expect(isAircraftVisible({ azimuth: 10, elevation: 4, distanceM: 1 }, flatProfile(5))).toBe(false);
-    expect(isAircraftVisible({ azimuth: 10, elevation: 6, distanceM: 1 }, flatProfile(5))).toBe(true);
+  it('hides an aircraft below 5° (too near the horizon, item 110) or behind the terrain', () => {
+    expect(MIN_ELEVATION_DEG).toBe(5);
+    expect(isAircraftVisible({ azimuth: 10, elevation: 4.9, distanceM: 1 }, null)).toBe(false);
+    expect(isAircraftVisible({ azimuth: 10, elevation: 5, distanceM: 1 }, null)).toBe(true);
+    expect(isAircraftVisible({ azimuth: 10, elevation: 7, distanceM: 1 }, flatProfile(8))).toBe(false);
+    expect(isAircraftVisible({ azimuth: 10, elevation: 9, distanceM: 1 }, flatProfile(8))).toBe(true);
   });
 });
 
-describe('pickNearestVisible (Lutz, 2026-10-06: the 12 nearest)', () => {
+describe('pickNearestVisible', () => {
   const item = (distanceKm: number, elevation: number, altM = 10_000, azimuth = 180) =>
     ({ ac: { altM }, view: { azimuth, elevation, distanceM: distanceKm * 1000 }, id: `${distanceKm}-${altM}` });
 
-  it('keeps the 12 nearest by slant distance', () => {
-    expect(MAX_LIVE_PLANES).toBe(12);
-    const items = Array.from({ length: 20 }, (_, i) => item(100 - i * 4, 5));
+  it('sorts all the visible ones by slant distance, nearest first; `max` cuts the list', () => {
+    const items = Array.from({ length: 20 }, (_, i) => item(100 - i * 4, 6));
     const picked = pickNearestVisible(items, 450, null);
-    expect(picked).toHaveLength(12);
-    expect(picked.map(p => p.view.distanceM / 1000)).toEqual([24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68]);
+    expect(picked).toHaveLength(20);
+    expect(picked.map(p => p.view.distanceM / 1000).slice(0, 3)).toEqual([24, 28, 32]);
+    expect(pickNearestVisible(items, 450, null, 12)).toHaveLength(12);
   });
 
   it('measures the slant distance with the height: a high plane overhead is farther than a low one beside it', () => {
@@ -106,12 +107,37 @@ describe('pickNearestVisible (Lutz, 2026-10-06: the 12 nearest)', () => {
     expect(picked[0].id).toBe('8-3000');
   });
 
-  it('picks only among the visible ones: one below 1° or behind the terrain leaves its place to the next', () => {
+  it('picks only among the visible ones: one below 5° or behind the terrain leaves its place to the next', () => {
     const ridge: HorizonProfile = { ...flatProfile(0), angles: Array.from({ length: 360 }, (_, az) => (az === 90 ? 20 : 0)) };
-    const items = [item(10, 0.5), item(12, 15, 10_000, 90), ...Array.from({ length: 12 }, (_, i) => item(20 + i, 5))];
+    const items = [item(10, 4), item(12, 15, 10_000, 90), ...Array.from({ length: 12 }, (_, i) => item(20 + i, 6))];
     const picked = pickNearestVisible(items, 450, ridge);
-    expect(picked).toHaveLength(12);
     expect(picked.map(p => p.view.distanceM / 1000)).toEqual(Array.from({ length: 12 }, (_, i) => 20 + i));
+  });
+});
+
+describe('pickShownPlanes (item 110, SUN-CHASER-13)', () => {
+  // Nearest first, as pickNearestVisible gives them.
+  const plane = (id: string, screenSpeedPxS: number, inView = true) => ({ id, screenSpeedPxS, inView });
+
+  it('in the normal view shows the 2 nearest that visibly move: a plane that hangs in the air leaves its place to the next', () => {
+    expect(MAX_NORMAL_PLANES).toBe(2);
+    expect(MIN_SCREEN_SPEED_PX_S).toBe(1);
+    const nearest = [plane('still', 0.2), plane('a', 1.5), plane('slow', 0.99), plane('b', 1), plane('c', 4)];
+    expect(pickShownPlanes(nearest, false).map(p => p.id)).toEqual(['a', 'b']);
+    expect(pickShownPlanes([plane('still', 0), plane('slow', 0.5)], false)).toEqual([]);
+  });
+
+  it('in compass mode shows every plane in the field of view, moving or not, up to 40', () => {
+    expect(MAX_COMPASS_PLANES).toBe(40);
+    const nearest = [plane('still', 0), plane('behind', 3, false), ...Array.from({ length: 14 }, (_, i) => plane(`p${i}`, 0.3))];
+    const shown = pickShownPlanes(nearest, true);
+    expect(shown).toHaveLength(15);
+    expect(shown.map(p => p.id)).not.toContain('behind');
+    expect(pickShownPlanes(Array.from({ length: 60 }, (_, i) => plane(`p${i}`, 0)), true)).toHaveLength(40);
+  });
+
+  it('does not show a plane outside the field of view in the normal view either', () => {
+    expect(pickShownPlanes([plane('off', 5, false), plane('on', 5)], false).map(p => p.id)).toEqual(['on']);
   });
 });
 
