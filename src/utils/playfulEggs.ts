@@ -36,8 +36,8 @@ export const getPlayfulOverride = (search: string): PlayfulEgg | null => {
   return PLAYFUL.find(kind => kind === egg) ?? null;
 };
 
-// April Fools: the sun and the moon swap their drawn places for one minute, once per page
-// view. A slow cross-fade, no jump: both fade out, swap, fade in; at the end the same way back.
+// April Fools: the sun and the moon swap their sky places for one minute, once per page view,
+// whether they are up or not. A slow cross-fade, no jump: both fade out, swap, fade in; at the end the same way back.
 export const APRIL_FOOLS_DELAY_MS = 10_000; // the normal scene first
 export const APRIL_FOOLS_FADE_MS = 3_000;
 export const APRIL_FOOLS_HOLD_MS = 60_000;

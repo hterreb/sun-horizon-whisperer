@@ -41,6 +41,14 @@ describe('PlayfulEggs (ROADMAP item 117)', () => {
     expect(tomb.innerHTML).not.toMatch(/animate-/);
   });
 
+  it('gives the empty tomb a static warm glow out of its entrance', () => {
+    render(<PlayfulEggs {...base} event="easter" easterMorning />);
+    const glow = screen.getByTestId('tomb-glow');
+    expect(glow.style.background).toMatch(/--scene-tomb-glow/);
+    expect(glow.style.animation).toBe('');
+    expect(screen.getByTestId('empty-tomb').innerHTML).toMatch(/--scene-tomb-glow/);
+  });
+
   it('puts the pot of gold at the rainbow end on St Patrick\'s Day, and nothing without a rainbow', () => {
     const onShown = vi.fn();
     const { rerender } = render(<PlayfulEggs {...base} event="st-patrick" onShown={onShown} />);
@@ -49,8 +57,23 @@ describe('PlayfulEggs (ROADMAP item 117)', () => {
     expect(onShown).toHaveBeenCalledWith('stPatrick');
     rerender(<PlayfulEggs {...base} event="st-patrick" rainbow={{ ...RAINBOW, visible: false }} />);
     expect(screen.queryByTestId('pot-of-gold')).toBeNull();
+    expect(screen.getByTestId('st-patrick-tint')).toBeTruthy();
     rerender(<PlayfulEggs {...base} event="valentine" />);
     expect(screen.queryByTestId('pot-of-gold')).toBeNull();
+  });
+
+  it('tints the sky green all St Patrick\'s Day without a rainbow, also with reduced motion, and the badge counts', () => {
+    mockReducedMotion(true);
+    const onShown = vi.fn();
+    const { rerender } = render(<PlayfulEggs {...base} event="st-patrick" rainbow={{ ...RAINBOW, visible: false }} onShown={onShown} />);
+    const tint = screen.getByTestId('st-patrick-tint');
+    expect(tint.style.height).toBe('500px'); // the sky, down to the horizon line
+    expect(tint.style.background).toMatch(/--scene-st-patrick/);
+    expect(tint.style.animation).toBe('');
+    expect(screen.queryByTestId('pot-of-gold')).toBeNull();
+    expect(onShown).toHaveBeenCalledWith('stPatrick');
+    rerender(<PlayfulEggs {...base} event="valentine" />);
+    expect(screen.queryByTestId('st-patrick-tint')).toBeNull();
   });
 
   it('opens the egg card on a double tap (item 116)', () => {
@@ -127,12 +150,66 @@ describe('April Fools swap (SunVisualization)', () => {
     expect(onEggShown).not.toHaveBeenCalled();
   });
 
-  it('does not swap when the moon is below the horizon or on another day', () => {
+  it('swaps also when the moon is below the horizon: the moon shows at the sun\'s place by day', () => {
     const onEggShown = vi.fn();
-    render(<SunVisualization {...dayProps} moonPosition={{ ...dayProps.moonPosition, altitude: -5, visible: false }} calendarEvent="april-fools" onEggShown={onEggShown} />);
+    const moonDown = { ...dayProps.moonPosition, altitude: -20, visible: false };
+    render(<SunVisualization {...dayProps} moonPosition={moonDown} calendarEvent="april-fools" onEggShown={onEggShown} />);
+    const before = sunLeft();
+    expect(screen.queryByTestId('moon-disc')).toBeNull();
+    act(() => { vi.advanceTimersByTime(APRIL_FOOLS_DELAY_MS); });
+    // Fade out: the moon is mounted but transparent, so it fades in and does not pop in.
+    expect(screen.getByTestId('moon-disc').style.opacity).toBe('0');
+    act(() => { vi.advanceTimersByTime(APRIL_FOOLS_FADE_MS); });
+    const moon = screen.getByTestId('moon-disc');
+    expect(moon.style.left).toBe(before);
+    expect(Number(moon.style.opacity)).toBeGreaterThan(0);
+    // The sun is at the moon's place below the horizon: hidden, and not a tap target.
+    expect(sunLeft()).not.toBe(before);
+    expect(screen.getByTestId('sun-dot').querySelector('svg')?.style.opacity).toBe('0');
+    expect(screen.getByTestId('sun-dot').style.pointerEvents).toBe('none');
+    expect(onEggShown).toHaveBeenCalledWith('aprilFools');
+    act(() => { vi.advanceTimersByTime(APRIL_FOOLS_HOLD_MS + 2 * APRIL_FOOLS_FADE_MS); });
+    expect(sunLeft()).toBe(before);
+    expect(screen.getByTestId('sun-dot').style.pointerEvents).toBe('');
+    expect(screen.queryByTestId('moon-disc')).toBeNull();
+  });
+
+  it('swaps but gives no badge when neither body can be seen', () => {
+    const onEggShown = vi.fn();
+    const night = {
+      ...dayProps,
+      sunPosition: { azimuth: 330, altitude: -30 },
+      moonPosition: { ...dayProps.moonPosition, altitude: -20, visible: false },
+      timeOfDay: 'night' as const,
+    };
+    render(<SunVisualization {...night} calendarEvent="april-fools" onEggShown={onEggShown} />);
+    act(() => { vi.advanceTimersByTime(APRIL_FOOLS_DELAY_MS + APRIL_FOOLS_FADE_MS + 1000); });
+    expect(screen.getByTestId('moon-disc').style.opacity).toBe('0'); // the swap runs
+    expect(onEggShown).not.toHaveBeenCalled();
+  });
+
+  it('gives no badge when clouds hide both swapped bodies', () => {
+    const onEggShown = vi.fn();
+    render(<SunVisualization {...dayProps} weatherType="fog" cloudCoverPercent={100} calendarEvent="april-fools" onEggShown={onEggShown} />);
+    act(() => { vi.advanceTimersByTime(APRIL_FOOLS_DELAY_MS + APRIL_FOOLS_FADE_MS + 1000); });
+    expect(onEggShown).not.toHaveBeenCalled();
+  });
+
+  it('tints the water green on St Patrick\'s Day only, also with reduced motion', () => {
+    mockReducedMotion(true);
+    const { unmount } = render(<SunVisualization {...dayProps} calendarEvent="st-patrick" />);
+    expect(screen.getByTestId('st-patrick-water').getAttribute('fill')).toBe('url(#stPatrickWater)');
+    unmount();
+    render(<SunVisualization {...dayProps} calendarEvent={null} />);
+    expect(screen.queryByTestId('st-patrick-water')).toBeNull();
+  });
+
+  it('does not swap on another day', () => {
+    const onEggShown = vi.fn();
     render(<SunVisualization {...dayProps} calendarEvent={null} onEggShown={onEggShown} />);
     act(() => { vi.advanceTimersByTime(APRIL_FOOLS_DELAY_MS + APRIL_FOOLS_FADE_MS + 1000); });
     expect(onEggShown).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('moon-disc')).toBeNull();
   });
 });
 
