@@ -158,9 +158,12 @@ export const RARITY_TIERS: [minShare: number, tier: MessageKey][] = [
   [10, 'rarity.common'], [3, 'rarity.uncommon'], [1, 'rarity.rare'], [0, 'rarity.veryRare'],
 ];
 
+export const getRarityTier = (share: number): MessageKey =>
+  RARITY_TIERS.find(([min]) => share >= min)?.[1] ?? 'rarity.veryRare';
+
 // "Very rare · 0.5 %": the tier and the share, with at most one decimal ("<0.1" below that).
 const rarityLine = (share: number, language: Language): InfoLine => {
-  const tier = RARITY_TIERS.find(([min]) => share >= min)?.[1] ?? 'rarity.veryRare';
+  const tier = getRarityTier(share);
   const rounded = Math.round(share * 10) / 10;
   const value = rounded < 0.1 ? `<${formatNumber(language, 0.1, 1)}`
     : formatNumber(language, rounded, Number.isInteger(rounded) ? 0 : 1);

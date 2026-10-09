@@ -939,6 +939,19 @@ describe('InfoPanel: line of sight as an icon at the sun and moon rows (ROADMAP 
       expect(onLivePlanesToggle).toHaveBeenCalledWith(false);
     });
   });
+  describe('collection button (ROADMAP item 112)', () => {
+    it('calls onCollectionOpen from the Collection row', () => {
+      const onCollectionOpen = vi.fn();
+      render(<InfoPanel {...defaultProps} onCollectionOpen={onCollectionOpen} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Collection' }));
+      expect(onCollectionOpen).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows no Collection row without onCollectionOpen', () => {
+      render(<InfoPanel {...defaultProps} />);
+      expect(screen.queryByRole('button', { name: 'Collection' })).toBeNull();
+    });
+  });
 });
 
 describe('formatTerrainDelta (ROADMAP items 13 & 30)', () => {
