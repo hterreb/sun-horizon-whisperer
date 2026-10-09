@@ -27,6 +27,7 @@ import {
 } from '../utils/moonUtils';
 import { fetchCurrentWeather, getUpperAirAt, getWeatherAt, type WeatherData } from '../utils/weatherUtils';
 import { getContrail } from '@/utils/planes';
+import { getRainMmH } from '@/utils/rainUtils';
 import { useLivePlanes, type LivePlanesState } from '@/hooks/useLivePlanes';
 import { useLiveRoute } from '@/hooks/useLiveRoute';
 import { getMoonLook, getSkyOvercastMix, getStarCloudFactor } from '@/utils/weatherEffectsUtils';
@@ -1137,7 +1138,7 @@ const SunTracker: React.FC = () => {
       )}
       {reveal === 'done' && (
         <>
-          <MusicPlayer isFullscreen={isFullscreen} duck={isCountdownSounding} />
+          <MusicPlayer isFullscreen={isFullscreen} duck={isCountdownSounding} rainMmH={getRainMmH(weatherType, rainMmH)} />
           <TopLeftButtons
             isFullscreen={isFullscreen}
             showCursor={showCursor}

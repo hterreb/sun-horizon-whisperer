@@ -256,4 +256,90 @@ describe('MusicPlayer', () => {
       expect(session.playbackState).toBe('none');
     });
   });
+
+  describe('rain sound (ROADMAP item 117)', () => {
+    // The app keeps one AudioContext, so the first test creates it; the arrays record the nodes.
+    const sources: { start: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn> }[] = [];
+    const ramps: number[] = [];
+    class FakeAudioContext {
+      currentTime = 0;
+      sampleRate = 8000;
+      state = 'running';
+      destination = {};
+      resume() { return Promise.resolve(); }
+      createBuffer(_channels: number, length: number) {
+        const data = new Float32Array(length);
+        return { getChannelData: () => data };
+      }
+      createBufferSource() {
+        const source = { buffer: null, loop: false, connect: (node: unknown) => node, start: vi.fn(), stop: vi.fn() };
+        sources.push(source);
+        return source;
+      }
+      createBiquadFilter() {
+        return { type: '', frequency: { value: 0 }, connect: (node: unknown) => node };
+      }
+      createGain() {
+        return {
+          gain: { value: 0, setValueAtTime: () => {}, cancelScheduledValues: () => {}, linearRampToValueAtTime: (v: number) => ramps.push(v) },
+          connect: (node: unknown) => node,
+        };
+      }
+    }
+    const rainButton = () => screen.queryByRole('button', { name: 'Rain sound' });
+
+    beforeEach(() => {
+      sources.length = 0;
+      ramps.length = 0;
+      vi.stubGlobal('AudioContext', FakeAudioContext);
+      vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+      vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+    });
+
+    it('shows the rain button only while it rains', () => {
+      const { rerender } = render(<MusicPlayer rainMmH={null} />);
+      expect(rainButton()).toBeNull();
+      rerender(<MusicPlayer rainMmH={4} />);
+      expect(rainButton()).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    it('the radio switch on presses it and starts the noise with a ramp; off stops both', () => {
+      render(<MusicPlayer rainMmH={4} />);
+      expect(sources).toHaveLength(0);
+      fireEvent.click(screen.getByRole('switch'));
+      expect(rainButton()).toHaveAttribute('aria-pressed', 'true');
+      expect(sources).toHaveLength(1);
+      expect(sources[0].start).toHaveBeenCalled();
+      expect(ramps.at(-1)).toBeGreaterThan(0);
+      fireEvent.click(screen.getByRole('switch'));
+      expect(rainButton()).toHaveAttribute('aria-pressed', 'false');
+      expect(ramps.at(-1)).toBe(0);
+      expect(sources[0].stop).toHaveBeenCalledWith(3);
+    });
+
+    it('the button alone plays the rain with the radio off, louder than with the radio', () => {
+      render(<MusicPlayer rainMmH={4} />);
+      fireEvent.click(rainButton()!);
+      expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
+      expect(sources).toHaveLength(1);
+      const alone = ramps.at(-1)!;
+      fireEvent.click(screen.getByRole('switch'));
+      expect(ramps.at(-1)).toBeLessThan(alone);
+    });
+
+    it('the button off with the radio on stops only the rain', () => {
+      render(<MusicPlayer rainMmH={4} />);
+      fireEvent.click(screen.getByRole('switch'));
+      fireEvent.click(rainButton()!);
+      expect(ramps.at(-1)).toBe(0);
+      expect(sources[0].stop).toHaveBeenCalled();
+      expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'true');
+    });
+
+    it('no rain: no noise, also with the radio on', () => {
+      render(<MusicPlayer rainMmH={null} />);
+      fireEvent.click(screen.getByRole('switch'));
+      expect(sources).toHaveLength(0);
+    });
+  });
 });

@@ -128,3 +128,14 @@ export const stepRainDrops = (
   }
   return splashes;
 };
+
+// Rain sound (ROADMAP item 117): a share of the radio slider, quiet under the music,
+// louder alone, and a little louder with more rain (0.6× at drizzle up to 1× at a storm).
+export const RAIN_SOUND_WITH_RADIO = 0.25;
+export const RAIN_SOUND_ALONE = 0.6;
+
+// The rain sound's gain; 0 when the rain sound is off or there is no rain (`mmH` null).
+export const getRainSoundGain = (mmH: number | null, rainOn: boolean, radioOn: boolean, volume: number): number => {
+  if (!rainOn || mmH == null) return 0;
+  return volume * (radioOn ? RAIN_SOUND_WITH_RADIO : RAIN_SOUND_ALONE) * (0.6 + 0.4 * getRainIntensity(mmH));
+};

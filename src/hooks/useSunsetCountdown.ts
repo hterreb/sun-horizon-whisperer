@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { getAudioContext, getRunningAudioContext } from '@/utils/audioContext';
 
 // Sunset countdown sound (ROADMAP item 43), Web Audio only (no audio files): from
 // T-10 s to T-1 s one soft 660 Hz tick per second, at T0 a soft two-note chime.
@@ -15,22 +16,6 @@ const COUNTDOWN_MS = 10_000;
 // room for a late tick, so a slow interval does not skip the countdown.
 const SCHEDULE_MIN_MS = 10_000;
 const SCHEDULE_MAX_MS = 11_500;
-
-let audioContext: AudioContext | null = null;
-
-// One AudioContext for the app. Browsers start it only after a user gesture, so the
-// toggle tap calls primeCountdownAudio first.
-const getAudioContext = (): AudioContext | null => {
-  if (typeof window === 'undefined' || !window.AudioContext) return null;
-  audioContext ??= new window.AudioContext();
-  if (audioContext.state === 'suspended') void audioContext.resume();
-  return audioContext;
-};
-
-// The app's AudioContext when it is already running, else null. It does not create or
-// resume one, so it plays nothing before the user turned the sound on (Santa's bells).
-export const getRunningAudioContext = (): AudioContext | null =>
-  audioContext?.state === 'running' ? audioContext : null;
 
 // One soft sine tone at `at` (AudioContext seconds), with a short fade in and out.
 // More than one frequency plays them as notes, CHIME_NOTE_S apart, on one oscillator.
@@ -84,7 +69,7 @@ export const useSunsetCountdown = (target: Date | null, now: Date, live: boolean
   // gesture (item 108). The first tap anywhere starts it; the capture phase also counts
   // a tap that a child handles, for example the radio's play switch.
   useEffect(() => {
-    if (!soundOn || audioContext?.state === 'running') return;
+    if (!soundOn || getRunningAudioContext()) return;
     const unlock = () => {
       getAudioContext();
     };
