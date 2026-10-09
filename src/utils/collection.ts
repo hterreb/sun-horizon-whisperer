@@ -21,7 +21,7 @@ export interface Badge {
   id: BadgeId;
   group: BadgeGroup;
   name: MessageKey;
-  // The rarity tier of the spawn share; null for things that are not rolled.
+  // The rarity tier of the spawn share; eggs are ultra rare (item 113); null for things that are not rolled.
   rarity: MessageKey | null;
 }
 
@@ -74,7 +74,7 @@ export const BADGES: readonly Badge[] = [
   { id: 'terrain', group: 'sky', name: 'scene.terrain', rarity: null },
   { id: 'satellite', group: 'sky', name: 'scene.satellite', rarity: null },
   ...CLOUDS.map(([type, name]): Badge => ({ id: `cloud:${type}`, group: 'cloud', name, rarity: null })),
-  ...EGGS.map(([kind, name]): Badge => ({ id: `egg:${kind}`, group: 'egg', name, rarity: null })),
+  ...EGGS.map(([kind, name]): Badge => ({ id: `egg:${kind}`, group: 'egg', name, rarity: 'rarity.ultraRare' })),
 ];
 const IDS = new Set<string>(BADGES.map(b => b.id));
 
