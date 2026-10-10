@@ -1,9 +1,15 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
-import { DICTIONARIES, translate, formatNumber } from '@/i18n';
+import { translate, formatNumber } from '@/i18n';
 import { en } from '@/i18n/en';
+import { de } from '@/i18n/de';
+import { es } from '@/i18n/es';
+import { it as itDict } from '@/i18n/it';
+import { fr } from '@/i18n/fr';
 import { LANGUAGES } from '@/utils/language';
+
+const DICTIONARIES: Record<string, Record<string, string>> = { en, de, es, it: itDict, fr };
 
 // ROADMAP item 67: every dictionary has exactly the keys of en.ts, every key is used
 // in src/, and t() fills the placeholders.

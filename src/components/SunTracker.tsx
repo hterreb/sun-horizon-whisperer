@@ -91,7 +91,7 @@ import DiscoSky from './DiscoSky';
 import Ufo, { UFO_RING } from './Ufo';
 import { loadTemperatureUnit, saveTemperatureUnit, type TemperatureUnit } from '@/utils/temperatureUnit';
 import { loadLanguage, saveLanguage, type Language } from '@/utils/language';
-import { translate, type Translate } from '@/i18n';
+import { loadDictionary, translate, type Translate } from '@/i18n';
 import { LanguageContext } from '@/hooks/useLanguage';
 
 // Eye height above ground for line of sight with terrain (ROADMAP item 13): e.g. a
@@ -202,9 +202,12 @@ const SunTracker: React.FC = () => {
   // UI language (ROADMAP item 67): default from navigator.language, saved choice first.
   // Given to the components below through LanguageContext.
   const [language, setLanguageState] = useState<Language>(() => loadLanguage(navigator.language));
+  // A picked language shows when its dictionary is loaded (ROADMAP item 125).
   const setLanguage = useCallback((next: Language) => {
-    setLanguageState(next);
-    saveLanguage(next);
+    loadDictionary(next).then(() => {
+      setLanguageState(next);
+      saveLanguage(next);
+    }, () => {});
   }, []);
   const t = useCallback<Translate>((key, vars) => translate(language, key, vars), [language]);
   const languageContext = useMemo(() => ({ language, setLanguage, t }), [language, setLanguage, t]);

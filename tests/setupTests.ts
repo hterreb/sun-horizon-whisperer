@@ -1,4 +1,8 @@
 import '@testing-library/jest-dom';
+import { loadDictionary } from '@/i18n';
+
+// The non-en dictionaries load on demand in the app (ROADMAP item 125); tests use them directly.
+await Promise.all((['de', 'es', 'it', 'fr'] as const).map(loadDictionary));
 
 // Polyfill window.matchMedia for jsdom
 global.window.matchMedia = global.window.matchMedia || function(query) {
