@@ -1,6 +1,6 @@
 import React from 'react';
-import { render, screen, act } from '@testing-library/react';
-import WeatherEffects from '../src/components/WeatherEffects';
+import { render, screen, act, fireEvent } from '@testing-library/react';
+import WeatherEffects, { RAINBOW_OPACITY, RAINBOW_RING } from '../src/components/WeatherEffects';
 import type { TimeOfDay } from '../src/utils/sunUtils';
 
 const mockReducedMotion = (matches: boolean) =>
@@ -113,5 +113,54 @@ describe('WeatherEffects (ROADMAP item 10)', () => {
   it('renders no rainbow arc when not visible', () => {
     const { container } = render(<WeatherEffects {...baseProps} weatherType="clear" rainbow={noRainbow} />);
     expect(container.querySelector('circle')).toBeNull();
+  });
+
+  describe('rainbow, item 121', () => {
+    const rainbow = { visible: true, xFraction: 0.5, apexHeightDeg: 20 };
+
+    it('is faint: opacity 0.2, blurred, the feet fading out', () => {
+      render(<WeatherEffects {...baseProps} weatherType="rain" rainbow={rainbow} />);
+      const svg = screen.getByTestId('rainbow');
+      expect(RAINBOW_OPACITY).toBe(0.2);
+      expect(svg.style.opacity).toBe('0.2');
+      expect(svg.querySelector('feGaussianBlur')).not.toBeNull();
+      expect(svg.querySelector('mask')).not.toBeNull();
+    });
+
+    it('takes taps only on the arc stroke, and has no hit path without onInfo', () => {
+      const { rerender } = render(<WeatherEffects {...baseProps} weatherType="rain" rainbow={rainbow} />);
+      expect(screen.queryByTestId('rainbow-hit')).toBeNull();
+      rerender(<WeatherEffects {...baseProps} weatherType="rain" rainbow={rainbow} onInfo={vi.fn()} />);
+      const hit = screen.getByTestId('rainbow-hit');
+      expect(hit.style.pointerEvents).toBe('stroke');
+      expect(hit.getAttribute('fill')).toBe('none');
+      expect(hit.hasAttribute('data-scene-hit')).toBe(true);
+      expect(hit.getAttribute('class')).toContain('touch-manipulation');
+      // The hit svg stops above the horizon, so the pot of gold at the foot keeps its tap.
+      expect(Number(hit.closest('svg')!.getAttribute('height'))).toBeLessThan(baseProps.containerHeight * 0.65);
+    });
+
+    it('opens its card on a double tap, not on one tap', () => {
+      const onInfo = vi.fn();
+      render(<WeatherEffects {...baseProps} weatherType="rain" rainbow={rainbow} onInfo={onInfo} />);
+      const hit = screen.getByTestId('rainbow-hit');
+      fireEvent.click(hit);
+      expect(onInfo).not.toHaveBeenCalled();
+      fireEvent.click(hit);
+      expect(onInfo).toHaveBeenCalledWith({ type: 'rainbow' }, expect.anything(), RAINBOW_RING);
+    });
+
+    it('shows the ring while its card is open', () => {
+      const { rerender } = render(<WeatherEffects {...baseProps} weatherType="rain" rainbow={rainbow} onInfo={vi.fn()} />);
+      expect(screen.queryAllByTestId('scene-info-ring')).toHaveLength(0);
+      rerender(<WeatherEffects {...baseProps} weatherType="rain" rainbow={rainbow} onInfo={vi.fn()} infoRing={RAINBOW_RING} />);
+      expect(screen.getAllByTestId('scene-info-ring').length).toBeGreaterThan(0);
+    });
+
+    it('draws nothing and takes no taps at night', () => {
+      render(<WeatherEffects {...baseProps} timeOfDay="night" weatherType="rain" rainbow={rainbow} onInfo={vi.fn()} />);
+      expect(screen.queryByTestId('rainbow')).toBeNull();
+      expect(screen.queryByTestId('rainbow-hit')).toBeNull();
+    });
   });
 });

@@ -231,6 +231,7 @@ export const de: Record<keyof typeof en, string> = {
   // Info cards (ROADMAP item 95)
   'scene.moon': "Mond",
   'scene.terrain': "Gelände",
+  'scene.rainbow': "Regenbogen",
   'fish.classic': "Fisch",
   'fish.minnow': "Elritzen",
   'fish.perch': "Barsch",
@@ -527,8 +528,10 @@ export const de: Record<keyof typeof en, string> = {
   'infoKind.sky': "Himmel",
   'infoKind.horizon': "Horizont",
   'infoKind.orbit': "Umlaufbahn",
+  'infoKind.weather': "Wetter",
   'info.fieldNote': "Feldnotiz",
   'info.cloudFact': "Wolkenwissen",
+  'info.rainbowFact': "Immer gegenüber der Sonne: Der Bogen liegt 42° um den Gegenpunkt der Sonne, darum zeigt er sich nur, wenn die Sonne tiefer als 42° steht. Rot ist außen, Violett innen.",
   'info.altitude': "Höhe",
   'info.direction': "Richtung",
   'info.directionValue': "{dir} ({deg}°)",

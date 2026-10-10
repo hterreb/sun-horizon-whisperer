@@ -231,6 +231,7 @@ export const en = {
   // Info cards (ROADMAP item 95)
   'scene.moon': 'Moon',
   'scene.terrain': 'Terrain',
+  'scene.rainbow': 'Rainbow',
   'fish.classic': 'Fish',
   'fish.minnow': 'Minnows',
   'fish.perch': 'Perch',
@@ -527,8 +528,10 @@ export const en = {
   'infoKind.sky': 'Sky',
   'infoKind.horizon': 'Horizon',
   'infoKind.orbit': 'Orbit',
+  'infoKind.weather': 'Weather',
   'info.fieldNote': 'Field note',
   'info.cloudFact': 'Cloud fact',
+  'info.rainbowFact': 'Always opposite the sun: the bow is 42° around the point opposite the sun, so it shows only when the sun is lower than 42°. Red is outside, violet inside.',
   'info.altitude': 'Altitude',
   'info.direction': 'Direction',
   'info.directionValue': '{dir} ({deg}°)',

@@ -44,7 +44,8 @@ export type SceneInfoTarget =
   | { type: 'moon' }
   | { type: 'terrain'; azimuth: number }
   | { type: 'satellite'; id: number; name: string }
-  | { type: 'egg'; kind: EggCardKind };
+  | { type: 'egg'; kind: EggCardKind }
+  | { type: 'rainbow' }; // item 121
 
 // A text from the dictionary; a var can be another dictionary text.
 export interface InfoText {
@@ -61,7 +62,7 @@ export interface InfoLine {
 // The kicker's icon; SceneInfoCard has the drawing and the colour for each.
 export type SceneIconId =
   | 'water' | 'visitor' | 'bird' | 'bat' | 'boat' | 'plane' | 'cloud' | 'sun' | 'moon' | 'terrain' | 'satellite'
-  | 'egg' | 'event';
+  | 'egg' | 'event' | 'rainbow';
 export interface SceneInfo {
   kicker: MessageKey; // the type name over the title
   icon: SceneIconId;
@@ -214,6 +215,9 @@ export const SATELLITE_TIERS: Record<SatelliteSize, RarityTier> = {
 };
 
 // The rarity row of a thing with a fixed tier: the tier alone.
+// Item 121: the rainbow is not rolled (it needs rain and a low sun), so it has a fixed tier.
+export const RAINBOW_TIER: RarityTier = 'uncommon';
+
 const tierLine = (tier: RarityTier): InfoLine & { tier: RarityTier } => ({ label: 'info.rarity', value: { key: RARITY_NAMES[tier] }, tier });
 
 // Item 106: one fact per cloud type.
@@ -560,6 +564,18 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
       const tier = SATELLITE_TIERS[getSatelliteSize(target.id, target.name)];
       return { kicker: 'infoKind.orbit', icon: 'satellite', title: 'scene.satellite', lines: [...satelliteLines(target.name, ctx), tierLine(tier)], tier };
     }
+    case 'rainbow':
+      return {
+        kicker: 'infoKind.weather',
+        icon: 'rainbow',
+        title: 'scene.rainbow',
+        tier: RAINBOW_TIER,
+        lines: [
+          { label: 'info.direction', value: directionText((ctx.sunPosition.azimuth + 180) % 360) },
+          tierLine(RAINBOW_TIER),
+        ],
+        fact: fieldNote('info.rainbowFact'),
+      };
     case 'egg': {
       const egg = EGGS[target.kind];
       if (target.kind === 'santa') return santaCard(egg, ctx);

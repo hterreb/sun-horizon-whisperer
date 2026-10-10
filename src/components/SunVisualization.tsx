@@ -1145,6 +1145,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         rainbow={rainbowGeometry}
         containerWidth={containerDimensions.width}
         containerHeight={containerDimensions.height}
+        onInfo={onSceneInfo}
+        infoRing={infoRing}
       />
       <Fireworks trigger={fireworksTrigger} />
 

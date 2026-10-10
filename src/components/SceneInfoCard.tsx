@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Bird, Cloud, Egg, Fish, Moon, Mountain, PartyPopper, Plane, Sailboat, Satellite, Sun, type LucideIcon } from 'lucide-react';
+import { Bird, Cloud, Egg, Fish, Moon, Mountain, PartyPopper, Plane, Rainbow, Sailboat, Satellite, Sun, type LucideIcon } from 'lucide-react';
 import { useLanguage } from '@/hooks/useLanguage';
 import { GLASS_CARD_SURFACE } from '@/utils/glassChrome';
 import { cardBorderClass, TIER_ORDER, type RarityTier } from '@/utils/rarityTier';
@@ -36,6 +36,7 @@ const KICKER: Record<SceneIconId, { Icon: LucideIcon; colour: string }> = {
   // Item 113: the easter eggs and special events, in the "ultra rare" colour.
   egg: { Icon: Egg, colour: 'text-tier-ultra-rare' },
   event: { Icon: PartyPopper, colour: 'text-tier-ultra-rare' },
+  rainbow: { Icon: Rainbow, colour: 'text-kind-cloud' }, // item 121
 };
 
 // The rarity meter: one bar per tier, lit up to the card's tier.

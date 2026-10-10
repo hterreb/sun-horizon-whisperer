@@ -231,6 +231,7 @@ export const fr: Record<keyof typeof en, string> = {
   // Info cards (ROADMAP item 95)
   'scene.moon': "Lune",
   'scene.terrain': "Relief",
+  'scene.rainbow': "Arc-en-ciel",
   'fish.classic': "Poisson",
   'fish.minnow': "Vairons",
   'fish.perch': "Perche",
@@ -527,8 +528,10 @@ export const fr: Record<keyof typeof en, string> = {
   'infoKind.sky': "Ciel",
   'infoKind.horizon': "Horizon",
   'infoKind.orbit': "Orbite",
+  'infoKind.weather': "Météo",
   'info.fieldNote': "Note de terrain",
   'info.cloudFact': "Le saviez-vous ?",
+  'info.rainbowFact': "Toujours à l'opposé du soleil : l'arc se trouve à 42° du point opposé au soleil, il n'apparaît donc que lorsque le soleil est à moins de 42°. Le rouge est à l'extérieur, le violet à l'intérieur.",
   'info.altitude': "Hauteur",
   'info.direction': "Direction",
   'info.directionValue': "{dir} ({deg}°)",

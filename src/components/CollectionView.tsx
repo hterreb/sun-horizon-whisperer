@@ -122,11 +122,12 @@ const EGG_ICONS: Record<Exclude<EggKind, 'ufo' | 'santa'>, [LucideIcon, string]>
   carnival: [Drama, 'text-brand-cyan'],
 };
 
-const SKY_ICONS: Record<'sun' | 'moon' | 'terrain' | 'satellite', [LucideIcon, string]> = {
+const SKY_ICONS: Record<'sun' | 'moon' | 'terrain' | 'satellite' | 'rainbow', [LucideIcon, string]> = {
   sun: [Sun, 'text-brand-gold'],
   moon: [Moon, 'text-white'],
   terrain: [Mountain, 'text-white'],
   satellite: [Satellite, 'text-white'],
+  rainbow: [Rainbow, 'text-white'], // item 121
 };
 
 // Item 115: the state badges. The sun in the colours of its time's sky gradient.
