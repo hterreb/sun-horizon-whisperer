@@ -6,8 +6,6 @@ import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import { type WeatherType } from './CloudLayer';
 import { getStarCloudFactor, getTwilightStars } from '../utils/weatherEffectsUtils';
 import { METEOR_SHOWER, meteorOpacity, meteorSpawnChance } from '../utils/astroEvents';
-import { useDoubleTap } from '../hooks/useDoubleTap';
-import { type SceneInfoHandler } from './CloudLayer';
 
 interface NightStarsProps {
   timeOfDay: TimeOfDay;
@@ -18,12 +16,7 @@ interface NightStarsProps {
   shootingStarRate?: number;
   // A meteor shower (astroEvents) adds long, slow meteor streaks.
   meteorShower?: boolean;
-  // Item 123: during a shower the star field takes double taps (a meteor is too small and fast
-  // to hit) and opens the meteor shower card.
-  onInfo?: SceneInfoHandler;
 }
-
-export const METEOR_RING = 'egg-meteor-shower';
 
 interface Star {
   x: number;
@@ -47,15 +40,12 @@ const createStars = (width: number, height: number): Star[] =>
 // 30 fps, less 2 ms of slack, so a 60 Hz display draws on every second frame.
 const TWINKLE_FRAME_MS = 1000 / 30 - 2;
 
-const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition, weatherType = 'clear', cloudCoverPercent = null, shootingStarRate = 0.001, meteorShower = false, onInfo }) => {
+const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition, weatherType = 'clear', cloudCoverPercent = null, shootingStarRate = 0.001, meteorShower = false }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const starsRef = useRef<Star[]>([]);
   const moonBrightnessRef = useRef(moonPosition?.illumination || 0);
   const prefersReducedMotion = usePrefersReducedMotion();
   const cloudFactor = getStarCloudFactor(weatherType, cloudCoverPercent);
-  const { tap } = useDoubleTap(onInfo);
-  // The meteors fly only at night and not with reduced motion (the badge's rule, SunTracker).
-  const showerTaps = onInfo && meteorShower && timeOfDay === 'night' && !prefersReducedMotion;
 
   // Keep the latest moon brightness in a ref so the animation effect below
   // doesn't need to depend on the moonPosition object (a new object every
@@ -245,22 +235,10 @@ const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition, weathe
   }, [timeOfDay, cloudFactor, prefersReducedMotion, shootingStarRate, meteorShower]);
 
   return (
-    <>
-      <canvas
-        ref={canvasRef}
-        className="fixed inset-0 pointer-events-none z-0"
-      />
-      {showerTaps && (
-        // The sky above the horizon (65 % of the height, as in SunVisualization).
-        <div
-          data-testid="meteor-sky"
-          data-scene-hit=""
-          aria-hidden="true"
-          className="fixed inset-x-0 top-0 h-[65%] z-0 pointer-events-auto cursor-pointer touch-manipulation"
-          onClick={(e) => tap({ type: 'egg', kind: 'meteorShower' }, { x: e.clientX, y: e.clientY }, METEOR_RING)}
-        />
-      )}
-    </>
+    <canvas
+      ref={canvasRef}
+      className="fixed inset-0 pointer-events-none z-0"
+    />
   );
 };
 

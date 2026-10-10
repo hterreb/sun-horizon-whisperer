@@ -8,8 +8,9 @@ interface FireworksProps {
   // Burst colours (CSS colours); keep the array stable, a new one restarts the show. National
   // days pass the flag colours (NationalEggs).
   palette?: readonly string[];
-  // Item 123: while a show runs, the canvas takes taps (a double tap opens the fireworks card).
-  onTap?: (event: React.MouseEvent) => void;
+  // Item 123: tells when a show starts and ends, so EventSkyTaps can take taps on the sky for it.
+  // The canvas itself never takes taps.
+  onRunningChange?: (running: boolean) => void;
 }
 
 // Burst colours that stand out on a sunset sky (no yellow or orange), plus a
@@ -63,12 +64,13 @@ const burst = (x: number, y: number, big: boolean, colors: readonly string[]): S
   });
 };
 
-const Fireworks: React.FC<FireworksProps> = ({ trigger, palette = COLORS, onTap }) => {
+const Fireworks: React.FC<FireworksProps> = ({ trigger, palette = COLORS, onRunningChange }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sparksRef = useRef<Spark[]>([]);
   const rafRef = useRef<number | null>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
   const [running, setRunning] = useState(false);
+  useEffect(() => onRunningChange?.(running), [running, onRunningChange]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -148,17 +150,7 @@ const Fireworks: React.FC<FireworksProps> = ({ trigger, palette = COLORS, onTap 
   }, [trigger, prefersReducedMotion, palette]);
 
   if (prefersReducedMotion) return null;
-  const tappable = running && onTap;
-  return (
-    <canvas
-      ref={canvasRef}
-      aria-hidden={tappable ? true : undefined}
-      data-testid="fireworks"
-      data-scene-hit={tappable ? '' : undefined}
-      className={`absolute inset-0 w-full h-full ${tappable ? 'pointer-events-auto cursor-pointer touch-manipulation' : 'pointer-events-none'}`}
-      onClick={tappable ? onTap : undefined}
-    />
-  );
+  return <canvas ref={canvasRef} data-testid="fireworks" className="absolute inset-0 w-full h-full pointer-events-none" />;
 };
 
 export default Fireworks;

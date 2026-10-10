@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import Fireworks, { planShow } from '../src/components/Fireworks';
 
 const mockReducedMotion = (matches: boolean) =>
@@ -96,26 +96,24 @@ describe('Fireworks palette (national days)', () => {
   });
 });
 
-// Item 123: the canvas takes taps only while a show runs.
-describe('Fireworks taps', () => {
+// Item 123: the canvas never takes taps; it reports when a show runs (EventSkyTaps takes the taps).
+describe('Fireworks running', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it('takes taps during the show and lets them through before and after it', () => {
+  it('reports the start and the end of a show and stays pointer-events-none', () => {
     let frame: FrameRequestCallback | null = null;
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => { frame = cb; return 1; });
     vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
     const ctx = { setTransform: () => {}, clearRect: () => {}, beginPath: () => {}, moveTo: () => {}, lineTo: () => {}, stroke: () => {} };
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx as unknown as CanvasRenderingContext2D);
     vi.spyOn(performance, 'now').mockReturnValue(0);
-    const onTap = vi.fn();
-    const { rerender } = render(<Fireworks trigger={0} onTap={onTap} />);
+    const onRunningChange = vi.fn();
+    const { rerender } = render(<Fireworks trigger={0} onRunningChange={onRunningChange} />);
     const canvas = () => screen.getByTestId('fireworks');
+    expect(onRunningChange).toHaveBeenLastCalledWith(false);
+    rerender(<Fireworks trigger={1000} onRunningChange={onRunningChange} />);
+    expect(onRunningChange).toHaveBeenLastCalledWith(true);
     expect(canvas().className).toContain('pointer-events-none');
-    rerender(<Fireworks trigger={1000} onTap={onTap} />);
-    expect(canvas().className).toContain('pointer-events-auto');
-    expect(canvas().hasAttribute('data-scene-hit')).toBe(true);
-    fireEvent.click(canvas());
-    expect(onTap).toHaveBeenCalledTimes(1);
     // Run the show to its end (14 s of frames).
     act(() => {
       for (let t = 100; t <= 14000 && frame; t += 100) {
@@ -124,6 +122,7 @@ describe('Fireworks taps', () => {
         run(t);
       }
     });
+    expect(onRunningChange).toHaveBeenLastCalledWith(false);
     expect(canvas().className).toContain('pointer-events-none');
   });
 });

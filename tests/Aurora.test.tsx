@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import Aurora from '../src/components/Aurora';
 
 const mockReducedMotion = (matches: boolean) =>
@@ -27,19 +27,5 @@ describe('Aurora', () => {
   it('draws nothing under a covered sky', () => {
     render(<Aurora opacity={0} />);
     expect(screen.queryByTestId('aurora')).toBeNull();
-  });
-
-  // Item 123: a double tap on a band opens the aurora card.
-  it('takes double taps on its bands with onInfo, and none without', () => {
-    const onInfo = vi.fn();
-    const { rerender } = render(<Aurora opacity={1} onInfo={onInfo} />);
-    const band = screen.getAllByTestId('aurora-band')[1];
-    expect(band.className).toContain('pointer-events-auto');
-    fireEvent.click(band, { detail: 1 });
-    expect(onInfo).not.toHaveBeenCalled();
-    fireEvent.click(band, { detail: 2 });
-    expect(onInfo).toHaveBeenCalledWith({ type: 'egg', kind: 'aurora' }, expect.anything(), 'egg-aurora');
-    rerender(<Aurora opacity={1} />);
-    expect(screen.getAllByTestId('aurora-band')[1].className).not.toContain('pointer-events-auto');
   });
 });

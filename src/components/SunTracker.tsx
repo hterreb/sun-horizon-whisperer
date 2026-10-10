@@ -38,6 +38,7 @@ import { getSceneInfo, type SceneInfoTarget } from '@/utils/sceneInfo';
 import InfoPanel from './InfoPanel';
 import NightStars from './NightStars';
 import Aurora from '@/components/Aurora';
+import EventSkyTaps from '@/components/EventSkyTaps';
 import MusicPlayer from './MusicPlayer';
 import TopLeftButtons from './TopLeftButtons';
 import PWAInstallPrompt from './PWAInstallPrompt';
@@ -700,6 +701,10 @@ const SunTracker: React.FC = () => {
   // one. A hidden tick (a desktop tab still ticks) waits for the return. Each fired or
   // skipped show leaves a Sentry breadcrumb, with no place or time in it.
   const [fireworksTrigger, setFireworksTrigger] = useState(0);
+  // Item 123: a running show (the sunrise, sunset or New Year one, or a national one) lets
+  // EventSkyTaps take taps on the sky.
+  const [ownFireworksRunning, setOwnFireworksRunning] = useState(false);
+  const [nationalFireworksRunning, setNationalFireworksRunning] = useState(false);
   const prevClockRef = React.useRef(date);
   const sunEventWatchRef = React.useRef(NO_SUN_EVENT_WATCH);
   useEffect(() => {
@@ -1142,21 +1147,27 @@ const SunTracker: React.FC = () => {
       }`} 
       style={{ background: skyGradient }}
     >
+      {/* Item 123 (decision 2026-10-10): first, with no z-index, so all scene things take their own taps. */}
+      <EventSkyTaps
+        onInfo={handleSceneTap}
+        aurora={astroEvent?.kind === 'aurora' && getStarCloudFactor(weatherType, cloudCover) > 0}
+        meteorShower={astroEvent?.kind === 'meteorShower' && timeOfDay === 'night' && !prefersReducedMotion}
+        fireworks={nationalFireworksRunning && nationalDay?.style === 'fireworks' ? nationalDay.kind : ownFireworksRunning ? 'fireworks' : null}
+      />
       <NightStars
         timeOfDay={timeOfDay}
         moonPosition={moonPosition}
         weatherType={weatherType}
         cloudCoverPercent={cloudCover}
         meteorShower={astroEvent?.kind === 'meteorShower'}
-        onInfo={handleSceneTap}
       />
-      {astroEvent?.kind === 'aurora' && <Aurora opacity={getStarCloudFactor(weatherType, cloudCover)} onInfo={handleSceneTap} />}
+      {astroEvent?.kind === 'aurora' && <Aurora opacity={getStarCloudFactor(weatherType, cloudCover)} />}
       {discoOn && <DiscoSky />}
       {ufoOn && (
         <Ufo onDone={handleUfoDone} onInfo={handleSceneTap} ringOn={infoCard?.ring === UFO_RING} ringTier={infoCardInfo?.tier ?? null} />
       )}
       {nationalDay && (
-        <NationalEggs key={nationalDay.kind} day={nationalDay} timeOfDay={timeOfDay} onInfo={handleSceneTap} infoRing={infoCard?.ring ?? null} infoRingTier={infoCardInfo?.tier ?? null} />
+        <NationalEggs key={nationalDay.kind} day={nationalDay} timeOfDay={timeOfDay} onInfo={handleSceneTap} infoRing={infoCard?.ring ?? null} infoRingTier={infoCardInfo?.tier ?? null} onFireworksRunning={setNationalFireworksRunning} />
       )}
       {reveal === 'done' && (
         <>
@@ -1214,6 +1225,7 @@ const SunTracker: React.FC = () => {
             horizonProfile={horizonProfile}
             terrainSunTimes={terrainExtras.terrainSunTimes}
             astroEvent={astroEvent}
+            onFireworksRunning={setOwnFireworksRunning}
             terrainMoonTimes={terrainExtras.terrainMoonTimes}
             isFullscreen={isFullscreen}
             showCursor={showCursor}

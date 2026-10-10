@@ -110,6 +110,8 @@ interface SunVisualizationProps {
   fireworksTrigger?: number;
   // The astronomy easter egg from SunTracker (astroEvents.getAstroEvent), or null.
   astroEvent?: AstroEvent | null;
+  // Item 123: the sunrise, sunset or New Year show starts or ends (for EventSkyTaps).
+  onFireworksRunning?: (running: boolean) => void;
   // Hidden sunglasses egg: the sun wears sunglasses; tapping the sun reports each tap to SunTracker.
   sunglasses?: boolean;
   onSunTap?: () => void;
@@ -569,8 +571,6 @@ const ARC_LABEL_ICONS: Record<ArcLabelKind, typeof Sunrise> = {
   set: Sunset,
 };
 
-// Item 123: the fireworks show has no ring shape (it fills the sky), like the terrain.
-export const FIREWORKS_RING = 'egg-fireworks';
 
 const SunVisualization: React.FC<SunVisualizationProps> = ({
   sunPosition,
@@ -603,6 +603,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   showCursor = true,
   fireworksTrigger = 0,
   astroEvent = null,
+  onFireworksRunning,
   sunglasses = false,
   onSunTap,
   onMoonTap,
@@ -1159,11 +1160,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         containerWidth={containerDimensions.width}
         containerHeight={containerDimensions.height}
       />
-      {/* Item 123: a double tap on a running show opens the fireworks card (the New Year badge). */}
-      <Fireworks
-        trigger={fireworksTrigger}
-        onTap={onSceneInfo && ((e) => tap({ type: 'egg', kind: 'fireworks' }, { x: e.clientX, y: e.clientY }, FIREWORKS_RING))}
-      />
+      {/* Item 123: SunTracker's EventSkyTaps takes the taps on a running show. */}
+      <Fireworks trigger={fireworksTrigger} onRunningChange={onFireworksRunning} />
 
       {(sunArcPath || moonArcPath || solsticeTracePaths.length > 0) && (
         <svg className="absolute inset-0 w-full h-full pointer-events-none">

@@ -1,39 +1,26 @@
 import React from 'react';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
-import { useDoubleTap } from '@/hooks/useDoubleTap';
-import { type SceneInfoHandler } from './CloudLayer';
+import { AURORA_BANDS } from '@/utils/auroraBands';
 
 interface AuroraProps {
   // 0-1: clouds hide the aurora like the stars (getStarCloudFactor).
   opacity: number;
-  // Item 123: a double tap on a band opens the aurora card.
-  onInfo?: SceneInfoHandler;
 }
 
-// Item 123: the bands have no ring shape (soft, blurred curtains), like the terrain.
-export const AURORA_RING = 'egg-aurora';
-
 // Soft green curtains in the upper sky (astroEvents: aurora). A slow CSS drift, no JS
-// loop; reduced motion keeps them still.
-const BANDS = [
-  { top: '6%', left: '-10%', width: '70%', delay: '0s', violet: false },
-  { top: '14%', left: '25%', width: '65%', delay: '-13s', violet: false },
-  { top: '3%', left: '50%', width: '55%', delay: '-27s', violet: true },
-];
+// loop; reduced motion keeps them still. Item 123: EventSkyTaps has the bands' tap areas, so the
+// curtains take no taps.
+const BANDS = AURORA_BANDS;
 
-const Aurora: React.FC<AuroraProps> = ({ opacity, onInfo }) => {
+const Aurora: React.FC<AuroraProps> = ({ opacity }) => {
   const prefersReducedMotion = usePrefersReducedMotion();
-  const { tap } = useDoubleTap(onInfo);
   if (opacity <= 0) return null;
   return (
     <div data-testid="aurora" aria-hidden="true" className="fixed inset-0 pointer-events-none z-0" style={{ opacity }}>
       {BANDS.map((b) => (
         <div
           key={b.left}
-          data-testid="aurora-band"
-          data-scene-hit={onInfo ? '' : undefined}
-          className={`absolute ${prefersReducedMotion ? '' : 'animate-aurora-drift'} ${onInfo ? 'pointer-events-auto cursor-pointer touch-manipulation' : ''}`}
-          onClick={onInfo && ((e) => tap({ type: 'egg', kind: 'aurora' }, { x: e.clientX, y: e.clientY }, AURORA_RING))}
+          className={`absolute ${prefersReducedMotion ? '' : 'animate-aurora-drift'}`}
           style={{
             top: b.top,
             left: b.left,

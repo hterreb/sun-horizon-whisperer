@@ -1028,6 +1028,22 @@ describe('SunTracker', () => {
       expect(ufo.querySelector('[data-testid="scene-info-ring"]')!.className).toContain('border-tier-ultra-rare/80');
     });
 
+    it('puts the event tap areas first in the scene, with no z-index, so the scene things take their own taps (item 123)', () => {
+      window.history.pushState({}, '', '/?egg=ufo');
+      vi.setSystemTime(NOON);
+      saveManualLocation(RAVENSBURG.latitude, RAVENSBURG.longitude, 'Ravensburg');
+      render(<SunTracker />);
+      advance(300);
+      const layer = screen.getByTestId('event-sky-taps');
+      expect(layer.parentElement!.hasAttribute('data-share-root')).toBe(true);
+      expect(layer.parentElement!.firstElementChild).toBe(layer);
+      expect(layer.className).not.toMatch(/\bz-/);
+      expect(layer.style.zIndex).toBe('');
+      for (const thing of [screen.getByTestId('ufo'), screen.getByTestId('sun-visualization'), screen.getAllByTestId('scene-hit')[0]]) {
+        expect(layer.compareDocumentPosition(thing) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      }
+    });
+
     it('closes the card after 15 s', () => {
       start();
       doubleTap(screen.getByRole('button', { name: 'Sun' }));

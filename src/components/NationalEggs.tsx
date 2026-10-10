@@ -14,6 +14,8 @@ interface NationalEggsProps {
   onInfo?: SceneInfoHandler;
   infoRing?: string | null;
   infoRingTier?: RarityTier | null;
+  // Item 123: the national show starts or ends (SunTracker's EventSkyTaps takes its taps).
+  onFireworksRunning?: (running: boolean) => void;
 }
 
 // The national-day eggs in the sky and on the shore (the bunting is on the boats: BoatBunting).
@@ -26,7 +28,6 @@ interface NationalEggsProps {
 // Reduced motion: no jets and no fireworks (their badges do not count); the bonfire stays.
 export const JETS_RING = 'egg-jets';
 export const BONFIRE_RING = 'egg-bonfire';
-export const FIREWORKS_RING = 'egg-national-fireworks';
 const SPEED_PCT = 2; // % of the width per second (calm-motion rule)
 const PX_CAP = (390 * SPEED_PCT) / 100; // phone px/s on wide screens
 const SMOKE_FADE_S = 40;
@@ -47,7 +48,7 @@ const resolvedColor = (token: string): string => {
   return value ? `hsl(${value})` : '#ffffff';
 };
 
-const NationalEggs: React.FC<NationalEggsProps> = ({ day, timeOfDay, onInfo, infoRing = null, infoRingTier = null }) => {
+const NationalEggs: React.FC<NationalEggsProps> = ({ day, timeOfDay, onInfo, infoRing = null, infoRingTier = null, onFireworksRunning }) => {
   const prefersReducedMotion = usePrefersReducedMotion();
   const { tap } = useDoubleTap(onInfo);
   const isDark = DARK.includes(timeOfDay);
@@ -116,10 +117,7 @@ const NationalEggs: React.FC<NationalEggsProps> = ({ day, timeOfDay, onInfo, inf
         </div>
       )}
 
-      {/* Item 123: a double tap on the running show opens the national day's card. */}
-      {fireworksOn && (
-        <Fireworks trigger={1} palette={palette} onTap={onInfo && ((e) => tap({ type: 'egg', kind: day.kind }, { x: e.clientX, y: e.clientY }, FIREWORKS_RING))} />
-      )}
+      {fireworksOn && <Fireworks trigger={1} palette={palette} onRunningChange={onFireworksRunning} />}
 
       {day.bonfire && isDark && (
         // On the shore at the horizon (65 % of the height, as in SunVisualization); the water
