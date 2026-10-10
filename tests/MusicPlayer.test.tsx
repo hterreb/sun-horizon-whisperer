@@ -114,8 +114,8 @@ describe('MusicPlayer', () => {
     render(<MusicPlayer />);
     const audioEl = instances[0];
 
-    // Fail every stream in turn (component ships 4 lo-fi stream URLs).
-    for (let i = 0; i < 4; i++) {
+    // Fail every stream in turn (component ships 10 lo-fi stream URLs).
+    for (let i = 0; i < 10; i++) {
       fireEvent.error(audioEl);
     }
 
@@ -145,7 +145,10 @@ describe('MusicPlayer', () => {
 
   it('shows the current station name and has a Next button that cycles and wraps (P0-5)', () => {
     render(<MusicPlayer />);
-    const names = ['FluxFM Chillhop', 'ILoveRadio Lo-Fi', 'Lofi Hip Hop Radio', 'Chillout Radio'];
+    const names = [
+      'FluxFM Chillhop', 'ILoveRadio Lo-Fi', 'Epic Lounge Jazzhop', '0nlineradio Lo-Fi', 'ISEKOI Chill Zone',
+      'laut.fm lofi', 'REYFM #lofi', 'Hunter.FM Lo-Fi', 'CLIAMP Lofi Hip Hop', 'Hotmix Lo-Fi',
+    ];
     expect(screen.getByText(names[0])).toBeInTheDocument();
 
     const nextButton = screen.getByRole('button', { name: 'Next station' });
@@ -159,12 +162,11 @@ describe('MusicPlayer', () => {
     const { unmount } = render(<MusicPlayer />);
     const nextButton = screen.getByRole('button', { name: 'Next station' });
     fireEvent.click(nextButton);
-    fireEvent.click(nextButton);
-    expect(localStorage.getItem('radio_station_index')).toBe('2');
+    expect(localStorage.getItem('radio_station_index')).toBe('1');
     unmount();
 
     render(<MusicPlayer />);
-    expect(screen.getByText('Lofi Hip Hop Radio')).toBeInTheDocument();
+    expect(screen.getByText('ILoveRadio Lo-Fi')).toBeInTheDocument();
   });
 
   it('falls back to the first station when the stored index is invalid (P0-5)', () => {
