@@ -291,6 +291,14 @@ export const getStarCloudFactor = (type: WeatherType, cloudCoverPercent: number 
     ? STAR_CLOUD_FACTOR[type] ?? 0 // ponytail: drizzle counts as covered too, same as rain
     : Math.min(1, Math.max(0, 1 - cloudCoverPercent / 100));
 
+// Item 134: clouds hide a share of the stars, through gaps, instead of dimming them all.
+// Each star has a random `gap` (0-1); it shows at full strength while the cloud factor is
+// above its gap, and fades over GAP_FADE below that. A clear sky shows all, 89 % cover about
+// one star in nine, a closed deck none.
+const GAP_FADE = 0.15;
+export const getStarGapShow = (cloudFactor: number, gap: number): number =>
+  Math.min(1, Math.max(0, (cloudFactor - gap * (1 - GAP_FADE)) / GAP_FADE));
+
 // Clouds hide the moon (ROADMAP item 57): the factor for the moon disc, its glow and
 // its reflection. The same cloud factor as the stars, but partial cover, cloudy and
 // overcast keep a faint light patch (at least 15 %). Storm and fog hide the moon.

@@ -1,4 +1,4 @@
-import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, hasBoatWake, getBoatTone, pickFish, FISH_WEIGHTS, canSpawnFish, getRestStopMotion, pickNightFish, pickMoonlitDayFish, NIGHT_FISH_WEIGHTS, MAX_FISH, MAX_NIGHT_FISH, MAX_BIRDS, getFishOverride, getWaterSpeedFactor, getWaterLimit, getSceneLimit, getStarCloudFactor, getTwilightStars, getSkyOvercastMix, getSunVisibility, getMoonCloudFactor, getMoonLook, BIRD_WEIGHTS, pickBird, isBirdInSeason, getBatShare, getFlyerShare } from '../src/utils/weatherEffectsUtils';
+import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, hasBoatWake, getBoatTone, pickFish, FISH_WEIGHTS, canSpawnFish, getRestStopMotion, pickNightFish, pickMoonlitDayFish, NIGHT_FISH_WEIGHTS, MAX_FISH, MAX_NIGHT_FISH, MAX_BIRDS, getFishOverride, getWaterSpeedFactor, getWaterLimit, getSceneLimit, getStarCloudFactor, getStarGapShow, getTwilightStars, getSkyOvercastMix, getSunVisibility, getMoonCloudFactor, getMoonLook, BIRD_WEIGHTS, pickBird, isBirdInSeason, getBatShare, getFlyerShare } from '../src/utils/weatherEffectsUtils';
 import { getSunTimes } from '../src/utils/sunUtils';
 
 describe('getWeatherEffects (ROADMAP item 10)', () => {
@@ -333,6 +333,21 @@ describe('getStarCloudFactor (ROADMAP item 52)', () => {
     for (const type of ['overcast', 'fog', 'drizzle', 'rain', 'snow', 'storm', 'hail'] as const) {
       expect(getStarCloudFactor(type, null)).toBe(0);
     }
+  });
+});
+
+describe('getStarGapShow (item 134)', () => {
+  it('shows a star at full strength through a gap, and hides it behind the cloud', () => {
+    expect(getStarGapShow(1, 0.99)).toBe(1);
+    expect(getStarGapShow(0.7, 0.5)).toBe(1);
+    expect(getStarGapShow(0.3, 0.5)).toBe(0);
+    expect(getStarGapShow(0, 0)).toBe(0);
+  });
+
+  it('fades a star in over a short band, not with a pop', () => {
+    const edge = getStarGapShow(0.5, 0.5);
+    expect(edge).toBeGreaterThan(0);
+    expect(edge).toBeLessThan(1);
   });
 });
 

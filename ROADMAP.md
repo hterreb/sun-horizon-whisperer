@@ -2581,6 +2581,14 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Spec:** the fullscreen wake listens to `pointermove` with `pointerType === 'mouse'`, not to `mousemove`. A touch wakes only through the `touchstart` listener (with the item 124 skip).
 - **Checked:** `SunTracker` fullscreen test: a `mousemove` and a touch `pointermove` on a scene hit area do not wake, a mouse `pointermove` wakes. Phone emulation (Playwright, touch, production build): a double tap on a scene hit area showed the controls on main, and keeps them hidden with the fix; a tap on the open sky shows them. Not checked: a real phone.
 
+### 134. Stars shine through cloud gaps — S — **✅ Done**
+
+- **Feedback (2026-10-10):** "even with a little cloud cover it seems to not show the stars anymore".
+- **Cause:** `getStarCloudFactor` (item 52) dimmed every star by the total cloud cover: 30 % cover dimmed all of them to 70 %, 89 % (Open-Meteo for Ravensburg that night) to 11 %, so with the twinkle and the moon factor nearly none were left. The night clouds are dark and hard to see, so the sky looked only a little cloudy but empty.
+- **Spec:** clouds hide a share of the stars (they are behind the clouds), and the others shine at full strength through the gaps. Each star gets a random gap value; it shows while the cloud factor is above it and fades out over a 0.15 band below it (no pop when the cover changes). Clear: all 300 stars; 30 %: about 250; 89 %: about one in eight; a closed deck: none. Twilight and the moon factor do not change. The satellites, the aurora and the sky eggs keep the old factor.
+- **Built:** `getStarGapShow` in `weatherEffectsUtils`; `NightStars` stars have a `gap`.
+- **Checked:** `weatherEffectsUtils` and `NightStars` tests (star count at 30 % and 89 %); screenshots of the built app at 0/30/60/89 %. Not checked: a real phone.
+
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 
 Rules for all items:
