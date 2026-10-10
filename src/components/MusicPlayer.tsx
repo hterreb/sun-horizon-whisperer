@@ -5,13 +5,14 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLanguage } from '@/hooks/useLanguage';
-import { useIdleHide } from '@/hooks/useIdleHide';
+import { ALWAYS_SHOWN, type IdleHide } from '@/hooks/useIdleHide';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
 import { getRainSoundGain } from '@/utils/rainUtils';
 import { useRainSound } from '@/hooks/useRainSound';
 
 interface MusicPlayerProps {
-  isFullscreen?: boolean;
+  // The shared fullscreen idle fade (items 89 and 132), from SunTracker.
+  controls?: IdleHide;
   // True during the sunset countdown sound (item 108): the radio plays at DUCK_FACTOR
   // of the slider volume. The slider value does not change.
   duck?: boolean;
@@ -71,7 +72,7 @@ const loadStoredStationIndex = (): number => {
   }
 };
 
-const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false, duck = false, rainMmH = null }) => {
+const MusicPlayer: React.FC<MusicPlayerProps> = ({ controls = ALWAYS_SHOWN, duck = false, rainMmH = null }) => {
   const [isPlaying, setIsPlayingState] = useState(false);
   // The rain sound (ROADMAP item 119): on with the radio, or alone by its button. Not saved:
   // a browser plays no sound before a tap.
@@ -89,12 +90,9 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false, duck = 
   const errorAttemptsRef = useRef(0);
   const isMobile = useIsMobile();
 
-  // In fullscreen the player fades out: 3 s after entering, 10 s after a wake (ROADMAP item 89).
-  const { isVisible, wake: handleMouseEnter } = useIdleHide(isFullscreen);
-
-  // Keyboard focus and touch also need to bring the controls back, not just mouse hover.
-  const handleFocus = handleMouseEnter;
-  const handleTouchStart = handleMouseEnter;
+  // In fullscreen the player fades out with the other controls: 3 s after entering, 10 s after a
+  // wake (ROADMAP item 89). SunTracker wakes on a mouse move or a tap; hidden, it takes no taps (item 132).
+  const { isVisible, isTappable, wake: handleFocus } = controls;
 
   // Plays the given station on the current audio element (if already playing).
   const playStream = useCallback((index: number) => {
@@ -243,14 +241,12 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ isFullscreen = false, duck = 
   return (
     <div 
       data-share-hide
-      className={`animate-fade-in fixed z-20 ${GLASS_SURFACE} rounded-full px-3 py-2 flex items-center gap-2 transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'}`}
+      className={`animate-fade-in fixed z-20 ${GLASS_SURFACE} rounded-full px-3 py-2 flex items-center gap-2 transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'} ${isTappable ? '' : 'pointer-events-none'}`}
       style={{
         bottom: `calc(${isMobile ? '4rem' : '1rem'} + env(safe-area-inset-bottom))`,
         left: 'calc(1rem + env(safe-area-inset-left))',
       }}
-      onMouseEnter={handleMouseEnter}
       onFocus={handleFocus}
-      onTouchStart={handleTouchStart}
     >
       <Switch
         checked={isPlaying}

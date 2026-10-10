@@ -192,26 +192,19 @@ describe('InfoPanel', () => {
     // Check for expanded/collapsed state
   });
 
-  it('fades out in fullscreen after timeout, reappears on mouse enter, focus, and touch (A-3)', () => {
-    vi.useFakeTimers();
-    const { container } = render(<InfoPanel {...defaultProps} isFullscreen={true} />);
+  it('follows the shared fullscreen fade: hidden takes no taps, focus wakes (A-3, item 132)', () => {
+    const wake = vi.fn();
+    const { container, rerender } = render(<InfoPanel {...defaultProps} controls={{ isVisible: false, isTappable: false, wake }} />);
     const panel = container.firstChild as HTMLElement;
-    expect(panel.className).toContain('opacity-100');
-
-    // 3 s after entering fullscreen, 10 s after a wake (ROADMAP item 89).
-    act(() => { vi.advanceTimersByTime(3000); });
     expect(panel.className).toContain('opacity-0');
+    expect(panel.className).toContain('pointer-events-none');
 
     fireEvent.focus(panel);
+    expect(wake).toHaveBeenCalled();
+
+    rerender(<InfoPanel {...defaultProps} controls={{ isVisible: true, isTappable: true, wake }} />);
     expect(panel.className).toContain('opacity-100');
-
-    act(() => { vi.advanceTimersByTime(10000); });
-    expect(panel.className).toContain('opacity-0');
-
-    fireEvent.touchStart(panel);
-    expect(panel.className).toContain('opacity-100');
-
-    vi.useRealTimers();
+    expect(panel.className).not.toContain('pointer-events-none');
   });
 
   it('weather options and icons are displayed and selectable', () => {

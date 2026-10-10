@@ -2562,6 +2562,18 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Deviation:** one magnitude per size class, not per satellite (a `ponytail:` note; McCants' per-satellite list if a known one looks wrong).
 - **Checked:** `satelliteUtils` tests: the classes in brightness order, dot size 2.5–7 px, glow only below 0, the new speed. Not checked: a real phone, a live pass.
 
+### 132. Hidden fullscreen controls take no taps — S — **✅ Done**
+
+- **Feedback (2026-10-10):** "double tap still activates buttons in fullscreen".
+- **Cause:** in fullscreen the top-left buttons, the info panel and the music player fade out with `opacity-0` only. They still take taps, and they lie above the scene (z-20 to z-40). A double tap on a fish under a hidden control clicks the control. Also, the first tap on a hidden control woke it (its own `onTouchStart`), and the second tap then clicked it. Item 124 stopped only the wake from a scene hit area.
+- **Spec:**
+  1. A hidden control takes no taps (`pointer-events-none`); the tap goes to the scene below.
+  2. After a wake, a control takes taps again only after `TAP_READY_MS` (`DOUBLE_TAP_MS` + 50 ms = 400 ms). The second tap of a double tap cannot click a control that the first tap brought back.
+  3. The info panel and the music player use the one idle fade of `SunTracker` (`useIdleHide`), not their own. A tap on the open sky or a mouse move shows all controls; keyboard focus on the panel or the player wakes them.
+  4. Outside fullscreen nothing changes.
+- **Built:** `useIdleHide` returns `isTappable` and the `IdleHide` type, plus `ALWAYS_SHOWN` for use outside `SunTracker`. `SunTracker` passes `controls` to `InfoPanel` and `MusicPlayer` (replaces their `isFullscreen` prop) and `isTappable` to `TopLeftButtons`.
+- **Checked:** `useIdleHide` test: not tappable while hidden, tappable `TAP_READY_MS` after a wake. `SunTracker` fullscreen test: the hidden button column has `pointer-events-none`, a wake keeps it for 400 ms. `TopLeftButtons`, `InfoPanel`, `MusicPlayer` tests. Not checked: a real phone.
+
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 
 Rules for all items:

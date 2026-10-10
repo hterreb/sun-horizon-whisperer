@@ -7,7 +7,7 @@ import { Button } from './ui/button';
 import LineOfSightDetails from './LineOfSightDetails';
 import PremiumBadge from './PremiumBadge';
 import { usePremiumGate } from '@/hooks/usePremium';
-import { useIdleHide } from '@/hooks/useIdleHide';
+import { ALWAYS_SHOWN, type IdleHide } from '@/hooks/useIdleHide';
 import ShareCardButton from '@/components/ShareCardButton';
 import PlaceSearch from './PlaceSearch';
 import {
@@ -106,7 +106,8 @@ interface InfoPanelProps {
   // Display unit for temperatures (°C/°F toggle). Defaults to °C for existing callers.
   temperatureUnit?: TemperatureUnit;
   onTemperatureUnitChange?: (unit: TemperatureUnit) => void;
-  isFullscreen?: boolean;
+  // The shared fullscreen idle fade (items 89 and 132), from SunTracker.
+  controls?: IdleHide;
   onWeatherChange: (weather: WeatherType) => void;
   // Manual mode's strong-wind switch (ROADMAP item 73): leaves, slower birds, boat wakes.
   manualWindy?: boolean;
@@ -177,7 +178,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   useRealWeather,
   temperatureUnit = 'C',
   onTemperatureUnitChange = () => {},
-  isFullscreen = false,
+  controls = ALWAYS_SHOWN,
   onWeatherChange,
   manualWindy = false,
   onManualWindyChange = () => {},
@@ -245,12 +246,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   const userToggledTwilightRef = React.useRef(false);
   const userToggledSunPositionRef = React.useRef(false);
 
-  // In fullscreen the panel fades out: 3 s after entering, 10 s after a wake (ROADMAP item 89).
-  const { isVisible, wake: handleMouseEnter } = useIdleHide(isFullscreen);
-
-  // Keyboard focus and touch also need to bring the panel back, not just mouse hover.
-  const handleFocus = handleMouseEnter;
-  const handleTouchStart = handleMouseEnter;
+  // In fullscreen the panel fades out with the other controls: 3 s after entering, 10 s after a
+  // wake (ROADMAP item 89). SunTracker wakes on a mouse move or a tap; hidden, it takes no taps (item 132).
+  const { isVisible, isTappable, wake: handleFocus } = controls;
 
   // Auto-adjust collapsed states based on time of day
   useEffect(() => {
@@ -476,7 +474,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
       data-share-hide
       className={`absolute top-0 max-[363px]:top-[calc(10rem+env(safe-area-inset-top))] right-0 z-30 w-full max-w-[min(300px,calc(100vw-2rem))] sm:w-[300px] bg-[hsl(var(--panel-background)/0.45)] backdrop-blur-md border border-[hsl(var(--panel-border)/0.14)] text-white rounded-bl-panel max-[363px]:rounded-tl-panel overflow-hidden transition-opacity duration-300 max-h-dvh max-[363px]:max-h-[calc(100dvh-10rem-env(safe-area-inset-top))] ${
         isVisible ? 'opacity-100' : 'opacity-0'
-      } ${
+      } ${isTappable ? '' : 'pointer-events-none'} ${
         // Frost (ROADMAP items 10 & 49): a white-blue inner edge about 6 px wide, CSS only.
         // Only one `shadow-[...]` utility can win per element, so the frost edge
         // (when present) replaces the plain D panel shadow rather than fighting it.
@@ -485,9 +483,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           : 'shadow-[0_8px_30px_rgba(0,0,0,0.25)]'
       }`}
       style={{ paddingTop: 'env(safe-area-inset-top)', paddingRight: 'env(safe-area-inset-right)' }}
-      onMouseEnter={handleMouseEnter}
       onFocus={handleFocus}
-      onTouchStart={handleTouchStart}
     >
       {isFrost && (
         // Static ice crystals in two corners (ROADMAP item 49). No animation.

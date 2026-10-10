@@ -11,6 +11,8 @@ import CompassToggle from './CompassToggle';
 interface TopLeftButtonsProps {
   isFullscreen: boolean;
   showCursor: boolean;
+  // Item 132: false while hidden and for a moment after a wake (useIdleHide).
+  isTappable?: boolean;
   onFullscreenChange: (isFullscreen: boolean) => void;
   compassStatus: CompassStatus;
   onCompassEnable: () => void;
@@ -28,6 +30,7 @@ interface TopLeftButtonsProps {
 const TopLeftButtons: React.FC<TopLeftButtonsProps> = ({
   isFullscreen,
   showCursor,
+  isTappable = true,
   onFullscreenChange,
   compassStatus,
   onCompassEnable,
@@ -41,7 +44,7 @@ const TopLeftButtons: React.FC<TopLeftButtonsProps> = ({
       data-share-hide
       className={`animate-fade-in fixed z-40 flex flex-col items-center gap-2 transition-opacity duration-300 has-focus-visible:opacity-100 ${
         isVisible ? 'opacity-100' : 'opacity-0'
-      }`}
+      } ${isFullscreen && !isTappable ? 'pointer-events-none' : ''}`}
       style={{
         top: 'calc(1rem + env(safe-area-inset-top))',
         left: 'calc(1rem + env(safe-area-inset-left))',
