@@ -20,10 +20,10 @@ describe('collection (ROADMAP item 112)', () => {
     vi.restoreAllMocks();
   });
 
-  it('has 128 badges with unique ids, one for every fish, flyer, boat and cloud type', () => {
+  it('has 129 badges with unique ids, one for every fish, flyer, boat and cloud type', () => {
     const ids = BADGES.map(b => b.id);
-    expect(ids).toHaveLength(128); // item 115: 69 + 5 sun + 5 terrain + 8 moon states; + 5 sky eggs + 9 national days + 5 playful eggs + 12 festivals; item 120: + 5 hauls + 5 sizes
-    expect(new Set(ids).size).toBe(128);
+    expect(ids).toHaveLength(129); // item 115: 69 + 5 sun + 5 terrain + 8 moon states; + 5 sky eggs + 9 national days + 5 playful eggs + 12 festivals; item 120: + 5 hauls + 5 sizes; item 121: + rainbow
+    expect(new Set(ids).size).toBe(129);
     for (const kind of [...FISH_WEIGHTS.map(([k]) => k), ...NIGHT_ONLY]) expect(ids).toContain(`fish:${kind}`);
     for (const kind of [...BIRD_WEIGHTS.map(([k]) => k), 'bat']) expect(ids).toContain(`flyer:${kind}`);
     for (const kind of ['sailboat', 'ferry', 'fishing', 'rowboat', 'freighter']) expect(ids).toContain(`boat:${kind}`);
@@ -82,6 +82,8 @@ describe('collection (ROADMAP item 112)', () => {
     expect(badgeForTarget({ type: 'fish', kind: 'perch' })).toBe('fish:perch');
     expect(badgeForTarget({ type: 'bird', kind: 'bat' })).toBe('flyer:bat');
     expect(badgeForTarget({ type: 'boat', kind: 'ferry' })).toBe('boat:ferry');
+    expect(badgeForTarget({ type: 'rainbow' })).toBe('rainbow'); // item 121
+    expect(tier('rainbow')).toBe('rarity.uncommon');
     expect(badgeForTarget({ type: 'plane', contrail: 'short' })).toBe('plane');
     expect(badgeForTarget({ type: 'livePlane', callsign: null, airline: null, aircraftType: null, altM: 10_000, speedKt: 450 })).toBe('plane');
     expect(badgeForTarget({ type: 'cloud', cloudType: 'Len', band: 'mid' })).toBe('cloud:Len');

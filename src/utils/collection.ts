@@ -5,7 +5,7 @@
 import { type MessageKey } from '@/i18n';
 import {
   type SceneInfoTarget, type PlaneHaul, type SatelliteSize, type TerrainBand,
-  CLOUD_TIERS, HAUL_TIERS, RARITY_NAMES, SATELLITE_TIERS, TERRAIN_TIERS, getPlaneHaul, getRarityTier, getSatelliteSize, getTerrainBand,
+  CLOUD_TIERS, HAUL_TIERS, RAINBOW_TIER, RARITY_NAMES, SATELLITE_TIERS, TERRAIN_TIERS, getPlaneHaul, getRarityTier, getSatelliteSize, getTerrainBand,
 } from './sceneInfo';
 import { type LiveRoute } from './planeFeed';
 import { TIER_ORDER, type RarityTier } from './rarityTier';
@@ -38,7 +38,7 @@ export type StateBase = 'sun' | 'moon' | 'terrain' | 'plane' | 'satellite';
 export type BadgeGroup = 'fish' | 'flyer' | 'boat' | 'sky' | 'cloud' | 'egg';
 export type BadgeId =
   | `fish:${FishKind}` | `flyer:${BirdKind | 'bat'}` | `boat:${BoatKind}` | 'plane' | `cloud:${CloudType}`
-  | 'sun' | 'moon' | 'terrain' | 'satellite' | `egg:${EggKind}`
+  | 'sun' | 'moon' | 'terrain' | 'satellite' | 'rainbow' | `egg:${EggKind}`
   | `sun:${SunState}` | `moon:${MoonState}` | `terrain:${TerrainBand}` | `plane:${PlaneHaul}` | `satellite:${SatelliteSize}`;
 export interface Badge {
   id: BadgeId;
@@ -132,6 +132,8 @@ export const BADGES: readonly Badge[] = [
   ...FISH.map(([kind, name]): Badge => ({ id: `fish:${kind}`, group: 'fish', name, rarity: getRarityTier(getFishShare(kind, false)) })),
   ...FLYERS.map(([kind, name]): Badge => ({ id: `flyer:${kind}`, group: 'flyer', name, rarity: getRarityTier(getFlyerShare(kind, BADGE_BAT_SHARE)) })),
   ...BOATS.map(([kind, name]): Badge => ({ id: `boat:${kind}`, group: 'boat', name, rarity: getRarityTier(getBoatShare(kind)) })),
+  // Item 121: first in the sky group, as CollectionView shows the sky badges without a state row first.
+  { id: 'rainbow', group: 'sky', name: 'scene.rainbow', rarity: RARITY_NAMES[RAINBOW_TIER] }, // item 121
   { id: 'plane', group: 'sky', name: 'plane.airliner', rarity: null },
   ...PLANE_HAULS.map(([haul, name]): Badge => ({ id: `plane:${haul}`, group: 'sky', name, rarity: RARITY_NAMES[HAUL_TIERS[haul]], base: 'plane' })),
   { id: 'satellite', group: 'sky', name: 'scene.satellite', rarity: null },
@@ -192,7 +194,8 @@ export const badgeForTarget = (target: SceneInfoTarget): BadgeId | null => {
     case 'sun':
     case 'moon':
     case 'terrain':
-    case 'satellite': return target.type;
+    case 'satellite':
+    case 'rainbow': return target.type;
     case 'egg': return null;
   }
 };

@@ -285,6 +285,20 @@ describe('sceneInfo: field guide data (ROADMAP item 107)', () => {
     expect(kicker({ type: 'satellite', id: 1, name: 'X' })).toEqual(['Orbit', 'satellite']);
   });
 
+  it('gives the rainbow a weather card: opposite the sun, uncommon, a field note (item 121)', () => {
+    const i = info({ type: 'rainbow' });
+    expect([en(i.kicker), i.icon, en(i.title)]).toEqual(['Weather', 'rainbow', 'Rainbow']);
+    expect(i.tier).toBe('uncommon');
+    expect(i.fact?.text).toBe('info.rainbowFact');
+    // The sun is at 200° in ctx, so the rainbow is at 20°.
+    expect(card({ type: 'rainbow' })).toEqual([
+      'Rainbow',
+      'Always opposite the sun: the bow is 42° around the point opposite the sun, so it shows only when the sun is lower than 42°. Red is outside, violet inside.',
+      'Direction: N (20°)',
+      'Rarity: Uncommon',
+    ]);
+  });
+
   it('gives a Latin name to the real species only', () => {
     expect(info({ type: 'fish', kind: 'pike' }).latin).toBe('Esox lucius');
     expect(info({ type: 'fish', kind: 'eel' }).latin).toBe('Anguilla anguilla');

@@ -231,6 +231,7 @@ export const es: Record<keyof typeof en, string> = {
   // Info cards (ROADMAP item 95)
   'scene.moon': "Luna",
   'scene.terrain': "Terreno",
+  'scene.rainbow': "Arcoíris",
   'fish.classic': "Pez",
   'fish.minnow': "Piscardos",
   'fish.perch': "Perca",
@@ -527,8 +528,10 @@ export const es: Record<keyof typeof en, string> = {
   'infoKind.sky': "Cielo",
   'infoKind.horizon': "Horizonte",
   'infoKind.orbit': "Órbita",
+  'infoKind.weather': "Tiempo",
   'info.fieldNote': "Nota de campo",
   'info.cloudFact': "Dato de la nube",
+  'info.rainbowFact': "Siempre frente al sol: el arco está a 42° del punto opuesto al sol, por eso solo aparece cuando el sol está a menos de 42°. El rojo va por fuera, el violeta por dentro.",
   'info.altitude': "Altura",
   'info.direction': "Dirección",
   'info.directionValue': "{dir} ({deg}°)",

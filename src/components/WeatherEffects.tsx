@@ -3,7 +3,6 @@ import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import { type WeatherType } from './CloudLayer';
 import { type TimeOfDay } from '../utils/sunUtils';
 import { getWeatherEffects, canFlashLightning } from '../utils/weatherEffectsUtils';
-import { type RainbowGeometry } from './SunVisualization';
 
 interface WeatherEffectsProps {
   weatherType: WeatherType;
@@ -11,7 +10,6 @@ interface WeatherEffectsProps {
   temperatureC: number | null;
   windSpeedKmh: number | null;
   sunAltitude: number;
-  rainbow: RainbowGeometry;
   containerWidth: number;
   containerHeight: number;
 }
@@ -23,25 +21,20 @@ const LIGHTNING_CHECK_INTERVAL_MS = 1000;
 const LIGHTNING_FLASH_CHANCE = 0.15;
 const LIGHTNING_FLASH_DURATION_MS = 150;
 
-// Rainbow bands, outermost first, drawn as concentric arcs. Deliberately not scene
-// tokens: a rainbow is the fixed spectrum, not a theme colour (AUDIT A-9).
-const RAINBOW_BANDS = ['#dc2626', '#f97316', '#eab308', '#22c55e', '#0ea5e9', '#7c3aed'];
-const RAINBOW_BAND_GAP_PX = 7;
-
 // Heat shimmer (ROADMAP item 56): a band just above the horizon with thin pale lines,
 // bent by a slowly drifting turbulence field (one 7 s cycle).
 const HEAT_SHIMMER_BAND_PX = 40;
 
 // The illustrations from ROADMAP item 10 that aren't part of the spawning "living
-// scene" (that's CloudLayer): fog low over the horizon, storm lightning, heat shimmer
-// and the rainbow. All scene elements stay at z <= 10 (see ROADMAP item 1).
+// scene" (that's CloudLayer): fog low over the horizon, storm lightning and heat shimmer.
+// The rainbow has its own layer under the clouds (RainbowLayer, item 121). All scene
+// elements stay at z <= 10 (see ROADMAP item 1).
 const WeatherEffects: React.FC<WeatherEffectsProps> = ({
   weatherType,
   timeOfDay,
   temperatureC,
   windSpeedKmh,
   sunAltitude,
-  rainbow,
   containerWidth,
   containerHeight
 }) => {
@@ -135,30 +128,6 @@ const WeatherEffects: React.FC<WeatherEffectsProps> = ({
             <rect width="100%" height="100%" fill="url(#heat-lines)" filter="url(#heat-wave)" mask="url(#heat-fade)" />
           )}
         </svg>
-      )}
-
-      {/* Rainbow: opposite the sun, clipped to the sky above the horizon so only the
-          arc (not a full ring) shows. */}
-      {rainbow.visible && containerWidth > 0 && containerHeight > 0 && (
-        <div className="absolute left-0 top-0 w-full overflow-hidden" style={{ height: `${horizonY}px` }}>
-          <svg width={containerWidth} height={horizonY} className="absolute inset-0" style={{ opacity: isNight ? 0 : 0.5 }}>
-            {RAINBOW_BANDS.map((color, i) => {
-              const radius = (rainbow.apexHeightDeg / 42) * horizonY * 0.95 - i * RAINBOW_BAND_GAP_PX;
-              if (radius <= 0) return null;
-              return (
-                <circle
-                  key={color}
-                  cx={rainbow.xFraction * containerWidth}
-                  cy={horizonY}
-                  r={radius}
-                  fill="none"
-                  stroke={color}
-                  strokeWidth={5}
-                />
-              );
-            })}
-          </svg>
-        </div>
       )}
     </div>
   );

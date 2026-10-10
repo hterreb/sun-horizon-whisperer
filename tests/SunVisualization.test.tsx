@@ -1088,6 +1088,21 @@ describe('SunVisualization (rendered): sea visible at the horizon (ROADMAP item 
     expect(ridge.compareDocumentPosition(sea) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it('draws the rainbow first, with no z-index, under the clouds, planes, birds and terrain (item 121)', () => {
+    setMockedContainerSize(800, 600);
+    // The sun low in the east, so the rainbow stands in the west, on the screen.
+    render(<SunVisualization {...baseProps} sunPosition={{ azimuth: 90, altitude: 20 }} weatherType="rain" horizonProfile={ridgeProfile} onSceneInfo={vi.fn()} />);
+    const layer = screen.getByTestId('rainbow-layer');
+    expect(screen.getByTestId('sun-visualization').firstElementChild).toBe(layer);
+    expect(layer.style.zIndex).toBe('');
+    expect(layer.className).not.toMatch(/\bz-/);
+    // Everything else in the scene comes later in DOM order, so it paints over the rainbow and takes the tap.
+    for (const id of ['terrain-silhouette', 'sea']) {
+      expect(layer.compareDocumentPosition(screen.getByTestId(id)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    expect(screen.getByTestId('rainbow-hit')).toBeInTheDocument();
+  });
+
   it('draws the sea without an outline (ROADMAP item 32), day and night', () => {
     setMockedContainerSize(800, 600);
 

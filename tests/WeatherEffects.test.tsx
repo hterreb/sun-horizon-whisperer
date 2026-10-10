@@ -15,14 +15,11 @@ const mockReducedMotion = (matches: boolean) =>
     dispatchEvent: () => false,
   } as unknown as MediaQueryList);
 
-const noRainbow = { visible: false, xFraction: 0, apexHeightDeg: 0 };
-
 const baseProps = {
   timeOfDay: 'midday' as TimeOfDay,
   temperatureC: 15,
   windSpeedKmh: 0,
   sunAltitude: 30,
-  rainbow: noRainbow,
   containerWidth: 800,
   containerHeight: 600,
 };
@@ -100,18 +97,5 @@ describe('WeatherEffects (ROADMAP item 10)', () => {
     expect(band).not.toBeNull();
     expect(band.querySelector('[filter="url(#heat-wave)"]')).toBeNull();
     mediaSpy.mockRestore();
-  });
-
-  it('renders a rainbow arc when visible, positioned by xFraction/apexHeightDeg', () => {
-    const rainbow = { visible: true, xFraction: 0.5, apexHeightDeg: 20 };
-    render(<WeatherEffects {...baseProps} weatherType="rain" rainbow={rainbow} />);
-    const circles = screen.getAllByText('', { selector: 'circle' }) as unknown as SVGCircleElement[];
-    expect(circles.length).toBeGreaterThan(0);
-    expect(circles[0].getAttribute('cx')).toBe(String(0.5 * baseProps.containerWidth));
-  });
-
-  it('renders no rainbow arc when not visible', () => {
-    const { container } = render(<WeatherEffects {...baseProps} weatherType="clear" rainbow={noRainbow} />);
-    expect(container.querySelector('circle')).toBeNull();
   });
 });
