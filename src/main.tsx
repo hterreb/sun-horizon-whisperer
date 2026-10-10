@@ -25,17 +25,7 @@ if (sentryDsn) {
     },
     beforeSend: (event) => scrubLocation(event),
     beforeBreadcrumb: (breadcrumb) => scrubLocation(breadcrumb),
-    integrations: [
-      Sentry.feedbackIntegration({
-        autoInject: false, // opened from the InfoPanel, so no floating button over the scene
-        showName: false,
-        showEmail: false,
-        isNameRequired: false,
-        isEmailRequired: false,
-        enableScreenshot: false, // a screenshot would show the location in the InfoPanel
-        showBranding: false,
-      }),
-    ],
+    // The feedback form loads on its first open (utils/feedback.ts, ROADMAP item 125).
   })
 }
 
