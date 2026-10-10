@@ -2514,6 +2514,14 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Built:** `tapPlaneBelow` in `SkyClouds`; `data-plane-hit` on the plane wrapper in `CloudLayer` and the hit span in `LivePlanes`.
 - **Checked:** `SkyClouds` test: two taps on a cloud over a plane go to the plane (with the tap point) and open no cloud card; with no plane under it, a double tap opens the cloud card. Not checked: a real phone.
 
+### 127. Radio: replace dead streams, more lo-fi stations — S — **✅ Done** (PR #167)
+
+- **Request (2026-10-10):** "please check the radio streams" and "search for more lo-fi stations that i can add".
+- **Found:** two of the four streams were dead: Lofi Hip Hop Radio (`radio.lofihiphop.com` does not resolve) and Chillout Radio (torontocast, connection refused).
+- **Lookbook:** [Sun Chaser Radio Lookbook](https://claude.ai/artifact/TyASUsXUa1TpidMCNF7F42) (private). 79 streams checked on 2026-10-10 (the app's four plus all lo-fi and chillhop stations in the Radio Browser directory), each with its status (OK, Limited, Blocked, Down), URL and format. OK = https, audio and a CORS header for the app's origin (the player uses `crossOrigin="anonymous"`). Picks: L5, L6, L7, L8, L9, L11, L12, L15. Not picked: L10, L14, L16 (do not fit), L13 (duplicate of L15).
+- **Built:** `MusicPlayer.tsx` has 10 stations: FluxFM Chillhop, ILoveRadio Lo-Fi, Epic Lounge Jazzhop, 0nlineradio Lo-Fi, ISEKOI Chill Zone, laut.fm lofi, REYFM #lofi, Hunter.FM Lo-Fi, CLIAMP Lofi Hip Hop, Hotmix Lo-Fi. No CSP change (`media-src` allows `https:`).
+- **Open (owner):** the licence for each station in a paid app (before Premium is on sale, item 16); listen to the new stations on a phone.
+
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 
 Rules for all items:
