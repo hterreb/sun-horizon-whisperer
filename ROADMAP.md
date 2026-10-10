@@ -2440,6 +2440,31 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   3. Outside fullscreen nothing changes.
 - **Done when:** a `SunTracker` test in fullscreen: a touch on a fish hit area does not wake, a touch on the empty scene wakes. On a phone: a double tap on a fish opens its card and the controls stay hidden.
 
+### 125. Lazy load: a smaller start bundle — M — item 91 H5
+
+- **Request (2026-10-10):** "spec the lazy load", before the Play release (item 16).
+- **Now (measured 2026-10-10, main `da73b15`):** `npm run build` gives one `index` chunk of 951 kB (316 kB gzip). The item 91 baseline was 581 kB. Minified bytes per part (`source-map-explorer` on a `--sourcemap` build):
+
+  | Part | kB | Needed at start? |
+  |---|--:|---|
+  | i18n, five dictionaries | 140 | One only |
+  | `react-dom` + `react` | 133 | Yes |
+  | Sentry (`core`, `browser`, `browser-utils`) | 88 | Yes, to catch start errors |
+  | `@sentry/feedback` | 38 | No, only when the feedback form opens |
+  | Easter-egg components and their own utils (`Fireworks`, `LunarDragon`, `Santa` + `santaFlight` + `sleighBells`, `CalendarEggs`, `FestivalEggs`, `PlayfulEggs`, `NationalEggs`, `MidnightGhost`, `TemperatureIceberg`, `Ufo`, `DiscoSky`, `sharkHunt`) | 60 | No, only on their day or trigger |
+  | Info card (`SceneInfoCard`, `sceneInfo`) | 19 | No, only after a double tap |
+  | Collection (`CollectionView`, `BadgeUnlocked`, `collection`) | 19 | `collection` yes (badges are counted), the view no |
+  | `PlaceSearch` + `geocodeUtils` | 3 | No, but too small to split |
+
+- **Spec:** one commit per step. Build after each step and write the `index` size into this item. Keep a step only when the chunk gets smaller.
+  1. **Dictionaries (−112 kB):** `en` stays static (it gives `MessageKey` and is the default). `de`, `es`, `it` and `fr` load with `import()`. `main.tsx` waits for the saved language (`loadLanguage()`) before `render`, so the first frame has the right texts and no English flash. A language change in `SunTracker` waits for its dictionary before it sets the language. `tests/i18n.test.ts` keeps its static imports.
+  2. **Feedback form (−38 kB):** remove `feedbackIntegration` from `Sentry.init`. `openFeedback` (`src/utils/feedback.ts`) does `import('@sentry/feedback')` on the first open, `Sentry.addIntegration(...)` with the same options, then `createForm`. `isFeedbackAvailable` checks the DSN, not `getFeedback()`. Check that `@sentry/feedback` is its own chunk; if `@sentry/react` pulls it back in, drop this step. Do not use `lazyLoadIntegration`: it loads a script from Sentry's CDN, and the CSP (and item 6) do not allow that.
+  3. **Easter eggs (−~55 kB):** `React.lazy` for each egg component, in `<Suspense fallback={null}>`. The decision utils (`calendarEvents`, `nationalDays`, `playfulEggs`, `hiddenEggs`, `festivalEvents`, `easterDate`) stay static, so `SunTracker` decides without a load. `GHOST_RING` and `UFO_RING` move from the component files to `hiddenEggs.ts`, because a static import of a constant keeps the whole component in `index`.
+  4. **Info card and collection view (−~25 kB):** `React.lazy` for `SceneInfoCard` and `CollectionView`. `getSceneInfo` moves into the lazy card, so `sceneInfo.ts` goes with it. `BadgeUnlocked` and `collection.ts` stay static.
+  5. **Offline:** the lazy chunks are `.js` files in `dist/assets`, so the PWA precache keeps them. The install size stays the same; the gain is less parse and run time at start.
+- **Not in scope:** `react-dom`, the Sentry core, `PlaceSearch` (3 kB), `lucide-react` and `tailwind-merge` (already tree-shaken).
+- **Done when:** the `index` chunk is 700 kB or less (−25 % from 951 kB), measured with `npm run build`. All tests, lint and typecheck pass. `npm run perf:trace -- --screenshots` shows no visual change. In the browser: a German start shows German texts in the first frame; the feedback form opens on the first tap; a forced egg (`?egg=…`) shows; with the network off after one visit, an egg, the info card and the feedback form still load.
+
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 
 Rules for all items:
