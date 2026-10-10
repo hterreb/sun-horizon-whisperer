@@ -4,7 +4,7 @@ import { type TimeOfDay } from '../utils/sunUtils';
 import { type MoonPosition } from '../utils/moonUtils';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import { type WeatherType } from './CloudLayer';
-import { getStarCloudFactor, getTwilightStars } from '../utils/weatherEffectsUtils';
+import { getStarCloudFactor, getStarGapShow, getTwilightStars } from '../utils/weatherEffectsUtils';
 import { METEOR_SHOWER, meteorOpacity, meteorSpawnChance } from '../utils/astroEvents';
 
 interface NightStarsProps {
@@ -25,6 +25,7 @@ interface Star {
   baseOpacity: number;
   twinkleSpeed: number;
   brightness: number;
+  gap: number; // item 134: the cloud factor below which clouds hide this star
 }
 
 const createStars = (width: number, height: number): Star[] =>
@@ -35,6 +36,7 @@ const createStars = (width: number, height: number): Star[] =>
     baseOpacity: Math.random() * 0.8 + 0.2,
     twinkleSpeed: Math.random() * 0.002 + 0.001,
     brightness: Math.random(),
+    gap: Math.random(),
   }));
 
 // 30 fps, less 2 ms of slack, so a 60 Hz display draws on every second frame.
@@ -80,10 +82,12 @@ const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition, weathe
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Twilight shows only the brightest share of the stars, dimmer; clouds dim them all.
+    // Twilight shows only the brightest share of the stars, dimmer; clouds hide a share of
+    // them (item 134), the rest shine through the gaps at full strength.
     const twilight = getTwilightStars(timeOfDay);
     const skyFactor = twilight.opacity * cloudFactor;
-    const isShown = (star: Star) => star.brightness >= 1 - twilight.share;
+    const isShown = (star: Star) => star.brightness >= 1 - twilight.share && getStarGapShow(cloudFactor, star.gap) > 0;
+    const starFactor = (star: Star) => twilight.opacity * getStarGapShow(cloudFactor, star.gap);
 
     if (skyFactor <= 0) {
       // Day or a covered sky: clear once and don't keep an animation loop running.
@@ -97,7 +101,7 @@ const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition, weathe
       const moonBrightness = moonBrightnessRef.current;
       const starVisibilityFactor = 1 - (moonBrightness * 0.3);
       starsRef.current.filter(isShown).forEach(star => {
-        const opacity = star.baseOpacity * starVisibilityFactor * skyFactor;
+        const opacity = star.baseOpacity * starVisibilityFactor * starFactor(star);
         ctx.beginPath();
         ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
         ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
@@ -168,7 +172,7 @@ const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition, weathe
       // Draw regular stars
       starsRef.current.filter(isShown).forEach(star => {
         const twinkle = Math.sin(time * star.twinkleSpeed + star.x) * 0.5 + 0.5;
-        const opacity = star.baseOpacity * twinkle * starVisibilityFactor * skyFactor;
+        const opacity = star.baseOpacity * twinkle * starVisibilityFactor * starFactor(star);
 
         ctx.beginPath();
         ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;

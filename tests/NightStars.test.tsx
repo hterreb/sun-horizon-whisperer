@@ -121,7 +121,15 @@ describe('NightStars', () => {
       expect(countStars({ weatherType })).toBe(0);
     }
     expect(countStars({ weatherType: 'rain', cloudCoverPercent: 100 })).toBe(0);
-    expect(countStars({ weatherType: 'partly', cloudCoverPercent: 30 })).toBe(300);
+  });
+
+  it('hides a share of the stars behind clouds, not all of them (item 134)', () => {
+    const light = countStars({ weatherType: 'partly', cloudCoverPercent: 30 });
+    expect(light).toBeGreaterThan(220);
+    expect(light).toBeLessThan(270);
+    const heavy = countStars({ weatherType: 'cloudy', cloudCoverPercent: 89 });
+    expect(heavy).toBeGreaterThan(15);
+    expect(heavy).toBeLessThan(65);
   });
 
   // Runs the loop by hand at 60 Hz and counts the frames that draw (clearRect).
