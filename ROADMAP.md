@@ -2552,6 +2552,16 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Checked:** `utils.placeName` (cache miss, hit, 24 h and language staleness, broken entries; the name rules; one call with the rounded location; a 429 then a retry after 2 s; a throw when the retry also fails; the zone map), `InfoPanel` (a fresh cache makes no call; a stale cache stays on screen when both calls fail and a new answer replaces it; the device zone's country when both calls fail), `utils.geocodeUtils` and `utils.manualLocation` (the country code round trip), `SunTracker` (a searched place in Germany dresses the boats on 3 Oct with no reverse-geocode call). Not checked: a real phone, and a real 429 from BigDataCloud.
 - **Limit:** the time-zone country is the device's, not the shown place's. It is wrong only for typed coordinates far away while the call also fails (a `ponytail:` note in `deviceCountry`).
 
+### 131. Satellites: easier to spot, size from magnitude — S — **✅ Done**
+
+- **Request (2026-10-10):** "ive never seen a satellite in the live app". The free dot was 2 px (smaller than most stars, 1–7 px) and moved 0.1–0.3 % of the width per second (about 0.8 px/s on a phone). Lutz: "make them faster and a little bigger, … make it 6x" and "use the magnitude for satellites size in live tracking mode".
+- **Lookbook:** [Satellite Spotting Lookbook](https://claude.ai/artifact/BY8YJCkbQHHUgbmeKEqzoW) (private). Ideas A–H, and the magnitude ladder: a satellite is always a point of light, so its size shows as brightness.
+- **Spec (free dots):** 3 px (was 2 px), 0.6–1.8 % of the width per second (6× before; slower than the birds' 2.5, the fastest pass the sailboat's 1.2). The gap between dots does not change.
+- **Spec (tracking):** each satellite gets the standard magnitude (at 1000 km) of its size class from `getSatelliteSize` (item 120): ISS −1.8, giant (Hubble, Tiangong) +1, rocket body +2.5, other +4, Starlink/OneWeb +6. The magnitude at the real distance sets the dot size (2.5–7 px: `4.5 − 0.65 × magnitude`), the glow (below magnitude 0) and the opacity (as before). Was: ISS 5 px with a glow, all others 3 px.
+- **Built:** `getSatelliteMagnitude(id, name, rangeKm)`, `getSatelliteDotPx`, `getSatelliteGlowPx` in `satelliteUtils`; `SkySatellite.magnitude`; `SatelliteDot.magnitude` replaces `iss` in `Satellites`.
+- **Deviation:** one magnitude per size class, not per satellite (a `ponytail:` note; McCants' per-satellite list if a known one looks wrong).
+- **Checked:** `satelliteUtils` tests: the classes in brightness order, dot size 2.5–7 px, glow only below 0, the new speed. Not checked: a real phone, a live pass.
+
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 
 Rules for all items:

@@ -9,8 +9,8 @@ const setReducedMotion = (reduce: boolean) => {
   }));
 };
 
-const iss: SatelliteDot = { id: 25544, name: 'ISS (ZARYA)', x: 100, y: 50, opacity: 1, shown: true, iss: true };
-const fading: SatelliteDot = { id: 1, name: 'SL-8 R/B', x: 200, y: 80, opacity: 0.4, shown: false, iss: false };
+const iss: SatelliteDot = { id: 25544, name: 'ISS (ZARYA)', x: 100, y: 50, opacity: 1, shown: true, magnitude: -3.7 };
+const fading: SatelliteDot = { id: 1, name: 'SL-8 R/B', x: 200, y: 80, opacity: 0.4, shown: false, magnitude: 3 };
 const base = { width: 390, height: 844, cloudFactor: 1, stepMs: 1000 };
 
 describe('Satellites (ROADMAP item 97)', () => {

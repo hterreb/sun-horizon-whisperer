@@ -9,6 +9,7 @@ import { type Language } from './language';
 import { formatTime, getSunPosition, type SunTimes } from './sunUtils';
 import { type GpRecord } from './satelliteData';
 import { type WeatherType } from '@/components/CloudLayer';
+import { getSatelliteSize, type SatelliteSize } from './sceneInfo';
 
 export type SatelliteLib = typeof SatelliteJs;
 type SatRec = SatelliteJs.SatRec;
@@ -34,8 +35,9 @@ const SATELLITE_HOURS_MS = 2 * HOUR_MS;
 // About one dot every 2-4 min in those hours, and a third of that in the middle of the night.
 export const SPAWN_GAP_MS: [number, number] = [2 * MINUTE_MS, 4 * MINUTE_MS];
 export const NIGHT_GAP_FACTOR = 3;
-// Speed in % of the screen width per second (calm: slower than the sailboat).
-export const DOT_SPEED: [number, number] = [0.1, 0.3];
+// Speed in % of the screen width per second: 6x the first 0.1-0.3, so the eye finds the
+// moving dot (item 131). Slower than the birds (2.5); the fastest pass the sailboat (1.2).
+export const DOT_SPEED: [number, number] = [0.6, 1.8];
 // The share of dots that fade out in the middle of the sky (into the Earth's shadow).
 export const FADE_SHARE = 1 / 3;
 
@@ -143,16 +145,21 @@ export const isInEarthShadow = (position: Vec3, sunDirection: Vec3): boolean => 
 export const isSatelliteVisible = ({ elevation, sunAltitude, sunlit }: { elevation: number; sunAltitude: number; sunlit: boolean }): boolean =>
   elevation > MIN_ELEVATION && sunAltitude < SUN_MAX_ALTITUDE && sunlit;
 
-// Brightness from the distance: the magnitude at 1000 km (the ISS -1.8, others about +3),
-// plus 5 log10(range / 1000 km). The opacity of the dot: 1 at magnitude -2 and brighter,
-// down to MIN_OPACITY for faint ones.
-const ISS_MAGNITUDE = -1.8;
-const OTHER_MAGNITUDE = 3;
+// Brightness from the distance: the standard magnitude (at 1000 km) of the satellite's size
+// class (item 131), plus 5 log10(range / 1000 km). The opacity of the dot: 1 at magnitude -2
+// and brighter, down to MIN_OPACITY for faint ones.
+// ponytail: one magnitude per size class; a table of per-satellite standard magnitudes
+// (McCants' list) if a known one looks wrong.
+const STANDARD_MAGNITUDE: Record<SatelliteSize, number> = { iss: -1.8, giant: 1, large: 2.5, medium: 4, small: 6 };
 const MIN_OPACITY = 0.25;
-export const getSatelliteMagnitude = (id: number, rangeKm: number): number =>
-  (id === ISS_NORAD_ID ? ISS_MAGNITUDE : OTHER_MAGNITUDE) + 5 * Math.log10(Math.max(rangeKm, 100) / 1000);
+export const getSatelliteMagnitude = (id: number, name: string, rangeKm: number): number =>
+  STANDARD_MAGNITUDE[getSatelliteSize(id, name)] + 5 * Math.log10(Math.max(rangeKm, 100) / 1000);
 export const getSatelliteOpacity = (magnitude: number): number =>
   Math.min(1, Math.max(MIN_OPACITY, 1 - (magnitude + 2) / 8));
+// The dot's size from the magnitude (item 131): 2.5 px for faint ones up to 7 px (the ISS
+// overhead, about -3.7), on the stars' scale. A glow below magnitude 0.
+export const getSatelliteDotPx = (magnitude: number): number => Math.min(7, Math.max(2.5, 4.5 - 0.65 * magnitude));
+export const getSatelliteGlowPx = (magnitude: number): number => Math.min(8, Math.max(0, -2 * magnitude));
 
 export interface Observer { latitude: number; longitude: number }
 
@@ -206,6 +213,7 @@ export interface SkySatellite extends SatelliteLook {
   id: number;
   name: string;
   visible: boolean;
+  magnitude: number;
   opacity: number;
 }
 
@@ -246,12 +254,14 @@ export const getSkySatellites = (lib: SatelliteLib, satellites: TrackedSatellite
     if (!look || look.elevation <= 0) continue;
     const visible = isShownInScene(look, snap.sunAltitude);
     if (!visible && !wasVisible(sat)) continue;
+    const magnitude = getSatelliteMagnitude(sat.id, sat.name, look.rangeKm);
     result.push({
       ...look,
       id: sat.id,
       name: sat.name,
       visible,
-      opacity: getSatelliteOpacity(getSatelliteMagnitude(sat.id, look.rangeKm)) * fade,
+      magnitude,
+      opacity: getSatelliteOpacity(magnitude) * fade,
     });
   }
   return result;

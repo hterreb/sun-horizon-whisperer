@@ -36,7 +36,7 @@ import { formatNumber, type MessageKey } from '@/i18n';
 import { type Language } from '@/utils/language';
 import { PLAY_TICK_MS, type PlayDirection } from '@/utils/timeTravel';
 import Satellites, { type SatelliteDot } from './Satellites';
-import { ISS_NORAD_ID, getDotGapMs, getTwilightFade, isSatelliteWeather, type SkySatellite } from '@/utils/satelliteUtils';
+import { getDotGapMs, getTwilightFade, isSatelliteWeather, type SkySatellite } from '@/utils/satelliteUtils';
 import { getTrailColour, isPlaneWeather, showsPlaneLights, type ContrailKind } from '@/utils/planes';
 import LivePlanes from './LivePlanes';
 import { type RarityTier } from '@/utils/rarityTier';
@@ -1075,7 +1075,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       const point = getArcScreenPosition(sat.elevation, sat.azimuth, width, height, latitude, compassHeading);
       if (!point) return [];
       const behindTerrain = !!horizonProfile && sat.elevation <= horizonAngleAt(horizonProfile, sat.azimuth);
-      return [{ id: sat.id, name: sat.name, x: point.x, y: point.y, opacity: sat.opacity, shown: sat.visible && !behindTerrain, iss: sat.id === ISS_NORAD_ID }];
+      return [{ id: sat.id, name: sat.name, x: point.x, y: point.y, opacity: sat.opacity, shown: sat.visible && !behindTerrain, magnitude: sat.magnitude }];
     });
   }, [satellites, containerDimensions, latitude, compassHeading, horizonProfile]);
 
