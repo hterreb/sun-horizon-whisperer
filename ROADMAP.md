@@ -2385,6 +2385,61 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Built:** fixed tiers in `sceneInfo.ts` (these things are not rolled): `TERRAIN_TIERS` (hills common → alpine very rare), `HAUL_TIERS` with `getPlaneHaul` (route leg < 800 km regional, < 2000 short, < 4500 medium, < 9000 long, else ultra long: common → very rare), `SATELLITE_TIERS` with `getSatelliteSize` (from the CelesTrak name: Starlink/OneWeb small, the rest medium, rocket bodies large, Hubble and the Chinese station giant, the ISS: common → very rare; follow-up: 5 classes each, like the terrain). `getTerrainBand` moved to `sceneInfo` (re-exported by `collection`). The terrain, live-plane (once the route is known) and satellite cards have a rarity row and the tier ring. `LiveRoute` has `km` (the leg length, `planeFeed.mapRoute`). 10 new state badges (`plane:*`, `satellite:*`, item 115 rows), 128 in all; the haul badge counts when the route comes (`badgeForRoute`, SunTracker), the size badge on the satellite double tap (`stateBadgeForTarget`). Art: the plane and the satellite icon grow with the step. Keys `badge.plane*`, `badge.satellite*` in 5 languages.
 - **Checked:** tests for the limits, the badges, the card rows and the route km; typecheck, lint, all tests. Browser at 390 × 844: the plane and satellite rows and the tier outlines. Not checked: a real live-plane route or satellite tap in the scene. Satellite size by name is an approximation (no size data in the GP records).
 
+### 121. A fainter rainbow that takes taps — S — [SUN-CHASER-17](https://ainabler.sentry.io/issues/SUN-CHASER-17)
+
+- **Feedback (2026-10-10):** "Rainbow needs to be a lot fainter and should also be tapable".
+- **Now:** `WeatherEffects` draws 6 solid bands (5 px stroke, 7 px apart) at opacity 0.5 by day, in a `pointer-events-none` layer (`z-8`). The rainbow has no card and no badge.
+- **Spec:**
+  1. Fainter: opacity 0.5 → **0.2** (decided 2026-10-10). The band edges get a soft blur (an SVG `feGaussianBlur`, 1.5 px), and the arc fades out toward its feet (a vertical mask: 100 % at the top, 30 % at the horizon), as a real rainbow does.
+  2. Taps: one invisible hit path along the arc (the circle at the middle band's radius, stroke 28 px, `pointer-events: stroke`, `touch-manipulation`), so only the arc takes taps and the sky inside it does not. It uses `useDoubleTap` (item 116). The ring is the arc's outline in its tier colour while the card is open.
+  3. Card: a new target `{ type: 'rainbow' }`, kicker "Weather", lucide `Rainbow` icon. Field notes: it is always opposite the sun; the bow is 42° around the point opposite the sun, so it shows only when the sun is lower than 42°; red is outside, violet inside. Rarity row: the fixed tier **uncommon** (decided 2026-10-10); the rainbow is not rolled, it needs rain and a low sun.
+  4. Badge: a new badge `rainbow` (129 in all), counted on the double tap, with the tier of step 3.
+  5. The pot of gold (item 117) stays above the hit path, so its tap still opens its own card.
+  6. Keys in 5 languages; no tap and no card at night (the rainbow is hidden then).
+- **Done when:** component tests: opacity 0.2, the hit path is a stroke with `pointer-events: stroke`, one tap no card, double tap card and the `rainbow` badge; the pot keeps its tap. The card test in `sceneInfo`. Browser at 390 × 844 with rain and a low sun: fainter, and the card opens.
+
+### 122. Fish change size, opacity and speed when they change lanes — M — [SUN-CHASER-18](https://ainabler.sentry.io/issues/SUN-CHASER-18)
+
+- **Feedback (2026-10-10):** "Lane changes fish need to change size as well".
+- **Cause:** a fish's size comes from its depth (`createFish`: `nearness = 1 − FAR_SHRINK × depth`), and its lane height from the same depth (`y = 67 + (1 − depth) × 26`). A lane change (item 102) only moves the fish (`sceneLaneShift`: `translateY(--shift-dy)`). A fish that moves to a nearer lane keeps its far size, and the other way round.
+- **Spec:**
+  1. `dodge` stores the scale with the shift: the new depth from the new lane (`1 − (y − 67) / 26`, clamped to 0–1), then `scale = nearness(new) / nearness(old)`.
+  2. `sceneLaneShift` animates `translateY(--shift-dy) scale(--shift-scale)` in the same 3 s (`LANE_SHIFT_SEC`), with the transform origin at the fish's centre. The pair's second fish does the same `lag` s later.
+  3. The lane plan uses the new size for the box after the change (`fishLane` with the new depth), so a fish that grows does not touch the next lane.
+  4. **Decided 2026-10-10: size, opacity and speed all follow the new depth.** The opacity goes to `(1 − 0.3 × depth)` of the new lane in the same 3 s (the night and rain factors stay). The speed: the crossing is one CSS animation, so the fish's crossing splits at the shift. `dodge` gives the fish a second leg: from the shift's end, the rest of the way at `spec.speed × nearness(new)`. The fish keeps one hit area and one id; the lane plan (`ScenePath`) gets the second leg's start and speed, so `firstMeeting` sees the real path. In rewind (item 83) the legs play in the other order.
+  5. During time-travel play nothing changes (as item 102).
+- **Done when:** a unit test: a shift to a nearer lane gives a scale > 1, to a farther lane < 1, and the scale equals the nearness ratio; the render test sees `--shift-scale`. The box simulation (item 92) still passes.
+
+### 123. Easter eggs collect only on a double tap — M — [SUN-CHASER-19](https://ainabler.sentry.io/issues/SUN-CHASER-19)
+
+- **Feedback (2026-10-10):** "Easter eggs also need to be double tapped to count as collected".
+- **Now:** item 116 made the scene things collect on a double tap. The eggs do not: by the item 113 decision an egg card adds no badge (`badgeForTarget` gives `null` for `egg`), and the egg's badge counts when the egg **shows** (`SunTracker`: `calendarBadge`, `santaBadge`, `nationalBadge`, `astroBadge`, the UFO, the New Year, `handleEggShown` for the April Fools sun, the empty tomb, the green St Patrick's sky and the heart cloud).
+- **Spec:**
+  1. An egg with a tappable thing collects its badge on the double tap that opens its card, not when it shows: UFO, Lunar New Year dragon, Santa, black cat, Halloween bat, pumpkin moon, the sky eggs (Matariki, conjunction, noctilucent clouds, midnight sun, polar night), the national-day eggs, the empty tomb, the pot of gold, the heart cloud and the festival eggs. `badgeForTarget({ type: 'egg', kind })` maps each egg card kind to its badge id (one table, with a test that each egg card kind with a badge maps to it).
+  2. **Decided 2026-10-10: the eggs with no tappable thing get one** (option B). Proposal, per egg:
+     - Fireworks (New Year, national-day fireworks): while a show plays, the fireworks canvas takes double taps (`pointer-events-auto` only during the show) and opens a "Fireworks" egg card.
+     - Eclipses, supermoon, blue moon, green flash: the sun or moon double tap during the event collects the event badge, and the sun or moon card gets an event row.
+     - Aurora: the aurora band gets a hit area (like the clouds) and an egg card.
+     - Meteor shower: a shooting star is too small and fast to hit, so the star field takes the double tap during a shower and opens a "Meteor shower" card.
+     - Solstice and equinox: the badge text takes the double tap and opens a card.
+     - Christmas boat lights, national-day bunting: the boat's double tap collects the badge; the boat card gets a row.
+     - April Fools sun: the sun's double tap while it shows. St Patrick's green sky: the pot of gold's double tap. National-day jets: a hit area on the jets.
+     - Patient watcher: an achievement for watching, not a thing; it stays as now (collects when earned).
+     Size with step 2: M.
+  3. The sunglasses and the disco (7 taps, the Konami code) are gestures already; they do not change.
+  4. The rules of item 112 stay: no badge in a time preview, with reduced motion, or for a forced `?egg=`.
+- **Done when:** tests: an egg that shows does not collect; a double tap on it collects its badge once; a single tap collects nothing; the eggs of step 2 follow the chosen option. Item 113's "an egg card adds no badge" is marked as replaced.
+
+### 124. A double tap does not wake the controls — S — [SUN-CHASER-1A](https://ainabler.sentry.io/issues/SUN-CHASER-1A)
+
+- **Feedback (2026-10-10):** "Double tap shouldn't activate controls".
+- **Meaning (confirmed 2026-10-10):** in fullscreen, each `touchstart` anywhere calls `wakeCursor` (`SunTracker`, item 89 `useIdleHide`), so the fullscreen, compass, feedback and top-left buttons fade in. Since item 116 a card needs a double tap, and these two taps also bring back all the controls over the scene and the card.
+- **Spec:**
+  1. Each scene hit area (the 17 `touch-manipulation` hit areas of item 116, and the rainbow of item 121) gets `data-scene-hit`.
+  2. The wake listener skips a touch that starts on a scene hit area (`event.target.closest('[data-scene-hit]')`). A tap on the open sky or the sea still wakes the controls; a mouse move still wakes them.
+  3. Outside fullscreen nothing changes.
+- **Done when:** a `SunTracker` test in fullscreen: a touch on a fish hit area does not wake, a touch on the empty scene wakes. On a phone: a double tap on a fish opens its card and the controls stay hidden.
+
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 
 Rules for all items:
