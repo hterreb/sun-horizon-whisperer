@@ -1,4 +1,5 @@
-import React, { Suspense, lazy, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { lazy, useState, useEffect, useCallback, useMemo } from 'react';
+import LazyPart from './LazyPart';
 import * as Sentry from '@sentry/react';
 import {
   getSunPosition,
@@ -33,7 +34,8 @@ import { useLiveRoute } from '@/hooks/useLiveRoute';
 import { getMoonLook, getSkyOvercastMix, getStarCloudFactor } from '@/utils/weatherEffectsUtils';
 import { getAstroEvent, parseEggOverride } from '@/utils/astroEvents';
 import SunVisualization from './SunVisualization';
-import SceneInfoCard from './SceneInfoCard';
+// The info card and the collection view load on their first open (ROADMAP item 125).
+const SceneInfoCard = lazy(() => import('./SceneInfoCard'));
 import { getSceneInfo, type SceneInfoTarget } from '@/utils/sceneInfo';
 import InfoPanel from './InfoPanel';
 import NightStars from './NightStars';
@@ -67,8 +69,9 @@ import { getTerrainSunTimes, getTerrainMoonTimes } from '../utils/horizonUtils';
 import { getSunArcLabels, getMoonArcLabels } from '../utils/arcLabels';
 import { PremiumContext, usePremium } from '@/hooks/usePremium';
 import PremiumDialog from './PremiumDialog';
-import CollectionView from './CollectionView';
-import BadgeUnlocked from './BadgeUnlocked';
+const CollectionView = lazy(() => import('./CollectionView'));
+// Lazy too: it imports BadgeArt from CollectionView (ROADMAP item 125).
+const BadgeUnlocked = lazy(() => import('./BadgeUnlocked'));
 import {
   BADGES, NOWRUZ_ALSO, addToCollection, badgeForAstroEvent, badgeForCalendarEvent, badgeForPlayfulEgg, badgeForSanta, badgeForTarget, countCollected, eggBadgesForTarget, isCollectionPaused, loadCollection,
   badgeForRoute, saveCollection, stateBadgeForTarget, type BadgeId, type Collection, type StateBadgeContext,
@@ -1166,7 +1169,7 @@ const SunTracker: React.FC = () => {
         meteorShower={astroEvent?.kind === 'meteorShower'}
       />
       {astroEvent?.kind === 'aurora' && <Aurora opacity={getStarCloudFactor(weatherType, cloudCover)} />}
-      <Suspense fallback={null}>
+      <LazyPart>
       {discoOn && <DiscoSky />}
       {ufoOn && (
         <Ufo onDone={handleUfoDone} onInfo={handleSceneTap} ringOn={infoCard?.ring === UFO_RING} ringTier={infoCardInfo?.tier ?? null} />
@@ -1174,7 +1177,7 @@ const SunTracker: React.FC = () => {
       {nationalDay && (
         <NationalEggs key={nationalDay.kind} day={nationalDay} timeOfDay={timeOfDay} onInfo={handleSceneTap} infoRing={infoCard?.ring ?? null} infoRingTier={infoCardInfo?.tier ?? null} onFireworksRunning={setNationalFireworksRunning} />
       )}
-      </Suspense>
+      </LazyPart>
       {reveal === 'done' && (
         <>
           <MusicPlayer isFullscreen={isFullscreen} duck={isCountdownSounding} rainMmH={getRainMmH(weatherType, rainMmH)} />
@@ -1319,26 +1322,34 @@ const SunTracker: React.FC = () => {
         </button>
       )}
       {infoCard && infoCardInfo && (
-        <SceneInfoCard
-          key={infoCard.id}
-          info={infoCardInfo}
-          x={infoCard.x}
-          y={infoCard.y}
-          onClose={handleInfoClose}
-        />
+        <LazyPart>
+          <SceneInfoCard
+            key={infoCard.id}
+            info={infoCardInfo}
+            x={infoCard.x}
+            y={infoCard.y}
+            onClose={handleInfoClose}
+          />
+        </LazyPart>
       )}
     </div>
     </BuntingContext.Provider>
     <PremiumDialog />
-    <CollectionView open={isCollectionOpen} onClose={handleCollectionClose} collection={collection} focusId={collectionFocus} />
+    {isCollectionOpen && (
+      <LazyPart>
+        <CollectionView open onClose={handleCollectionClose} collection={collection} focusId={collectionFocus} />
+      </LazyPart>
+    )}
     {unlockedQueue.length > 0 && (
-      <BadgeUnlocked
-        key={unlockedQueue[0].id}
-        badgeId={unlockedQueue[0].id}
-        found={unlockedQueue[0].found}
-        onOpen={handleUnlockedOpen}
-        onDone={handleUnlockedDone}
-      />
+      <LazyPart>
+        <BadgeUnlocked
+          key={unlockedQueue[0].id}
+          badgeId={unlockedQueue[0].id}
+          found={unlockedQueue[0].found}
+          onOpen={handleUnlockedOpen}
+          onDone={handleUnlockedDone}
+        />
+      </LazyPart>
     )}
     </PremiumContext.Provider>
     </LanguageContext.Provider>

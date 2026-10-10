@@ -1,4 +1,5 @@
-import React, { Suspense, lazy, useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import React, { lazy, useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import LazyPart from './LazyPart';
 import { Sun, ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp, Mountain, BellOff } from 'lucide-react';
 import { type SunPosition, type SunTimes, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors, getReflectionFade, getSunPathAround, getDayLengthMinutes } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
@@ -1387,7 +1388,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       />
 
       {isFestivalEvent(calendarEvent) && (
-      <Suspense fallback={null}>
+      <LazyPart>
       <FestivalEggs
         event={calendarEvent}
         timeOfDay={timeOfDay}
@@ -1400,7 +1401,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         infoRing={infoRing}
         infoRingTier={infoRingTier}
       />
-      </Suspense>
+      </LazyPart>
       )}
 
       <svg className="absolute inset-0 w-full h-full pointer-events-none">

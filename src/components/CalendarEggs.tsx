@@ -1,4 +1,5 @@
-import React, { Suspense, lazy, useCallback, useState } from 'react';
+import React, { lazy, useCallback, useState } from 'react';
+import LazyPart from './LazyPart';
 import { Bat } from './sceneIcons';
 // The dragon and Santa load only on their days (ROADMAP item 125).
 const LunarDragon = lazy(() => import('./LunarDragon'));
@@ -218,7 +219,7 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, moon, hor
         </div>
       )}
 
-      <Suspense fallback={null}>
+      <LazyPart>
       {event === 'lunar-new-year' && !dragonDone && !prefersReducedMotion && (
         // ROADMAP item 100: one flight per page view.
         <LunarDragon
@@ -235,7 +236,7 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, moon, hor
         // (lookbook S2), else he flies small and far (S4).
         <Santa onDone={handleSantaDone} onInfo={onInfo} ringOn={infoRing === SANTA_RING} ringTier={infoRingTier} moon={moon} soundOn={soundOn} />
       )}
-      </Suspense>
+      </LazyPart>
 
       <style>{`
         @keyframes egg-glide { to { transform: translateX(var(--dx)); } }
