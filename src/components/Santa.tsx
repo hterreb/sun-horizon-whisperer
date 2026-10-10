@@ -23,7 +23,8 @@ const SPEED_PCT = 2.5; // % of the width per second: the calm-motion limit for b
 const PX_CAP = 390 * SPEED_PCT / 100; // phone px/s on wide screens (9.75)
 export const SANTA_WIDTH = 120;
 const SANTA_HEIGHT = 32;
-export const SANTA_RING = 'egg-santa';
+import { SANTA_RING } from '@/utils/calendarEvents';
+export { SANTA_RING };
 export const MOON_WIDTH_PER_R = 54 / 28;
 export const FAR_WIDTH = 24;
 const FAR_TOP_PCT = 23;

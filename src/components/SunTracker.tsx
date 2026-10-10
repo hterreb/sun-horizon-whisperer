@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useCallback, useMemo } from 'react';
 import * as Sentry from '@sentry/react';
 import {
   getSunPosition,
@@ -78,17 +78,18 @@ import { getCalendarEvent, isSantaTime } from '@/utils/calendarEvents';
 import { getNationalDay, parseCountryOverride, parseNationalEggOverride } from '@/utils/nationalDays';
 import { badgeForNationalDay } from '@/utils/collection';
 import { BuntingContext, type Bunting } from '@/hooks/useBunting';
-import NationalEggs from './NationalEggs';
+// Easter eggs that show only on their day or trigger load on demand (ROADMAP item 125).
+const NationalEggs = lazy(() => import('./NationalEggs'));
 import { NO_PATIENT_WATCH, PLAYFUL_EVENT, advancePatientWatch, getPlayfulOverride, isEasterMorning, type PlayfulEgg } from '@/utils/playfulEggs';
 import { parseFestivalOverride } from '@/utils/festivalEvents';
 import { PLAY_SPEED, PLAY_TICK_MS, clampTimeOffset } from '@/utils/timeTravel';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
-import { DISCO_MS, KONAMI_SEQUENCE, SUNGLASSES_MS, advanceKonami, getEggOverride, registerSunTap, rollUfo } from '@/utils/hiddenEggs';
+import { DISCO_MS, KONAMI_SEQUENCE, SUNGLASSES_MS, UFO_RING, advanceKonami, getEggOverride, registerSunTap, rollUfo } from '@/utils/hiddenEggs';
 import { isCloudEggDay, isCloudEggForced } from '@/utils/skyCloudUtils';
 import { isInstalledApp } from '@/utils/installedApp';
 import { getStartReveal, isFastReturn, loadLastVisible, saveLastVisible } from '@/utils/fastReturn';
-import DiscoSky from './DiscoSky';
-import Ufo, { UFO_RING } from './Ufo';
+const DiscoSky = lazy(() => import('./DiscoSky'));
+const Ufo = lazy(() => import('./Ufo'));
 import { loadTemperatureUnit, saveTemperatureUnit, type TemperatureUnit } from '@/utils/temperatureUnit';
 import { loadLanguage, saveLanguage, type Language } from '@/utils/language';
 import { loadDictionary, translate, type Translate } from '@/i18n';
@@ -1165,6 +1166,7 @@ const SunTracker: React.FC = () => {
         meteorShower={astroEvent?.kind === 'meteorShower'}
       />
       {astroEvent?.kind === 'aurora' && <Aurora opacity={getStarCloudFactor(weatherType, cloudCover)} />}
+      <Suspense fallback={null}>
       {discoOn && <DiscoSky />}
       {ufoOn && (
         <Ufo onDone={handleUfoDone} onInfo={handleSceneTap} ringOn={infoCard?.ring === UFO_RING} ringTier={infoCardInfo?.tier ?? null} />
@@ -1172,6 +1174,7 @@ const SunTracker: React.FC = () => {
       {nationalDay && (
         <NationalEggs key={nationalDay.kind} day={nationalDay} timeOfDay={timeOfDay} onInfo={handleSceneTap} infoRing={infoCard?.ring ?? null} infoRingTier={infoCardInfo?.tier ?? null} onFireworksRunning={setNationalFireworksRunning} />
       )}
+      </Suspense>
       {reveal === 'done' && (
         <>
           <MusicPlayer isFullscreen={isFullscreen} duck={isCountdownSounding} rainMmH={getRainMmH(weatherType, rainMmH)} />

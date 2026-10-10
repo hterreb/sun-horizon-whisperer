@@ -50,3 +50,7 @@ export const getEggOverride = (search: string): HiddenEgg | null => {
   const egg = new URLSearchParams(search).get('egg');
   return egg === 'sunglasses' || egg === 'ufo' || egg === 'disco' ? egg : null;
 };
+
+// The UFO's info-card ring id. Here, not in Ufo.tsx, so SunTracker can use it without
+// loading the lazy Ufo component (ROADMAP item 125).
+export const UFO_RING = 'egg-ufo';

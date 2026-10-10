@@ -17,7 +17,8 @@ const WAVE_S = 5; // M2: one body wave per 5 s
 const TRAIL_S = 20; // F1: a wisp fades over 20 s
 // Item 113: the tap box around the creature, in creature units (tail fin to pearl, crest to legs).
 const BOX = { left: -45, top: -38, width: 350, height: 76 };
-export const DRAGON_RING = 'egg-dragon';
+import { DRAGON_RING } from '@/utils/calendarEvents';
+export { DRAGON_RING };
 
 type Tod = 'day' | 'sunset' | 'night';
 const toTod = (t: TimeOfDay): Tod =>
