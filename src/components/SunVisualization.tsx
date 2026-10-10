@@ -1225,6 +1225,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             tap({ type: 'sun' }, tapPoint(event), 'sun', event.detail === 0);
           }}
           data-testid="sun-dot"
+          data-scene-hit
           className={`absolute rounded-full pointer-events-auto touch-manipulation focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 ${compassActive ? '' : 'transition-transform duration-1000'} ${getSunColor()} ${getGlowIntensity()} animate-glow`}
           style={{
             left: `${sunDrawX}px`,
@@ -1297,6 +1298,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             onMoonTap?.();
             tap({ type: 'moon' }, tapPoint(event), 'moon', event.detail === 0);
           }}
+          data-scene-hit
           className={`absolute flex min-h-11 min-w-11 items-center justify-center rounded-full pointer-events-auto touch-manipulation focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 ${compassActive ? '' : 'transition-all duration-1000'}`}
           style={{
             left: `${moonDrawX}px`,
@@ -1409,6 +1411,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             aria-label={t('scene.terrain')}
             // No tap highlight and no focus outline on a tap: on a phone they drew a bar across the
             // screen (the box of the path). The keyboard focus keeps its outline.
+            data-scene-hit
             className="pointer-events-auto cursor-pointer touch-manipulation outline-none [-webkit-tap-highlight-color:transparent] focus-visible:outline-2 focus-visible:outline-white/70"
             onClick={handleTerrainTap}
             onKeyDown={handleTerrainKey}

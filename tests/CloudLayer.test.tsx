@@ -1182,6 +1182,7 @@ describe('CloudLayer info cards (ROADMAP item 95)', () => {
       const view = renderScene({ onInfo: vi.fn() });
       for (const hit of hits(view.container)) {
         expect(hit.closest('.pointer-events-auto')!.className).toContain('touch-manipulation');
+        expect(hit.closest('.pointer-events-auto')).toHaveAttribute('data-scene-hit');
       }
     });
   });

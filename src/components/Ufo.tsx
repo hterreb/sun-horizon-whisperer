@@ -73,6 +73,7 @@ const Ufo: React.FC<UfoProps> = ({ onDone, onInfo, ringOn = false, ringTier = nu
       ref={ref}
       aria-hidden="true"
       data-testid="ufo"
+      data-scene-hit
       className={`fixed left-0 top-[16%] ${onInfo ? 'pointer-events-auto cursor-pointer touch-manipulation' : 'pointer-events-none'}`}
       style={{ transform: `translateX(${-UFO_WIDTH}px)` }}
       onClick={onInfo && (event => tap({ type: 'egg', kind: 'ufo' }, { x: event.clientX, y: event.clientY }, UFO_RING))}

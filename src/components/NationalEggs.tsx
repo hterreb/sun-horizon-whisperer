@@ -101,7 +101,7 @@ const NationalEggs: React.FC<NationalEggsProps> = ({ day, timeOfDay, onInfo, inf
           ))}
           <div
             data-testid="national-formation"
-            className={`absolute ${tapClass}`}
+            className={`absolute ${tapClass}`} data-scene-hit
             style={{ left: -FORM_W, top: 0, width: FORM_W, height: FORM_H, ['--dx' as string]: `${flight.travel}px`, animation: `national-fly ${flight.seconds}s linear forwards` }}
             {...tapProps(JETS_RING)}
           >
@@ -122,7 +122,7 @@ const NationalEggs: React.FC<NationalEggsProps> = ({ day, timeOfDay, onInfo, inf
         // covers its lower edge. Still: no flicker.
         <div
           data-testid="national-bonfire"
-          className={`absolute left-[18%] ${tapClass}`}
+          className={`absolute left-[18%] ${tapClass}`} data-scene-hit
           style={{ top: 'calc(65% - 48px)', width: 120, height: 48, background: 'radial-gradient(ellipse 50% 100% at 50% 100%, hsl(var(--national-bonfire) / 0.6), transparent)' }}
           {...tapProps(BONFIRE_RING)}
         >

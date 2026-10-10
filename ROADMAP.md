@@ -2430,7 +2430,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   4. The rules of item 112 stay: no badge in a time preview, with reduced motion, or for a forced `?egg=`.
 - **Done when:** tests: an egg that shows does not collect; a double tap on it collects its badge once; a single tap collects nothing; the eggs of step 2 follow the chosen option. Item 113's "an egg card adds no badge" is marked as replaced.
 
-### 124. A double tap does not wake the controls — S — [SUN-CHASER-1A](https://ainabler.sentry.io/issues/SUN-CHASER-1A)
+### 124. A double tap does not wake the controls — S — [SUN-CHASER-1A](https://ainabler.sentry.io/issues/SUN-CHASER-1A) — **✅ Done**
 
 - **Feedback (2026-10-10):** "Double tap shouldn't activate controls".
 - **Meaning (confirmed 2026-10-10):** in fullscreen, each `touchstart` anywhere calls `wakeCursor` (`SunTracker`, item 89 `useIdleHide`), so the fullscreen, compass, feedback and top-left buttons fade in. Since item 116 a card needs a double tap, and these two taps also bring back all the controls over the scene and the card.
@@ -2439,6 +2439,8 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   2. The wake listener skips a touch that starts on a scene hit area (`event.target.closest('[data-scene-hit]')`). A tap on the open sky or the sea still wakes the controls; a mouse move still wakes them.
   3. Outside fullscreen nothing changes.
 - **Done when:** a `SunTracker` test in fullscreen: a touch on a fish hit area does not wake, a touch on the empty scene wakes. On a phone: a double tap on a fish opens its card and the controls stay hidden.
+- **Built:** each existing scene hit area has `data-scene-hit`: `CloudLayer` (`tappable`: fish, birds, bats, boats, planes), `SkyClouds`, `SunVisualization` (sun, moon, terrain), `Satellites`, `LivePlanes`, `Ufo`, `MidnightGhost`, `Santa`, `LunarDragon` and each `tapClass` element of `CalendarEggs`, `FestivalEggs`, `PlayfulEggs`, `NationalEggs` and `SkyEggs`. In fullscreen the `touchstart` listener in `SunTracker` returns when the touch target is inside `[data-scene-hit]`; else it calls `wakeCursor` as before. `mousemove` is unchanged. The rainbow (item 121) and the new egg hit areas (item 123) add the attribute in their own items.
+- **Checked:** `SunTracker` fullscreen test: two touches inside a `data-scene-hit` element keep the controls hidden, a touch on the document wakes them. `CloudLayer` and `SunVisualization` tests check the attribute on the fish, sun, moon and terrain hit areas. Typecheck, lint and all 1634 tests pass. Not checked: a real phone.
 
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 

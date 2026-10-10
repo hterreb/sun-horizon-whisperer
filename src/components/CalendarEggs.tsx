@@ -99,7 +99,7 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, moon, hor
       {event === 'halloween-pumpkin' && moon && (
         // Over the moon button: a tap opens the pumpkin's card, not the moon's.
         <div
-          className={`absolute ${tapClass}`}
+          className={`absolute ${tapClass}`} data-scene-hit
           style={{ left: moon.x - moon.r, top: moon.y - moon.r, width: moon.r * 2, height: moon.r * 2 }}
           {...tapProps('pumpkinMoon', 'egg-pumpkin')}
         >
@@ -125,7 +125,7 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, moon, hor
         <div
           key={i}
           data-testid="halloween-bat"
-          className={`absolute ${tapClass}`}
+          className={`absolute ${tapClass}`} data-scene-hit
           {...tapProps('halloweenBat', `egg-bat-${i}`)}
           style={{
             top: `${b.top}%`,
@@ -145,7 +145,7 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, moon, hor
         <div
           data-testid="hanging-bat"
           data-state={hangBat}
-          className={`absolute ${HANG_CLASS} ${tapClass}`}
+          className={`absolute ${HANG_CLASS} ${tapClass}`} data-scene-hit
           style={{ width: 28, height: 60, animation: hangBat === 'leave' ? 'egg-bat-leave 40s linear 1.2s forwards' : undefined }}
           {...tapProps('halloweenBat', 'egg-bat-hang')}
           onClickCapture={() => { if (onInfo && !prefersReducedMotion) setHangBat('leave'); }}
@@ -185,7 +185,7 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, moon, hor
         <div
           data-testid="black-cat"
           // z-5: in front of the terrain silhouette, drawn later in SunVisualization.
-          className={`absolute z-5 ${tapClass}`}
+          className={`absolute z-5 ${tapClass}`} data-scene-hit
           style={{ left: '12%', top: horizonY - 71, width: 51, height: 71 }}
           {...tapProps('blackCat', 'egg-cat')}
         >

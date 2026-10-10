@@ -315,12 +315,17 @@ const SunTracker: React.FC = () => {
 
     // A tap should bring the cursor (and the fullscreen/compass toggles, which fade
     // together with it - ROADMAP item 18) back too; mobile taps don't fire mousemove.
+    // Item 124: a touch on a scene thing (a double tap opens its card) does not wake them.
+    const onTouch = (event: TouchEvent) => {
+      if (event.target instanceof Element && event.target.closest('[data-scene-hit]')) return;
+      wakeCursor();
+    };
     document.addEventListener('mousemove', wakeCursor);
-    document.addEventListener('touchstart', wakeCursor);
+    document.addEventListener('touchstart', onTouch);
 
     return () => {
       document.removeEventListener('mousemove', wakeCursor);
-      document.removeEventListener('touchstart', wakeCursor);
+      document.removeEventListener('touchstart', onTouch);
     };
   }, [isFullscreen, wakeCursor]);
 

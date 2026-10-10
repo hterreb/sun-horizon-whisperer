@@ -1205,6 +1205,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   // tap opens the card; `touch-manipulation` stops the browser's double-tap zoom.
   const tappable = (target: SceneInfoTarget, ring: string) => onInfo ? {
     'aria-hidden': true,
+    'data-scene-hit': true,
     className: 'absolute pointer-events-auto cursor-pointer touch-manipulation',
     onClick: (event: React.MouseEvent) => tap(target, { x: event.clientX, y: event.clientY }, ring),
   } : { className: 'absolute' };

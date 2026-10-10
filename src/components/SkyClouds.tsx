@@ -82,6 +82,7 @@ const CloudSvg = memo(function CloudSvg({
   const size = { width: 120 * cloud.scale, height: 60 * cloud.scale };
   return (
     <div
+      data-scene-hit
       className={onInfo ? 'absolute pointer-events-auto cursor-pointer touch-manipulation' : 'absolute'}
       onClick={onInfo && (event => onInfo(
         heart ? { type: 'egg', kind: 'heartCloud' } : { type: 'cloud', cloudType: cloud.type, band: cloud.band },

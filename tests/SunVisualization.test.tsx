@@ -1353,6 +1353,7 @@ describe('SunVisualization info cards (ROADMAP item 95)', () => {
     render(<SunVisualization {...props} timeOfDay="midday" onSunTap={onSunTap} onSceneInfo={onSceneInfo} />);
     const sun = screen.getByRole('button', { name: 'Sun' });
     expect(sun.className).toContain('touch-manipulation');
+    expect(sun).toHaveAttribute('data-scene-hit');
     fireEvent.click(sun, { detail: 1, clientX: 400, clientY: 100 });
     expect(onSunTap).toHaveBeenCalledTimes(1);
     expect(onSceneInfo).not.toHaveBeenCalled();
@@ -1408,6 +1409,7 @@ describe('SunVisualization info cards (ROADMAP item 95)', () => {
     // Item 116: a pointer opens the card only on a double tap.
     onSceneInfo.mockClear();
     expect(moon.className).toContain('touch-manipulation');
+    expect(moon).toHaveAttribute('data-scene-hit');
     fireEvent.click(moon, { detail: 1, clientX: 300, clientY: 150 });
     expect(onSceneInfo).not.toHaveBeenCalled();
     expect(moon.querySelector('[data-testid="scene-info-ring"]')).toBeNull();
@@ -1430,6 +1432,7 @@ describe('SunVisualization info cards (ROADMAP item 95)', () => {
     const terrain = screen.getByRole('button', { name: 'Terrain' });
     expect(terrain.getAttribute('tabindex')).toBe('0');
     expect(terrain.getAttribute('class')).toContain('touch-manipulation');
+    expect(terrain).toHaveAttribute('data-scene-hit');
     fireEvent.click(terrain, { clientX: 400, clientY: 380, detail: 1 }); // the middle of 800 px: 180°
     expect(onSceneInfo).not.toHaveBeenCalled(); // item 116: a double tap opens the card
     fireEvent.click(terrain, { clientX: 400, clientY: 380, detail: 2 });
