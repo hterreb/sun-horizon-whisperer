@@ -1061,7 +1061,7 @@ const SunTracker: React.FC = () => {
     }
   }, [handleSceneInfo, collect, shownEggs, calendarEvent]);
   const bunting = useMemo<Bunting | null>(
-    () => (nationalDay?.style === 'bunting' ? { colors: nationalDay.colors.map((c) => `hsl(var(--national-${c}))`) }
+    () => (nationalDay?.style === 'bunting' ? { colors: nationalDay.colors.map((c) => `hsl(var(--national-${c}))`), day: nationalDay.kind }
       // Día de los Muertos (item 118): papel picado; its badge counts with the marigolds.
       : calendarEvent === 'dia-de-muertos' ? { colors: PICADO_COLORS, shape: 'picado' }
       // Christmas: warm bulbs and a gold star on every boat.

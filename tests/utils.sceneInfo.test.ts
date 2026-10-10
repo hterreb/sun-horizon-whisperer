@@ -495,6 +495,17 @@ describe('sceneInfo: item 123 rows', () => {
     expect(card({ type: 'boat', kind: 'ferry', dressed: 'lights' })).toContain('Dressed: Christmas lights');
     expect(card({ type: 'boat', kind: 'ferry' }).join()).not.toMatch(/Dressed/);
   });
+
+  it('names the national day on a dressed boat and gives its fact (item 128)', () => {
+    const rows = card({ type: 'boat', kind: 'ferry', dressed: 'pennant', day: 'germanUnity' });
+    expect(rows).toEqual(expect.arrayContaining(['Dressed: Flag bunting', 'Event: German Unity Day', en('eggFact.germanUnity')]));
+    expect(rows).not.toContain(en('boatFact.ferry'));
+    // Christmas lights and a plain boat: no event row, the boat's own fact.
+    for (const target of [{ type: 'boat', kind: 'ferry', dressed: 'lights' }, { type: 'boat', kind: 'ferry' }] as const) {
+      expect(card(target).join()).not.toMatch(/Event/);
+      expect(card(target)).toContain(en('boatFact.ferry'));
+    }
+  });
 });
 
 describe('sceneInfo formatting', () => {

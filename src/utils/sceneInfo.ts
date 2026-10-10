@@ -41,7 +41,7 @@ export type BoatDress = 'pennant' | 'picado' | 'lights';
 export type SceneInfoTarget =
   | { type: 'fish'; kind: FishKind }
   | { type: 'bird'; kind: BirdKind | 'bat' }
-  | { type: 'boat'; kind: BoatKind; dressed?: BoatDress }
+  | { type: 'boat'; kind: BoatKind; dressed?: BoatDress; day?: NationalDayKind } // day: item 128
   | { type: 'plane'; contrail: ContrailKind }
   | { type: 'livePlane'; callsign: string | null; airline: string | null; aircraftType: string | null; altM: number; speedKt: number }
   | { type: 'cloud'; cloudType: CloudType; band: CloudBand }
@@ -478,9 +478,15 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
     case 'boat': {
       const boat = BOATS[target.kind];
       const rarity = rarityLine(getBoatShare(target.kind), language);
+      // Item 128: on a bunting day the card names the national day and gives its fact.
+      const day = target.day ? EGGS[target.day] : null;
       return {
-        kicker: 'infoKind.boat', icon: 'boat', title: boat.name, fact: fieldNote(boat.fact), tier: rarity.tier,
-        lines: [rarity, ...(target.dressed ? [{ label: 'info.dressed' as const, value: { key: DRESS[target.dressed] } }] : [])],
+        kicker: 'infoKind.boat', icon: 'boat', title: boat.name, fact: fieldNote(day?.fact ?? boat.fact), tier: rarity.tier,
+        lines: [
+          rarity,
+          ...(target.dressed ? [{ label: 'info.dressed' as const, value: { key: DRESS[target.dressed] } }] : []),
+          ...(day ? [{ label: 'info.event' as const, value: { key: day.name } }] : []),
+        ],
       };
     }
     case 'plane':
