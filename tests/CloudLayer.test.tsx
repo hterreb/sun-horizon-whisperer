@@ -39,12 +39,13 @@ const endAnimation = (element: Element, animationName: string) => {
 
 // Item 102: the box of a thing at time t, or null. A fish that changes lane swims on its old
 // lane until the change starts (`path.y` is the new lane); a diving fish swims under the others
-// after its dive (the H4 fade), so it has no box then.
-type Mover = { path?: ScenePath; shift?: { at: number; dy: number }; dive?: number };
+// after its dive (the H4 fade), so it has no box then. Item 122: until the change the fish has its
+// old size and speed too (`hold`, the old path).
+type Mover = { path?: ScenePath; hold?: ScenePath; shift?: { at: number; dy: number }; dive?: number };
 const boxAt = (e: Mover, t: number, viewHeight: number) => {
-  const p = e.path;
+  const p = e.shift && e.hold && t < e.shift.at ? e.hold : e.path;
   if (!p || t < p.start || t > p.start + p.duration + (p.lag ?? 0) || (e.dive !== undefined && t >= e.dive)) return null;
-  const y = e.shift && t < e.shift.at ? p.y - (e.shift.dy * 100) / viewHeight : p.y;
+  const y = e.shift && !e.hold && t < e.shift.at ? p.y - (e.shift.dy * 100) / viewHeight : p.y;
   return { l: xAt(p, t - (p.lag ?? 0)), r: xAt(p, t) + p.width, top: y, bottom: y + p.height };
 };
 
@@ -886,10 +887,12 @@ describe('a calmer sea that is full from the start (ROADMAP item 93)', () => {
       expect(sea.fish.length + sea.ships.length).toBeGreaterThanOrEqual(0.6 * seaTarget(scene));
       for (const thing of [...sea.fish, ...sea.ships, ...sea.birds]) {
         // Each one started 0.1-0.9 of the way across: a negative delay and a path that began in the past.
-        const progress = -(thing.delay ?? 0) / thing.duration;
+        // A fish that changes lane (item 122) gets a new duration; its old one is in `hold`.
+        const duration = ('hold' in thing && thing.hold?.duration) || thing.duration;
+        const progress = -(thing.delay ?? 0) / duration;
         expect(progress).toBeGreaterThanOrEqual(0.1);
         expect(progress).toBeLessThanOrEqual(0.9);
-        expect(thing.path?.start).toBeCloseTo(0.5 - progress * thing.duration, 6);
+        expect(thing.path?.start).toBeCloseTo(0.5 - progress * duration, 6);
         expect(thing.fadeIn).toBe(false); // at load the scene's reveal covers it
       }
     }
@@ -1290,7 +1293,53 @@ describe('the shark hunt (ROADMAP item 94)', () => {
     const meet = firstMeeting(scene.ships[0].path!, path, 10)!;
     expect(scene.fish[0].dive).toBeUndefined();
     expect(scene.fish[0].path!.y).toBe(50);
-    expect(scene.fish[0].shift).toEqual({ at: Math.max(10, meet - 4), dy: (50 * 844) / 100 });
+    expect(scene.fish[0].shift).toMatchObject({ at: Math.max(10, meet - 4), dy: (50 * 844) / 100 });
+  });
+
+  // Item 122: the new lane is nearer or farther, so the fish's size, opacity and speed follow it.
+  it.each([
+    { name: 'a nearer lane', from: 0, to: 13 },
+    { name: 'a farther lane', from: 13, to: 0 },
+  ])('gives a fish the depth of $name when it changes lane (item 122)', ({ from, to }) => {
+    const fish = { ...createFish('carp', false, false, 390, mulberry32(1)), id: 7, depth: 0.5 };
+    const path: ScenePath = { start: 0, duration: 1000, x: 30, dx: 75, width: 5, y: from, height: 100 };
+    const last: SpawnTimes = { birds: 1e9, fish: 1e9, ships: 0, leaves: 1e9, planes: 1e9, shown: { birds: true, fish: true, ships: true } };
+    const answers = [null, undefined, to];
+    const lane = (candidate: { y: number }) => { const a = answers.shift(); return a === undefined ? candidate.y : a; };
+    const scene = spawnTick(
+      { birds: [], fish: [{ ...fish, path }], ships: [], leaves: [], planes: [] }, last, rules({ fishOverride: null }),
+      200_000, 10, () => 0.3, lane,
+    );
+    const moved = scene.fish[0];
+    // 13 % of the scene is half the fish band: the depth goes from 0.5 to 0 or 1.
+    const depth = to > from ? 0 : 1;
+    const scale = (1 - 0.45 * depth) / (1 - 0.45 * 0.5);
+    expect(moved.shift!.scale).toBeCloseTo(scale, 6);
+    expect(moved.shift!.fade).toBeCloseTo((1 - 0.3 * depth) / (1 - 0.3 * 0.5), 6);
+    expect(moved.shift!.scale > 1).toBe(to > from);
+    // The box grows or shrinks; the old lane keeps the old box.
+    expect(moved.path!.width).toBeCloseTo(((fish.width * scale) / 390) * 100, 6);
+    expect(moved.hold).toBe(path);
+    // Faster on a nearer lane, slower on a farther one, from the change on; the CSS easing has the curve.
+    expect(moved.duration < 1000).toBe(to > from);
+    expect(moved.path!.duration).toBe(moved.duration);
+    expect(xAt(moved.path!, moved.shift!.at)).toBeCloseTo(xAt(path, moved.shift!.at), 6);
+    expect(moved.easing).toMatch(/^linear\(/);
+  });
+
+  it('keeps the speed and the glide of a fish already at the end of the depth (item 122)', () => {
+    const fish = { ...createFish('carp', false, false, 390, mulberry32(1)), id: 7, depth: 0 };
+    const path: ScenePath = { start: 0, duration: 1000, x: 30, dx: 75, width: 5, y: 0, height: 100 };
+    const last: SpawnTimes = { birds: 1e9, fish: 1e9, ships: 0, leaves: 1e9, planes: 1e9, shown: { birds: true, fish: true, ships: true } };
+    const answers = [null, undefined, 13];
+    const lane = (candidate: { y: number }) => { const a = answers.shift(); return a === undefined ? candidate.y : a; };
+    const moved = spawnTick(
+      { birds: [], fish: [{ ...fish, path }], ships: [], leaves: [], planes: [] }, last, rules({ fishOverride: null }),
+      200_000, 10, () => 0.3, lane,
+    ).fish[0];
+    expect(moved.shift!.scale).toBe(1);
+    expect(moved.duration).toBe(1000);
+    expect(moved.easing).toBeUndefined();
   });
 
   it('spawns a fish with no free lane anyway, and it dodges the first thing it meets (item 102)', () => {

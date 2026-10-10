@@ -1,4 +1,4 @@
-import { findLane, firstMeeting, getSceneTime, setSceneRate, xAt, LIVE_SCENE_CLOCK, type LaneCandidate, type ScenePath } from '../src/utils/scenePaths';
+import { findLane, firstMeeting, getSceneTime, setSceneRate, warpPath, xAt, LIVE_SCENE_CLOCK, type LaneCandidate, type ScenePath } from '../src/utils/scenePaths';
 import { getRestStopMotion } from '../src/utils/weatherEffectsUtils';
 
 // A glide at 1 % of the width per second, from x -5 to 101, 5 % wide and 4 % high.
@@ -39,6 +39,45 @@ describe('xAt (ROADMAP item 92)', () => {
     expect(xAt(path, rest.duration)).toBeCloseTo(101, 6);
     // The curve is the CSS easing: its first point holds still at 51.5 s.
     expect(rest.easing).toContain(`${(50 / 106).toFixed(4)} ${((51.5 / rest.duration) * 100).toFixed(2)}%`);
+  });
+});
+
+describe('warpPath (ROADMAP item 122)', () => {
+  // A glide at 1 %/s that starts at 10 s; the change starts at 40 s and takes 3 s.
+  const path = glide(10, 70);
+
+  it('keeps the place until the change, then moves k times as fast', () => {
+    const fast = warpPath(path, 40, 3, 2);
+    for (const t of [10, 25, 40]) expect(xAt(fast, t)).toBeCloseTo(xAt(path, t), 6);
+    // The speed goes evenly from 1 to 2 in 3 s: 4.5 % in the change, then 2 %/s.
+    expect(xAt(fast, 43)).toBeCloseTo(-5 + 30 + 4.5, 2);
+    expect(xAt(fast, 53) - xAt(fast, 43)).toBeCloseTo(20, 6);
+    // The rest of the way (106 - 34.5 = 71.5 %) at 2 %/s from 43 s.
+    expect(fast.start + fast.duration).toBeCloseTo(43 + 71.5 / 2, 6);
+    expect(xAt(fast, fast.start + fast.duration)).toBeCloseTo(101, 6);
+  });
+
+  it('is slower and longer for a farther lane (k < 1)', () => {
+    const slow = warpPath(path, 40, 3, 0.5);
+    expect(xAt(slow, 40)).toBeCloseTo(xAt(path, 40), 6);
+    expect(xAt(slow, 53) - xAt(slow, 43)).toBeCloseTo(5, 6);
+    expect(slow.duration).toBeGreaterThan(path.duration);
+  });
+
+  it('keeps a rest stop, at the new speed (P8)', () => {
+    const rest = getRestStopMotion(106, 1, 50, 6);
+    const stop = glide(0, 70, { duration: rest.duration, curve: rest.curve });
+    const fast = warpPath(stop, 20, 3, 2);
+    expect(xAt(fast, 20)).toBeCloseTo(xAt(stop, 20), 6);
+    // It still stops at 50 % on, and leaves at the end.
+    const still = fast.curve!.filter(([, s], i, c) => i > 0 && s === c[i - 1][1]);
+    expect(still.length).toBeGreaterThan(0);
+    expect(xAt(fast, fast.duration)).toBeCloseTo(101, 6);
+  });
+
+  it('changes nothing for k = 1 or a change after the end', () => {
+    expect(warpPath(path, 40, 3, 1)).toBe(path);
+    expect(warpPath(path, 500, 3, 2)).toBe(path);
   });
 });
 

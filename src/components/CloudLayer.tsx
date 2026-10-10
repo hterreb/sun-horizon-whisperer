@@ -17,7 +17,7 @@ import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import { useScenePlaybackRate } from '@/hooks/useScenePlaybackRate';
 import { useDoubleTap } from '@/hooks/useDoubleTap';
 import { getScenePlaybackRate, getSpawnGapFactor, type PlayDirection } from '@/utils/timeTravel';
-import { findLane, firstMeeting, getSceneTime, setSceneRate, LIVE_SCENE_CLOCK, type ScenePath } from '@/utils/scenePaths';
+import { findLane, firstMeeting, getSceneTime, setSceneRate, warpPath, LIVE_SCENE_CLOCK, type ScenePath } from '@/utils/scenePaths';
 import {
   BODY_LINE, HUNTER_SHARE, HUNT_PREY, HUNT_VARIANTS, SLOW_EASING, SLOW_SEC, SHIFT_KEYS, getHuntOverride, getKeepAwayPath,
   isSmallFish, pickMeetX, planMeeting, planPreyHunt, toLinearEasing,
@@ -186,6 +186,8 @@ const BOATS: Record<BoatKind, { scale: number; speed: number }> = {
   freighter: { scale: 1.4, speed: 1.3 },
 };
 const FAR_SHRINK = 0.45; // the farthest boat is 55% of the size, opacity and speed of the nearest
+// A fish's lane height spans 26 % of the scene from the farthest (depth 1) to the nearest (0).
+const FISH_DEPTH_SPAN = 26;
 
 // ROADMAP item 62 (Fish & Currents lookbook). `size` (px) and `speed` (% of the width per
 // second) are a near fish's; far fish shrink and slow down like the boats (FAR_SHRINK).
@@ -245,7 +247,9 @@ interface FishEntity extends MovingEntity {
   rolls?: number[]; // DO1 (item 85): each dolphin's roll delay in s, 2 or 3 dolphins
   hunt?: HuntPlan; // a hunting shark (item 94): its prey and the hunt's timeline
   dive?: number; // item 94: the scene time when the fish dives under a boat (the H4 fade)
-  shift?: { at: number; dy: number }; // item 102: at the scene time `at` it swims `dy` px up or down to a free lane
+  // Item 102: at the scene time `at` it swims `dy` px up or down to a free lane. Item 122: it then
+  // grows by `scale` and its opacity changes by `fade`, as its new lane is nearer or farther.
+  shift?: { at: number; dy: number; scale: number; fade: number };
   hold?: ScenePath; // item 103: the old lane of a lane change, kept free for the rest of the crossing
   shifted?: boolean; // item 102: the lane change has started
   hunted?: PreyHunt; // item 94: the hunt that plays on this fish
@@ -298,7 +302,7 @@ export const createFish = (
     // The whole water (item 71): far fish just below the horizon (67 % of the height), near
     // ones in the front (93 %), ±1 %. Before, all fish shared a 70-85 % band in the middle.
     // For a shark or a pod, `y` is the waterline (item 85).
-    y: 67 + (1 - depth) * 26 + (random() - 0.5) * 2,
+    y: 67 + (1 - depth) * FISH_DEPTH_SPAN + (random() - 0.5) * 2,
     dx,
     duration: rest ? rest.duration : dx / speed,
     easing: rest?.easing,
@@ -617,15 +621,32 @@ export const spawnTick = (
   // Item 102: a fish that meets a thing at `at` changes to a free lane when there is one
   // (LANE_SHIFT_SEC, ending 1 s before), else it dives (the H4 fade, 2 s before). A hunting
   // shark and its prey keep their lane, as the hunt is planned on it.
+  // Item 122: the new lane is nearer or farther, so the fish takes its depth: its size, opacity
+  // and speed change in the same LANE_SHIFT_SEC. The lane is checked again with the new size and
+  // speed; with no lane then, it dives.
   const dodge = (f: FishEntity & { path: ScenePath }, at: number, others: ScenePath[]): FishEntity => {
     if (f.shift === undefined && !f.hunt && !fish.some(g => g.hunt?.preyId === f.id)) {
       const from = Math.max(sceneTime, at - LANE_SHIFT_SEC - 1);
       const shape = fishLane(f, view, rewind);
       const band: [number, number] = [shape.band[0] - shape.above, shape.band[1] - shape.above];
-      const y = lane({ ...f.path, band, view }, others, from);
+      const atLane = (y: number) => {
+        const depth = Math.min(1, Math.max(0, f.depth - (y - f.path.y) / FISH_DEPTH_SPAN));
+        const scale = (1 - FAR_SHRINK * depth) / (1 - FAR_SHRINK * f.depth);
+        const grown = fishLane({ ...f, size: f.size * scale, width: f.width * scale, height: f.height * scale }, view, rewind);
+        const path = { ...warpPath(f.path, from, LANE_SHIFT_SEC, scale), width: grown.width, height: grown.height, y };
+        return { path, scale, fade: (1 - 0.3 * depth) / (1 - 0.3 * f.depth) };
+      };
+      const first = lane({ ...f.path, band, view }, others, from);
+      const y = first === null || first === f.path.y ? null : lane({ ...atLane(first).path, band, view }, others, from);
       if (y !== null && y !== f.path.y) {
         // `path` is the new lane; until the change the fish is on its old one (`hold`).
-        return { ...f, path: { ...f.path, y }, hold: f.path, shift: { at: from, dy: ((y - f.path.y) * view.height) / 100 } };
+        const { path, scale, fade } = atLane(y);
+        return {
+          ...f, path, hold: f.path, duration: path.duration, curve: path.curve,
+          // Without a speed change (the depth is at its end already) the old easing stays.
+          easing: path.curve ? toLinearEasing(path.curve) : f.easing,
+          shift: { at: from, dy: ((y - f.path.y) * view.height) / 100, scale, fade },
+        };
       }
     }
     return { ...f, dive: Math.min(f.dive ?? Infinity, Math.max(sceneTime, at - 2)) };
@@ -1285,7 +1306,9 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
           left: `${fishItem.x}%`,
           top: `${fishItem.y + dy}%`,
           zIndex: 5,
-          opacity: fishItem.opacity,
+          // Item 122: a fish that gets brighter on its new lane draws at the brighter opacity, and
+          // the lane-change wrapper dims it to its old one until the change.
+          opacity: fishItem.opacity * Math.max(1, fishItem.shift?.fade ?? 1),
           filter: halo,
           ['--dx' as string]: `${fishItem.dx}vw`,
           animation: `moveAcrossX ${fishItem.duration}s linear ${lag + (fishItem.delay ?? 0)}s forwards${fishItem.fadeIn ? FADE_IN : ''}`,
@@ -1303,10 +1326,17 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         {fishItem.shift ? (
           <div
             data-testid="lane-shift"
-            style={fishItem.shifted ? {
+            style={{
               ['--shift-dy' as string]: `${fishItem.shift.dy}px`,
-              animation: `sceneLaneShift ${LANE_SHIFT_SEC}s ease-in-out ${lag}s both`,
-            } : undefined}
+              ['--shift-scale' as string]: fishItem.shift.scale,
+              ['--shift-o0' as string]: 1 / Math.max(1, fishItem.shift.fade),
+              ['--shift-o1' as string]: fishItem.shift.fade / Math.max(1, fishItem.shift.fade),
+              // Item 122: it grows from its top left corner, as its box in the lane plan does.
+              transformOrigin: '0 0',
+              ...(fishItem.shifted
+                ? { animation: `sceneLaneShift ${LANE_SHIFT_SEC}s ease-in-out ${lag}s both` }
+                : { opacity: 1 / Math.max(1, fishItem.shift.fade) }),
+            }}
           >
             {contentOf(key)}
           </div>
@@ -1652,8 +1682,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         }
 
         @keyframes sceneLaneShift {
+          from {
+            opacity: var(--shift-o0);
+          }
           to {
-            transform: translateY(var(--shift-dy));
+            transform: translateY(var(--shift-dy)) scale(var(--shift-scale));
+            opacity: var(--shift-o1);
           }
         }
 
