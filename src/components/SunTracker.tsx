@@ -176,6 +176,11 @@ const SunTracker: React.FC = () => {
   const [manualPlaceName, setManualPlaceName] = useState<string | null>(
     () => loadManualLocation()?.name ?? null
   );
+  // Item 128: the searched place's country code (Open-Meteo), for the national days. InfoPanel
+  // makes no reverse-geocode call for a searched place, so it passes no country for it.
+  const [manualCountry, setManualCountry] = useState<string | null>(
+    () => loadManualLocation()?.countryCode ?? null
+  );
   // Time travel (ROADMAP item 44): the one time source. `date` is always
   // `Date.now() + timeOffsetMs`; 0 is live. Play moves the offset (-1 back, 1 forward).
   const [timeOffsetMs, setTimeOffsetMs] = useState(0);
@@ -502,11 +507,12 @@ const SunTracker: React.FC = () => {
 
   // Manual location form (InfoPanel): validated lat/lon submitted by the user, or a
   // place selected from search (in which case `name` is set alongside the coordinates).
-  const handleLocationChange = useCallback((latitude: number, longitude: number, name?: string) => {
+  const handleLocationChange = useCallback((latitude: number, longitude: number, name?: string, countryCode?: string) => {
     locationChosenRef.current = true;
     setLocation({ latitude, longitude, loaded: true });
     setManualPlaceName(name ?? null);
-    saveManualLocation(latitude, longitude, name);
+    setManualCountry(name ? countryCode ?? null : null);
+    saveManualLocation(latitude, longitude, name, name ? countryCode : undefined);
   }, []);
 
   // "Use my location" inside the manual form: re-requests geolocation and, on
@@ -525,6 +531,7 @@ const SunTracker: React.FC = () => {
       (position) => {
         clearManualLocation();
         setManualPlaceName(null);
+        setManualCountry(null);
         setLocation({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
@@ -849,7 +856,7 @@ const SunTracker: React.FC = () => {
   // or `?country=XX`. Unknown country: none.
   const [detectedCountry, setDetectedCountry] = useState<string | null>(null);
   const [countryOverride] = useState(() => parseCountryOverride(window.location.search));
-  const country = countryOverride ?? detectedCountry;
+  const country = countryOverride ?? (manualPlaceName ? manualCountry : detectedCountry);
   const calendarEvent = useMemo(
     () => (dragonForced ? 'lunar-new-year' : playfulForced ? PLAYFUL_EVENT[playfulForced]
       : festivalForced ?? getCalendarEvent(date, location.latitude, country ?? undefined)),

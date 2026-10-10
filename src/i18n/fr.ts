@@ -38,7 +38,7 @@ export const fr: Record<keyof typeof en, string> = {
   'panel.expand': "Déplier le panneau",
   'panel.collapse': "Replier le panneau",
   'location.loading': "Chargement du lieu…",
-  'location.unknown': "Lieu inconnu",
+  'location.unknown': "Votre position",
   'location.change': "Changer de lieu",
   'location.latitude': "Latitude",
   'location.longitude': "Longitude",

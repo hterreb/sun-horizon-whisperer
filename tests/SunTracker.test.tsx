@@ -1425,7 +1425,7 @@ describe('SunTracker national days', () => {
   const BERLIN = { latitude: 52.52, longitude: 13.4 };
   const answer = (countryCode: string) => {
     global.fetch = vi.fn((url: string) => String(url).includes('bigdatacloud')
-      ? Promise.resolve({ json: () => Promise.resolve({ city: 'Berlin', countryName: 'Germany', countryCode }) })
+      ? Promise.resolve({ ok: true, json: () => Promise.resolve({ city: 'Berlin', countryName: 'Germany', countryCode }) })
       : Promise.reject(new Error('offline'))) as unknown as typeof fetch;
   };
 
@@ -1466,6 +1466,14 @@ describe('SunTracker national days', () => {
     render(<SunTracker />);
     await waitFor(() => expect(screen.getAllByTestId('scene-boat').length).toBeGreaterThan(0));
     expect(screen.queryByTestId('boat-bunting')).toBeNull();
+  });
+
+  it('uses the searched place\'s country code, with no reverse-geocode call (item 128)', async () => {
+    localStorage.setItem('manual-location', JSON.stringify({ ...BERLIN, name: 'Berlin, Germany', countryCode: 'DE' }));
+    global.fetch = vi.fn(() => Promise.reject(new Error('offline'))) as unknown as typeof fetch;
+    render(<SunTracker />);
+    await waitFor(() => expect(screen.getAllByTestId('boat-bunting').length).toBeGreaterThan(0));
+    expect(global.fetch).not.toHaveBeenCalledWith(expect.stringContaining('bigdatacloud'));
   });
 
   it('?country=DE sets the country and counts no badge', async () => {

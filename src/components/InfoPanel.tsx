@@ -28,7 +28,7 @@ import { isValidLatitude, isValidLongitude } from '../utils/manualLocation';
 import { type HorizonProfileStatus } from '../hooks/useHorizonProfile';
 import { type HorizonProfile } from '@/utils/horizonUtils';
 import { type WeatherType } from './CloudLayer';
-import { countryCodeOf } from '@/utils/nationalDays';
+import { loadPlace, savePlace, fetchPlace, deviceCountry } from '@/utils/placeName';
 import { getTimeTravelRange, toDateTimeLocalValue } from '@/utils/timeTravel';
 import { formatTemperature, type TemperatureUnit } from '@/utils/temperatureUnit';
 import { SUNSET_REMINDER_MIN } from '@/utils/sunsetReminder';
@@ -113,7 +113,7 @@ interface InfoPanelProps {
   onManualWindyChange?: (windy: boolean) => void;
   onWeatherModeToggle: (useReal: boolean) => void;
   onWeatherRefresh: () => void;
-  onLocationChange: (latitude: number, longitude: number, name?: string) => void;
+  onLocationChange: (latitude: number, longitude: number, name?: string, countryCode?: string) => void;
   onUseMyLocation: () => void;
   // Line of sight with terrain (ROADMAP item 13): hidden entirely while `idle` (the
   // feature is off, or location isn't loaded yet). Defaults keep every existing
@@ -151,7 +151,8 @@ interface InfoPanelProps {
   // Collection badges (ROADMAP item 112): the row button that opens the collection.
   onCollectionOpen?: () => void;
   // National days (utils/nationalDays): the place's country code from the reverse-geocode
-  // answer below, or null (a searched place, no answer, an error). Keep it stable (a state
+  // answer below (cached, item 128), the device time zone's country when the call fails, or
+  // null (a searched place: SunTracker keeps its own code; no code). Keep it stable (a state
   // setter): a new function fetches again.
   onCountryChange?: (countryCode: string | null) => void;
 }
@@ -294,32 +295,32 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     let cancelled = false;
 
     const fetchLocationName = async () => {
-      setLoadingLocation(true);
+      const latitude = location.latitude;
+      const longitude = location.longitude;
+      // Item 128: show the cached answer at once; ask again only when it is stale.
+      const cached = loadPlace(latitude, longitude, language);
+      if (cached) {
+        setLocationName(cached.place.name);
+        onCountryChange?.(cached.place.countryCode);
+        setLoadingLocation(false);
+        if (cached.fresh) return;
+      } else {
+        setLoadingLocation(true);
+      }
       try {
-        // Round to ~1km precision before sending the location to a third party.
-        const roundedLat = Math.round(location.latitude * 100) / 100;
-        const roundedLon = Math.round(location.longitude * 100) / 100;
-        const response = await fetch(
-          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${roundedLat}&longitude=${roundedLon}&localityLanguage=${language}`
-        );
-        const data = await response.json();
+        const place = await fetchPlace(latitude, longitude, language);
         if (cancelled) return;
-        onCountryChange?.(countryCodeOf(data));
-
-        if (data.city && data.countryName) {
-          setLocationName(`${data.city}, ${data.countryName}`);
-        } else if (data.locality && data.countryName) {
-          setLocationName(`${data.locality}, ${data.countryName}`);
-        } else if (data.countryName) {
-          setLocationName(data.countryName);
-        } else {
-          setLocationName(null);
-        }
+        savePlace(latitude, longitude, language, place);
+        onCountryChange?.(place.countryCode);
+        setLocationName(place.name);
       } catch (error) {
         if (cancelled) return;
         console.error('Error fetching location name:', error);
-        setLocationName(null);
-        onCountryChange?.(null);
+        // Keep the cached answer; without one, no name and the device time zone's country.
+        if (!cached) {
+          setLocationName(null);
+          onCountryChange?.(deviceCountry());
+        }
       } finally {
         if (!cancelled) setLoadingLocation(false);
       }
@@ -375,8 +376,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     closeLocationForm();
   };
 
-  const handleSelectPlace = (latitude: number, longitude: number, name: string) => {
-    onLocationChange(latitude, longitude, name);
+  const handleSelectPlace = (latitude: number, longitude: number, name: string, countryCode?: string) => {
+    onLocationChange(latitude, longitude, name, countryCode);
     closeLocationForm();
   };
 

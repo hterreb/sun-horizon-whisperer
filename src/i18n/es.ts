@@ -38,7 +38,7 @@ export const es: Record<keyof typeof en, string> = {
   'panel.expand': "Desplegar panel",
   'panel.collapse': "Plegar panel",
   'location.loading': "Cargando ubicación…",
-  'location.unknown': "Ubicación desconocida",
+  'location.unknown': "Tu ubicación",
   'location.change': "Cambiar ubicación",
   'location.latitude': "Latitud",
   'location.longitude': "Longitud",

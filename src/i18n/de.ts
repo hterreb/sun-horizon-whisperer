@@ -38,7 +38,7 @@ export const de: Record<keyof typeof en, string> = {
   'panel.expand': "Infobereich aufklappen",
   'panel.collapse': "Infobereich zuklappen",
   'location.loading': "Ort wird geladen…",
-  'location.unknown': "Unbekannter Ort",
+  'location.unknown': "Dein Standort",
   'location.change': "Ort ändern",
   'location.latitude': "Breitengrad",
   'location.longitude': "Längengrad",
