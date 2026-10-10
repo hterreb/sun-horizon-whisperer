@@ -1407,6 +1407,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         ))}
         <div
           {...tappable({ type: 'plane', contrail: plane.contrail }, `plane-${plane.id}`)}
+          data-plane-hit={onInfo ? true : undefined} // item 126: a cloud passes its tap on
           style={{
             left: `${plane.x}%`,
             top: `${plane.y}%`,

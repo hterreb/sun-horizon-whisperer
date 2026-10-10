@@ -70,6 +70,17 @@ interface CloudSvgProps {
   heart?: boolean; // item 117: the Valentine's heart; its tap opens the egg card
 }
 
+// Item 126: a plane flies behind the clouds but still takes the tap. A cloud hands its tap on
+// to a plane hit area under the tap point and returns true.
+const tapPlaneBelow = (event: React.MouseEvent) => {
+  const { clientX, clientY } = event;
+  const plane = document.elementsFromPoint?.(clientX, clientY)
+    .map(el => el.closest<HTMLElement>('[data-plane-hit]'))
+    .find(Boolean);
+  plane?.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX, clientY }));
+  return !!plane;
+};
+
 // One cloud. Memoized on plain values, so the once-a-second tick only redraws a cloud
 // whose light direction or silver lining changed.
 const CloudSvg = memo(function CloudSvg({
@@ -84,11 +95,14 @@ const CloudSvg = memo(function CloudSvg({
     <div
       data-scene-hit
       className={onInfo ? 'absolute pointer-events-auto cursor-pointer touch-manipulation' : 'absolute'}
-      onClick={onInfo && (event => onInfo(
-        heart ? { type: 'egg', kind: 'heartCloud' } : { type: 'cloud', cloudType: cloud.type, band: cloud.band },
-        { x: event.clientX, y: event.clientY },
-        ringId,
-      ))}
+      onClick={onInfo && (event => {
+        if (tapPlaneBelow(event)) return;
+        onInfo(
+          heart ? { type: 'egg', kind: 'heartCloud' } : { type: 'cloud', cloudType: cloud.type, band: cloud.band },
+          { x: event.clientX, y: event.clientY },
+          ringId,
+        );
+      })}
       style={{
         left: cloud.x,
         top: cloud.y - 30 * cloud.scale,

@@ -2486,6 +2486,14 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Not in scope:** `react-dom`, the Sentry core, `PlaceSearch` (3 kB), `lucide-react` and `tailwind-merge` (already tree-shaken).
 - **Done when:** the `index` chunk is 700 kB or less (−25 % from 951 kB), measured with `npm run build`. All tests, lint and typecheck pass. `npm run perf:trace -- --screenshots` shows no visual change. In the browser: a German start shows German texts in the first frame; the feedback form opens on the first tap; a forced egg (`?egg=…`) shows; with the network off after one visit, an egg, the info card and the feedback form still load.
 
+### 126. A plane behind a cloud takes the tap — S — **✅ Done**
+
+- **Feedback (2026-10-10):** "cant tap a plane behind a cloud".
+- **Cause:** planes (item 96 scene planes and the item 106 live planes) draw before the clouds, so the clouds pass in front of them. Each cloud's hit area is its full box (`SkyClouds`, item 95), so it takes the tap over the plane.
+- **Spec:** each plane hit area gets `data-plane-hit`. A tap on a cloud first looks under the tap point (`document.elementsFromPoint`). When a plane hit area is there, the cloud sends the click on to that plane and does not count its own tap. The plane still draws behind the cloud.
+- **Built:** `tapPlaneBelow` in `SkyClouds`; `data-plane-hit` on the plane wrapper in `CloudLayer` and the hit span in `LivePlanes`.
+- **Checked:** `SkyClouds` test: two taps on a cloud over a plane go to the plane (with the tap point) and open no cloud card; with no plane under it, a double tap opens the cloud card. Not checked: a real phone.
+
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 
 Rules for all items:

@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render } from '@testing-library/react';
+import { act, fireEvent, render } from '@testing-library/react';
 import SkyClouds, { LAYOUT_FADE_MS } from '../src/components/SkyClouds';
 import type { WeatherType } from '../src/components/CloudLayer';
 import type { TimeOfDay } from '../src/utils/sunUtils';
@@ -181,5 +181,35 @@ describe('SkyClouds at Holi (ROADMAP item 118)', () => {
     expect(tinted(holi)[0].getAttribute('fill')).toMatch(/--scene-festival-pastel-[123]/);
     expect(tinted(sky({ weatherType: 'partly' }))).toHaveLength(0);
     expect(tinted(sky({ weatherType: 'partly', holi: true, timeOfDay: 'night' }))).toHaveLength(0);
+  });
+});
+
+describe('SkyClouds over a plane (ROADMAP item 126)', () => {
+  afterEach(() => { delete (document as { elementsFromPoint?: unknown }).elementsFromPoint; });
+
+  it('hands a tap on a cloud to a plane behind it, and opens the cloud card when no plane is there', () => {
+    const onInfo = vi.fn();
+    const cloud = sky({ weatherType: 'partly', onInfo }).querySelector<HTMLElement>('[data-testid="sky-cloud"]')!;
+    const plane = document.createElement('span');
+    plane.setAttribute('data-plane-hit', '');
+    const hit = document.createElement('span');
+    plane.appendChild(hit);
+    document.body.appendChild(plane);
+    const planeTap = vi.fn();
+    plane.addEventListener('click', planeTap);
+
+    document.elementsFromPoint = () => [cloud, hit];
+    fireEvent.click(cloud, { clientX: 40, clientY: 50 });
+    fireEvent.click(cloud, { clientX: 40, clientY: 50 });
+    expect(planeTap).toHaveBeenCalledTimes(2);
+    expect(planeTap.mock.calls[0][0]).toMatchObject({ clientX: 40, clientY: 50 });
+    expect(onInfo).not.toHaveBeenCalled();
+
+    document.elementsFromPoint = () => [cloud];
+    fireEvent.click(cloud, { clientX: 40, clientY: 50 });
+    fireEvent.click(cloud, { clientX: 40, clientY: 50 });
+    expect(onInfo).toHaveBeenCalledWith(expect.objectContaining({ type: 'cloud' }), { x: 40, y: 50 }, expect.any(String));
+    expect(planeTap).toHaveBeenCalledTimes(2);
+    plane.remove();
   });
 });
