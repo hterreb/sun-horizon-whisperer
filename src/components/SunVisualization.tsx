@@ -17,6 +17,7 @@ import { type PlayfulEgg } from '@/utils/playfulEggs';
 import { type CalendarEvent, type SeasonPath, getSolsticeTraceDates } from '@/utils/calendarEvents';
 import PremiumBadge from './PremiumBadge';
 import WeatherEffects from './WeatherEffects';
+import RainbowLayer from './RainbowLayer';
 import SolarEclipse from '@/components/SolarEclipse';
 import GreenFlash from '@/components/GreenFlash';
 import MoonTint from '@/components/MoonTint';
@@ -1073,6 +1074,16 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
   return (
     <div ref={containerRef} className="w-full h-dvh relative overflow-hidden pointer-events-none" data-testid="sun-visualization">
+      {/* Item 121 (decision 2026-10-10): the rainbow first, with no z-index, so everything after
+          it (satellites, planes, clouds, birds, the terrain) draws over it and takes the tap. */}
+      <RainbowLayer
+        rainbow={rainbowGeometry}
+        timeOfDay={timeOfDay}
+        containerWidth={containerDimensions.width}
+        containerHeight={containerDimensions.height}
+        onInfo={onSceneInfo}
+        infoRing={infoRing}
+      />
       <Satellites
         width={containerDimensions.width}
         height={containerDimensions.height}
@@ -1142,11 +1153,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         temperatureC={temperatureC}
         windSpeedKmh={windSpeedKmh}
         sunAltitude={sunPosition.altitude}
-        rainbow={rainbowGeometry}
         containerWidth={containerDimensions.width}
         containerHeight={containerDimensions.height}
-        onInfo={onSceneInfo}
-        infoRing={infoRing}
       />
       <Fireworks trigger={fireworksTrigger} />
 

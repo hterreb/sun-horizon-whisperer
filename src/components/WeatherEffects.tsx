@@ -1,10 +1,8 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
-import { useDoubleTap } from '@/hooks/useDoubleTap';
-import { type SceneInfoHandler, type WeatherType } from './CloudLayer';
+import { type WeatherType } from './CloudLayer';
 import { type TimeOfDay } from '../utils/sunUtils';
 import { getWeatherEffects, canFlashLightning } from '../utils/weatherEffectsUtils';
-import { type RainbowGeometry } from './SunVisualization';
 
 interface WeatherEffectsProps {
   weatherType: WeatherType;
@@ -12,12 +10,8 @@ interface WeatherEffectsProps {
   temperatureC: number | null;
   windSpeedKmh: number | null;
   sunAltitude: number;
-  rainbow: RainbowGeometry;
   containerWidth: number;
   containerHeight: number;
-  // Item 121: a double tap on the rainbow opens its card.
-  onInfo?: SceneInfoHandler;
-  infoRing?: string | null;
 }
 
 // Storm lightning: a random flash, capped by canFlashLightning (>= 8s apart) and
@@ -27,43 +21,24 @@ const LIGHTNING_CHECK_INTERVAL_MS = 1000;
 const LIGHTNING_FLASH_CHANCE = 0.15;
 const LIGHTNING_FLASH_DURATION_MS = 150;
 
-// Rainbow bands, outermost first, drawn as concentric arcs. Deliberately not scene
-// tokens: a rainbow is the fixed spectrum, not a theme colour (AUDIT A-9).
-const RAINBOW_BANDS = ['#dc2626', '#f97316', '#eab308', '#22c55e', '#0ea5e9', '#7c3aed'];
-const RAINBOW_BAND_GAP_PX = 7;
-const RAINBOW_STROKE_PX = 5;
-// Item 121: fainter (it was 0.5), with soft band edges and the feet fading toward the horizon.
-export const RAINBOW_OPACITY = 0.2;
-const RAINBOW_BLUR_PX = 1.5;
-const RAINBOW_FEET_OPACITY = 0.3;
-// The hit path covers the 6 bands (5 gaps + a stroke = 40 px). It stops RAINBOW_FEET_FREE_PX above
-// the horizon, so the pot of gold at the rainbow's foot (item 117) keeps its own tap.
-const RAINBOW_HIT_PX = 5 * RAINBOW_BAND_GAP_PX + RAINBOW_STROKE_PX;
-const RAINBOW_FEET_FREE_PX = 30;
-export const RAINBOW_RING = 'rainbow';
-
 // Heat shimmer (ROADMAP item 56): a band just above the horizon with thin pale lines,
 // bent by a slowly drifting turbulence field (one 7 s cycle).
 const HEAT_SHIMMER_BAND_PX = 40;
 
 // The illustrations from ROADMAP item 10 that aren't part of the spawning "living
-// scene" (that's CloudLayer): fog low over the horizon, storm lightning, heat shimmer
-// and the rainbow. All scene elements stay at z <= 10 (see ROADMAP item 1).
+// scene" (that's CloudLayer): fog low over the horizon, storm lightning and heat shimmer.
+// The rainbow has its own layer under the clouds (RainbowLayer, item 121). All scene
+// elements stay at z <= 10 (see ROADMAP item 1).
 const WeatherEffects: React.FC<WeatherEffectsProps> = ({
   weatherType,
   timeOfDay,
   temperatureC,
   windSpeedKmh,
   sunAltitude,
-  rainbow,
   containerWidth,
-  containerHeight,
-  onInfo,
-  infoRing = null,
+  containerHeight
 }) => {
   const prefersReducedMotion = usePrefersReducedMotion();
-  const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
-  const { tap } = useDoubleTap(onInfo);
   const effects = getWeatherEffects({ type: weatherType, windKmh: windSpeedKmh, tempC: temperatureC, sunAltitude });
 
   const [flash, setFlash] = useState(false);
@@ -154,69 +129,6 @@ const WeatherEffects: React.FC<WeatherEffectsProps> = ({
           )}
         </svg>
       )}
-
-      {/* Rainbow: opposite the sun, clipped to the sky above the horizon so only the
-          arc (not a full ring) shows. */}
-      {rainbow.visible && !isNight && containerWidth > 0 && containerHeight > 0 && (() => {
-        const cx = rainbow.xFraction * containerWidth;
-        const outer = (rainbow.apexHeightDeg / 42) * horizonY * 0.95;
-        const middle = outer - 2.5 * RAINBOW_BAND_GAP_PX;
-        const ringOn = infoRing === RAINBOW_RING;
-        return (
-          <div className="absolute left-0 top-0 w-full overflow-hidden" style={{ height: `${horizonY}px` }}>
-            <svg width={containerWidth} height={horizonY} className="absolute inset-0" style={{ opacity: RAINBOW_OPACITY }} data-testid="rainbow">
-              <defs>
-                <filter id={`${uid}b`} x="-10%" y="-10%" width="120%" height="120%">
-                  <feGaussianBlur stdDeviation={RAINBOW_BLUR_PX} />
-                </filter>
-                {/* Full strength at the top, RAINBOW_FEET_OPACITY at the horizon. */}
-                <linearGradient id={`${uid}f`} x1="0" y1="0" x2="0" y2={horizonY} gradientUnits="userSpaceOnUse">
-                  <stop offset="0" stopColor="white" stopOpacity={1} />
-                  <stop offset="1" stopColor="white" stopOpacity={RAINBOW_FEET_OPACITY} />
-                </linearGradient>
-                <mask id={`${uid}m`} maskUnits="userSpaceOnUse" x="0" y="0" width={containerWidth} height={horizonY}>
-                  <rect width={containerWidth} height={horizonY} fill={`url(#${uid}f)`} />
-                </mask>
-              </defs>
-              <g filter={`url(#${uid}b)`} mask={`url(#${uid}m)`}>
-                {RAINBOW_BANDS.map((color, i) => {
-                  const radius = outer - i * RAINBOW_BAND_GAP_PX;
-                  if (radius <= 0) return null;
-                  return (
-                    <circle key={color} cx={cx} cy={horizonY} r={radius} fill="none" stroke={color} strokeWidth={RAINBOW_STROKE_PX} />
-                  );
-                })}
-              </g>
-            </svg>
-            {onInfo && middle > 0 && (
-              // Only the arc takes taps (pointer-events: stroke), not the sky inside it.
-              <svg
-                width={containerWidth}
-                height={Math.max(0, horizonY - RAINBOW_FEET_FREE_PX)}
-                className="absolute left-0 top-0 overflow-hidden"
-                aria-hidden="true"
-              >
-                <circle
-                  cx={cx}
-                  cy={horizonY}
-                  r={middle}
-                  fill="none"
-                  stroke="transparent"
-                  strokeWidth={RAINBOW_HIT_PX}
-                  className="cursor-pointer touch-manipulation"
-                  style={{ pointerEvents: 'stroke' }}
-                  data-testid="rainbow-hit"
-                  data-scene-hit=""
-                  onClick={(e) => tap({ type: 'rainbow' }, { x: e.clientX, y: e.clientY }, RAINBOW_RING)}
-                />
-                {ringOn && [middle + RAINBOW_HIT_PX / 2, middle - RAINBOW_HIT_PX / 2].map((r) => r > 0 && (
-                  <circle key={r} cx={cx} cy={horizonY} r={r} fill="none" strokeWidth={1} className="stroke-tier-uncommon/80" data-testid="scene-info-ring" />
-                ))}
-              </svg>
-            )}
-          </div>
-        );
-      })()}
     </div>
   );
 };
