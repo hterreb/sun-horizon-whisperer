@@ -26,6 +26,7 @@ interface NationalEggsProps {
 // Reduced motion: no jets and no fireworks (their badges do not count); the bonfire stays.
 export const JETS_RING = 'egg-jets';
 export const BONFIRE_RING = 'egg-bonfire';
+export const FIREWORKS_RING = 'egg-national-fireworks';
 const SPEED_PCT = 2; // % of the width per second (calm-motion rule)
 const PX_CAP = (390 * SPEED_PCT) / 100; // phone px/s on wide screens
 const SMOKE_FADE_S = 40;
@@ -115,7 +116,10 @@ const NationalEggs: React.FC<NationalEggsProps> = ({ day, timeOfDay, onInfo, inf
         </div>
       )}
 
-      {fireworksOn && <Fireworks trigger={1} palette={palette} />}
+      {/* Item 123: a double tap on the running show opens the national day's card. */}
+      {fireworksOn && (
+        <Fireworks trigger={1} palette={palette} onTap={onInfo && ((e) => tap({ type: 'egg', kind: day.kind }, { x: e.clientX, y: e.clientY }, FIREWORKS_RING))} />
+      )}
 
       {day.bonfire && isDark && (
         // On the shore at the horizon (65 % of the height, as in SunVisualization); the water

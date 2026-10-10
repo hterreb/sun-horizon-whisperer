@@ -32,32 +32,29 @@ describe('SceneBoat bunting on a national day', () => {
     expect(screen.queryByTestId('boat-bunting')).toBeNull();
   });
 
-  it('hangs the flag colours and reports that it shows, so the badge counts', () => {
-    const onShow = vi.fn();
+  it('hangs the flag colours', () => {
     render(
-      <BuntingContext.Provider value={{ colors: ['hsl(var(--national-de-black))', 'hsl(var(--national-de-red))'], onShow }}>
+      <BuntingContext.Provider value={{ colors: ['hsl(var(--national-de-black))', 'hsl(var(--national-de-red))'] }}>
         <SceneBoat kind="ferry" tone="day" lit={false} wake={false} />
       </BuntingContext.Provider>
     );
     expect(screen.getByTestId('boat-bunting')).toBeTruthy();
     expect(screen.getAllByTestId('bunting-pennant')[1].getAttribute('fill')).toBe('hsl(var(--national-de-red))');
-    expect(onShow).toHaveBeenCalledTimes(1);
   });
   });
 
   it('hangs papel picado (square flags) on Día de los Muertos (item 118)', () => {
     render(
-      <BuntingContext.Provider value={{ colors: ['hsl(var(--scene-festival-pastel-1))'], shape: 'picado', onShow: () => {} }}>
+      <BuntingContext.Provider value={{ colors: ['hsl(var(--scene-festival-pastel-1))'], shape: 'picado' }}>
         <SceneBoat kind="sailboat" tone="day" lit={false} wake={false} />
       </BuntingContext.Provider>
     );
     expect(screen.getByTestId('boat-bunting').querySelectorAll('rect').length).toBeGreaterThan(2);
   });
 
-  it('lights up on Christmas above the dimming filter, glowing at night, and reports that it shows', () => {
-    const onShow = vi.fn();
+  it('lights up on Christmas above the dimming filter, glowing at night', () => {
     const { rerender } = render(
-      <BuntingContext.Provider value={{ colors: ['hsl(var(--scene-xmas-bulb-1))'], shape: 'lights', onShow }}>
+      <BuntingContext.Provider value={{ colors: ['hsl(var(--scene-xmas-bulb-1))'], shape: 'lights' }}>
         <SceneBoat kind="fishing" tone="night" lit wake={false} />
       </BuntingContext.Provider>
     );
@@ -67,9 +64,8 @@ describe('SceneBoat bunting on a national day', () => {
     expect((lights.ownerSVGElement as SVGSVGElement).style.filter).toBe('');
     expect(screen.getByTestId('christmas-star')).toBeTruthy();
     expect(lights.innerHTML).toMatch(/drop-shadow/);
-    expect(onShow).toHaveBeenCalledTimes(1);
     rerender(
-      <BuntingContext.Provider value={{ colors: ['hsl(var(--scene-xmas-bulb-1))'], shape: 'lights', onShow }}>
+      <BuntingContext.Provider value={{ colors: ['hsl(var(--scene-xmas-bulb-1))'], shape: 'lights' }}>
         <SceneBoat kind="fishing" tone="day" lit={false} wake={false} />
       </BuntingContext.Provider>
     );

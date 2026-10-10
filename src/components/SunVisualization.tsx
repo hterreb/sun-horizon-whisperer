@@ -569,6 +569,9 @@ const ARC_LABEL_ICONS: Record<ArcLabelKind, typeof Sunrise> = {
   set: Sunset,
 };
 
+// Item 123: the fireworks show has no ring shape (it fills the sky), like the terrain.
+export const FIREWORKS_RING = 'egg-fireworks';
+
 const SunVisualization: React.FC<SunVisualizationProps> = ({
   sunPosition,
   moonPosition,
@@ -1156,7 +1159,11 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         containerWidth={containerDimensions.width}
         containerHeight={containerDimensions.height}
       />
-      <Fireworks trigger={fireworksTrigger} />
+      {/* Item 123: a double tap on a running show opens the fireworks card (the New Year badge). */}
+      <Fireworks
+        trigger={fireworksTrigger}
+        onTap={onSceneInfo && ((e) => tap({ type: 'egg', kind: 'fireworks' }, { x: e.clientX, y: e.clientY }, FIREWORKS_RING))}
+      />
 
       {(sunArcPath || moonArcPath || solsticeTracePaths.length > 0) && (
         <svg className="absolute inset-0 w-full h-full pointer-events-none">

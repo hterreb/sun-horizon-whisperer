@@ -1,5 +1,5 @@
 import React from 'react';
-import { render } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import NightStars from '../src/components/NightStars';
 
 // The global HTMLCanvasElement.getContext mock in tests/setupTests.ts is only
@@ -193,6 +193,25 @@ describe('NightStars', () => {
 
     rafSpy.mockRestore();
     mediaSpy.mockRestore();
+    ctxSpy.mockRestore();
+  });
+
+  // Item 123: during a shower at night the sky takes double taps (the meteor shower card).
+  it('lets the sky take double taps only during a meteor shower at night', () => {
+    const ctxSpy = mockCanvasContext();
+    const rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 1);
+    const onInfo = vi.fn();
+    const { rerender } = render(<NightStars timeOfDay="night" meteorShower onInfo={onInfo} />);
+    const sky = screen.getByTestId('meteor-sky');
+    fireEvent.click(sky, { detail: 1 });
+    expect(onInfo).not.toHaveBeenCalled();
+    fireEvent.click(sky, { detail: 2 });
+    expect(onInfo).toHaveBeenCalledWith({ type: 'egg', kind: 'meteorShower' }, expect.anything(), 'egg-meteor-shower');
+    rerender(<NightStars timeOfDay="night" onInfo={onInfo} />);
+    expect(screen.queryByTestId('meteor-sky')).toBeNull();
+    rerender(<NightStars timeOfDay="nautical-twilight" meteorShower onInfo={onInfo} />);
+    expect(screen.queryByTestId('meteor-sky')).toBeNull();
+    rafSpy.mockRestore();
     ctxSpy.mockRestore();
   });
 });

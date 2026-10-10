@@ -8,7 +8,7 @@ import { type Language } from './language';
 import { formatTime, type NextGoldenBlueHours, type SunPosition, type SunTimes, type TimeOfDay } from './sunUtils';
 import { getMoonPhaseLabel, type MoonPosition, type MoonTimes } from './moonUtils';
 import { getMoonEclipticGeocentric } from './lunarEphemeris';
-import { isSupermoon } from './astroEvents';
+import { isSupermoon, type AstroEventKind } from './astroEvents';
 import { horizonAngleAt, ridgeAt, type HorizonProfile } from './horizonUtils';
 import { getCloudLayers, type CloudBand, type CloudLayers, type CloudType } from './skyCloudUtils';
 import {
@@ -31,12 +31,17 @@ export type EggCardKind = 'ufo' | 'ghost' | 'dragon' | 'santa' | 'blackCat' | 'h
   | NationalDayKind
   | 'emptyTomb' | 'potOfGold' | 'heartCloud' // item 117
   // Item 118: the festival eggs (FestivalEggs). Holi tints the clouds, which keep their cloud cards.
-  | Exclude<FestivalEgg, 'holi'>;
+  | Exclude<FestivalEgg, 'holi'>
+  // Item 123: the fireworks show, the aurora, the meteor shower's star field and the season badge.
+  | 'fireworks' | 'aurora' | 'meteorShower' | 'solstice' | 'equinox';
+
+// Item 123: a boat on a bunting day, at Día de los Muertos or at Christmas carries this (useBunting).
+export type BoatDress = 'pennant' | 'picado' | 'lights';
 
 export type SceneInfoTarget =
   | { type: 'fish'; kind: FishKind }
   | { type: 'bird'; kind: BirdKind | 'bat' }
-  | { type: 'boat'; kind: BoatKind }
+  | { type: 'boat'; kind: BoatKind; dressed?: BoatDress }
   | { type: 'plane'; contrail: ContrailKind }
   | { type: 'livePlane'; callsign: string | null; airline: string | null; aircraftType: string | null; altM: number; speedKt: number }
   | { type: 'cloud'; cloudType: CloudType; band: CloudBand }
@@ -100,6 +105,8 @@ export interface SceneInfoContext {
   route?: LiveRoute | null;
   // The place name the InfoPanel shows ("Ravensburg, Germany"), for Santa's route (S7); null: none.
   placeName?: string | null;
+  // Item 123: today's astronomy event, for its row on the sun or moon card; null: none.
+  skyEvent?: AstroEventKind | null;
 }
 
 // Item 107: the Latin name where the kind is one species. Group names (fish, ray, sea turtle,
@@ -279,7 +286,22 @@ const EGGS: Record<EggCardKind, { name: MessageKey; fact: MessageKey; hidden: bo
   nowruz: { name: 'egg.nowruz', fact: 'eggFact.nowruz', hidden: false, chance: { event: 'nowruz' } },
   midsummer: { name: 'egg.midsummer', fact: 'eggFact.midsummer', hidden: false, chance: { event: 'midsummer' } },
   carnival: { name: 'egg.carnival', fact: 'eggFact.carnival', hidden: false, chance: { event: 'carnival' } },
+  // Item 123: real sky events and the season badge, so no chance text (the tier alone).
+  fireworks: { name: 'egg.fireworks', fact: 'eggFact.fireworks', hidden: false, chance: null },
+  aurora: { name: 'egg.aurora', fact: 'eggFact.aurora', hidden: false, chance: null },
+  meteorShower: { name: 'egg.meteorShower', fact: 'eggFact.meteorShower', hidden: false, chance: null },
+  solstice: { name: 'egg.solstice', fact: 'eggFact.solstice', hidden: false, chance: null },
+  equinox: { name: 'egg.equinox', fact: 'eggFact.equinox', hidden: false, chance: null },
 };
+
+// Item 123: the event row of the sun and the moon card (the moon card has its own supermoon row).
+const SUN_EVENTS: Partial<Record<AstroEventKind, MessageKey>> = { solarEclipse: 'egg.solarEclipse', greenFlash: 'egg.greenFlash' };
+const MOON_EVENTS: Partial<Record<AstroEventKind, MessageKey>> = { lunarEclipse: 'egg.lunarEclipse', blueMoon: 'egg.blueMoon' };
+const eventLine = (events: Partial<Record<AstroEventKind, MessageKey>>, kind: AstroEventKind | null | undefined): InfoLine[] => {
+  const key = kind ? events[kind] : undefined;
+  return key ? [{ label: 'info.event', value: { key } }] : [];
+};
+const DRESS: Record<BoatDress, MessageKey> = { pennant: 'info.dressedPennant', picado: 'info.dressedPicado', lights: 'info.dressedLights' };
 
 const DIRECTIONS: MessageKey[] = [
   'direction.n', 'direction.ne', 'direction.e', 'direction.se',
@@ -457,7 +479,8 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
       const boat = BOATS[target.kind];
       const rarity = rarityLine(getBoatShare(target.kind), language);
       return {
-        kicker: 'infoKind.boat', icon: 'boat', title: boat.name, lines: [rarity], fact: fieldNote(boat.fact), tier: rarity.tier,
+        kicker: 'infoKind.boat', icon: 'boat', title: boat.name, fact: fieldNote(boat.fact), tier: rarity.tier,
+        lines: [rarity, ...(target.dressed ? [{ label: 'info.dressed' as const, value: { key: DRESS[target.dressed] } }] : [])],
       };
     }
     case 'plane':
@@ -517,6 +540,7 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
           { label: 'info.direction', value: directionText(ctx.sunPosition.azimuth) },
           ...(next ? [next] : []),
           { label: 'info.goldenHour', value: goldenHour(ctx) },
+          ...eventLine(SUN_EVENTS, ctx.skyEvent),
         ],
       };
     }
@@ -537,6 +561,7 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
           { label: 'moon.set', value: riseSet(moonTimes.set) },
           { label: 'info.distance', value: { key: 'info.km', vars: { value: formatNumber(language, Math.round(distanceKm / 100) * 100, 0) } } },
           ...(isSupermoon(now) ? [{ value: { key: 'info.supermoon' as const } }] : []),
+          ...eventLine(MOON_EVENTS, ctx.skyEvent),
         ],
       };
     }

@@ -372,7 +372,8 @@ describe('sceneInfo: easter egg cards (ROADMAP item 113)', () => {
     'loyKrathong', 'diwali', 'eidAlFitr', 'midAutumn', 'hanami', 'tanabata', 'diaDeMuertos', 'hanukkah', 'nowruz', 'midsummer', 'carnival',
   ];
   const kinds: EggCardKind[] = ['ufo', 'ghost', 'dragon', 'santa', 'blackCat', 'halloweenBat', 'pumpkinMoon',
-    'matariki', 'conjunction', 'noctilucent', 'midnightSun', 'polarNight', 'emptyTomb', 'potOfGold', 'heartCloud', ...festivals];
+    'matariki', 'conjunction', 'noctilucent', 'midnightSun', 'polarNight', 'emptyTomb', 'potOfGold', 'heartCloud', ...festivals,
+    'fireworks', 'aurora', 'meteorShower', 'solstice', 'equinox']; // item 123
 
   it('gives every egg the "ultra rare" tier, a title, a field note and the rarity row', () => {
     for (const kind of kinds) {
@@ -471,6 +472,28 @@ describe('sceneInfo: easter egg cards (ROADMAP item 113)', () => {
     expect(eggCard('ghost')).toEqual([
       'Midnight ghost', 'Old folklore calls midnight the witching hour, when ghosts are said to walk.', 'Rarity: Ultra rare',
     ]);
+  });
+});
+
+describe('sceneInfo: item 123 rows', () => {
+  it('names the new egg cards: fireworks, aurora, meteor shower, solstice, equinox', () => {
+    expect(card({ type: 'egg', kind: 'fireworks' })[0]).toBe('Fireworks');
+    expect(card({ type: 'egg', kind: 'aurora' })[0]).toBe('Aurora');
+    expect(card({ type: 'egg', kind: 'meteorShower' })[0]).toBe('Meteor shower');
+    expect(card({ type: 'egg', kind: 'solstice' }, undefined, de)[0]).toBe('Sonnenwende');
+    expect(getSceneInfo({ type: 'egg', kind: 'equinox' }, ctx()).kicker).toBe('infoKind.specialEvent');
+  });
+
+  it('adds the event row to the sun card in a solar eclipse and to the moon card in a lunar eclipse', () => {
+    expect(card({ type: 'sun' }, { skyEvent: 'solarEclipse' })).toContain('Event: Solar eclipse');
+    expect(card({ type: 'sun' }, { skyEvent: 'lunarEclipse' }).join()).not.toMatch(/Event/);
+    expect(card({ type: 'moon' }, { skyEvent: 'blueMoon' })).toContain('Event: Blue moon');
+    expect(card({ type: 'moon' }, { skyEvent: null }).join()).not.toMatch(/Event/);
+  });
+
+  it('says how a dressed boat is decorated', () => {
+    expect(card({ type: 'boat', kind: 'ferry', dressed: 'lights' })).toContain('Dressed: Christmas lights');
+    expect(card({ type: 'boat', kind: 'ferry' }).join()).not.toMatch(/Dressed/);
   });
 });
 
