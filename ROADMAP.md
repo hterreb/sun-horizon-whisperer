@@ -2506,6 +2506,14 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Screenshots (2026-10-10):** `npm run perf:trace -- --build --seconds 5 --warmup 11 --screenshots DIR` on main `9a2efeb` and on the rebased branch, all 8 scenes, both with the same `.env.local`. 0.04–1.7 % of the pixels differ, all of them moving parts (birds, boats, twinkling stars, rain). The chrome (top-left buttons, panel, player) is the same.
 - **Open:** a check on a phone.
 
+### 126. A plane behind a cloud takes the tap — S — **✅ Done**
+
+- **Feedback (2026-10-10):** "cant tap a plane behind a cloud".
+- **Cause:** planes (item 96 scene planes and the item 106 live planes) draw before the clouds, so the clouds pass in front of them. Each cloud's hit area is its full box (`SkyClouds`, item 95), so it takes the tap over the plane.
+- **Spec:** each plane hit area gets `data-plane-hit`. A tap on a cloud first looks under the tap point (`document.elementsFromPoint`). When a plane hit area is there, the cloud sends the click on to that plane and does not count its own tap. The plane still draws behind the cloud.
+- **Built:** `tapPlaneBelow` in `SkyClouds`; `data-plane-hit` on the plane wrapper in `CloudLayer` and the hit span in `LivePlanes`.
+- **Checked:** `SkyClouds` test: two taps on a cloud over a plane go to the plane (with the tap point) and open no cloud card; with no plane under it, a double tap opens the cloud card. Not checked: a real phone.
+
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 
 Rules for all items:
