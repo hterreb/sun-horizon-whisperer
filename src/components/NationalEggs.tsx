@@ -14,6 +14,8 @@ interface NationalEggsProps {
   onInfo?: SceneInfoHandler;
   infoRing?: string | null;
   infoRingTier?: RarityTier | null;
+  // Item 123: the national show starts or ends (SunTracker's EventSkyTaps takes its taps).
+  onFireworksRunning?: (running: boolean) => void;
 }
 
 // The national-day eggs in the sky and on the shore (the bunting is on the boats: BoatBunting).
@@ -46,7 +48,7 @@ const resolvedColor = (token: string): string => {
   return value ? `hsl(${value})` : '#ffffff';
 };
 
-const NationalEggs: React.FC<NationalEggsProps> = ({ day, timeOfDay, onInfo, infoRing = null, infoRingTier = null }) => {
+const NationalEggs: React.FC<NationalEggsProps> = ({ day, timeOfDay, onInfo, infoRing = null, infoRingTier = null, onFireworksRunning }) => {
   const prefersReducedMotion = usePrefersReducedMotion();
   const { tap } = useDoubleTap(onInfo);
   const isDark = DARK.includes(timeOfDay);
@@ -115,7 +117,7 @@ const NationalEggs: React.FC<NationalEggsProps> = ({ day, timeOfDay, onInfo, inf
         </div>
       )}
 
-      {fireworksOn && <Fireworks trigger={1} palette={palette} />}
+      {fireworksOn && <Fireworks trigger={1} palette={palette} onRunningChange={onFireworksRunning} />}
 
       {day.bonfire && isDark && (
         // On the shore at the horizon (65 % of the height, as in SunVisualization); the water

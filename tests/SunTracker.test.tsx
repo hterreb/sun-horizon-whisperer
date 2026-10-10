@@ -39,6 +39,7 @@ import { loadSatelliteData, type GpRecord } from '../src/utils/satelliteData';
 import issFixture from './fixtures/iss-omm-2026-10-05.json';
 import { BADGES } from '../src/utils/collection';
 import { FADE_OUT_MS, SHOW_MS } from '../src/components/BadgeUnlocked';
+import { type EggCardKind } from '../src/utils/sceneInfo';
 
 describe('SunTracker', () => {
   beforeEach(() => {
@@ -1027,6 +1028,22 @@ describe('SunTracker', () => {
       expect(ufo.querySelector('[data-testid="scene-info-ring"]')!.className).toContain('border-tier-ultra-rare/80');
     });
 
+    it('puts the event tap areas first in the scene, with no z-index, so the scene things take their own taps (item 123)', () => {
+      window.history.pushState({}, '', '/?egg=ufo');
+      vi.setSystemTime(NOON);
+      saveManualLocation(RAVENSBURG.latitude, RAVENSBURG.longitude, 'Ravensburg');
+      render(<SunTracker />);
+      advance(300);
+      const layer = screen.getByTestId('event-sky-taps');
+      expect(layer.parentElement!.hasAttribute('data-share-root')).toBe(true);
+      expect(layer.parentElement!.firstElementChild).toBe(layer);
+      expect(layer.className).not.toMatch(/\bz-/);
+      expect(layer.style.zIndex).toBe('');
+      for (const thing of [screen.getByTestId('ufo'), screen.getByTestId('sun-visualization'), screen.getAllByTestId('scene-hit')[0]]) {
+        expect(layer.compareDocumentPosition(thing) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      }
+    });
+
     it('closes the card after 15 s', () => {
       start();
       doubleTap(screen.getByRole('button', { name: 'Sun' }));
@@ -1138,16 +1155,55 @@ describe('SunTracker', () => {
       expect(unlocked()).toBeNull();
     });
 
-    it('on Christmas Eve after sunset, Santa flies without the snow and his badge counts', () => {
+    it('on Christmas Eve after sunset, Santa flies without the snow and his badge counts on a double tap (item 123)', () => {
       vi.useFakeTimers();
       // 21:00 UTC: about 5.5 h after sunset in Ravensburg (the tests run in UTC).
       vi.setSystemTime(new Date('2026-12-24T21:00:00Z'));
       try {
         render(<SunTracker />);
         expect(visProps.current).toMatchObject({ calendarEvent: null, santa: true });
+        // Item 123: flying is not enough; the double tap on Santa (CalendarEggs' useDoubleTap) collects.
+        expect(localStorage.getItem('collection')).toBeNull();
+        act(() => visProps.current!.onSceneInfo!({ type: 'egg', kind: 'santa' }, { x: 100, y: 100 }, 'egg-santa'));
         expect(JSON.parse(localStorage.getItem('collection')!)).toHaveProperty('egg:santa');
         expect(JSON.parse(localStorage.getItem('collection')!)).not.toHaveProperty('egg:christmas');
         expect(unlocked()).toHaveTextContent('Badge unlocked: Santa Claus'); // item 114
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('an egg that shows does not count; a double tap on it counts once; an egg that does not show counts nothing (item 123)', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-11-13T12:00:00Z')); // Friday the 13th
+      try {
+        render(<SunTracker />);
+        expect(visProps.current).toMatchObject({ calendarEvent: 'friday-13' });
+        expect(localStorage.getItem('collection')).toBeNull();
+        const tapEgg = (kind: EggCardKind) => act(() => visProps.current!.onSceneInfo!({ type: 'egg', kind }, { x: 100, y: 100 }, `egg-${kind}`));
+        tapEgg('dragon');
+        tapEgg('fireworks');
+        expect(localStorage.getItem('collection')).toBeNull();
+        tapEgg('blackCat');
+        tapEgg('blackCat');
+        expect(Object.keys(JSON.parse(localStorage.getItem('collection')!))).toEqual(['egg:friday13']);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('the April Fools sun counts on a double tap on the sun once the scene reported it (item 123)', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2027-04-01T10:00:00Z'));
+      try {
+        render(<SunTracker />);
+        const tapSun = () => act(() => visProps.current!.onSceneInfo!({ type: 'sun' }, { x: 200, y: 200 }, 'sun'));
+        tapSun();
+        expect(JSON.parse(localStorage.getItem('collection')!)).not.toHaveProperty('egg:aprilFools');
+        act(() => visProps.current!.onEggShown!('aprilFools'));
+        expect(JSON.parse(localStorage.getItem('collection')!)).not.toHaveProperty('egg:aprilFools');
+        tapSun();
+        expect(JSON.parse(localStorage.getItem('collection')!)).toHaveProperty('egg:aprilFools');
       } finally {
         vi.useRealTimers();
       }
@@ -1360,6 +1416,12 @@ describe('SunTracker', () => {
 
 // National days (utils/nationalDays): the country comes from InfoPanel's reverse-geocode answer.
 describe('SunTracker national days', () => {
+  // Item 116: two pointer taps on the first boat's tap wrapper.
+  const doubleTapBoat = () => {
+    const boat = screen.getAllByTestId('boat-bunting')[0].closest('[aria-hidden="true"]')!;
+    fireEvent.click(boat, { detail: 1 });
+    fireEvent.click(boat, { detail: 2 });
+  };
   const BERLIN = { latitude: 52.52, longitude: 13.4 };
   const answer = (countryCode: string) => {
     global.fetch = vi.fn((url: string) => String(url).includes('bigdatacloud')
@@ -1381,11 +1443,14 @@ describe('SunTracker national days', () => {
     window.history.pushState({}, '', '/');
   });
 
-  it('dresses the boats with bunting in the detected country, and the badge counts when a boat shows', async () => {
+  it('dresses the boats with bunting in the detected country, and the badge counts on a double tap on a boat (item 123)', async () => {
     answer('DE');
     render(<SunTracker />);
     await waitFor(() => expect(screen.getAllByTestId('boat-bunting').length).toBeGreaterThan(0));
-    await waitFor(() => expect(JSON.parse(localStorage.getItem('collection') ?? '{}')).toHaveProperty('egg:germanUnity'));
+    expect(JSON.parse(localStorage.getItem('collection') ?? '{}')).not.toHaveProperty('egg:germanUnity');
+    doubleTapBoat();
+    expect(JSON.parse(localStorage.getItem('collection') ?? '{}')).toHaveProperty('egg:germanUnity');
+    expect(screen.getByTestId('scene-info-card')).toHaveTextContent('Flag bunting');
   });
 
   it('shows no national egg in another country', async () => {
@@ -1411,13 +1476,16 @@ describe('SunTracker national days', () => {
     expect(localStorage.getItem('collection')).toBeNull();
   });
 
-  it('lights up the boats on Christmas Day, and the badge counts when a boat shows', async () => {
+  it('lights up the boats on Christmas Day, and the badge counts on a double tap on a boat (item 123)', async () => {
     vi.setSystemTime(new Date('2026-12-25T12:00:00Z'));
     answer('DE');
     render(<SunTracker />);
     await waitFor(() => expect(screen.getAllByTestId('christmas-bulb').length).toBeGreaterThan(0));
     expect(screen.getAllByTestId('boat-bunting')[0].getAttribute('data-shape')).toBe('lights');
-    await waitFor(() => expect(JSON.parse(localStorage.getItem('collection') ?? '{}')).toHaveProperty('egg:christmas'));
+    expect(JSON.parse(localStorage.getItem('collection') ?? '{}')).not.toHaveProperty('egg:christmas');
+    doubleTapBoat();
+    expect(JSON.parse(localStorage.getItem('collection') ?? '{}')).toHaveProperty('egg:christmas');
+    expect(screen.getByTestId('scene-info-card')).toHaveTextContent('Christmas lights');
   });
 
   it('?egg=festaRepubblica flies the jets on any day and counts no badge', async () => {

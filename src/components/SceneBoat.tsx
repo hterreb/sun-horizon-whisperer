@@ -1,4 +1,4 @@
-import { useEffect, useId } from 'react';
+import { useId } from 'react';
 import { useBunting } from '@/hooks/useBunting';
 import BoatBunting from './BoatBunting';
 import { type BoatKind, type BoatTone } from '../utils/weatherEffectsUtils';
@@ -112,9 +112,8 @@ interface SceneBoatProps {
 const SceneBoat = ({ kind, tone, lit, wake, seaWindKmh = UNKNOWN_SEA_WIND_KMH }: SceneBoatProps) => {
   const id = useId().replace(/:/g, '');
   const boat = FLEET[kind];
-  // National days, Día de los Muertos and Christmas: a decorated boat reports that it shows, so the egg's badge counts.
+  // National days, Día de los Muertos and Christmas: the boats are dressed.
   const bunting = useBunting();
-  useEffect(() => bunting?.onShow(), [bunting]);
   const height = BOAT_HEIGHT_PX;
   // At dawn and in the evening the sails catch the peach light.
   const sail = tone === 'sun' ? [c('sun'), c('sun-deep')] : [c('white'), c('shade')];

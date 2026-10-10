@@ -2,9 +2,10 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   BADGES, COLLECTION_STORAGE_KEY, addToCollection, badgeForAstroEvent, badgeForRoute, getPlaneHaul, badgeForCalendarEvent, badgeForSanta, badgeForTarget,
   countCollected, getMoonState, getSunState, getTerrainBand, isCollectionPaused, loadCollection, saveCollection,
-  NOWRUZ_ALSO, stateBadgeForTarget, type BadgeId, type CalendarBadgeOptions, type StateBadgeContext,
+  NOWRUZ_ALSO, eggBadgesForTarget, stateBadgeForTarget, type BadgeId, type CalendarBadgeOptions, type StateBadgeContext,
 } from '@/utils/collection';
 import { type HorizonProfile } from '@/utils/horizonUtils';
+import { type EggCardKind } from '@/utils/sceneInfo';
 import { badgeForNationalDay, type NationalBadgeOptions } from '@/utils/collection';
 import { NATIONAL_DAYS, type NationalDayKind } from '@/utils/nationalDays';
 import { FISH_WEIGHTS, BIRD_WEIGHTS, type FishKind } from '@/utils/weatherEffectsUtils';
@@ -308,5 +309,42 @@ describe('national-day badges', () => {
     expect(badgeForNationalDay(day('germanUnity'), noon)).toBeNull();
     expect(badgeForNationalDay(null, noon)).toBeNull();
     expect(badgeForNationalDay(day('bastilleDay'), { ...night, isTimePreview: true })).toBeNull();
+  });
+});
+
+// Item 123: the egg badges a double tap can collect.
+describe('eggBadgesForTarget (ROADMAP item 123)', () => {
+  const ids = new Set<string>(BADGES.map(b => b.id));
+  const cards: EggCardKind[] = ['ufo', 'ghost', 'dragon', 'santa', 'blackCat', 'halloweenBat', 'pumpkinMoon',
+    'matariki', 'conjunction', 'noctilucent', 'midnightSun', 'polarNight', ...NATIONAL_DAYS.map(d => d.kind),
+    'emptyTomb', 'potOfGold', 'heartCloud',
+    'loyKrathong', 'diwali', 'eidAlFitr', 'midAutumn', 'hanami', 'tanabata', 'diaDeMuertos', 'hanukkah', 'nowruz', 'midsummer', 'carnival',
+    'fireworks', 'aurora', 'meteorShower', 'solstice', 'equinox'];
+
+  it('maps every egg card but the ghost to real badges', () => {
+    for (const kind of cards) {
+      const badges = eggBadgesForTarget({ type: 'egg', kind });
+      if (kind === 'ghost') expect(badges).toEqual([]);
+      else expect(badges.length, kind).toBeGreaterThan(0);
+      for (const id of badges) expect(ids.has(id), `${kind} -> ${id}`).toBe(true);
+    }
+  });
+
+  it('maps the renamed cards to their badges; Nowruz also gives the equinox', () => {
+    expect(eggBadgesForTarget({ type: 'egg', kind: 'dragon' })).toEqual(['egg:lunarNewYear']);
+    expect(eggBadgesForTarget({ type: 'egg', kind: 'blackCat' })).toEqual(['egg:friday13']);
+    expect(eggBadgesForTarget({ type: 'egg', kind: 'potOfGold' })).toEqual(['egg:stPatrick']);
+    expect(eggBadgesForTarget({ type: 'egg', kind: 'fireworks' })).toEqual(['egg:newYear']);
+    expect(eggBadgesForTarget({ type: 'egg', kind: 'nowruz' })).toEqual(['egg:nowruz', NOWRUZ_ALSO]);
+    expect(eggBadgesForTarget({ type: 'egg', kind: 'bastilleDay' })).toEqual(['egg:bastilleDay']);
+  });
+
+  it('lets the sun, the moon, a dressed boat and a cloud carry their events', () => {
+    expect(eggBadgesForTarget({ type: 'sun' })).toEqual(['egg:solarEclipse', 'egg:greenFlash', 'egg:aprilFools']);
+    expect(eggBadgesForTarget({ type: 'moon' })).toEqual(['egg:lunarEclipse', 'egg:supermoon', 'egg:blueMoon']);
+    expect(eggBadgesForTarget({ type: 'boat', kind: 'ferry', dressed: 'pennant' })).toEqual(expect.arrayContaining(['egg:christmas', 'egg:germanUnity']));
+    expect(eggBadgesForTarget({ type: 'boat', kind: 'ferry' })).toEqual([]);
+    expect(eggBadgesForTarget({ type: 'cloud', cloudType: 'Cu', band: 'low' })).toEqual(['egg:holi']);
+    expect(eggBadgesForTarget({ type: 'fish', kind: 'perch' })).toEqual([]);
   });
 });

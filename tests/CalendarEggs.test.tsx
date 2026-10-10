@@ -294,4 +294,23 @@ describe('CalendarEggs', () => {
       expect(bat.getAttribute('style')).not.toMatch(/animation/);
     });
   });
+
+  // Item 123: the season badge takes double taps (the solstice or equinox card); the blue moon label does not.
+  it('opens the solstice or equinox card on a double tap on the season badge, not on one tap', () => {
+    const onInfo = vi.fn();
+    const { rerender } = render(<CalendarEggs {...base} event="solstice-longest" onInfo={onInfo} />);
+    const badge = screen.getByTestId('season-badge');
+    expect(badge.className).toContain('pointer-events-auto');
+    expect(badge.hasAttribute('data-scene-hit')).toBe(true);
+    fireEvent.click(badge, { detail: 1 });
+    expect(onInfo).not.toHaveBeenCalled();
+    fireEvent.click(badge, { detail: 2 });
+    expect(onInfo).toHaveBeenCalledWith({ type: 'egg', kind: 'solstice' }, expect.anything(), 'egg-season');
+    rerender(<CalendarEggs {...base} event="nowruz" onInfo={onInfo} />);
+    fireEvent.click(screen.getByTestId('season-badge'), { detail: 1 });
+    fireEvent.click(screen.getByTestId('season-badge'), { detail: 2 });
+    expect(onInfo).toHaveBeenLastCalledWith({ type: 'egg', kind: 'equinox' }, expect.anything(), 'egg-season');
+    rerender(<CalendarEggs {...base} event={null} blueMoon onInfo={onInfo} />);
+    expect(screen.getByTestId('season-badge').className).toContain('pointer-events-none');
+  });
 });

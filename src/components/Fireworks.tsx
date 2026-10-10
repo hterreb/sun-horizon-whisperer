@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 
 interface FireworksProps {
@@ -8,6 +8,9 @@ interface FireworksProps {
   // Burst colours (CSS colours); keep the array stable, a new one restarts the show. National
   // days pass the flag colours (NationalEggs).
   palette?: readonly string[];
+  // Item 123: tells when a show starts and ends, so EventSkyTaps can take taps on the sky for it.
+  // The canvas itself never takes taps.
+  onRunningChange?: (running: boolean) => void;
 }
 
 // Burst colours that stand out on a sunset sky (no yellow or orange), plus a
@@ -61,15 +64,18 @@ const burst = (x: number, y: number, big: boolean, colors: readonly string[]): S
   });
 };
 
-const Fireworks: React.FC<FireworksProps> = ({ trigger, palette = COLORS }) => {
+const Fireworks: React.FC<FireworksProps> = ({ trigger, palette = COLORS, onRunningChange }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sparksRef = useRef<Spark[]>([]);
   const rafRef = useRef<number | null>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
+  const [running, setRunning] = useState(false);
+  useEffect(() => onRunningChange?.(running), [running, onRunningChange]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!trigger || prefersReducedMotion || !canvas) return;
+    setRunning(true);
     const pending = planShow();
     const start = performance.now();
     let last = start;
@@ -130,6 +136,7 @@ const Fireworks: React.FC<FireworksProps> = ({ trigger, palette = COLORS }) => {
       }
 
       rafRef.current = next.length || pending.length ? requestAnimationFrame(frame) : null;
+      if (rafRef.current === null) setRunning(false);
     };
     rafRef.current = requestAnimationFrame(frame);
     // The trigger is a start time, so it changes only for a new show. Cleanup runs
@@ -138,11 +145,12 @@ const Fireworks: React.FC<FireworksProps> = ({ trigger, palette = COLORS }) => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
       sparksRef.current = [];
+      setRunning(false);
     };
   }, [trigger, prefersReducedMotion, palette]);
 
   if (prefersReducedMotion) return null;
-  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />;
+  return <canvas ref={canvasRef} data-testid="fireworks" className="absolute inset-0 w-full h-full pointer-events-none" />;
 };
 
 export default Fireworks;

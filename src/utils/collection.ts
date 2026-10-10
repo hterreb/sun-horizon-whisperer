@@ -4,7 +4,7 @@
 
 import { type MessageKey } from '@/i18n';
 import {
-  type SceneInfoTarget, type PlaneHaul, type SatelliteSize, type TerrainBand,
+  type EggCardKind, type SceneInfoTarget, type PlaneHaul, type SatelliteSize, type TerrainBand,
   CLOUD_TIERS, HAUL_TIERS, RAINBOW_TIER, RARITY_NAMES, SATELLITE_TIERS, TERRAIN_TIERS, getPlaneHaul, getRarityTier, getSatelliteSize, getTerrainBand,
 } from './sceneInfo';
 import { type LiveRoute } from './planeFeed';
@@ -14,7 +14,7 @@ import { type CloudType } from './skyCloudUtils';
 import { type CalendarEvent } from './calendarEvents';
 import { FESTIVALS, isFestivalEvent, isFestivalShown, type FestivalEgg } from './festivalEvents';
 import { type AstroEventKind } from './astroEvents';
-import { type NationalDay, type NationalDayKind } from './nationalDays';
+import { NATIONAL_DAYS, type NationalDay, type NationalDayKind } from './nationalDays';
 import { type PlayfulEgg } from './playfulEggs';
 import { type TimeOfDay } from './sunUtils';
 import { getMoonPhaseIndex } from './moonUtils';
@@ -181,8 +181,8 @@ export const saveCollection = (collection: Collection): void => {
 export const addToCollection = (collection: Collection, id: BadgeId, now: Date): Collection | null =>
   collection[id] ? null : { ...collection, [id]: now.toISOString() };
 
-// Item 113: an egg card gives no badge. The egg's badge counts when the egg shows (the rules
-// below and SunTracker), so a tap in a time preview or on the ghost (no badge) adds nothing.
+// The base badge of a thing. An egg card gives none here: item 123's eggBadgesForTarget has the
+// egg's badge, which counts only while the egg shows (the rules below and SunTracker).
 export const badgeForTarget = (target: SceneInfoTarget): BadgeId | null => {
   switch (target.type) {
     case 'fish': return `fish:${target.kind}`;
@@ -196,7 +196,39 @@ export const badgeForTarget = (target: SceneInfoTarget): BadgeId | null => {
     case 'terrain':
     case 'satellite':
     case 'rainbow': return target.type;
+    // Item 123: an egg's badge comes from eggBadgesForTarget.
     case 'egg': return null;
+  }
+};
+
+// Item 123: the egg badge of each egg card. The ghost has none; Nowruz is the March equinox,
+// so it also gives the equinox badge (NOWRUZ_ALSO); the fireworks card gives the New Year badge
+// (the sunrise and sunset shows have none). A national day's card gives its badge.
+const EGG_CARD_BADGES: Partial<Record<EggCardKind, BadgeId[]>> = {
+  ufo: ['egg:ufo'], dragon: ['egg:lunarNewYear'], santa: ['egg:santa'], blackCat: ['egg:friday13'],
+  halloweenBat: ['egg:halloweenBats'], pumpkinMoon: ['egg:halloweenPumpkin'],
+  emptyTomb: ['egg:easter'], potOfGold: ['egg:stPatrick'], heartCloud: ['egg:valentine'],
+  nowruz: ['egg:nowruz', 'egg:equinox'], fireworks: ['egg:newYear'],
+};
+// The decorated boats: the national bunting days and the Christmas lights (Día de los Muertos'
+// papel picado counts with the marigolds).
+const DRESSED_BADGES: BadgeId[] = [
+  'egg:christmas', ...NATIONAL_DAYS.filter(day => day.style === 'bunting').map((day): BadgeId => `egg:${day.kind}`),
+];
+
+// Item 123: the egg badges a double tap on this thing can collect. SunTracker collects one only
+// while the scene shows that egg (the item 112 rules: no time preview, no reduced motion, no ?egg=).
+// The sun and the moon carry their astronomy events and the April Fools sun; a dressed boat its
+// bunting day; a cloud Holi's colours.
+export const eggBadgesForTarget = (target: SceneInfoTarget): BadgeId[] => {
+  switch (target.type) {
+    // The other cards have the badge of their own name (sky, national and festival eggs, item 123's cards).
+    case 'egg': return EGG_CARD_BADGES[target.kind] ?? (target.kind === 'ghost' ? [] : [`egg:${target.kind as EggKind}`]);
+    case 'sun': return ['egg:solarEclipse', 'egg:greenFlash', 'egg:aprilFools'];
+    case 'moon': return ['egg:lunarEclipse', 'egg:supermoon', 'egg:blueMoon'];
+    case 'boat': return target.dressed ? DRESSED_BADGES : [];
+    case 'cloud': return ['egg:holi'];
+    default: return [];
   }
 };
 
@@ -264,7 +296,7 @@ export const badgeForCalendarEvent = (event: CalendarEvent | null, o: CalendarBa
     case 'equinox': return 'egg:equinox';
     case 'halloween-pumpkin': return o.moonUp ? 'egg:halloweenPumpkin' : null;
     case 'halloween-bats': return o.isNight && !o.reducedMotion ? 'egg:halloweenBats' : null;
-    // Christmas: the lit boats report themselves (useBunting), like a bunting day.
+    // Christmas: the lit boats (SunTracker's buntingBadge), like a bunting day.
     case 'christmas': return null;
     case 'friday-13': return 'egg:friday13';
     case 'lunar-new-year': return o.reducedMotion ? null : 'egg:lunarNewYear';
@@ -300,8 +332,8 @@ export interface NationalBadgeOptions {
 
 // National days: the badge when the scene really shows the egg (NationalEggs' rules). The jets
 // fly by day and the fireworks burst at night; reduced motion hides both, but the Guy Fawkes
-// bonfire glow stays. Bunting gives null here: a decorated boat reports itself (useBunting),
-// as a bunting day without a boat on screen shows nothing. Never in the time preview.
+// bonfire glow stays. Bunting gives null here: SunTracker's buntingBadge counts on a double tap
+// on a dressed boat (item 123), as a bunting day without a boat on screen shows nothing. Never in the time preview.
 export const badgeForNationalDay = (day: NationalDay | null, o: NationalBadgeOptions): BadgeId | null => {
   if (!day || o.isTimePreview) return null;
   switch (day.style) {

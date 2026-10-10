@@ -1,5 +1,6 @@
 import React from 'react';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
+import { AURORA_BANDS } from '@/utils/auroraBands';
 
 interface AuroraProps {
   // 0-1: clouds hide the aurora like the stars (getStarCloudFactor).
@@ -7,12 +8,9 @@ interface AuroraProps {
 }
 
 // Soft green curtains in the upper sky (astroEvents: aurora). A slow CSS drift, no JS
-// loop; reduced motion keeps them still.
-const BANDS = [
-  { top: '6%', left: '-10%', width: '70%', delay: '0s', violet: false },
-  { top: '14%', left: '25%', width: '65%', delay: '-13s', violet: false },
-  { top: '3%', left: '50%', width: '55%', delay: '-27s', violet: true },
-];
+// loop; reduced motion keeps them still. Item 123: EventSkyTaps has the bands' tap areas, so the
+// curtains take no taps.
+const BANDS = AURORA_BANDS;
 
 const Aurora: React.FC<AuroraProps> = ({ opacity }) => {
   const prefersReducedMotion = usePrefersReducedMotion();

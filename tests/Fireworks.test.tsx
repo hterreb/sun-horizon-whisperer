@@ -1,5 +1,5 @@
 import React from 'react';
-import { render } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import Fireworks, { planShow } from '../src/components/Fireworks';
 
 const mockReducedMotion = (matches: boolean) =>
@@ -93,5 +93,36 @@ describe('Fireworks palette (national days)', () => {
     const burstColours = [...strokes].filter((c) => c !== '#fff3d1');
     expect(burstColours.length).toBeGreaterThan(0);
     for (const colour of burstColours) expect(palette).toContain(colour);
+  });
+});
+
+// Item 123: the canvas never takes taps; it reports when a show runs (EventSkyTaps takes the taps).
+describe('Fireworks running', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('reports the start and the end of a show and stays pointer-events-none', () => {
+    let frame: FrameRequestCallback | null = null;
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => { frame = cb; return 1; });
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    const ctx = { setTransform: () => {}, clearRect: () => {}, beginPath: () => {}, moveTo: () => {}, lineTo: () => {}, stroke: () => {} };
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx as unknown as CanvasRenderingContext2D);
+    vi.spyOn(performance, 'now').mockReturnValue(0);
+    const onRunningChange = vi.fn();
+    const { rerender } = render(<Fireworks trigger={0} onRunningChange={onRunningChange} />);
+    const canvas = () => screen.getByTestId('fireworks');
+    expect(onRunningChange).toHaveBeenLastCalledWith(false);
+    rerender(<Fireworks trigger={1000} onRunningChange={onRunningChange} />);
+    expect(onRunningChange).toHaveBeenLastCalledWith(true);
+    expect(canvas().className).toContain('pointer-events-none');
+    // Run the show to its end (14 s of frames).
+    act(() => {
+      for (let t = 100; t <= 14000 && frame; t += 100) {
+        const run: FrameRequestCallback = frame;
+        frame = null;
+        run(t);
+      }
+    });
+    expect(onRunningChange).toHaveBeenLastCalledWith(false);
+    expect(canvas().className).toContain('pointer-events-none');
   });
 });

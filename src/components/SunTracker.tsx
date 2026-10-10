@@ -38,6 +38,7 @@ import { getSceneInfo, type SceneInfoTarget } from '@/utils/sceneInfo';
 import InfoPanel from './InfoPanel';
 import NightStars from './NightStars';
 import Aurora from '@/components/Aurora';
+import EventSkyTaps from '@/components/EventSkyTaps';
 import MusicPlayer from './MusicPlayer';
 import TopLeftButtons from './TopLeftButtons';
 import PWAInstallPrompt from './PWAInstallPrompt';
@@ -69,7 +70,7 @@ import PremiumDialog from './PremiumDialog';
 import CollectionView from './CollectionView';
 import BadgeUnlocked from './BadgeUnlocked';
 import {
-  BADGES, NOWRUZ_ALSO, addToCollection, badgeForAstroEvent, badgeForCalendarEvent, badgeForPlayfulEgg, badgeForSanta, badgeForTarget, countCollected, isCollectionPaused, loadCollection,
+  BADGES, NOWRUZ_ALSO, addToCollection, badgeForAstroEvent, badgeForCalendarEvent, badgeForPlayfulEgg, badgeForSanta, badgeForTarget, countCollected, eggBadgesForTarget, isCollectionPaused, loadCollection,
   badgeForRoute, saveCollection, stateBadgeForTarget, type BadgeId, type Collection, type StateBadgeContext,
 } from '@/utils/collection';
 import { watchSunEvent, NO_SUN_EVENT_WATCH, getCountdownTarget } from '../utils/sunEvents';
@@ -147,6 +148,8 @@ const NO_LIVE_PLANES: LivePlanesState = { feed: { now: 0, aircraft: [] }, receiv
 const PICADO_COLORS = [1, 2, 3, 4, 5].map((n) => `hsl(var(--scene-festival-pastel-${n}))`);
 // Christmas (Dec 25-26): the warm bulbs of the lit boats, through BuntingContext.
 const CHRISTMAS_LIGHT_COLORS = [1, 2, 3, 4].map((n) => `hsl(var(--scene-xmas-bulb-${n}))`);
+// Item 123: a New Year show takes taps for its 12-13 s (Fireworks.planShow), plus a little slack.
+const NEW_YEAR_TAP_MS = 15_000;
 
 const SunTracker: React.FC = () => {
   const [date, setDate] = useState<Date>(new Date());
@@ -678,6 +681,8 @@ const SunTracker: React.FC = () => {
     const found = countCollected(next);
     setUnlockedQueue((queue) => [...queue, { id, found }]);
   }, [collectionPaused]);
+  // Item 123: the New Year show and the playful eggs report their show (handleSceneTap).
+  const eggShowRef = React.useRef({ newYearAt: -Infinity, playful: new Set<PlayfulEgg>() });
   const handleUnlockedDone = useCallback(() => setUnlockedQueue((queue) => queue.slice(1)), []);
   const handleUnlockedOpen = useCallback((id: BadgeId) => {
     setCollectionFocus(id);
@@ -696,6 +701,10 @@ const SunTracker: React.FC = () => {
   // one. A hidden tick (a desktop tab still ticks) waits for the return. Each fired or
   // skipped show leaves a Sentry breadcrumb, with no place or time in it.
   const [fireworksTrigger, setFireworksTrigger] = useState(0);
+  // Item 123: a running show (the sunrise, sunset or New Year one, or a national one) lets
+  // EventSkyTaps take taps on the sky.
+  const [ownFireworksRunning, setOwnFireworksRunning] = useState(false);
+  const [nationalFireworksRunning, setNationalFireworksRunning] = useState(false);
   const prevClockRef = React.useRef(date);
   const sunEventWatchRef = React.useRef(NO_SUN_EVENT_WATCH);
   useEffect(() => {
@@ -704,7 +713,8 @@ const SunTracker: React.FC = () => {
     // New Year (ROADMAP "Ongoing", Calendar): also when the clock enters 00:00 on Jan 1.
     const entersNewYear = getCalendarEvent(date) === 'new-year' && getCalendarEvent(prev) !== 'new-year';
     let fire = !isTimePreview && entersNewYear;
-    if (fire && !prefersReducedMotion) collect('egg:newYear');
+    // Item 123: the New Year badge counts on a double tap on this show (eggShowRef).
+    if (fire && !prefersReducedMotion) eggShowRef.current.newYearAt = Date.now();
     if (document.visibilityState !== 'hidden') {
       const { watch, outcome } = watchSunEvent(sunEventWatchRef.current, date, isTimePreview, sunTimes, terrainExtras.terrainSunTimes);
       sunEventWatchRef.current = watch;
@@ -797,10 +807,6 @@ const SunTracker: React.FC = () => {
     if (isNight && rollUfo()) setUfoOn(true);
   }
   const handleUfoDone = useCallback(() => setUfoOn(false), []);
-  // Reduced motion shows no UFO, so it does not count.
-  useEffect(() => {
-    if (ufoOn && !prefersReducedMotion) collect('egg:ufo');
-  }, [ufoOn, prefersReducedMotion, collect]);
   // Info cards (ROADMAP item 95): one card at a time, for the last thing tapped in the scene.
   // `id` mounts a new card per tap, so its 15 s timer starts again.
   const [infoCard, setInfoCard] = useState<{ target: SceneInfoTarget; x: number; y: number; ring: string; id: number } | null>(null);
@@ -852,11 +858,11 @@ const SunTracker: React.FC = () => {
   const nationalDay = nationalForced ?? getNationalDay(date, country, calendarEvent);
   // Easter Sunday from sunrise to 12:00: the empty tomb (item 117). `?egg=easter` shows it at once.
   const easterMorning = playfulForced === 'easter' || isEasterMorning(date, sunTimes);
-  // The scene reports a playful egg when it really shows; its badge counts then (not in a preview).
+  // The scene reports a playful egg when it really shows (not in a preview); item 123: its badge
+  // counts on a double tap on it on its day.
   const handleEggShown = useCallback((kind: PlayfulEgg) => {
-    const badge = badgeForPlayfulEgg(kind, isTimePreview);
-    if (badge) collect(badge);
-  }, [collect, isTimePreview]);
+    if (badgeForPlayfulEgg(kind, isTimePreview)) eggShowRef.current.playful.add(kind);
+  }, [isTimePreview]);
 
   // Sunset countdown (ROADMAP item 43): 10 s of ticks and a chime at the next sunset
   // (line of sight when there is one). Live time only; the tap that turns it on
@@ -998,8 +1004,8 @@ const SunTracker: React.FC = () => {
   // the moon then follow the weather type alone (ROADMAP items 50, 52, 57).
   const cloudCover = useRealWeather ? weatherData?.cloudCoverPercent ?? null : null;
 
-  // Collection badges (ROADMAP item 112) of the calendar and astronomy eggs, when the scene
-  // really shows them (CalendarEggs' rules: dark sky = night or astronomical/nautical twilight).
+  // Collection badges (ROADMAP item 112) of the calendar and astronomy eggs that the scene
+  // really shows (item 123: a double tap on the egg collects one; CalendarEggs' rules: dark sky = night or astronomical/nautical twilight).
   // Not for a forced egg (?egg=dragon, ?egg=santa or any ?egg) and not in a time preview.
   const isDarkSky = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
   const calendarBadge = dragonForced || santaForced || festivalForced ? null : badgeForCalendarEvent(calendarEvent, {
@@ -1010,49 +1016,51 @@ const SunTracker: React.FC = () => {
     isTimePreview,
     timeOfDay,
   });
-  useEffect(() => {
-    if (calendarBadge) collect(calendarBadge);
-  }, [calendarBadge, collect]);
   // Item 118: Nowruz is the March equinox, so it also collects the equinox badge.
   const nowruzEquinoxBadge = calendarBadge === 'egg:nowruz' ? NOWRUZ_ALSO : null;
-  useEffect(() => {
-    if (nowruzEquinoxBadge) collect(nowruzEquinoxBadge);
-  }, [nowruzEquinoxBadge, collect]);
   const santaBadge = santaForced ? null : badgeForSanta(isSanta, { reducedMotion: prefersReducedMotion, isTimePreview });
-  useEffect(() => {
-    if (santaBadge) collect(santaBadge);
-  }, [santaBadge, collect]);
   // Reduced motion draws no shooting stars, so the meteor shower does not count then.
   const astroKind = astroEggOverride || isTimePreview ? null : astroEvent?.kind ?? null;
   const astroBadge = astroKind && !(astroKind === 'meteorShower' && prefersReducedMotion) ? badgeForAstroEvent(astroKind) : null;
-  useEffect(() => {
-    if (astroBadge) collect(astroBadge);
-  }, [astroBadge, collect]);
-  // National days: the jets and fireworks badges by NationalEggs' rules; a bunting badge when a
-  // decorated boat shows (SceneBoat calls `onShow`).
+  // National days: the jets and fireworks badges by NationalEggs' rules; the bunting badge on a
+  // double tap on a dressed boat (item 123).
   const nationalBadge = nationalForced ? null : badgeForNationalDay(nationalDay, {
     isDay: timeOfDay === 'dawn' || timeOfDay === 'morning' || timeOfDay === 'midday' || timeOfDay === 'afternoon' || timeOfDay === 'evening',
     isNight: isDarkSky,
     reducedMotion: prefersReducedMotion,
     isTimePreview,
   });
-  useEffect(() => {
-    if (nationalBadge) collect(nationalBadge);
-  }, [nationalBadge, collect]);
   const buntingBadge = !nationalForced && !isTimePreview && nationalDay?.style === 'bunting' ? (`egg:${nationalDay.kind}` as const)
-    // Christmas: the lit boats; the badge counts when a boat shows them.
+    // Christmas: the lit boats.
     : !isTimePreview && calendarEvent === 'christmas' ? 'egg:christmas' as const : null;
-  const handleBuntingShow = useCallback(() => {
-    if (buntingBadge) collect(buntingBadge);
-  }, [buntingBadge, collect]);
+  // Item 123: an egg's badge counts on the double tap that opens its card (or the sun, moon, boat
+  // or cloud card that carries it), and only while the scene shows the egg: the badges above
+  // follow the show rules (item 112: no time preview, no reduced motion, no ?egg=). The UFO counts
+  // while it flies (reduced motion shows none); the New Year show for its run; a playful egg on its
+  // day, once the scene reported it.
+  const ufoBadge: BadgeId | null = ufoOn && !prefersReducedMotion ? 'egg:ufo' : null;
+  // One string (a template, so the React Compiler sees a new primitive, not the national day it
+  // came from), so the callback below changes only when the shown eggs do. A null shows as "null".
+  const shownEggs = `${calendarBadge} ${nowruzEquinoxBadge} ${santaBadge} ${astroBadge} ${nationalBadge} ${buntingBadge} ${ufoBadge}`;
+  const handleSceneTap = useCallback((target: SceneInfoTarget, point: { x: number; y: number }, ring: string) => {
+    handleSceneInfo(target, point, ring);
+    const shown = shownEggs.split(' ');
+    const { newYearAt, playful } = eggShowRef.current;
+    for (const id of eggBadgesForTarget(target)) {
+      const kind = id.slice('egg:'.length) as PlayfulEgg;
+      if (shown.includes(id)
+        || (id === 'egg:newYear' && Date.now() - newYearAt < NEW_YEAR_TAP_MS)
+        || (playful.has(kind) && PLAYFUL_EVENT[kind] === calendarEvent)) collect(id);
+    }
+  }, [handleSceneInfo, collect, shownEggs, calendarEvent]);
   const bunting = useMemo<Bunting | null>(
-    () => (nationalDay?.style === 'bunting' ? { colors: nationalDay.colors.map((c) => `hsl(var(--national-${c}))`), onShow: handleBuntingShow }
-      // Día de los Muertos (item 118): papel picado; its badge counts with the marigolds, so onShow adds nothing.
-      : calendarEvent === 'dia-de-muertos' ? { colors: PICADO_COLORS, shape: 'picado', onShow: handleBuntingShow }
+    () => (nationalDay?.style === 'bunting' ? { colors: nationalDay.colors.map((c) => `hsl(var(--national-${c}))`) }
+      // Día de los Muertos (item 118): papel picado; its badge counts with the marigolds.
+      : calendarEvent === 'dia-de-muertos' ? { colors: PICADO_COLORS, shape: 'picado' }
       // Christmas: warm bulbs and a gold star on every boat.
-      : calendarEvent === 'christmas' ? { colors: CHRISTMAS_LIGHT_COLORS, shape: 'lights', onShow: handleBuntingShow }
+      : calendarEvent === 'christmas' ? { colors: CHRISTMAS_LIGHT_COLORS, shape: 'lights' }
       : null),
-    [nationalDay, calendarEvent, handleBuntingShow]
+    [nationalDay, calendarEvent]
   );
   // The forecast rain amount (ROADMAP item 77); manual weather uses the type's middle value.
   const rainMmH = useRealWeather ? weatherData?.precipitationMmH ?? null : null;
@@ -1119,6 +1127,7 @@ const SunTracker: React.FC = () => {
     satellite: satelliteCard,
     route: liveRoute,
     placeName,
+    skyEvent: astroEvent?.kind ?? null,
   }) : null;
 
   return (
@@ -1138,6 +1147,13 @@ const SunTracker: React.FC = () => {
       }`} 
       style={{ background: skyGradient }}
     >
+      {/* Item 123 (decision 2026-10-10): first, with no z-index, so all scene things take their own taps. */}
+      <EventSkyTaps
+        onInfo={handleSceneTap}
+        aurora={astroEvent?.kind === 'aurora' && getStarCloudFactor(weatherType, cloudCover) > 0}
+        meteorShower={astroEvent?.kind === 'meteorShower' && timeOfDay === 'night' && !prefersReducedMotion}
+        fireworks={nationalFireworksRunning && nationalDay?.style === 'fireworks' ? nationalDay.kind : ownFireworksRunning ? 'fireworks' : null}
+      />
       <NightStars
         timeOfDay={timeOfDay}
         moonPosition={moonPosition}
@@ -1148,10 +1164,10 @@ const SunTracker: React.FC = () => {
       {astroEvent?.kind === 'aurora' && <Aurora opacity={getStarCloudFactor(weatherType, cloudCover)} />}
       {discoOn && <DiscoSky />}
       {ufoOn && (
-        <Ufo onDone={handleUfoDone} onInfo={handleSceneInfo} ringOn={infoCard?.ring === UFO_RING} ringTier={infoCardInfo?.tier ?? null} />
+        <Ufo onDone={handleUfoDone} onInfo={handleSceneTap} ringOn={infoCard?.ring === UFO_RING} ringTier={infoCardInfo?.tier ?? null} />
       )}
       {nationalDay && (
-        <NationalEggs key={nationalDay.kind} day={nationalDay} timeOfDay={timeOfDay} onInfo={handleSceneInfo} infoRing={infoCard?.ring ?? null} infoRingTier={infoCardInfo?.tier ?? null} />
+        <NationalEggs key={nationalDay.kind} day={nationalDay} timeOfDay={timeOfDay} onInfo={handleSceneTap} infoRing={infoCard?.ring ?? null} infoRingTier={infoCardInfo?.tier ?? null} onFireworksRunning={setNationalFireworksRunning} />
       )}
       {reveal === 'done' && (
         <>
@@ -1171,7 +1187,7 @@ const SunTracker: React.FC = () => {
       {calendarEvent !== 'new-year' && (
         <MidnightGhost
           currentTime={date}
-          onInfo={handleSceneInfo}
+          onInfo={handleSceneTap}
           ringOn={infoCard?.ring === GHOST_RING}
           ringTier={infoCardInfo?.tier ?? null}
         />
@@ -1209,6 +1225,7 @@ const SunTracker: React.FC = () => {
             horizonProfile={horizonProfile}
             terrainSunTimes={terrainExtras.terrainSunTimes}
             astroEvent={astroEvent}
+            onFireworksRunning={setOwnFireworksRunning}
             terrainMoonTimes={terrainExtras.terrainMoonTimes}
             isFullscreen={isFullscreen}
             showCursor={showCursor}
@@ -1216,7 +1233,7 @@ const SunTracker: React.FC = () => {
             sunglasses={sunglassesOn}
             onSunTap={handleSunTap}
             onMoonTap={handleMoonTap}
-            onSceneInfo={handleSceneInfo}
+            onSceneInfo={handleSceneTap}
             infoRing={infoCard?.ring ?? null}
             infoRingTier={infoCardInfo?.tier ?? null}
             calendarEvent={calendarEvent}

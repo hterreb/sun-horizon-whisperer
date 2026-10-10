@@ -16,6 +16,7 @@ import { ringBorderClass, type RarityTier } from '@/utils/rarityTier';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import { useScenePlaybackRate } from '@/hooks/useScenePlaybackRate';
 import { useDoubleTap } from '@/hooks/useDoubleTap';
+import { useBunting } from '@/hooks/useBunting';
 import { getScenePlaybackRate, getSpawnGapFactor, type PlayDirection } from '@/utils/timeTravel';
 import { findLane, firstMeeting, getSceneTime, setSceneRate, warpPath, LIVE_SCENE_CLOCK, type ScenePath } from '@/utils/scenePaths';
 import {
@@ -1031,6 +1032,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
 }) => {
   // Item 116: a double tap opens the card; a single tap shows nothing.
   const { tap } = useDoubleTap(onInfo);
+  // Item 123: on a bunting day, at Día de los Muertos or at Christmas the boats are dressed; their card says so.
+  const bunting = useBunting();
   // The ring of a thing (its ring id) while its card is open, in the tier colour.
   const ringOf = (id: string) => ({ ring: infoRing === id, tier: infoRing === id ? infoRingTier : null });
   // The things that cross the scene. The state renders them; the ref has the latest lists at
@@ -1583,7 +1586,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         return (
           <div
             key={ship.id}
-            {...tappable({ type: 'boat', kind: ship.kind }, `boat-${ship.id}`)}
+            {...tappable({ type: 'boat', kind: ship.kind, ...(bunting && { dressed: bunting.shape ?? 'pennant' }) }, `boat-${ship.id}`)}
             style={{
               left: `${ship.x}%`,
               top: `${ship.y}%`,
