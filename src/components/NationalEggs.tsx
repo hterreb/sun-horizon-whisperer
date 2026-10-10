@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Fireworks from './Fireworks';
 import { HitArea, type SceneInfoHandler } from './CloudLayer';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
@@ -15,6 +15,7 @@ interface NationalEggsProps {
   infoRing?: string | null;
   infoRingTier?: RarityTier | null;
   // Item 123: the national show starts or ends (SunTracker's EventSkyTaps takes its taps).
+  // Item 129: it stays true during the afterglow, so the sky tap still opens the card.
   onFireworksRunning?: (running: boolean) => void;
 }
 
@@ -23,7 +24,9 @@ interface NationalEggsProps {
 // SunVisualization root is pointer-events-none.
 // - jets: nine small jets cross the day sky once per page view, in a slow straight glide, each
 //   with a smoke trail in the flag colours. The trails stay, then fade out over SMOKE_FADE_S.
-// - fireworks: one Fireworks show in the flag colours per night view.
+// - fireworks: one Fireworks show in the flag colours per night view. After the show, faint
+//   smoke in the flag colours stays in the burst band, drifts slowly and fades out over
+//   AFTERGLOW_S (item 129).
 // - bonfire: a soft, still glow on the shore at night.
 // Reduced motion: no jets and no fireworks (their badges do not count); the bonfire stays.
 export const JETS_RING = 'egg-jets';
@@ -31,6 +34,16 @@ export const BONFIRE_RING = 'egg-bonfire';
 const SPEED_PCT = 2; // % of the width per second (calm-motion rule)
 const PX_CAP = (390 * SPEED_PCT) / 100; // phone px/s on wide screens
 const SMOKE_FADE_S = 40;
+// Item 129: the afterglow. 0.5 px/s to the right and 0.15 px/s up (calm-motion rule).
+const AFTERGLOW_S = 180;
+const DRIFT_X_PX = 90;
+const DRIFT_Y_PX = -27;
+// ponytail: fixed puffs in the band where planShow puts the bursts (x 15–85 %, y 20–45 %),
+// not the real burst points; pass the plan up from Fireworks if they must match.
+const PUFFS = [
+  { x: 22, y: 30, size: 120 }, { x: 38, y: 40, size: 100 }, { x: 50, y: 27, size: 160 },
+  { x: 64, y: 36, size: 110 }, { x: 78, y: 25, size: 120 },
+];
 const FORM_W = 64;
 const FORM_H = 64;
 const JET_W = 12;
@@ -61,6 +74,19 @@ const NationalEggs: React.FC<NationalEggsProps> = ({ day, timeOfDay, onInfo, inf
   const [fireworksOn, setFireworksOn] = useState(false);
   if (day.style === 'fireworks' && isDark && !fireworksOn && !prefersReducedMotion) setFireworksOn(true);
   const palette = useMemo(() => day.colors.map(resolvedColor), [day]);
+  // Item 129: 'on' from the end of the show until the smoke has faded.
+  const [afterglow, setAfterglow] = useState<'none' | 'on' | 'done'>('none');
+  const [showRunning, setShowRunning] = useState(false);
+  const showStarted = useRef(false);
+  const handleShowRunning = useCallback((running: boolean) => {
+    setShowRunning(running);
+    if (running) showStarted.current = true;
+    else if (showStarted.current) setAfterglow(a => (a === 'none' ? 'on' : a));
+  }, []);
+  const smokeOn = afterglow === 'on' && !prefersReducedMotion;
+  const tapsOn = showRunning || smokeOn;
+  useEffect(() => onFireworksRunning?.(tapsOn), [tapsOn, onFireworksRunning]);
+  useEffect(() => () => onFireworksRunning?.(false), [onFireworksRunning]);
   // Travel from fully off the left edge to fully off the right edge.
   const [flight] = useState(() => {
     const width = typeof window === 'undefined' ? 390 : window.innerWidth;
@@ -117,7 +143,30 @@ const NationalEggs: React.FC<NationalEggsProps> = ({ day, timeOfDay, onInfo, inf
         </div>
       )}
 
-      {fireworksOn && <Fireworks trigger={1} palette={palette} onRunningChange={onFireworksRunning} />}
+      {fireworksOn && <Fireworks trigger={1} palette={palette} onRunningChange={handleShowRunning} />}
+
+      {smokeOn && (
+        // No taps here: SunTracker's EventSkyTaps opens the card on the empty sky (item 123).
+        <div className="absolute inset-0 pointer-events-none" data-testid="national-afterglow">
+          {PUFFS.map((puff, i) => (
+            <div
+              key={i}
+              data-testid="national-afterglow-puff"
+              className="absolute rounded-full"
+              style={{
+                left: `calc(${puff.x}% - ${puff.size / 2}px)`,
+                top: `calc(${puff.y}% - ${puff.size / 2}px)`,
+                width: puff.size,
+                height: puff.size,
+                background: `radial-gradient(circle, hsl(var(--national-${day.colors[i % day.colors.length]}) / 0.22), transparent 70%)`,
+                filter: 'blur(14px)',
+                animation: `national-afterglow ${AFTERGLOW_S}s linear forwards`,
+              }}
+              onAnimationEnd={(e) => { if (i === 0 && e.animationName === 'national-afterglow') setAfterglow('done'); }}
+            />
+          ))}
+        </div>
+      )}
 
       {day.bonfire && isDark && (
         // On the shore at the horizon (65 % of the height, as in SunVisualization); the water
@@ -136,6 +185,7 @@ const NationalEggs: React.FC<NationalEggsProps> = ({ day, timeOfDay, onInfo, inf
         @keyframes national-fly { to { transform: translateX(var(--dx)); } }
         @keyframes national-smoke { to { transform: scaleX(1); } }
         @keyframes national-fade { to { opacity: 0; } }
+        @keyframes national-afterglow { to { opacity: 0; transform: translate(${DRIFT_X_PX}px, ${DRIFT_Y_PX}px); } }
       `}</style>
     </>
   );
