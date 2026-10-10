@@ -2522,6 +2522,14 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Built:** `MusicPlayer.tsx` has 10 stations: FluxFM Chillhop, ILoveRadio Lo-Fi, Epic Lounge Jazzhop, 0nlineradio Lo-Fi, ISEKOI Chill Zone, laut.fm lofi, REYFM #lofi, Hunter.FM Lo-Fi, CLIAMP Lofi Hip Hop, Hotmix Lo-Fi. No CSP change (`media-src` allows `https:`).
 - **Open (owner):** the licence for each station in a paid app (before Premium is on sale, item 16); listen to the new stations on a phone.
 
+### 128. Dressed boat card names the national day — S — **✅ Done**
+
+- **Request (2026-10-10):** pitch B for the bunting: the national-day name on the card.
+- **Before:** on a bunting day (`germanUnity`, `fiestaNacional`, `canadaDay`, `australiaDay`, `kingsDay`) a double tap on a dressed boat opens the boat card with the row "Dressed: Flag bunting" (item 123). The card does not say which day it is.
+- **Spec:** the boat card also has the row "Event: <day>" (the `egg.<kind>` text). The field note is the day's fact (`eggFact.<kind>`), not the boat's fact. No new texts. The badge rule (item 123, `DRESSED_BADGES`) does not change. Christmas lights and papel picado do not change: they keep the boat's fact and have no event row.
+- **Built:** `Bunting.day` (`useBunting`), set by `SunTracker` on a bunting day. `CloudLayer` passes it into the boat target (`{ type: 'boat', dressed, day }`). `getSceneInfo` reads the name and the fact from the national-day egg entry.
+- **Checked:** `utils.sceneInfo` test: a dressed boat on German Unity Day has the event row and the day's fact; a boat with Christmas lights and a plain boat have no event row and keep the boat's fact. Not checked: a real phone.
+
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 
 Rules for all items:
@@ -2571,7 +2579,8 @@ Items:
   - **Reduced motion:** no jets and no fireworks, and their badges do not count. The bunting and the bonfire are static, so they stay and count.
   - **Collection:** one ultra rare badge `egg:<kind>` per national day. The jets count by day, the fireworks at night (`badgeForNationalDay`). The bunting counts when a decorated boat shows (`useBunting`: `SceneBoat` calls `onShow`), because a bunting day without a boat on the screen shows nothing. Never in a time preview.
   - **Test links:** `?egg=<kind>` (for example `?egg=bastilleDay`) forces that day in any country on any date; the time-of-day rules still apply. `?country=XX` sets the country. Both pause the collection.
-  - **Open:** the bunting and the French and US fireworks have no tap target, so their cards do not open yet. A searched place has no country code (Open-Meteo gives `country_code`, but the saved place keeps only the name).
+  - **Taps (item 123):** a double tap on a dressed boat opens the boat card, which names the day (item 128). During the French and US fireworks show, a tap on the empty sky opens the day's card (`EventSkyTaps`).
+  - **Open:** a searched place has no country code (Open-Meteo gives `country_code`, but the saved place keeps only the name).
 - **Astronomy:**
   - ✅ Solar and lunar eclipses: a darkened sun or red moon at the correct time (hardcoded date list for 10 years). Done: NASA GSFC list 2026–2035 in `astroEvents.ts`; solar only within ~3500 km of the greatest-eclipse point.
   - ✅ Supermoon: a bigger moon when the full moon is near perigee. Done: 14 % bigger moon when the full moon is closer than 360 000 km (Meeus distance).
