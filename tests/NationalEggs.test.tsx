@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import NationalEggs, { BONFIRE_RING, JETS_RING } from '../src/components/NationalEggs';
 import { NATIONAL_DAYS, type NationalDayKind } from '@/utils/nationalDays';
 
@@ -106,6 +106,55 @@ describe('NationalEggs', () => {
       mockReducedMotion(true);
       const { container } = render(<NationalEggs day={day('independenceDay')} timeOfDay="night" />);
       expect(container.querySelector('canvas')).toBeNull();
+    });
+  });
+
+  // Item 129: the smoke after the show.
+  describe('fireworks afterglow', () => {
+    // Runs the show to its end: a no-op 2D context and 100 ms frames (Fireworks clamps dt to 0.1 s).
+    const endShow = () => {
+      const frames: FrameRequestCallback[] = [];
+      vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => { frames.push(cb); return frames.length; });
+      vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+        new Proxy({}, { get: () => () => {} }) as unknown as CanvasRenderingContext2D,
+      );
+      return () => act(() => {
+        const start = performance.now();
+        for (let i = 1; i <= 400 && frames.length; i++) frames.shift()!(start + i * 100);
+      });
+    };
+
+    it('shows faint smoke in the flag colours when the show ends, and keeps the sky tap on', () => {
+      const run = endShow();
+      const onFireworksRunning = vi.fn();
+      render(<NationalEggs day={day('bastilleDay')} timeOfDay="night" onFireworksRunning={onFireworksRunning} />);
+      expect(onFireworksRunning).toHaveBeenLastCalledWith(true);
+      expect(screen.queryByTestId('national-afterglow')).toBeNull();
+      run();
+      const puffs = screen.getAllByTestId('national-afterglow-puff');
+      expect(puffs.length).toBeGreaterThan(0);
+      expect(puffs[0].style.background).toContain('--national-');
+      expect(puffs[0].style.animation).toContain('national-afterglow 180s');
+      expect(screen.getByTestId('national-afterglow').className).toContain('pointer-events-none');
+      expect(onFireworksRunning).toHaveBeenLastCalledWith(true);
+    });
+
+    it('ends the sky tap when the smoke has faded', () => {
+      const run = endShow();
+      const onFireworksRunning = vi.fn();
+      render(<NationalEggs day={day('independenceDay')} timeOfDay="night" onFireworksRunning={onFireworksRunning} />);
+      run();
+      endAnimation(screen.getAllByTestId('national-afterglow-puff')[0], 'national-afterglow');
+      expect(screen.queryByTestId('national-afterglow')).toBeNull();
+      expect(onFireworksRunning).toHaveBeenLastCalledWith(false);
+    });
+
+    it('shows no smoke before a show and none with reduced motion', () => {
+      mockReducedMotion(true);
+      const onFireworksRunning = vi.fn();
+      render(<NationalEggs day={day('guyFawkes')} timeOfDay="night" onFireworksRunning={onFireworksRunning} />);
+      expect(screen.queryByTestId('national-afterglow')).toBeNull();
+      expect(onFireworksRunning).not.toHaveBeenCalledWith(true);
     });
   });
 

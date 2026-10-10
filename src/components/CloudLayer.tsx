@@ -1587,7 +1587,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         return (
           <div
             key={ship.id}
-            {...tappable({ type: 'boat', kind: ship.kind, ...(bunting && { dressed: bunting.shape ?? 'pennant' }) }, `boat-${ship.id}`)}
+            {...tappable({ type: 'boat', kind: ship.kind, ...(bunting && { dressed: bunting.shape ?? 'pennant', day: bunting.day }) }, `boat-${ship.id}`)}
             style={{
               left: `${ship.x}%`,
               top: `${ship.y}%`,
