@@ -43,6 +43,36 @@ export const xAt = (path: ScenePath, t: number): number => {
   return path.x + path.dx * (path.curve ? along(path.curve, p) : p);
 };
 
+// Item 122: a fish that changes lane comes nearer or goes farther, so its speed changes by the
+// factor `k`. The fish's own clock runs at rate 1 until the scene time `at`, changes evenly to
+// `k` in `rampSec`, and stays at `k`. The new path is the old one on this clock: the same place
+// until `at`, and after it the old crossing (also a rest stop) at `k` times the speed. It is one
+// crossing again (a new duration and curve), so CSS moves it in one animation, and a running
+// animation does not jump when it gets the new duration and easing before `at`.
+export const warpPath = (path: ScenePath, at: number, rampSec: number, k: number): ScenePath => {
+  const { duration } = path;
+  const t1 = Math.max(0, at - path.start);
+  if (k === 1 || t1 >= duration) return path;
+  const a = (k - 1) / (2 * rampSec);
+  const tau2 = t1 + (rampSec * (1 + k)) / 2;
+  // The fish's clock at the path time t, and back.
+  const tauAt = (t: number) => (t <= t1 ? t : t <= t1 + rampSec ? t + a * (t - t1) ** 2 : tau2 + k * (t - t1 - rampSec));
+  const tOf = (tau: number) => {
+    if (tau <= t1) return tau;
+    if (tau > tau2) return t1 + rampSec + (tau - tau2) / k;
+    const d = tau - t1;
+    return t1 + (Math.abs(a) < 1e-9 ? d : (Math.sqrt(1 + 4 * a * d) - 1) / (2 * a));
+  };
+  const end = tOf(duration);
+  const share = (p: number) => (path.curve ? along(path.curve, p) : p);
+  // The old curve's points on the new time, and the speed change in 6 steps (a quadratic path).
+  const times = [0, t1, ...Array.from({ length: 6 }, (_, i) => t1 + (rampSec * (i + 1)) / 6),
+    ...(path.curve ?? []).map(([p]) => tOf(p * duration)), end];
+  const sorted = [...new Set(times.filter(t => t <= end))].sort((x, y) => x - y);
+  const curve = sorted.map((t): [number, number] => [t / end, share(Math.min(1, tauAt(t) / duration))]);
+  return { ...path, duration: end, curve };
+};
+
 // The scene time when the thing leaves: a pair leaves with its second fish.
 const endOf = (path: ScenePath): number => path.start + path.duration + (path.lag ?? 0);
 
