@@ -20,7 +20,7 @@ export interface SatelliteDot {
   y: number;
   opacity: number;
   shown: boolean; // false: fading out (into the Earth's shadow, below 10° or behind terrain)
-  magnitude: number; // sets the dot's size and glow (item 130)
+  magnitude: number; // sets the dot's size and glow (item 131)
 }
 
 interface SatellitesProps {

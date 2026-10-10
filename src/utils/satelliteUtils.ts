@@ -36,7 +36,7 @@ const SATELLITE_HOURS_MS = 2 * HOUR_MS;
 export const SPAWN_GAP_MS: [number, number] = [2 * MINUTE_MS, 4 * MINUTE_MS];
 export const NIGHT_GAP_FACTOR = 3;
 // Speed in % of the screen width per second: 6x the first 0.1-0.3, so the eye finds the
-// moving dot (item 130). Slower than the birds (2.5); the fastest pass the sailboat (1.2).
+// moving dot (item 131). Slower than the birds (2.5); the fastest pass the sailboat (1.2).
 export const DOT_SPEED: [number, number] = [0.6, 1.8];
 // The share of dots that fade out in the middle of the sky (into the Earth's shadow).
 export const FADE_SHARE = 1 / 3;
@@ -146,7 +146,7 @@ export const isSatelliteVisible = ({ elevation, sunAltitude, sunlit }: { elevati
   elevation > MIN_ELEVATION && sunAltitude < SUN_MAX_ALTITUDE && sunlit;
 
 // Brightness from the distance: the standard magnitude (at 1000 km) of the satellite's size
-// class (item 130), plus 5 log10(range / 1000 km). The opacity of the dot: 1 at magnitude -2
+// class (item 131), plus 5 log10(range / 1000 km). The opacity of the dot: 1 at magnitude -2
 // and brighter, down to MIN_OPACITY for faint ones.
 // ponytail: one magnitude per size class; a table of per-satellite standard magnitudes
 // (McCants' list) if a known one looks wrong.
@@ -156,7 +156,7 @@ export const getSatelliteMagnitude = (id: number, name: string, rangeKm: number)
   STANDARD_MAGNITUDE[getSatelliteSize(id, name)] + 5 * Math.log10(Math.max(rangeKm, 100) / 1000);
 export const getSatelliteOpacity = (magnitude: number): number =>
   Math.min(1, Math.max(MIN_OPACITY, 1 - (magnitude + 2) / 8));
-// The dot's size from the magnitude (item 130): 2.5 px for faint ones up to 7 px (the ISS
+// The dot's size from the magnitude (item 131): 2.5 px for faint ones up to 7 px (the ISS
 // overhead, about -3.7), on the stars' scale. A glow below magnitude 0.
 export const getSatelliteDotPx = (magnitude: number): number => Math.min(7, Math.max(2.5, 4.5 - 0.65 * magnitude));
 export const getSatelliteGlowPx = (magnitude: number): number => Math.min(8, Math.max(0, -2 * magnitude));

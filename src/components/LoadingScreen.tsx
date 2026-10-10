@@ -33,7 +33,7 @@ const fill = (token: string) => ({ fill: `hsl(var(--${token}))` });
 interface LoadingScreenProps {
   // Reduced motion, or the reveal has started: the mark rests in its logo pose.
   still: boolean;
-  onSelectPlace: (latitude: number, longitude: number, name: string) => void;
+  onSelectPlace: (latitude: number, longitude: number, name: string, countryCode?: string) => void;
 }
 
 // Loading screen "Rising Mark" (ROADMAP item 39): the app mark on Night (the manifest
