@@ -914,7 +914,7 @@ describe('SunTracker', () => {
       expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Standort nicht verfügbar' }));
 
       fireEvent.click(screen.getByRole('button', { name: 'Français' }));
-      expect(screen.getByText('Coucher du soleil')).toBeInTheDocument();
+      expect(await screen.findByText('Coucher du soleil')).toBeInTheDocument();
       expect(document.documentElement.lang).toBe('fr');
       expect(localStorage.getItem('language')).toBe('fr');
     });

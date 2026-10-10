@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { lazy, useState, useEffect, useCallback, useMemo } from 'react';
+import LazyPart from './LazyPart';
 import * as Sentry from '@sentry/react';
 import {
   getSunPosition,
@@ -33,7 +34,8 @@ import { useLiveRoute } from '@/hooks/useLiveRoute';
 import { getMoonLook, getSkyOvercastMix, getStarCloudFactor } from '@/utils/weatherEffectsUtils';
 import { getAstroEvent, parseEggOverride } from '@/utils/astroEvents';
 import SunVisualization from './SunVisualization';
-import SceneInfoCard from './SceneInfoCard';
+// The info card and the collection view load on their first open (ROADMAP item 125).
+const SceneInfoCard = lazy(() => import('./SceneInfoCard'));
 import { getSceneInfo, type SceneInfoTarget } from '@/utils/sceneInfo';
 import InfoPanel from './InfoPanel';
 import NightStars from './NightStars';
@@ -67,8 +69,9 @@ import { getTerrainSunTimes, getTerrainMoonTimes } from '../utils/horizonUtils';
 import { getSunArcLabels, getMoonArcLabels } from '../utils/arcLabels';
 import { PremiumContext, usePremium } from '@/hooks/usePremium';
 import PremiumDialog from './PremiumDialog';
-import CollectionView from './CollectionView';
-import BadgeUnlocked from './BadgeUnlocked';
+const CollectionView = lazy(() => import('./CollectionView'));
+// Lazy too: it imports BadgeArt from CollectionView (ROADMAP item 125).
+const BadgeUnlocked = lazy(() => import('./BadgeUnlocked'));
 import {
   BADGES, NOWRUZ_ALSO, addToCollection, badgeForAstroEvent, badgeForCalendarEvent, badgeForPlayfulEgg, badgeForSanta, badgeForTarget, countCollected, eggBadgesForTarget, isCollectionPaused, loadCollection,
   badgeForRoute, saveCollection, stateBadgeForTarget, type BadgeId, type Collection, type StateBadgeContext,
@@ -78,20 +81,21 @@ import { getCalendarEvent, isSantaTime } from '@/utils/calendarEvents';
 import { getNationalDay, parseCountryOverride, parseNationalEggOverride } from '@/utils/nationalDays';
 import { badgeForNationalDay } from '@/utils/collection';
 import { BuntingContext, type Bunting } from '@/hooks/useBunting';
-import NationalEggs from './NationalEggs';
+// Easter eggs that show only on their day or trigger load on demand (ROADMAP item 125).
+const NationalEggs = lazy(() => import('./NationalEggs'));
 import { NO_PATIENT_WATCH, PLAYFUL_EVENT, advancePatientWatch, getPlayfulOverride, isEasterMorning, type PlayfulEgg } from '@/utils/playfulEggs';
 import { parseFestivalOverride } from '@/utils/festivalEvents';
 import { PLAY_SPEED, PLAY_TICK_MS, clampTimeOffset } from '@/utils/timeTravel';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
-import { DISCO_MS, KONAMI_SEQUENCE, SUNGLASSES_MS, advanceKonami, getEggOverride, registerSunTap, rollUfo } from '@/utils/hiddenEggs';
+import { DISCO_MS, KONAMI_SEQUENCE, SUNGLASSES_MS, UFO_RING, advanceKonami, getEggOverride, registerSunTap, rollUfo } from '@/utils/hiddenEggs';
 import { isCloudEggDay, isCloudEggForced } from '@/utils/skyCloudUtils';
 import { isInstalledApp } from '@/utils/installedApp';
 import { getStartReveal, isFastReturn, loadLastVisible, saveLastVisible } from '@/utils/fastReturn';
-import DiscoSky from './DiscoSky';
-import Ufo, { UFO_RING } from './Ufo';
+const DiscoSky = lazy(() => import('./DiscoSky'));
+const Ufo = lazy(() => import('./Ufo'));
 import { loadTemperatureUnit, saveTemperatureUnit, type TemperatureUnit } from '@/utils/temperatureUnit';
 import { loadLanguage, saveLanguage, type Language } from '@/utils/language';
-import { translate, type Translate } from '@/i18n';
+import { loadDictionary, translate, type Translate } from '@/i18n';
 import { LanguageContext } from '@/hooks/useLanguage';
 
 // Eye height above ground for line of sight with terrain (ROADMAP item 13): e.g. a
@@ -202,9 +206,12 @@ const SunTracker: React.FC = () => {
   // UI language (ROADMAP item 67): default from navigator.language, saved choice first.
   // Given to the components below through LanguageContext.
   const [language, setLanguageState] = useState<Language>(() => loadLanguage(navigator.language));
+  // A picked language shows when its dictionary is loaded (ROADMAP item 125).
   const setLanguage = useCallback((next: Language) => {
-    setLanguageState(next);
-    saveLanguage(next);
+    loadDictionary(next).then(() => {
+      setLanguageState(next);
+      saveLanguage(next);
+    }, () => {});
   }, []);
   const t = useCallback<Translate>((key, vars) => translate(language, key, vars), [language]);
   const languageContext = useMemo(() => ({ language, setLanguage, t }), [language, setLanguage, t]);
@@ -1162,6 +1169,7 @@ const SunTracker: React.FC = () => {
         meteorShower={astroEvent?.kind === 'meteorShower'}
       />
       {astroEvent?.kind === 'aurora' && <Aurora opacity={getStarCloudFactor(weatherType, cloudCover)} />}
+      <LazyPart>
       {discoOn && <DiscoSky />}
       {ufoOn && (
         <Ufo onDone={handleUfoDone} onInfo={handleSceneTap} ringOn={infoCard?.ring === UFO_RING} ringTier={infoCardInfo?.tier ?? null} />
@@ -1169,6 +1177,7 @@ const SunTracker: React.FC = () => {
       {nationalDay && (
         <NationalEggs key={nationalDay.kind} day={nationalDay} timeOfDay={timeOfDay} onInfo={handleSceneTap} infoRing={infoCard?.ring ?? null} infoRingTier={infoCardInfo?.tier ?? null} onFireworksRunning={setNationalFireworksRunning} />
       )}
+      </LazyPart>
       {reveal === 'done' && (
         <>
           <MusicPlayer isFullscreen={isFullscreen} duck={isCountdownSounding} rainMmH={getRainMmH(weatherType, rainMmH)} />
@@ -1313,26 +1322,34 @@ const SunTracker: React.FC = () => {
         </button>
       )}
       {infoCard && infoCardInfo && (
-        <SceneInfoCard
-          key={infoCard.id}
-          info={infoCardInfo}
-          x={infoCard.x}
-          y={infoCard.y}
-          onClose={handleInfoClose}
-        />
+        <LazyPart>
+          <SceneInfoCard
+            key={infoCard.id}
+            info={infoCardInfo}
+            x={infoCard.x}
+            y={infoCard.y}
+            onClose={handleInfoClose}
+          />
+        </LazyPart>
       )}
     </div>
     </BuntingContext.Provider>
     <PremiumDialog />
-    <CollectionView open={isCollectionOpen} onClose={handleCollectionClose} collection={collection} focusId={collectionFocus} />
+    {isCollectionOpen && (
+      <LazyPart>
+        <CollectionView open onClose={handleCollectionClose} collection={collection} focusId={collectionFocus} />
+      </LazyPart>
+    )}
     {unlockedQueue.length > 0 && (
-      <BadgeUnlocked
-        key={unlockedQueue[0].id}
-        badgeId={unlockedQueue[0].id}
-        found={unlockedQueue[0].found}
-        onOpen={handleUnlockedOpen}
-        onDone={handleUnlockedDone}
-      />
+      <LazyPart>
+        <BadgeUnlocked
+          key={unlockedQueue[0].id}
+          badgeId={unlockedQueue[0].id}
+          found={unlockedQueue[0].found}
+          onOpen={handleUnlockedOpen}
+          onDone={handleUnlockedDone}
+        />
+      </LazyPart>
     )}
     </PremiumContext.Provider>
     </LanguageContext.Provider>
