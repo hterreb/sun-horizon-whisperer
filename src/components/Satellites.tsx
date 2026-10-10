@@ -4,7 +4,7 @@ import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { useScenePlaybackRate } from '@/hooks/useScenePlaybackRate';
 import { useDoubleTap } from '@/hooks/useDoubleTap';
 import { getSpawnGapFactor, type PlayDirection } from '@/utils/timeTravel';
-import { makeDotPath, type DotPath } from '@/utils/satelliteUtils';
+import { getSatelliteDotPx, getSatelliteGlowPx, makeDotPath, type DotPath } from '@/utils/satelliteUtils';
 import { type SceneInfoHandler } from './CloudLayer';
 
 // Satellites (ROADMAP item 97), behind everything else in the scene. Free: decorative white
@@ -20,7 +20,7 @@ export interface SatelliteDot {
   y: number;
   opacity: number;
   shown: boolean; // false: fading out (into the Earth's shadow, below 10° or behind terrain)
-  iss: boolean;
+  magnitude: number; // sets the dot's size and glow (item 130)
 }
 
 interface SatellitesProps {
@@ -77,7 +77,7 @@ const DecorDot: React.FC<{ decor: Decor; width: number; height: number; onDone: 
     // The size at spawn: a resize does not restart a crossing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [decor]);
-  return <span ref={ref} className="absolute left-0 top-0 h-0.5 w-0.5 rounded-full bg-white" data-testid="satellite-decor" />;
+  return <span ref={ref} className="absolute left-0 top-0 size-0.75 rounded-full bg-white" data-testid="satellite-decor" />;
 };
 
 const Satellites: React.FC<SatellitesProps> = ({
@@ -141,7 +141,8 @@ const Satellites: React.FC<SatellitesProps> = ({
       )}
       {tracked?.map((dot) => {
         const ring = `satellite-${dot.id}`;
-        const size = dot.iss ? 5 : 3;
+        const size = getSatelliteDotPx(dot.magnitude);
+        const glow = getSatelliteGlowPx(dot.magnitude);
         return (
           <button
             key={dot.id}
@@ -166,7 +167,7 @@ const Satellites: React.FC<SatellitesProps> = ({
           >
             <span
               className="rounded-full bg-white"
-              style={{ width: size, height: size, boxShadow: dot.iss ? '0 0 4px 1px rgb(255 255 255 / 0.6)' : undefined }}
+              style={{ width: size, height: size, boxShadow: glow > 0 ? `0 0 ${glow}px 1px rgb(255 255 255 / 0.6)` : undefined }}
             />
             {(infoRing === ring) && <span className="absolute inset-2 rounded-full border border-white/70" data-testid="scene-info-ring" />}
           </button>

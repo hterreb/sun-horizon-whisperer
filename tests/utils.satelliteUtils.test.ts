@@ -15,6 +15,8 @@ import {
   getPassReminderText,
   getSatelliteCard,
   getSatelliteDetails,
+  getSatelliteDotPx,
+  getSatelliteGlowPx,
   getSatelliteMagnitude,
   getSatelliteOpacity,
   getSkySatellites,
@@ -104,13 +106,29 @@ describe('isSatelliteVisible (the visibility rule)', () => {
 
 describe('brightness from the distance', () => {
   it('makes a nearer satellite brighter', () => {
-    expect(getSatelliteMagnitude(1, 500)).toBeLessThan(getSatelliteMagnitude(1, 1500));
+    expect(getSatelliteMagnitude(1, 'X', 500)).toBeLessThan(getSatelliteMagnitude(1, 'X', 1500));
   });
 
   it('makes the ISS brighter than another satellite at the same distance', () => {
-    expect(getSatelliteMagnitude(ISS_NORAD_ID, 800)).toBeLessThan(getSatelliteMagnitude(1, 800));
-    expect(getSatelliteOpacity(getSatelliteMagnitude(ISS_NORAD_ID, 800))).toBe(1);
-    expect(getSatelliteOpacity(getSatelliteMagnitude(1, 800))).toBeLessThan(1);
+    expect(getSatelliteMagnitude(ISS_NORAD_ID, 'ISS (ZARYA)', 800)).toBeLessThan(getSatelliteMagnitude(1, 'X', 800));
+    expect(getSatelliteOpacity(getSatelliteMagnitude(ISS_NORAD_ID, 'ISS (ZARYA)', 800))).toBe(1);
+    expect(getSatelliteOpacity(getSatelliteMagnitude(1, 'X', 800))).toBeLessThan(1);
+  });
+
+  it('orders the size classes by brightness: ISS, giant, rocket body, other, Starlink (item 130)', () => {
+    const at = (id: number, name: string) => getSatelliteMagnitude(id, name, 500);
+    const order = [at(ISS_NORAD_ID, 'ISS (ZARYA)'), at(48274, 'CSS (TIANHE)'), at(2, 'SL-16 R/B'), at(3, 'COSMOS 1'), at(4, 'STARLINK-1007')];
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
+  it('draws a brighter satellite as a bigger dot, 2.5-7 px, with a glow only below 0 (item 130)', () => {
+    const iss = getSatelliteMagnitude(ISS_NORAD_ID, 'ISS (ZARYA)', 420);
+    expect(getSatelliteDotPx(iss)).toBeGreaterThan(6);
+    expect(getSatelliteGlowPx(iss)).toBeGreaterThan(0);
+    const starlink = getSatelliteMagnitude(4, 'STARLINK-1007', 550);
+    expect(getSatelliteDotPx(starlink)).toBe(2.5);
+    expect(getSatelliteGlowPx(starlink)).toBe(0);
+    expect(getSatelliteDotPx(-10)).toBe(7);
   });
 
   it('keeps a faint satellite at the least opacity', () => {
@@ -304,14 +322,14 @@ describe('decorative dots (free part)', () => {
     expect(isSatelliteWeather('cloudy')).toBe(false);
   });
 
-  it('cross in a straight line at 0.1-0.3 % of the width per second', () => {
+  it('cross in a straight line at 0.6-1.8 % of the width per second (item 130)', () => {
     const slow = makeDotPath([0.1, 0.2, 0.8, 0, 0.9]);
     expect(slow.x0).toBeLessThan(slow.x1);
-    expect(slow.durationMs).toBeCloseTo((104 / 0.1) * 1000);
+    expect(slow.durationMs).toBeCloseTo((104 / 0.6) * 1000);
     expect(slow.fadeAt).toBe(1);
     const fast = makeDotPath([0.9, 0.2, 0.8, 1, 0.1]);
     expect(fast.x0).toBeGreaterThan(fast.x1);
-    expect(fast.durationMs).toBeCloseTo((104 / 0.3) * 1000);
+    expect(fast.durationMs).toBeCloseTo((104 / 1.8) * 1000);
     expect(fast.fadeAt).toBeGreaterThan(0.3);
     expect(fast.fadeAt).toBeLessThan(0.75);
   });
