@@ -2485,6 +2485,22 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   5. **Offline:** the lazy chunks are `.js` files in `dist/assets`, so the PWA precache keeps them. The install size stays the same; the gain is less parse and run time at start.
 - **Not in scope:** `react-dom`, the Sentry core, `PlaceSearch` (3 kB), `lucide-react` and `tailwind-merge` (already tree-shaken).
 - **Done when:** the `index` chunk is 700 kB or less (−25 % from 951 kB), measured with `npm run build`. All tests, lint and typecheck pass. `npm run perf:trace -- --screenshots` shows no visual change. In the browser: a German start shows German texts in the first frame; the feedback form opens on the first tap; a forced egg (`?egg=…`) shows; with the network off after one visit, an egg, the info card and the feedback form still load.
+- **Built (2026-10-10):** one commit per step. Start size = the entry chunk plus the chunks it imports statically (Rollup moves shared code into such chunks, so the `index` chunk alone reads too low).
+
+  | Step | Change | Start size |
+  |---|---|--:|
+  | — | Before (main `88157f3`) | 951 kB |
+  | 1 | `de`/`es`/`it`/`fr` load with `loadDictionary`; `main.tsx` waits for the start language; a picked language shows when loaded; a failed load falls back to `en` | 835 kB |
+  | 2 | Feedback form: `@sentry/feedback` (direct dependency, same version as `@sentry/react`) loads on the first open in `utils/feedback.ts`; `isFeedbackAvailable` checks `getClient()` | 786 kB |
+  | 3 | `React.lazy` for `DiscoSky`, `Ufo`, `NationalEggs`, `FestivalEggs` (only on a festival day), `LunarDragon`, `Santa`; ring ids to `hiddenEggs.ts` and `calendarEvents.ts` | 762 kB |
+  | 4 | `SceneInfoCard`, `CollectionView` (mounted only while open) and `BadgeUnlocked` (it imports `BadgeArt` from `CollectionView`) lazy; new `LazyPart` wraps every lazy part | 728 kB |
+  | — | Not in the spec: drop the unused `TooltipProvider` (Radix Tooltip + floating-ui) from `App.tsx` | **696 kB** (232 kB gzip) |
+
+  - Not as specced: `getSceneInfo` stays static, because `SunTracker` needs the card's tier for the ring and `collection.ts` imports `sceneInfo.ts`. `MidnightGhost`, `Fireworks`, `PlayfulEggs`, `SkyEggs`, `TemperatureIceberg` and `CalendarEggs` stay static: they are always mounted and decide inside (about 21 kB together).
+  - `LazyPart` (request 2026-10-10: "if lazy loading doesnt work just dont show it"): nothing shows while a part loads; a part that fails to load or throws stays hidden, the rest of the app goes on, and the error goes to Sentry.
+  - Tests: `tests/setupTests.ts` preloads the dictionaries and makes `React.lazy` components ready before the first render, so the tests stay synchronous. They do not cover the lazy loading itself.
+- **Checked (2026-10-10):** 1636 tests, lint and typecheck pass. Production build in Chrome (Playwright, placeholder Sentry DSN): a saved German start loads the `de` chunk and never shows an English text; a switch to Français loads `fr`; `?egg=ufo` loads `Ufo` and shows it; a double tap on it opens the info card (`SceneInfoCard` chunk, ultra rare ring); the feedback button loads the form chunk and opens the form; the collection view opens. Offline after one visit (service worker): the app starts, and the UFO and the collection view load from the precache. No page errors.
+- **Open:** `npm run perf:trace -- --screenshots` before/after comparison; a check on a phone.
 
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 
