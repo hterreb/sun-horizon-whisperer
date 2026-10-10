@@ -200,6 +200,12 @@ describe('SunTracker', () => {
       Object.defineProperty(document, 'fullscreenElement', { value: element, configurable: true });
       document.dispatchEvent(new Event('fullscreenchange'));
     });
+    // jsdom has no PointerEvent: a MouseEvent named pointermove, with its pointerType.
+    const pointerMove = (target: EventTarget, pointerType: string) => act(() => {
+      const event = new MouseEvent('pointermove', { bubbles: true });
+      Object.defineProperty(event, 'pointerType', { value: pointerType });
+      target.dispatchEvent(event);
+    });
     const { container } = render(<SunTracker />);
     // The top-left buttons (with the fullscreen listener) mount after the 200 ms fade.
     advance(250);
@@ -208,7 +214,7 @@ describe('SunTracker', () => {
     try {
       setFullscreenElement(document.documentElement);
       advance(2000);
-      fireEvent.mouseMove(document);
+      pointerMove(document, 'mouse');
       advance(2999);
       expect(scene).not.toHaveClass('cursor-none');
       advance(1);
@@ -221,6 +227,10 @@ describe('SunTracker', () => {
       document.body.appendChild(hit);
       fireEvent.touchStart(inner);
       fireEvent.touchStart(inner);
+      expect(scene).toHaveClass('cursor-none');
+      // Item 133: the compatibility mouse events of a tap do not wake.
+      fireEvent.mouseMove(inner);
+      pointerMove(inner, 'touch');
       expect(scene).toHaveClass('cursor-none');
       hit.remove();
 

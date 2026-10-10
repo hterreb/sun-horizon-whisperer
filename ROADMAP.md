@@ -2574,6 +2574,13 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Built:** `useIdleHide` returns `isTappable` and the `IdleHide` type, plus `ALWAYS_SHOWN` for use outside `SunTracker`. `SunTracker` passes `controls` to `InfoPanel` and `MusicPlayer` (replaces their `isFullscreen` prop) and `isTappable` to `TopLeftButtons`.
 - **Checked:** `useIdleHide` test: not tappable while hidden, tappable `TAP_READY_MS` after a wake. `SunTracker` fullscreen test: the hidden button column has `pointer-events-none`, a wake keeps it for 400 ms. `TopLeftButtons`, `InfoPanel`, `MusicPlayer` tests. Not checked: a real phone.
 
+### 133. A phone tap's mouse event does not wake the controls — S — **✅ Done**
+
+- **Feedback (2026-10-10, after item 132):** "still doesnt work on the phone".
+- **Cause:** a phone tap fires `touchstart` and then compatibility mouse events (`mousemove`, `mousedown`, `click`). Item 124 skips scene hit areas only in the `touchstart` listener; the `mousemove` listener in `SunTracker` woke the controls on each tap, also on a double tap on a fish.
+- **Spec:** the fullscreen wake listens to `pointermove` with `pointerType === 'mouse'`, not to `mousemove`. A touch wakes only through the `touchstart` listener (with the item 124 skip).
+- **Checked:** `SunTracker` fullscreen test: a `mousemove` and a touch `pointermove` on a scene hit area do not wake, a mouse `pointermove` wakes. Phone emulation (Playwright, touch, production build): a double tap on a scene hit area showed the controls on main, and keeps them hidden with the fix; a tap on the open sky shows them. Not checked: a real phone.
+
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 
 Rules for all items:
