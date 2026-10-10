@@ -21,7 +21,7 @@ const premiumValue = (overrides: Partial<PremiumValue>): PremiumValue => ({
 });
 
 describe('InfoPanel', () => {
-  // Item 128: the place name cache must not carry over between tests.
+  // Item 130: the place name cache must not carry over between tests.
   beforeEach(() => localStorage.clear());
   const now = new Date();
   const sunTimes: SunTimes = {
@@ -322,12 +322,12 @@ describe('InfoPanel', () => {
       vi.stubGlobal('fetch', fetchMock);
       vi.spyOn(console, 'error').mockImplementation(() => {});
       render(<InfoPanel {...defaultProps} onCountryChange={onCountryChange} />);
-      // Item 128: one retry after 2 s, then the device zone (UTC in the tests: no country).
+      // Item 130: one retry after 2 s, then the device zone (UTC in the tests: no country).
       await waitFor(() => expect(onCountryChange).toHaveBeenCalledWith(null), { timeout: 3500 });
       expect(fetchMock).toHaveBeenCalledTimes(2);
     });
 
-    it('uses the device time zone\'s country when both calls fail and nothing is cached (item 128)', async () => {
+    it('uses the device time zone\'s country when both calls fail and nothing is cached (item 130)', async () => {
       vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ ok: false, status: 429, json: () => Promise.resolve({}) })));
       vi.spyOn(console, 'error').mockImplementation(() => {});
       const realFormat = Intl.DateTimeFormat;
@@ -342,7 +342,7 @@ describe('InfoPanel', () => {
       vi.restoreAllMocks();
     });
 
-    it('shows a fresh cached place at once, with no call (item 128)', async () => {
+    it('shows a fresh cached place at once, with no call (item 130)', async () => {
       localStorage.setItem('place-name', JSON.stringify({ key: '40.71,-74.01', language: 'en', savedAt: Date.now(), name: 'Cached City, Testland', countryCode: 'US' }));
       const fetchMock = vi.fn();
       vi.stubGlobal('fetch', fetchMock);
@@ -353,7 +353,7 @@ describe('InfoPanel', () => {
       expect(fetchMock).not.toHaveBeenCalled();
     });
 
-    it('keeps a stale cached place when both calls fail, and saves a new answer (item 128)', async () => {
+    it('keeps a stale cached place when both calls fail, and saves a new answer (item 130)', async () => {
       const stale = { key: '40.71,-74.01', language: 'en', savedAt: Date.now() - 2 * 24 * 3600 * 1000, name: 'Old City, Testland', countryCode: 'US' };
       localStorage.setItem('place-name', JSON.stringify(stale));
       const fetchMock = vi.fn(() => Promise.reject(new Error('network down')));

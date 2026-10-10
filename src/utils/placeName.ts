@@ -1,4 +1,4 @@
-// The place name and country of the user's location (ROADMAP item 128): the BigDataCloud
+// The place name and country of the user's location (ROADMAP item 130): the BigDataCloud
 // reverse-geocode call with one retry, a localStorage cache of the last answer, and a country
 // from the device time zone when there is no answer. InfoPanel owns the state.
 

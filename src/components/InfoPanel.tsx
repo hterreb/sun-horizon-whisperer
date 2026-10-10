@@ -151,7 +151,7 @@ interface InfoPanelProps {
   // Collection badges (ROADMAP item 112): the row button that opens the collection.
   onCollectionOpen?: () => void;
   // National days (utils/nationalDays): the place's country code from the reverse-geocode
-  // answer below (cached, item 128), the device time zone's country when the call fails, or
+  // answer below (cached, item 130), the device time zone's country when the call fails, or
   // null (a searched place: SunTracker keeps its own code; no code). Keep it stable (a state
   // setter): a new function fetches again.
   onCountryChange?: (countryCode: string | null) => void;
@@ -297,7 +297,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     const fetchLocationName = async () => {
       const latitude = location.latitude;
       const longitude = location.longitude;
-      // Item 128: show the cached answer at once; ask again only when it is stale.
+      // Item 130: show the cached answer at once; ask again only when it is stale.
       const cached = loadPlace(latitude, longitude, language);
       if (cached) {
         setLocationName(cached.place.name);

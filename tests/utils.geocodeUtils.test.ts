@@ -65,7 +65,7 @@ describe('geocodeUtils', () => {
       ]);
     });
 
-    it('keeps the country code for the national days (item 128), upper case, and drops a bad one', async () => {
+    it('keeps the country code for the national days (item 130), upper case, and drops a bad one', async () => {
       vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({
         ok: true,
         json: () => Promise.resolve({ results: [

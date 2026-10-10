@@ -2522,7 +2522,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Built:** `MusicPlayer.tsx` has 10 stations: FluxFM Chillhop, ILoveRadio Lo-Fi, Epic Lounge Jazzhop, 0nlineradio Lo-Fi, ISEKOI Chill Zone, laut.fm lofi, REYFM #lofi, Hunter.FM Lo-Fi, CLIAMP Lofi Hip Hop, Hotmix Lo-Fi. No CSP change (`media-src` allows `https:`).
 - **Open (owner):** the licence for each station in a paid app (before Premium is on sale, item 16); listen to the new stations on a phone.
 
-### 128. Place name: cache, retry, fallback, offline country — S — **✅ Done**
+### 130. Place name: cache, retry, fallback, offline country — S — **✅ Done**
 
 > summary: the place name and country of the user's location survive a failed or rate-limited reverse-geocode call. A cache, one retry, a softer fallback text, and a country from the device time zone. The national days (which need the country) work for a searched place too.
 
@@ -2585,7 +2585,7 @@ Items:
   - **Reduced motion:** no jets and no fireworks, and their badges do not count. The bunting and the bonfire are static, so they stay and count.
   - **Collection:** one ultra rare badge `egg:<kind>` per national day. The jets count by day, the fireworks at night (`badgeForNationalDay`). The bunting counts when a decorated boat shows (`useBunting`: `SceneBoat` calls `onShow`), because a bunting day without a boat on the screen shows nothing. Never in a time preview.
   - **Test links:** `?egg=<kind>` (for example `?egg=bastilleDay`) forces that day in any country on any date; the time-of-day rules still apply. `?country=XX` sets the country. Both pause the collection.
-  - **Open:** the bunting and the French and US fireworks have no tap target, so their cards do not open yet. A searched place keeps Open-Meteo's `country_code` (item 128).
+  - **Open:** the bunting and the French and US fireworks have no tap target, so their cards do not open yet. A searched place keeps Open-Meteo's `country_code` (item 130).
 - **Astronomy:**
   - ✅ Solar and lunar eclipses: a darkened sun or red moon at the correct time (hardcoded date list for 10 years). Done: NASA GSFC list 2026–2035 in `astroEvents.ts`; solar only within ~3500 km of the greatest-eclipse point.
   - ✅ Supermoon: a bigger moon when the full moon is near perigee. Done: 14 % bigger moon when the full moon is closer than 360 000 km (Meeus distance).

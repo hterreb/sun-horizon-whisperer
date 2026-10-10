@@ -176,7 +176,7 @@ const SunTracker: React.FC = () => {
   const [manualPlaceName, setManualPlaceName] = useState<string | null>(
     () => loadManualLocation()?.name ?? null
   );
-  // Item 128: the searched place's country code (Open-Meteo), for the national days. InfoPanel
+  // Item 130: the searched place's country code (Open-Meteo), for the national days. InfoPanel
   // makes no reverse-geocode call for a searched place, so it passes no country for it.
   const [manualCountry, setManualCountry] = useState<string | null>(
     () => loadManualLocation()?.countryCode ?? null

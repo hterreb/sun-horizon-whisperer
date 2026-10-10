@@ -56,7 +56,7 @@ describe('manualLocation', () => {
       });
     });
 
-    it('round-trips the country code of a searched place (item 128), and drops it without a name', () => {
+    it('round-trips the country code of a searched place (item 130), and drops it without a name', () => {
       saveManualLocation(41.9, 12.5, 'Roma, Italy', 'IT');
       expect(loadManualLocation()).toEqual({ latitude: 41.9, longitude: 12.5, name: 'Roma, Italy', countryCode: 'IT' });
       saveManualLocation(41.9, 12.5, undefined, 'IT');

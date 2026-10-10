@@ -10,7 +10,7 @@ export interface GeocodeResult {
   name: string;
   admin1?: string;
   country?: string;
-  // ISO 3166-1 alpha-2 ("DE"), for the national days (ROADMAP item 128).
+  // ISO 3166-1 alpha-2 ("DE"), for the national days (ROADMAP item 130).
   countryCode?: string;
   latitude: number;
   longitude: number;

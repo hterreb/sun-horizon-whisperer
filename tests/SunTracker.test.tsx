@@ -1468,7 +1468,7 @@ describe('SunTracker national days', () => {
     expect(screen.queryByTestId('boat-bunting')).toBeNull();
   });
 
-  it('uses the searched place\'s country code, with no reverse-geocode call (item 128)', async () => {
+  it('uses the searched place\'s country code, with no reverse-geocode call (item 130)', async () => {
     localStorage.setItem('manual-location', JSON.stringify({ ...BERLIN, name: 'Berlin, Germany', countryCode: 'DE' }));
     global.fetch = vi.fn(() => Promise.reject(new Error('offline'))) as unknown as typeof fetch;
     render(<SunTracker />);

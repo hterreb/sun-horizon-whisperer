@@ -8,7 +8,7 @@ export interface ManualLocation {
   // Set when the location came from place-name search (ROADMAP item 12), so the
   // chosen place survives a reload instead of falling back to a reverse-geocode guess.
   name?: string;
-  // The searched place's country code (ROADMAP item 128), for the national days.
+  // The searched place's country code (ROADMAP item 130), for the national days.
   countryCode?: string;
 }
 

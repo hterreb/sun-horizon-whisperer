@@ -6,7 +6,7 @@ import {
 const ROME = { name: 'Roma, Italia', countryCode: 'IT' };
 const NOW = 1_800_000_000_000;
 
-describe('place name cache (item 128)', () => {
+describe('place name cache (item 130)', () => {
   beforeEach(() => localStorage.clear());
 
   it('misses when nothing is saved or the place is another one', () => {
