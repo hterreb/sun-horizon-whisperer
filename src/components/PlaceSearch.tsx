@@ -4,7 +4,7 @@ import { FOCUS_RING } from './InfoPanel';
 import { useLanguage } from '@/hooks/useLanguage';
 
 interface PlaceSearchProps {
-  onSelect: (latitude: number, longitude: number, name: string) => void;
+  onSelect: (latitude: number, longitude: number, name: string, countryCode?: string) => void;
   autoFocus?: boolean;
 }
 
@@ -100,7 +100,7 @@ const PlaceSearch: React.FC<PlaceSearchProps> = ({ onSelect, autoFocus }) => {
                 type="button"
                 role="option"
                 aria-selected={false}
-                onClick={() => onSelect(result.latitude, result.longitude, formatGeocodeResultLabel(result))}
+                onClick={() => onSelect(result.latitude, result.longitude, formatGeocodeResultLabel(result), result.countryCode)}
                 className={`w-full text-left px-2 py-1 rounded bg-white/5 hover:bg-white/20 transition-colors ${FOCUS_RING}`}
               >
                 {formatGeocodeResultLabel(result)}

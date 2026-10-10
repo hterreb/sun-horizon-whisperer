@@ -56,6 +56,15 @@ describe('manualLocation', () => {
       });
     });
 
+    it('round-trips the country code of a searched place (item 130), and drops it without a name', () => {
+      saveManualLocation(41.9, 12.5, 'Roma, Italy', 'IT');
+      expect(loadManualLocation()).toEqual({ latitude: 41.9, longitude: 12.5, name: 'Roma, Italy', countryCode: 'IT' });
+      saveManualLocation(41.9, 12.5, undefined, 'IT');
+      expect(loadManualLocation()).toEqual({ latitude: 41.9, longitude: 12.5 });
+      localStorage.setItem('manual-location', JSON.stringify({ latitude: 41.9, longitude: 12.5, name: 'Roma', countryCode: 'italy' }));
+      expect(loadManualLocation()).toEqual({ latitude: 41.9, longitude: 12.5, name: 'Roma' });
+    });
+
     it('clears the stored location', () => {
       saveManualLocation(1, 2);
       clearManualLocation();

@@ -10,6 +10,8 @@ export interface GeocodeResult {
   name: string;
   admin1?: string;
   country?: string;
+  // ISO 3166-1 alpha-2 ("DE"), for the national days (ROADMAP item 130).
+  countryCode?: string;
   latitude: number;
   longitude: number;
 }
@@ -19,6 +21,7 @@ interface OpenMeteoGeocodeResponse {
     name?: unknown;
     admin1?: unknown;
     country?: unknown;
+    country_code?: unknown;
     latitude?: unknown;
     longitude?: unknown;
   }>;
@@ -53,6 +56,7 @@ export const searchPlaces = async (
       name: typeof r.name === 'string' ? r.name : '',
       admin1: typeof r.admin1 === 'string' ? r.admin1 : undefined,
       country: typeof r.country === 'string' ? r.country : undefined,
+      countryCode: typeof r.country_code === 'string' && /^[A-Z]{2}$/i.test(r.country_code) ? r.country_code.toUpperCase() : undefined,
       latitude: typeof r.latitude === 'number' ? r.latitude : NaN,
       longitude: typeof r.longitude === 'number' ? r.longitude : NaN,
     }))

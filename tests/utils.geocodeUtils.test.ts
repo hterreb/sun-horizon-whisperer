@@ -65,6 +65,19 @@ describe('geocodeUtils', () => {
       ]);
     });
 
+    it('keeps the country code for the national days (item 130), upper case, and drops a bad one', async () => {
+      vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ results: [
+          { name: 'Roma', country: 'Italy', country_code: 'it', latitude: 41.9, longitude: 12.5 },
+          { name: 'Nowhere', country_code: 'XYZ', latitude: 1, longitude: 2 },
+        ] }),
+      })));
+      const [rome, nowhere] = await searchPlaces('test');
+      expect(rome.countryCode).toBe('IT');
+      expect(nowhere.countryCode).toBeUndefined();
+    });
+
     it('drops results missing a usable name or coordinates', async () => {
       const fetchMock = vi.fn(() =>
         Promise.resolve({

@@ -2538,6 +2538,20 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Deviation:** the puffs have fixed places in the burst band of `planShow` (x 15–85 %, y 20–45 %), not the real burst points (a `ponytail:` note).
 - **Checked:** `NationalEggs` tests: smoke in the flag colours after the show, the sky tap stays on; the tap ends when the smoke has faded; no smoke with reduced motion. Not checked: a real phone.
 
+### 130. Place name: cache, retry, fallback, offline country — S — **✅ Done**
+
+> summary: the place name and country of the user's location survive a failed or rate-limited reverse-geocode call. A cache, one retry, a softer fallback text, and a country from the device time zone. The national days (which need the country) work for a searched place too.
+
+- **Found (2026-10-10, easter-egg lookbook shoot):** some shots showed "Unknown Location". The BigDataCloud call had no check of `response.ok`, so a 429 or 5xx answer parsed as "no place here". There was no cache (one call for each page load and each language change) and no retry. The national days (`nationalDays.ts`) use the country code of the same call, so a failed call also stopped all national eggs. A searched place had no country code.
+- **Decision (Lutz, 2026-10-10):** A cache, B check and retry, C softer fallback text, D offline country. Build and merge.
+- **Spec and built:**
+  - **A, cache:** `src/utils/placeName.ts` keeps the last answer (`{ name, countryCode }`) in `localStorage` (`place-name`), keyed on the location rounded to 2 decimals (~1 km, the value that goes to BigDataCloud). `InfoPanel` shows the cached answer at once. It calls again only when the entry is older than 24 h or in another language. One entry only (the last place): a user who moves gets one call for each new place.
+  - **B, check and retry:** `fetchPlace` treats a non-ok answer as a failure and tries once more after 2 s. When both calls fail, `InfoPanel` keeps the cached answer (also a stale one) and does not clear the name or the country.
+  - **C, fallback text:** with no name, the panel shows "Your location" (`location.unknown`; de "Dein Standort", es "Tu ubicación", it "La tua posizione", fr "Votre position") above the coordinates, not "Unknown Location".
+  - **D, offline country:** when both calls fail and nothing is cached, the country comes from the device time zone (`deviceCountry`, `countryFromTimeZone`): a map of the IANA zones of the 9 national-day countries (the main zones for US, CA and AU). Other zones give no country. A searched place keeps Open-Meteo's `country_code` (`geocodeUtils` → `PlaceSearch` → `manualLocation`); `SunTracker` uses it while the searched place is set, because `InfoPanel` makes no call for a searched place.
+- **Checked:** `utils.placeName` (cache miss, hit, 24 h and language staleness, broken entries; the name rules; one call with the rounded location; a 429 then a retry after 2 s; a throw when the retry also fails; the zone map), `InfoPanel` (a fresh cache makes no call; a stale cache stays on screen when both calls fail and a new answer replaces it; the device zone's country when both calls fail), `utils.geocodeUtils` and `utils.manualLocation` (the country code round trip), `SunTracker` (a searched place in Germany dresses the boats on 3 Oct with no reverse-geocode call). Not checked: a real phone, and a real 429 from BigDataCloud.
+- **Limit:** the time-zone country is the device's, not the shown place's. It is wrong only for typed coordinates far away while the call also fails (a `ponytail:` note in `deviceCountry`).
+
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 
 Rules for all items:
@@ -2568,7 +2582,7 @@ Items:
   - ✅ Playful pack (item 118): April Fools (the sun and the moon swap places for one minute), Easter Sunday morning (the empty tomb), Valentine's Day (a heart cloud), St Patrick's Day (a pot of gold at the rainbow's end) and the patient-watcher badge.
 - **National days** (`nationalDays.ts`, `NationalEggs.tsx`, `BoatBunting.tsx`): ✅ Done 2026-10-09.
   - **Summary:** each national day shows only in its own country, on its local day. One row per country in `NATIONAL_DAYS` (country code, date, style, flag colours). A new country is one row.
-  - **Country source:** the `countryCode` of the BigDataCloud reverse-geocode answer that `InfoPanel` already gets for the place name. `InfoPanel` passes it up with `onCountryChange`; `SunTracker` keeps it in state. No second call and no new CSP host. Unknown country (no answer, an error, a searched place): no national egg. The app does not guess the country from the language.
+  - **Country source:** the `countryCode` of the BigDataCloud reverse-geocode answer that `InfoPanel` already gets for the place name. `InfoPanel` passes it up with `onCountryChange`; `SunTracker` keeps it in state. No second call and no new CSP host. Since item 130: a cached answer, then the device time zone when the call fails, and Open-Meteo's `country_code` for a searched place. Still unknown: no national egg. The app does not guess the country from the language.
   - **Eggs:**
 
     | Country | Day | Egg | Style |
@@ -2588,7 +2602,7 @@ Items:
   - **Collection:** one ultra rare badge `egg:<kind>` per national day. The jets count by day, the fireworks at night (`badgeForNationalDay`). The bunting counts when a decorated boat shows (`useBunting`: `SceneBoat` calls `onShow`), because a bunting day without a boat on the screen shows nothing. Never in a time preview.
   - **Test links:** `?egg=<kind>` (for example `?egg=bastilleDay`) forces that day in any country on any date; the time-of-day rules still apply. `?country=XX` sets the country. Both pause the collection.
   - **Taps (item 123):** a double tap on a dressed boat opens the boat card, which names the day (item 128). During the French and US fireworks show, a tap on the empty sky opens the day's card (`EventSkyTaps`).
-  - **Open:** a searched place has no country code (Open-Meteo gives `country_code`, but the saved place keeps only the name).
+  - **Open:** none. A searched place keeps Open-Meteo's `country_code` (item 130).
 - **Astronomy:**
   - ✅ Solar and lunar eclipses: a darkened sun or red moon at the correct time (hardcoded date list for 10 years). Done: NASA GSFC list 2026–2035 in `astroEvents.ts`; solar only within ~3500 km of the greatest-eclipse point.
   - ✅ Supermoon: a bigger moon when the full moon is near perigee. Done: 14 % bigger moon when the full moon is closer than 360 000 km (Meeus distance).

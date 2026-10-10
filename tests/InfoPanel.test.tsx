@@ -21,6 +21,8 @@ const premiumValue = (overrides: Partial<PremiumValue>): PremiumValue => ({
 });
 
 describe('InfoPanel', () => {
+  // Item 130: the place name cache must not carry over between tests.
+  beforeEach(() => localStorage.clear());
   const now = new Date();
   const sunTimes: SunTimes = {
     sunrise: new Date(now.setHours(6, 0, 0, 0)),
@@ -280,7 +282,7 @@ describe('InfoPanel', () => {
 
   it('rounds coordinates to 2 decimals before sending them to BigDataCloud (S-8)', async () => {
     const fetchMock = vi.fn(() =>
-      Promise.resolve({ json: () => Promise.resolve({ city: 'Test City', countryName: 'Testland' }) })
+      Promise.resolve({ ok: true, json: () => Promise.resolve({ city: 'Test City', countryName: 'Testland' }) })
     );
     vi.stubGlobal('fetch', fetchMock);
 
@@ -299,7 +301,7 @@ describe('InfoPanel', () => {
 
     it('passes the country code of the reverse-geocode answer up, with no second call', async () => {
       const fetchMock = vi.fn(() =>
-        Promise.resolve({ json: () => Promise.resolve({ city: 'Roma', countryName: 'Italia', countryCode: 'IT' }) })
+        Promise.resolve({ ok: true, json: () => Promise.resolve({ city: 'Roma', countryName: 'Italia', countryCode: 'IT' }) })
       );
       vi.stubGlobal('fetch', fetchMock);
       const onCountryChange = vi.fn();
@@ -308,17 +310,70 @@ describe('InfoPanel', () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
-    it('passes null when the answer has no code or the call fails', async () => {
+    it('passes null when the answer has no code, or the calls fail in an unmapped time zone', async () => {
       const onCountryChange = vi.fn();
-      vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ json: () => Promise.resolve({ countryName: 'Testland' }) })));
+      vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ countryName: 'Testland' }) })));
       const { unmount } = render(<InfoPanel {...defaultProps} onCountryChange={onCountryChange} />);
       await waitFor(() => expect(onCountryChange).toHaveBeenCalledWith(null));
       unmount();
+      localStorage.clear();
       onCountryChange.mockClear();
-      vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('network down'))));
+      const fetchMock = vi.fn(() => Promise.reject(new Error('network down')));
+      vi.stubGlobal('fetch', fetchMock);
       vi.spyOn(console, 'error').mockImplementation(() => {});
       render(<InfoPanel {...defaultProps} onCountryChange={onCountryChange} />);
-      await waitFor(() => expect(onCountryChange).toHaveBeenCalledWith(null));
+      // Item 130: one retry after 2 s, then the device zone (UTC in the tests: no country).
+      await waitFor(() => expect(onCountryChange).toHaveBeenCalledWith(null), { timeout: 3500 });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('uses the device time zone\'s country when both calls fail and nothing is cached (item 130)', async () => {
+      vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ ok: false, status: 429, json: () => Promise.resolve({}) })));
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const realFormat = Intl.DateTimeFormat;
+      vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(((...args: ConstructorParameters<typeof Intl.DateTimeFormat>) => {
+        const format = new realFormat(...args);
+        return Object.assign(format, { resolvedOptions: () => ({ ...realFormat.prototype.resolvedOptions.call(format), timeZone: 'Europe/Berlin' }) });
+      }) as unknown as typeof Intl.DateTimeFormat);
+      const onCountryChange = vi.fn();
+      render(<InfoPanel {...defaultProps} onCountryChange={onCountryChange} />);
+      await waitFor(() => expect(onCountryChange).toHaveBeenCalledWith('DE'), { timeout: 3500 });
+      expect(screen.getByText('Your location')).toBeInTheDocument();
+      vi.restoreAllMocks();
+    });
+
+    it('shows a fresh cached place at once, with no call (item 130)', async () => {
+      localStorage.setItem('place-name', JSON.stringify({ key: '40.71,-74.01', language: 'en', savedAt: Date.now(), name: 'Cached City, Testland', countryCode: 'US' }));
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+      const onCountryChange = vi.fn();
+      render(<InfoPanel {...defaultProps} location={{ latitude: 40.7128, longitude: -74.006, loaded: true }} onCountryChange={onCountryChange} />);
+      await screen.findByText('Cached City, Testland');
+      expect(onCountryChange).toHaveBeenCalledWith('US');
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('keeps a stale cached place when both calls fail, and saves a new answer (item 130)', async () => {
+      const stale = { key: '40.71,-74.01', language: 'en', savedAt: Date.now() - 2 * 24 * 3600 * 1000, name: 'Old City, Testland', countryCode: 'US' };
+      localStorage.setItem('place-name', JSON.stringify(stale));
+      const fetchMock = vi.fn(() => Promise.reject(new Error('network down')));
+      vi.stubGlobal('fetch', fetchMock);
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const onCountryChange = vi.fn();
+      const location = { latitude: 40.7128, longitude: -74.006, loaded: true };
+      const { unmount } = render(<InfoPanel {...defaultProps} location={location} onCountryChange={onCountryChange} />);
+      await screen.findByText('Old City, Testland');
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2), { timeout: 3500 });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(screen.getByText('Old City, Testland')).toBeInTheDocument();
+      expect(onCountryChange).not.toHaveBeenCalledWith(null);
+      unmount();
+
+      vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ city: 'New City', countryName: 'Testland', countryCode: 'US' }) })));
+      render(<InfoPanel {...defaultProps} location={location} onCountryChange={onCountryChange} />);
+      await screen.findByText('New City, Testland');
+      expect(JSON.parse(localStorage.getItem('place-name')!)).toMatchObject({ name: 'New City, Testland', countryCode: 'US' });
+      vi.restoreAllMocks();
     });
 
     it('passes null for a searched place (no reverse-geocode call)', async () => {
@@ -338,7 +393,7 @@ describe('InfoPanel', () => {
 
     it('hides the coordinates once a place name is known, and shows them again in the "Change location" form', async () => {
       const fetchMock = vi.fn(() =>
-        Promise.resolve({ json: () => Promise.resolve({ city: 'Test City', countryName: 'Testland' }) })
+        Promise.resolve({ ok: true, json: () => Promise.resolve({ city: 'Test City', countryName: 'Testland' }) })
       );
       vi.stubGlobal('fetch', fetchMock);
 
@@ -366,7 +421,7 @@ describe('InfoPanel', () => {
 
       render(<InfoPanel {...defaultProps} location={{ latitude: 12.3456, longitude: -65.4321, loaded: true }} />);
 
-      await screen.findByText('Unknown Location');
+      await screen.findByText('Your location', undefined, { timeout: 3500 });
       expect(screen.getByText(/12\.3456.*-65\.4321/)).toBeInTheDocument();
     });
 
@@ -537,6 +592,7 @@ describe('InfoPanel', () => {
                   name: 'Friedrichshafen',
                   admin1: 'Baden-Württemberg',
                   country: 'Germany',
+                  country_code: 'DE',
                   latitude: 47.65,
                   longitude: 9.48,
                 },
@@ -574,7 +630,7 @@ describe('InfoPanel', () => {
       });
       fireEvent.click(resultOption);
 
-      expect(onLocationChange).toHaveBeenCalledWith(47.65, 9.48, 'Friedrichshafen, Baden-Württemberg, Germany');
+      expect(onLocationChange).toHaveBeenCalledWith(47.65, 9.48, 'Friedrichshafen, Baden-Württemberg, Germany', 'DE');
       // Selecting a result closes the form, like submitting or "Use my location" do.
       expect(screen.queryByLabelText(/search for a place/i)).not.toBeInTheDocument();
     });

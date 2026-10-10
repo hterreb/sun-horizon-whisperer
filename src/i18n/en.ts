@@ -38,7 +38,7 @@ export const en = {
   'panel.expand': 'Expand info panel',
   'panel.collapse': 'Collapse info panel',
   'location.loading': 'Loading location...',
-  'location.unknown': 'Unknown Location',
+  'location.unknown': 'Your location',
   'location.change': 'Change location',
   'location.latitude': 'Latitude',
   'location.longitude': 'Longitude',
