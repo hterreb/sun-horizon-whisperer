@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import React, { lazy, useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import LazyPart from './LazyPart';
 import { Sun, ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp, Mountain, BellOff } from 'lucide-react';
 import { type SunPosition, type SunTimes, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors, getReflectionFade, getSunPathAround, getDayLengthMinutes } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
@@ -10,7 +11,9 @@ import Fireworks from './Fireworks';
 import SunSunglasses from './SunSunglasses';
 import CalendarEggs from './CalendarEggs';
 import SkyEggs from './SkyEggs';
-import FestivalEggs from './FestivalEggs';
+import { isFestivalEvent } from '@/utils/festivalEvents';
+// Loads only on a festival day (ROADMAP item 125).
+const FestivalEggs = lazy(() => import('./FestivalEggs'));
 import PlayfulEggs from './PlayfulEggs';
 import { useAprilFoolsSwap } from '@/hooks/useAprilFoolsSwap';
 import { type PlayfulEgg } from '@/utils/playfulEggs';
@@ -1384,6 +1387,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         onShown={onEggShown}
       />
 
+      {isFestivalEvent(calendarEvent) && (
+      <LazyPart>
       <FestivalEggs
         event={calendarEvent}
         timeOfDay={timeOfDay}
@@ -1396,6 +1401,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         infoRing={infoRing}
         infoRingTier={infoRingTier}
       />
+      </LazyPart>
+      )}
 
       <svg className="absolute inset-0 w-full h-full pointer-events-none">
         <defs>

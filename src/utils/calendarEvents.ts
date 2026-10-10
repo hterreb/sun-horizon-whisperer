@@ -137,3 +137,8 @@ export const isSantaTime = (date: Date, sunTimes: Pick<SunTimes, 'sunset' | 'pol
   if (!sameLocalDay(sunTimes.sunset, date)) return false;
   return date.getTime() >= sunTimes.sunset.getTime();
 };
+
+// Info-card ring ids of the lazy calendar eggs. Here, not in their component files, so
+// CalendarEggs can use them without loading the components (ROADMAP item 125).
+export const DRAGON_RING = 'egg-dragon';
+export const SANTA_RING = 'egg-santa';

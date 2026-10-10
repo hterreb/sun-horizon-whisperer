@@ -4,7 +4,7 @@ import App from './App.tsx'
 import './index.css'
 import { registerSW } from 'virtual:pwa-register'
 import { scrubLocation } from './utils/sentryScrub'
-import { translate } from './i18n'
+import { loadDictionary, translate } from './i18n'
 import { loadLanguage } from './utils/language'
 
 // Error reports + anonymous feedback (ROADMAP item 21). Off when no DSN is set
@@ -25,17 +25,7 @@ if (sentryDsn) {
     },
     beforeSend: (event) => scrubLocation(event),
     beforeBreadcrumb: (breadcrumb) => scrubLocation(breadcrumb),
-    integrations: [
-      Sentry.feedbackIntegration({
-        autoInject: false, // opened from the InfoPanel, so no floating button over the scene
-        showName: false,
-        showEmail: false,
-        isNameRequired: false,
-        isEmailRequired: false,
-        enableScreenshot: false, // a screenshot would show the location in the InfoPanel
-        showBranding: false,
-      }),
-    ],
+    // The feedback form loads on its first open (utils/feedback.ts, ROADMAP item 125).
   })
 }
 
@@ -48,11 +38,15 @@ const errorFallback = (
   </div>
 )
 
-createRoot(document.getElementById("root")!).render(
-  <Sentry.ErrorBoundary fallback={errorFallback}>
-    <App />
-  </Sentry.ErrorBoundary>
-);
+// The first frame is in the start language (ROADMAP item 125). If the dictionary
+// fails to load, render anyway: translate() falls back to en.
+loadDictionary(fallbackLanguage).catch(() => {}).finally(() => {
+  createRoot(document.getElementById("root")!).render(
+    <Sentry.ErrorBoundary fallback={errorFallback}>
+      <App />
+    </Sentry.ErrorBoundary>
+  );
+});
 
 // Register PWA service worker with immediate updates
 const updateSW = registerSW({

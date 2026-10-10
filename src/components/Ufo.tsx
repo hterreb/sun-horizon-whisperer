@@ -31,7 +31,8 @@ interface UfoProps {
   ringTier?: RarityTier | null;
 }
 
-export const UFO_RING = 'egg-ufo';
+import { UFO_RING } from '@/utils/hiddenEggs';
+export { UFO_RING };
 
 const Ufo: React.FC<UfoProps> = ({ onDone, onInfo, ringOn = false, ringTier = null }) => {
   const prefersReducedMotion = usePrefersReducedMotion();

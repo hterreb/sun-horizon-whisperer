@@ -1,12 +1,14 @@
-import React, { useCallback, useState } from 'react';
+import React, { lazy, useCallback, useState } from 'react';
+import LazyPart from './LazyPart';
 import { Bat } from './sceneIcons';
-import LunarDragon, { DRAGON_RING } from './LunarDragon';
-import Santa, { SANTA_RING } from './Santa';
+// The dragon and Santa load only on their days (ROADMAP item 125).
+const LunarDragon = lazy(() => import('./LunarDragon'));
+const Santa = lazy(() => import('./Santa'));
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useDoubleTap } from '@/hooks/useDoubleTap';
 import { type MessageKey } from '@/i18n';
-import { type CalendarEvent } from '@/utils/calendarEvents';
+import { DRAGON_RING, SANTA_RING, type CalendarEvent } from '@/utils/calendarEvents';
 import { type TimeOfDay } from '@/utils/sunUtils';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
 import { HitArea, type SceneInfoHandler } from './CloudLayer';
@@ -217,6 +219,7 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, moon, hor
         </div>
       )}
 
+      <LazyPart>
       {event === 'lunar-new-year' && !dragonDone && !prefersReducedMotion && (
         // ROADMAP item 100: one flight per page view.
         <LunarDragon
@@ -233,6 +236,7 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, moon, hor
         // (lookbook S2), else he flies small and far (S4).
         <Santa onDone={handleSantaDone} onInfo={onInfo} ringOn={infoRing === SANTA_RING} ringTier={infoRingTier} moon={moon} soundOn={soundOn} />
       )}
+      </LazyPart>
 
       <style>{`
         @keyframes egg-glide { to { transform: translateX(var(--dx)); } }
