@@ -175,7 +175,7 @@ const FestivalEggs: React.FC<FestivalEggsProps> = ({
           key={i}
           data-testid="festival-krathong"
           // z-6: on the sea, over the waves and the fish (z 5), under the boats (z 7).
-          className={`absolute z-6 ${tapClass}`}
+          className={`absolute z-6 ${tapClass}`} data-scene-hit
           style={{ left: `${k.left}%`, top: horizonY + k.dy, ['--dx' as string]: `${k.dx}px`, animation: anim(`festival-drift ${k.duration}s ease-in-out infinite alternate`) }}
           {...tapProps('loyKrathong', `egg-krathong-${i}`)}
         >
@@ -189,7 +189,7 @@ const FestivalEggs: React.FC<FestivalEggsProps> = ({
         <div
           key={i}
           data-testid="festival-diya"
-          className={`absolute z-5 ${tapClass}`}
+          className={`absolute z-5 ${tapClass}`} data-scene-hit
           style={{ left: `${d.left}%`, top: horizonY - 12, animation: anim(`festival-glow ${d.duration}s ease-in-out ${d.delay}s infinite alternate`) }}
           {...tapProps('diwali', `egg-diya-${i}`)}
         >
@@ -205,7 +205,7 @@ const FestivalEggs: React.FC<FestivalEggsProps> = ({
             // A soft golden glow over the crescent; a tap opens the Eid card (like the pumpkin moon).
             <div
               data-testid="festival-eid-glow"
-              className={`absolute rounded-full ${tapClass}`}
+              className={`absolute rounded-full ${tapClass}`} data-scene-hit
               style={{
                 left: moon.x - moon.r * 2, top: moon.y - moon.r * 2, width: moon.r * 4, height: moon.r * 4,
                 background: `radial-gradient(circle closest-side, ${c('gold', 0.45)} 0%, ${c('gold', 0.18)} 50%, transparent 100%)`,
@@ -241,7 +241,7 @@ const FestivalEggs: React.FC<FestivalEggsProps> = ({
             <div
               key={i}
               data-testid="festival-lantern"
-              className={`absolute ${tapClass}`}
+              className={`absolute ${tapClass}`} data-scene-hit
               style={reducedMotion
                 ? { left: `${l.left}%`, top: horizonY * l.still }
                 : { left: `${l.left}%`, top: horizonY, opacity: 0, ['--dy' as string]: `${-(horizonY + 40)}px`, animation: `festival-rise ${l.duration}s linear ${l.delay}s infinite` }}
@@ -258,7 +258,7 @@ const FestivalEggs: React.FC<FestivalEggsProps> = ({
         <div
           key={i}
           data-testid="festival-petal"
-          className={`absolute ${tapClass}`}
+          className={`absolute ${tapClass}`} data-scene-hit
           style={{ left: '-5%', top: `${p.top}%`, ['--dx' as string]: '110vw', ['--dy' as string]: '20vh', animation: `festival-fall ${p.duration}s linear ${p.delay}s infinite` }}
           {...tapProps('hanami', `egg-petal-${i}`)}
         >
@@ -283,7 +283,7 @@ const FestivalEggs: React.FC<FestivalEggsProps> = ({
             <div
               key={i}
               data-testid="festival-tanabata-star"
-              className={`absolute ${tapClass}`}
+              className={`absolute ${tapClass}`} data-scene-hit
               style={{ left: `calc(${s.x}% - 7px)`, top: horizonY * s.y - 7, filter: 'drop-shadow(0 0 6px hsl(var(--scene-glow-white) / 0.9))' }}
               {...tapProps('tanabata', `egg-star-${i}`)}
             >
@@ -299,7 +299,7 @@ const FestivalEggs: React.FC<FestivalEggsProps> = ({
           key={i}
           data-testid="festival-marigold"
           // z-6: on the sea, over the waves and the fish (z 5), under the boats (z 7).
-          className={`absolute z-6 ${tapClass}`}
+          className={`absolute z-6 ${tapClass}`} data-scene-hit
           style={{ left: `${m.left}%`, top: horizonY + m.dy, ['--dx' as string]: `${m.dx}px`, animation: anim(`festival-drift ${m.duration}s ease-in-out infinite alternate`) }}
           {...tapProps('diaDeMuertos', `egg-marigold-${i}`)}
         >
@@ -317,7 +317,7 @@ const FestivalEggs: React.FC<FestivalEggsProps> = ({
             <div
               key={i}
               data-testid="festival-hanukkah-light"
-              className={`relative ${tapClass}`}
+              className={`relative ${tapClass}`} data-scene-hit
               style={{ animation: anim(`festival-bob ${6 + (i % 3)}s ease-in-out ${-i * 1.3}s infinite alternate`) }}
               {...tapProps('hanukkah', `egg-light-${i}`)}
             >
@@ -336,7 +336,7 @@ const FestivalEggs: React.FC<FestivalEggsProps> = ({
             <div
               key={i}
               data-testid="festival-blossom"
-              className={`absolute ${tapClass}`}
+              className={`absolute ${tapClass}`} data-scene-hit
               style={{ left: b.x - b.size / 2, top: b.y - b.size / 2 }}
               {...tapProps('nowruz', `egg-blossom-${i}`)}
             >
@@ -363,7 +363,7 @@ const FestivalEggs: React.FC<FestivalEggsProps> = ({
             <div
               key={i}
               data-testid="festival-bonfire"
-              className={`absolute z-5 ${tapClass}`}
+              className={`absolute z-5 ${tapClass}`} data-scene-hit
               style={{ left: `${left}%`, top: horizonY - 22, animation: anim(`festival-glow ${5 + i}s ease-in-out ${-i * 1.7}s infinite alternate`) }}
               {...tapProps('midsummer', `egg-bonfire-${i}`)}
             >
@@ -378,7 +378,7 @@ const FestivalEggs: React.FC<FestivalEggsProps> = ({
         <div
           key={i}
           data-testid="festival-confetti"
-          className={`absolute top-[-5%] ${tapClass}`}
+          className={`absolute top-[-5%] ${tapClass}`} data-scene-hit
           style={{ left: `${f.left}%`, ['--dx' as string]: '24px', ['--dy' as string]: '110vh', animation: `festival-fall ${f.duration}s linear ${f.delay}s infinite` }}
           {...tapProps('carnival', `egg-confetti-${i}`)}
         >

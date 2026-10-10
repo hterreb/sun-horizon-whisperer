@@ -83,6 +83,7 @@ const MidnightGhost: React.FC<MidnightGhostProps> = ({ currentTime, onInfo, ring
 
   return (
     <div 
+      data-scene-hit
       className={`fixed z-10 transition-all duration-1000 ${onInfo ? 'pointer-events-auto cursor-pointer touch-manipulation' : 'pointer-events-none'}`}
       style={{
         left: `${position.x}%`,

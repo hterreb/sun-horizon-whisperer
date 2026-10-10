@@ -89,7 +89,7 @@ const PlayfulEggs: React.FC<PlayfulEggsProps> = ({
         <div
           data-testid="empty-tomb"
           // z-5: in front of the terrain silhouette, like the black cat.
-          className={`absolute z-5 ${tapClass}`}
+          className={`absolute z-5 ${tapClass}`} data-scene-hit
           style={{ left: tombX - TOMB_W / 2, top: horizonY - TOMB_H + 2, width: TOMB_W, height: TOMB_H }}
           {...tapProps('emptyTomb', TOMB_RING)}
         >
@@ -133,7 +133,7 @@ const PlayfulEggs: React.FC<PlayfulEggsProps> = ({
       {showPot && (
         <div
           data-testid="pot-of-gold"
-          className={`absolute z-5 ${tapClass}`}
+          className={`absolute z-5 ${tapClass}`} data-scene-hit
           style={{ left: (potX as number) - POT_W / 2, top: horizonY - POT_H + 2, width: POT_W, height: POT_H }}
           {...tapProps('potOfGold', POT_RING)}
         >

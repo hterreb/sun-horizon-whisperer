@@ -212,6 +212,16 @@ describe('SunTracker', () => {
       advance(1);
       expect(scene).toHaveClass('cursor-none');
 
+      // Item 124: a touch on a scene hit area (a double tap on a fish) does not wake.
+      const hit = document.createElement('span');
+      hit.setAttribute('data-scene-hit', 'true');
+      const inner = hit.appendChild(document.createElement('span'));
+      document.body.appendChild(hit);
+      fireEvent.touchStart(inner);
+      fireEvent.touchStart(inner);
+      expect(scene).toHaveClass('cursor-none');
+      hit.remove();
+
       fireEvent.touchStart(document);
       expect(scene).not.toHaveClass('cursor-none');
       advance(9999);

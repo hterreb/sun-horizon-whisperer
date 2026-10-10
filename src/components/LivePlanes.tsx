@@ -78,6 +78,7 @@ const PlaneBody = React.memo(({
       </div>
       {onInfo && (
         <span
+          data-scene-hit
           className="absolute pointer-events-auto cursor-pointer touch-manipulation"
           style={{ left: 0, top: 0 }}
           aria-hidden

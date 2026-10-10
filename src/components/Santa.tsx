@@ -171,6 +171,7 @@ const Santa: React.FC<SantaProps> = ({ onDone, onInfo, ringOn = false, ringTier 
       data-testid="santa"
       data-direction={leftToRight ? 'right' : 'left'}
       data-mode={atMoon ? 'moon' : 'far'}
+      data-scene-hit
       className={`absolute left-0 ${onInfo ? 'pointer-events-auto cursor-pointer touch-manipulation' : 'pointer-events-none'}`}
       // Off screen until the first frame places it. S2: his middle on the moon's centre height.
       style={{ transform: `translateX(${-width * 2}px)`, top: startMoon ? startMoon.y - height / 2 : `${FAR_TOP_PCT}%`, width, height }}

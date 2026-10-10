@@ -68,7 +68,7 @@ const SkyEggs: React.FC<SkyEggsProps> = ({ event, project, latitude, horizonY, o
     <div
       data-testid="sky-egg-polar"
       style={{ top: horizonY + 130 }}
-      className={`absolute left-1/2 z-9 -translate-x-1/2 ${tapClass}`}
+      className={`absolute left-1/2 z-9 -translate-x-1/2 ${tapClass}`} data-scene-hit
       {...tapProps(kind, ring)}
     >
       <div className={PILL}>{t(kind === 'midnightSun' ? 'egg.midnightSun' : 'egg.polarNight')}</div>
@@ -84,7 +84,7 @@ const SkyEggs: React.FC<SkyEggsProps> = ({ event, project, latitude, horizonY, o
       return (
         <div
           data-testid="sky-egg-matariki"
-          className={`absolute flex flex-col items-center gap-1 ${tapClass}`}
+          className={`absolute flex flex-col items-center gap-1 ${tapClass}`} data-scene-hit
           style={{ left: at.x - 40, top: at.y - 12, width: 80, opacity }}
           {...tapProps('matariki', 'egg-matariki')}
         >
@@ -109,7 +109,7 @@ const SkyEggs: React.FC<SkyEggsProps> = ({ event, project, latitude, horizonY, o
       return (
         <div
           data-testid="sky-egg-conjunction"
-          className={`absolute flex flex-col items-center gap-1 ${tapClass}`}
+          className={`absolute flex flex-col items-center gap-1 ${tapClass}`} data-scene-hit
           style={{ left: mid.x - 60, top: mid.y - 12, width: 120, opacity }}
           {...tapProps('conjunction', 'egg-conjunction')}
         >
@@ -134,7 +134,7 @@ const SkyEggs: React.FC<SkyEggsProps> = ({ event, project, latitude, horizonY, o
               <div
                 key={i}
                 data-testid="sky-egg-noctilucent"
-                className={`absolute ${tapClass}`}
+                className={`absolute ${tapClass}`} data-scene-hit
                 style={{ left: at.x - width / 2, top: at.y - 6, width, height: 12, opacity }}
                 {...tapProps('noctilucent', 'egg-noctilucent')}
               >
