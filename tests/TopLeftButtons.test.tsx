@@ -63,6 +63,14 @@ describe('TopLeftButtons (ROADMAP items 22 and 23)', () => {
     expect(container.firstChild).toHaveClass('opacity-0');
   });
 
+  it('takes no taps in fullscreen while not tappable, and always outside fullscreen (item 132)', () => {
+    const props = { showCursor: false, isTappable: false, onFullscreenChange: vi.fn(), compassStatus: 'idle' as const, onCompassEnable: vi.fn(), onCompassDisable: vi.fn() };
+    const { container, rerender } = render(<TopLeftButtons isFullscreen {...props} />);
+    expect(container.firstChild).toHaveClass('pointer-events-none');
+    rerender(<TopLeftButtons isFullscreen={false} {...props} />);
+    expect(container.firstChild).not.toHaveClass('pointer-events-none');
+  });
+
   it('stays visible in fullscreen while showCursor is true', () => {
     const { container } = renderRow(true, true);
     expect(container.firstChild).toHaveClass('opacity-100');

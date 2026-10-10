@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ENTER_HIDE_MS, WAKE_HIDE_MS, useIdleHide } from '../src/hooks/useIdleHide';
+import { ENTER_HIDE_MS, TAP_READY_MS, WAKE_HIDE_MS, useIdleHide } from '../src/hooks/useIdleHide';
 
 describe('useIdleHide (ROADMAP item 89)', () => {
   beforeEach(() => {
@@ -75,5 +75,28 @@ describe('useIdleHide (ROADMAP item 89)', () => {
     act(() => result.current.wake());
     advance(3000);
     expect(result.current.isVisible).toBe(false);
+  });
+
+  it('takes no taps while hidden, and only TAP_READY_MS after a wake (item 132)', () => {
+    expect(TAP_READY_MS).toBeGreaterThan(350); // longer than a double tap (DOUBLE_TAP_MS)
+    const { result, rerender } = enterFullscreen();
+    expect(result.current.isTappable).toBe(true);
+    advance(3000);
+    expect(result.current.isTappable).toBe(false);
+
+    act(() => result.current.wake());
+    expect(result.current.isVisible).toBe(true);
+    expect(result.current.isTappable).toBe(false);
+    advance(TAP_READY_MS - 1);
+    expect(result.current.isTappable).toBe(false);
+    advance(1);
+    expect(result.current.isTappable).toBe(true);
+
+    advance(WAKE_HIDE_MS);
+    expect(result.current.isTappable).toBe(false);
+    rerender({ active: false });
+    expect(result.current.isTappable).toBe(true);
+    rerender({ active: true });
+    expect(result.current.isTappable).toBe(true);
   });
 });

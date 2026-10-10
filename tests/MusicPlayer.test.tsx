@@ -39,25 +39,19 @@ describe('MusicPlayer', () => {
     expect(screen.getByRole('switch')).toHaveAttribute('aria-label', 'Play lo-fi music');
   });
 
-  it('reappears on focus and touch in fullscreen, not just mouse hover (A-3)', () => {
-    vi.useFakeTimers();
-    const { container } = render(<MusicPlayer isFullscreen={true} />);
+  it('follows the shared fullscreen fade: hidden takes no taps, focus wakes (A-3, item 132)', () => {
+    const wake = vi.fn();
+    const { container, rerender } = render(<MusicPlayer controls={{ isVisible: false, isTappable: false, wake }} />);
     const player = container.firstChild as HTMLElement;
-
-    // 3 s after entering fullscreen, 10 s after a wake (ROADMAP item 89).
-    act(() => { vi.advanceTimersByTime(3000); });
     expect(player.className).toContain('opacity-0');
+    expect(player.className).toContain('pointer-events-none');
 
     fireEvent.focus(player);
+    expect(wake).toHaveBeenCalled();
+
+    rerender(<MusicPlayer controls={{ isVisible: true, isTappable: true, wake }} />);
     expect(player.className).toContain('opacity-100');
-
-    act(() => { vi.advanceTimersByTime(10000); });
-    expect(player.className).toContain('opacity-0');
-
-    fireEvent.touchStart(player);
-    expect(player.className).toContain('opacity-100');
-
-    vi.useRealTimers();
+    expect(player.className).not.toContain('pointer-events-none');
   });
 
   // More tests for play, pause, error fallback, etc.

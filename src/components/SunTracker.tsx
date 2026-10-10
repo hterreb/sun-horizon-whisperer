@@ -246,7 +246,9 @@ const SunTracker: React.FC = () => {
     document.documentElement.lang = language;
   }, [language]);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const { isVisible: showCursor, wake: wakeCursor } = useIdleHide(isFullscreen);
+  // One idle fade for all controls: the top-left buttons, the info panel and the player (item 132).
+  const controls = useIdleHide(isFullscreen);
+  const { isVisible: showCursor, wake: wakeCursor } = controls;
   const isMobile = useIsMobile();
 
   // Loading screen hand-off (ROADMAP item 39): the top-left buttons and the radio
@@ -1187,10 +1189,11 @@ const SunTracker: React.FC = () => {
       </LazyPart>
       {reveal === 'done' && (
         <>
-          <MusicPlayer isFullscreen={isFullscreen} duck={isCountdownSounding} rainMmH={getRainMmH(weatherType, rainMmH)} />
+          <MusicPlayer controls={controls} duck={isCountdownSounding} rainMmH={getRainMmH(weatherType, rainMmH)} />
           <TopLeftButtons
             isFullscreen={isFullscreen}
             showCursor={showCursor}
+            isTappable={controls.isTappable}
             onFullscreenChange={setIsFullscreen}
             compassStatus={compassStatus}
             onCompassEnable={handleCompassEnable}
@@ -1282,7 +1285,7 @@ const SunTracker: React.FC = () => {
             useRealWeather={useRealWeather}
             temperatureUnit={temperatureUnit}
             onTemperatureUnitChange={handleTemperatureUnitChange}
-            isFullscreen={isFullscreen}
+            controls={controls}
             onWeatherChange={handleWeatherChange}
             manualWindy={manualWindy}
             onManualWindyChange={setManualWindy}

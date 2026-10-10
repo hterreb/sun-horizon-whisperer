@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import SunTracker from '../src/components/SunTracker';
 import { vi } from 'vitest';
+import { TAP_READY_MS } from '../src/hooks/useIdleHide';
 import { loadManualLocation, saveManualLocation } from '../src/utils/manualLocation';
 import { getSunPosition, getSunTimes } from '../src/utils/sunUtils';
 import type SunVisualizationType from '../src/components/SunVisualization';
@@ -223,9 +224,15 @@ describe('SunTracker', () => {
       expect(scene).toHaveClass('cursor-none');
       hit.remove();
 
+      // Item 132: the hidden buttons take no taps; after a wake only once a double tap is over.
+      const column = screen.getByRole('button', { name: 'Exit fullscreen' }).parentElement!;
+      expect(column).toHaveClass('pointer-events-none');
       fireEvent.touchStart(document);
       expect(scene).not.toHaveClass('cursor-none');
-      advance(9999);
+      expect(column).toHaveClass('pointer-events-none');
+      advance(TAP_READY_MS);
+      expect(column).not.toHaveClass('pointer-events-none');
+      advance(9999 - TAP_READY_MS);
       expect(scene).not.toHaveClass('cursor-none');
       advance(1);
       expect(scene).toHaveClass('cursor-none');
