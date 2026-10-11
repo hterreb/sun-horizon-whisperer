@@ -2784,7 +2784,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Open:** (a) Are the life values right (short 60 s, medium 300 s, persistent 600–900 s)? (b) When the radar is switched off, does a trail stay or go at once?
 - **Decision (Lutz, 2026-10-11):** Lifetimes as spec 3 (60 / 300 / 600–900 s, `MAX_TRAIL_SEC` 600). When the live radar is switched off, the planes go at once, but their trails stay and fade on their own clock.
 
-### 143. Live planes point the way they fly on the screen — S — [SUN-CHASER-1J](https://ainabler.sentry.io/issues/SUN-CHASER-1J)
+### 143. Live planes point the way they fly on the screen — M — [SUN-CHASER-1J](https://ainabler.sentry.io/issues/SUN-CHASER-1J) — **✅ Done**
 
 - **Feedback (2026-10-11 17:19 CEST, Ravensburg):** "In live tracking a plane needs to be tilted in the direction it flies".
 - **Now:**
@@ -2801,7 +2801,22 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   - `LivePlanes`: a plane that moves up and right gets a rotate with a negative angle; a plane that moves left is upright (`scaleY(-1)`); a still plane in compass mode keeps its last angle; no flip flicker near vertical motion.
   - The trail (item 142) starts at the rotated tail.
 - **Open:** Limit the tilt (for example ±60°), or let a plane that flies straight up the screen point straight up?
-- **Decision (Lutz, 2026-10-11):** Lookbook first with tilt options (full angle, ±60°, ±45° and others). Build after Lutz picks one.
+- **Decision (Lutz, 2026-10-11):** Option H of the [Plane Tilt Lookbook](https://claude.ai/artifact/8GT8CsQQwHu5zLbckPgPzC) ("planes option h is perfect"): glide + underside. Size S → M.
+  - Side view up to 60°: the body turns to `atan2(dy, dx)`, at most ±60°, as `rotate(a) scaleY(±1)` (the fin stays up when the plane moves left), with a 2 s ease (`transition: transform 2s ease-in-out`). `a` stays unwrapped per `hex` in a ref, so a plane never turns the long way round. A plane's first frame gets its angle at once, with no transition.
+  - Steeper than 60°: the plane rolls over in 1.5 s to the underside view (the side view goes to `scaleY(0)` in 0.75 s, then the underside opens from 0 to 1 in 0.75 s). The underside is a planform seen from below (fuselage, both wings, tailplane, engines) that points exactly along the way, with no limit, also straight up. Back to the side view only below 50°. A left/right turn on a steep way happens in the underside view.
+  - Night, in the underside view: the red and green lights and the strobes on the wingtips. Seen from below with the nose up, the left wing's red light is on the viewer's right.
+  - Keep the 1/50 rad rounding. Below 0.1 px/s, or with `dx` 0 at the 360° edge, keep the last angle, side and view. The tap area stays level. Scene planes do not change.
+- **Built:**
+  - `src/utils/liveTilt.ts` (pure): `getLiveTilt(prev, dx, dy)` gives the angle (1/50 rad steps, unwrapped against the last angle), the side (it changes only when `dx` passes ±0.05 px/s), the view (underside above 60°, side view again below 50°) and `first`. Below 0.1 px/s or with `dx` 0 it gives the last tilt.
+  - `LivePlanes` keeps the last tilt per `hex` in a ref. A plane that is not shown drops out, so when it shows again it starts fresh. The ref is written during render (one `react-hooks/refs` lint exception): `getLiveTilt` is pure, so a second render with the same step gives the same tilt.
+  - `PlaneBody`: the outer element turns (`rotate(a)`, 2 s ease-in-out). In it, the side view (`scaleY(1)` or `scaleY(0)`, with the left/right `scaleY(±1)` in its own element, 2 s) and the underside view (`scaleY(1)` or `scaleY(0)`) roll: the view that goes uses `0.75s ease-in`, the view that comes uses `0.75s ease-out 0.75s`. No transition on a plane's first frame and with reduced motion (the global reduced-motion CSS does not remove `transition-delay`).
+  - `ScenePlane` gets `view="under"`: the lookbook's 7 paths on a 40 × 40 grid; at night the two wingtip lights and two strobes.
+  - The tap area, the scene planes and the trail code do not change.
+  - **Deviations:** (1) The left/right roll keeps its 2 s transition also while the side view is hidden (the lookbook snaps it there), so a side change and a view change at the same time do not jump. (2) The trail still starts at the plane's centre: it is aligned with the turned tail after item 142.
+- **Checked:**
+  - Tests: `utils.liveTilt` (9: the angle and its steps, a left plane mirrored with the fin up, the side view never past ±60° and the underside exact up to 90°, the 60°/50° hysteresis, the ±0.05 px/s side change, a turn over the top the short way round, the first frame, a still plane and `dx` 0 keep their tilt, the same step gives the same tilt); `ScenePlane` (2: the underside by day; at night red on the right of the nose seen from below, two strobes); `LivePlanes` (6: a left plane mirrored, a steep plane from below, no transition on the first frame and then 2 s / 0.75 s, none with reduced motion, a plane that stops keeps its tilt and the tap area stays level, the night lights per view). Typecheck, lint, all 1,711 tests and the build pass.
+  - Built app (`vite preview`, 390 × 844, stubbed feed: a shallow climb, a steep climb, a steep turn, an overflight; compass facing east), by day and at night: in 45 s each plane changed its view at most once and its side at most once. The roll shows the underside going edge-on and then the side view opening. At night the steep planes show green on the left and red on the right. With reduced motion all transitions are off.
+  - Note: in the normal 360° view a phone has about 7 times more px per degree up than across (in compass mode about 2 times), so there most live planes move steeply on the screen and show from below. The overflight test plane: 57° and from below in the 360° view, 17° and in the side view in compass mode 2.5 s later.
 
 ### 144. A whale that looks like a whale — M — [SUN-CHASER-1K](https://ainabler.sentry.io/issues/SUN-CHASER-1K) — **✅ Done**
 
