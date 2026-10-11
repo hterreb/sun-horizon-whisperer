@@ -1,6 +1,6 @@
 // The live flight radar's proxy logic (ROADMAP item 96, Premium). Pure and host-neutral: the
-// Vercel Edge function `api/planes.ts` and the Cloudflare Pages Function
-// `functions/api/planes.ts` (item 16) wrap handlePlanesRequest. No `@/` imports: both bundles
+// Vercel Edge function `api/planes.ts` and the Cloudflare Worker
+// `worker/index.ts` (item 16) wrap handlePlanesRequest. No `@/` imports: both bundles
 // resolve only relative paths.
 
 // The upstream: adsb.lol (ODbL, attribution "Data: adsb.lol"). The radius is in nautical
