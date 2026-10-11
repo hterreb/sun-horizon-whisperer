@@ -1193,7 +1193,7 @@ const SunTracker: React.FC = () => {
       </LazyPart>
       {reveal === 'done' && (
         <>
-          <MusicPlayer controls={controls} duck={isCountdownSounding} rainMmH={getRainMmH(weatherType, rainMmH)} />
+          <MusicPlayer controls={controls} duck={isCountdownSounding} rainMmH={getRainMmH(weatherType, rainMmH)} night={isDarkSky} />
           <TopLeftButtons
             isFullscreen={isFullscreen}
             showCursor={showCursor}

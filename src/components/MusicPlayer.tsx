@@ -18,9 +18,22 @@ interface MusicPlayerProps {
   duck?: boolean;
   // The rain amount in mm/h, null without rain (ROADMAP item 119): the rain sound button shows then.
   rainMmH?: number | null;
+  // A dark sky (isDarkSky: night, astronomical and nautical twilight): the switch and the slider
+  // dim (ROADMAP item 139). The icons, the text and the glass pill do not change.
+  night?: boolean;
 }
 
 const DUCK_FACTOR = 0.3;
+
+// Item 139: the shadcn Switch and Slider are near-white in their light defaults, too bright at
+// night. They are styled from here (src/components/ui/ is not hand-edited). The transitions are
+// always on, so the colours fade at the twilight edge in both directions. The focus rings do not change.
+const SWITCH_CLASS = '*:transition-[translate,background-color,box-shadow]';
+const SWITCH_DAY = 'data-[state=checked]:bg-primary';
+const SWITCH_NIGHT = 'data-[state=unchecked]:bg-white/15 data-[state=checked]:bg-white/35 *:bg-white/60 *:shadow-none';
+// The Radix slider: the root holds the track (first span, with the range in it) and the thumb.
+const SLIDER_CLASS = 'w-16 sm:w-24 [&>span:first-child]:transition-colors [&>span:first-child>span]:transition-colors';
+const SLIDER_NIGHT = '[&>span:first-child]:bg-white/15 [&>span:first-child>span]:bg-white/40 [&_[role=slider]]:bg-white/60 [&_[role=slider]]:border-transparent [&_[role=slider]]:h-4 [&_[role=slider]]:w-4';
 
 // Lo-fi hip hop radio streams
 const STREAMS: { name: string; url: string }[] = [
@@ -72,7 +85,7 @@ const loadStoredStationIndex = (): number => {
   }
 };
 
-const MusicPlayer: React.FC<MusicPlayerProps> = ({ controls = ALWAYS_SHOWN, duck = false, rainMmH = null }) => {
+const MusicPlayer: React.FC<MusicPlayerProps> = ({ controls = ALWAYS_SHOWN, duck = false, rainMmH = null, night = false }) => {
   const [isPlaying, setIsPlayingState] = useState(false);
   // The rain sound (ROADMAP item 119): on with the radio, or alone by its button. Not saved:
   // a browser plays no sound before a tap.
@@ -251,7 +264,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ controls = ALWAYS_SHOWN, duck
       <Switch
         checked={isPlaying}
         onCheckedChange={handlePlayToggle}
-        className="data-[state=checked]:bg-primary"
+        className={`${SWITCH_CLASS} ${night ? SWITCH_NIGHT : SWITCH_DAY}`}
         aria-label={t('music.play')}
       />
       <Music className="h-4 w-4 text-white" />
@@ -283,7 +296,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ controls = ALWAYS_SHOWN, duck
         <Volume2 className="h-4 w-4 text-white" />
       )}
       <Slider
-        className="w-16 sm:w-24"
+        className={night ? `${SLIDER_CLASS} ${SLIDER_NIGHT}` : SLIDER_CLASS}
         value={volume}
         onValueChange={handleVolumeChange}
         max={1}

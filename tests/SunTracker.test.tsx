@@ -292,6 +292,34 @@ describe('SunTracker', () => {
     });
   });
 
+  describe('radio at night (ROADMAP item 139)', () => {
+    const radioSwitch = (time: string) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(time));
+      saveManualLocation(47.78, 9.61, 'Ravensburg');
+      render(<SunTracker />);
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      return screen.getByRole('switch', { name: 'Play lo-fi music' });
+    };
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('a dark sky dims the radio switch and the volume slider', () => {
+      // 00:00 in Ravensburg: night.
+      expect(radioSwitch('2026-10-11T22:00:00Z')).toHaveClass('data-[state=unchecked]:bg-white/15');
+      expect(screen.getByRole('slider', { name: 'Volume' }).closest('.touch-none')).toHaveClass('[&_[role=slider]]:bg-white/60');
+    });
+
+    it('by day they keep their look', () => {
+      // 13:00 in Ravensburg: midday.
+      expect(radioSwitch('2026-09-30T11:00:00Z')).not.toHaveClass('data-[state=unchecked]:bg-white/15');
+      expect(screen.getByRole('slider', { name: 'Volume' }).closest('.touch-none')).not.toHaveClass('[&_[role=slider]]:bg-white/60');
+    });
+  });
+
   describe('manual location (A-4)', () => {
     it('uses a stored manual location on load instead of requesting geolocation', async () => {
       saveManualLocation(48.8566, 2.3522);
