@@ -99,4 +99,66 @@ describe('useIdleHide (ROADMAP item 89)', () => {
     rerender({ active: true });
     expect(result.current.isTappable).toBe(true);
   });
+
+  describe('toggle (a tap on the empty sky, item 136)', () => {
+    it('hides at once with no taps, and stays hidden until the next toggle', () => {
+      const { result } = enterFullscreen();
+      advance(1000);
+      act(() => result.current.toggle());
+      expect(result.current.isVisible).toBe(false);
+      expect(result.current.isTappable).toBe(false);
+      advance(60_000);
+      expect(result.current.isVisible).toBe(false);
+    });
+
+    it('shows like a wake: taps after TAP_READY_MS, hides after WAKE_HIDE_MS', () => {
+      const { result } = enterFullscreen();
+      act(() => result.current.toggle());
+      act(() => result.current.toggle());
+      expect(result.current.isVisible).toBe(true);
+      expect(result.current.isTappable).toBe(false);
+      advance(TAP_READY_MS);
+      expect(result.current.isTappable).toBe(true);
+      advance(WAKE_HIDE_MS - TAP_READY_MS - 1);
+      expect(result.current.isVisible).toBe(true);
+      advance(1);
+      expect(result.current.isVisible).toBe(false);
+    });
+
+    it('hides controls that a wake brought back, and stops their timer', () => {
+      const { result } = enterFullscreen();
+      advance(ENTER_HIDE_MS);
+      act(() => result.current.wake());
+      advance(2000);
+      act(() => result.current.toggle());
+      expect(result.current.isVisible).toBe(false);
+      act(() => result.current.toggle());
+      advance(WAKE_HIDE_MS - 1);
+      expect(result.current.isVisible).toBe(true);
+    });
+
+    it('does nothing while not active', () => {
+      const { result } = renderHook(() => useIdleHide(false));
+      act(() => result.current.toggle());
+      expect(result.current.isVisible).toBe(true);
+      expect(result.current.isTappable).toBe(true);
+    });
+
+    it('with no enter delay (the installed app), shows until the first toggle', () => {
+      const { result } = renderHook(() => useIdleHide(true, null));
+      advance(60_000);
+      act(() => result.current.wake());
+      advance(60_000);
+      expect(result.current.isVisible).toBe(true);
+
+      act(() => result.current.toggle());
+      advance(60_000);
+      expect(result.current.isVisible).toBe(false);
+      act(() => result.current.toggle());
+      advance(WAKE_HIDE_MS - 1);
+      expect(result.current.isVisible).toBe(true);
+      advance(1);
+      expect(result.current.isVisible).toBe(false);
+    });
+  });
 });

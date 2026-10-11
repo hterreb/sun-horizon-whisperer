@@ -88,15 +88,26 @@ describe('CollectionView', () => {
     delete (Element.prototype as Partial<Element>).scrollIntoView;
   });
 
-  it('groups the states under their base badge: one row each for sun, moon and terrain (item 115)', () => {
+  it('groups the states in one row each for satellite, sun, moon and terrain, with no base cell (items 115, 138)', () => {
     renderView();
     const rowOf = (id: string) => cellOf(id).closest('ul')!;
-    expect(within(rowOf('sun')).getAllByRole('listitem')).toHaveLength(6);
-    expect(within(rowOf('moon')).getAllByRole('listitem')).toHaveLength(9);
-    expect(within(rowOf('terrain')).getAllByRole('listitem')).toHaveLength(6);
-    expect(rowOf('sun:dawn')).toBe(rowOf('sun'));
-    expect(rowOf('terrain:alpine')).toBe(rowOf('terrain'));
-    expect(rowOf('plane')).not.toBe(rowOf('sun'));
+    const rowIds = (id: string) => within(rowOf(id)).getAllByRole('listitem').map((cell) => cell.getAttribute('data-badge-id'));
+    expect(rowIds('satellite:small')).toEqual(['satellite:small', 'satellite:medium', 'satellite:large', 'satellite:giant', 'satellite:iss']);
+    expect(rowIds('sun:dawn')).toEqual(['sun:dawn', 'sun:morning', 'sun:midday', 'sun:afternoon', 'sun:evening']);
+    expect(rowIds('moon:new')).toHaveLength(8);
+    expect(rowIds('terrain:hills')).toEqual(['terrain:hills', 'terrain:lowMountains', 'terrain:mountains', 'terrain:highMountains', 'terrain:alpine']);
+    expect(rowIds('plane')[0]).toBe('plane');
+    expect(rowOf('plane')).not.toBe(rowOf('sun:dawn'));
+    for (const id of ['sun', 'moon', 'terrain', 'satellite']) {
+      expect(screen.getByRole('dialog').querySelector(`[data-badge-id="${id}"]`)).toBeNull();
+    }
+  });
+
+  it('shows and counts no retired base badge of an old save (item 138)', () => {
+    render(<CollectionView open onClose={vi.fn()} collection={{ ...collection, sun: '2026-10-01T10:00:00.000Z', moon: '2026-10-01T22:00:00.000Z', terrain: '2026-10-01T12:00:00.000Z', satellite: '2026-10-01T20:00:00.000Z' }} />);
+    expect(screen.getByRole('dialog')).toHaveTextContent(`3 / ${BADGES.length}`);
+    expect(screen.getAllByRole('listitem')).toHaveLength(BADGES.length);
+    expect(screen.getAllByRole('listitem').filter((cell) => !cell.hasAttribute('data-missing'))).toHaveLength(3);
   });
 
   it('shows a collected state with its name and a missing state as a grey outline (item 115)', () => {

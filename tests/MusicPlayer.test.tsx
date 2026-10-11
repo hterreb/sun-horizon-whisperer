@@ -338,4 +338,41 @@ describe('MusicPlayer', () => {
       expect(sources).toHaveLength(0);
     });
   });
+
+  describe('night look (ROADMAP item 139)', () => {
+    const SWITCH_NIGHT = ['data-[state=unchecked]:bg-white/15', 'data-[state=checked]:bg-white/35', '*:bg-white/60', '*:shadow-none'];
+    const SLIDER_NIGHT = [
+      '[&>span:first-child]:bg-white/15',
+      '[&>span:first-child>span]:bg-white/40',
+      '[&_[role=slider]]:bg-white/60',
+      '[&_[role=slider]]:border-transparent',
+      '[&_[role=slider]]:h-4',
+      '[&_[role=slider]]:w-4',
+    ];
+    // The Radix slider root holds the track and the thumb (role="slider").
+    const sliderRoot = () => screen.getByRole('slider').closest('.touch-none') as HTMLElement;
+
+    it('at night the switch and the slider dim, with a colour transition; the focus rings, icons and text stay', () => {
+      render(<MusicPlayer night />);
+      const sw = screen.getByRole('switch');
+      expect(sw).toHaveClass(...SWITCH_NIGHT, '*:transition-[translate,background-color,box-shadow]', 'transition-colors');
+      // tailwind-merge drops the day colours of the shadcn Switch.
+      expect(sw).not.toHaveClass('data-[state=checked]:bg-primary');
+      expect(sw).not.toHaveClass('data-[state=unchecked]:bg-input');
+      expect(sw).toHaveClass('focus-visible:ring-2', 'focus-visible:ring-ring');
+      expect(sliderRoot()).toHaveClass(...SLIDER_NIGHT, '[&>span:first-child]:transition-colors', '[&>span:first-child>span]:transition-colors');
+      expect(screen.getByRole('slider')).toHaveClass('focus-visible:ring-2', 'focus-visible:ring-ring');
+      expect(screen.getByRole('button', { name: 'Next station' })).toHaveClass('text-white/80');
+      expect(document.querySelector('.lucide-music')).toHaveClass('text-white');
+    });
+
+    it('by day the switch and the slider keep their look, and the transitions are on for the change', () => {
+      render(<MusicPlayer />);
+      const sw = screen.getByRole('switch');
+      expect(sw).toHaveClass('data-[state=checked]:bg-primary', '*:transition-[translate,background-color,box-shadow]');
+      for (const c of SWITCH_NIGHT) expect(sw).not.toHaveClass(c);
+      for (const c of SLIDER_NIGHT) expect(sliderRoot()).not.toHaveClass(c);
+      expect(sliderRoot()).toHaveClass('w-16', 'sm:w-24', '[&>span:first-child]:transition-colors');
+    });
+  });
 });

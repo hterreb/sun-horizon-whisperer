@@ -31,6 +31,29 @@ describe('CalendarEggs', () => {
     expect(screen.getByTestId('season-badge').textContent).toMatch(/shortest day/);
   });
 
+  // Item 140: on the winter solstice day the pill names the longest night after sunset.
+  it('names the longest night after sunset on the winter solstice day', () => {
+    const { rerender } = render(<CalendarEggs {...base} event="solstice-shortest" longestNight />);
+    expect(screen.getByTestId('season-badge').textContent).toBe('Solstice · the longest night of the year');
+    rerender(<CalendarEggs {...base} event="solstice-shortest" longestNight={false} />);
+    expect(screen.getByTestId('season-badge').textContent).toBe('Solstice · the shortest day of the year');
+    // Only the winter solstice: the flag does not change another season's text.
+    rerender(<CalendarEggs {...base} event="solstice-longest" longestNight />);
+    expect(screen.getByTestId('season-badge').textContent).toBe('Solstice · the longest day of the year');
+  });
+
+  it('names the longest night in the chosen language, also with reduced motion (the pill is static)', () => {
+    mockReducedMotion(true);
+    render(
+      <LanguageContext.Provider value={{ language: 'de', setLanguage: () => {}, t: (key, vars) => translate('de', key, vars) }}>
+        <CalendarEggs {...base} event="solstice-shortest" longestNight />
+      </LanguageContext.Provider>
+    );
+    const badge = screen.getByTestId('season-badge');
+    expect(badge.textContent).toBe('Sonnenwende · die längste Nacht des Jahres');
+    expect(badge.getAttribute('style')).not.toMatch(/animation/);
+  });
+
   it('shows the season badge in the chosen language', () => {
     render(
       <LanguageContext.Provider value={{ language: 'de', setLanguage: () => {}, t: (key, vars) => translate('de', key, vars) }}>
@@ -312,5 +335,20 @@ describe('CalendarEggs', () => {
     expect(onInfo).toHaveBeenLastCalledWith({ type: 'egg', kind: 'equinox' }, expect.anything(), 'egg-season');
     rerender(<CalendarEggs {...base} event={null} blueMoon onInfo={onInfo} />);
     expect(screen.getByTestId('season-badge').className).toContain('pointer-events-none');
+  });
+
+  // Item 140: the winter solstice pill opens the midwinter card, by day and after sunset.
+  it('opens the midwinter card on a double tap on the winter solstice pill', () => {
+    const onInfo = vi.fn();
+    const { rerender } = render(<CalendarEggs {...base} event="solstice-shortest" onInfo={onInfo} />);
+    fireEvent.click(screen.getByTestId('season-badge'), { detail: 1 });
+    expect(onInfo).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('season-badge'), { detail: 2 });
+    expect(onInfo).toHaveBeenLastCalledWith({ type: 'egg', kind: 'midwinter' }, expect.anything(), 'egg-season');
+    rerender(<CalendarEggs {...base} event="solstice-shortest" longestNight onInfo={onInfo} />);
+    fireEvent.click(screen.getByTestId('season-badge'), { detail: 1 });
+    fireEvent.click(screen.getByTestId('season-badge'), { detail: 2 });
+    expect(onInfo).toHaveBeenCalledTimes(2);
+    expect(onInfo).toHaveBeenLastCalledWith({ type: 'egg', kind: 'midwinter' }, expect.anything(), 'egg-season');
   });
 });

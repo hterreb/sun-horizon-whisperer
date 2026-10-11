@@ -220,13 +220,15 @@ describe('SunTracker', () => {
       advance(1);
       expect(scene).toHaveClass('cursor-none');
 
-      // Item 124: a touch on a scene hit area (a double tap on a fish) does not wake.
+      // Item 124: a tap on a scene hit area (a double tap on a fish) does not wake.
       const hit = document.createElement('span');
       hit.setAttribute('data-scene-hit', 'true');
       const inner = hit.appendChild(document.createElement('span'));
-      document.body.appendChild(hit);
+      scene.appendChild(hit);
       fireEvent.touchStart(inner);
+      fireEvent.click(inner);
       fireEvent.touchStart(inner);
+      fireEvent.click(inner);
       expect(scene).toHaveClass('cursor-none');
       // Item 133: the compatibility mouse events of a tap do not wake.
       fireEvent.mouseMove(inner);
@@ -237,7 +239,10 @@ describe('SunTracker', () => {
       // Item 132: the hidden buttons take no taps; after a wake only once a double tap is over.
       const column = screen.getByRole('button', { name: 'Exit fullscreen' }).parentElement!;
       expect(column).toHaveClass('pointer-events-none');
-      fireEvent.touchStart(document);
+      // Item 136: a touch alone does not wake; a tap (click) on the empty sky does.
+      fireEvent.touchStart(scene);
+      expect(scene).toHaveClass('cursor-none');
+      fireEvent.click(scene);
       expect(scene).not.toHaveClass('cursor-none');
       expect(column).toHaveClass('pointer-events-none');
       advance(TAP_READY_MS);
@@ -253,6 +258,147 @@ describe('SunTracker', () => {
       delete (document as { fullscreenElement?: Element | null }).fullscreenElement;
       vi.useRealTimers();
     }
+  });
+
+  describe('a tap on the empty sky hides or shows the controls (ROADMAP item 136)', () => {
+    const advance = (ms: number) => act(() => {
+      vi.advanceTimersByTime(ms);
+    });
+    const setFullscreenElement = (element: Element | null) => act(() => {
+      Object.defineProperty(document, 'fullscreenElement', { value: element, configurable: true });
+      document.dispatchEvent(new Event('fullscreenchange'));
+    });
+    // A phone tap: pointerdown (SceneInfoCard closes on it), then the click.
+    const tap = (el: Element) => {
+      fireEvent.pointerDown(el);
+      fireEvent.click(el);
+    };
+    const column = () => screen.getByRole('button', { name: /fullscreen/i }).parentElement!;
+    const shown = () => column().classList.contains('opacity-100');
+    const start = (displayMode: string | null = null) => {
+      vi.useFakeTimers();
+      // Midday: the sun shows (a tap on it opens a card).
+      vi.setSystemTime(new Date('2026-09-30T11:00:00Z'));
+      vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 1, longitude: 2 } }) } });
+      vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
+        matches: query === displayMode,
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }));
+      const { container } = render(<SunTracker />);
+      // The top-left buttons mount after the 200 ms fade.
+      advance(250);
+      return container.querySelector('[data-share-root]')!;
+    };
+
+    afterEach(() => {
+      delete (document as { fullscreenElement?: Element | null }).fullscreenElement;
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    it('in fullscreen: a sky tap hides at once and for good, the next shows for 10 s', () => {
+      const scene = start();
+      setFullscreenElement(document.documentElement);
+      advance(1000);
+      expect(shown()).toBe(true);
+
+      tap(scene);
+      expect(shown()).toBe(false);
+      expect(column()).toHaveClass('pointer-events-none');
+      advance(60_000);
+      expect(shown()).toBe(false);
+
+      tap(scene);
+      expect(shown()).toBe(true);
+      expect(column()).toHaveClass('pointer-events-none');
+      advance(TAP_READY_MS);
+      expect(column()).not.toHaveClass('pointer-events-none');
+      advance(10_000 - TAP_READY_MS - 1);
+      expect(shown()).toBe(true);
+      advance(1);
+      expect(shown()).toBe(false);
+
+      // A mouse move still wakes (item 133).
+      act(() => {
+        const event = new MouseEvent('pointermove', { bubbles: true });
+        Object.defineProperty(event, 'pointerType', { value: 'mouse' });
+        document.dispatchEvent(event);
+      });
+      expect(shown()).toBe(true);
+    });
+
+    it('two sky taps 200 ms apart toggle once: a double tap on the sky does not flicker', () => {
+      const scene = start();
+      setFullscreenElement(document.documentElement);
+      tap(scene);
+      advance(200);
+      tap(scene);
+      expect(shown()).toBe(false);
+      advance(400);
+      tap(scene);
+      expect(shown()).toBe(true);
+    });
+
+    it('a tap on a scene thing, a control or outside the scene does not toggle', () => {
+      const scene = start();
+      setFullscreenElement(document.documentElement);
+      const hit = scene.appendChild(document.createElement('span'));
+      hit.setAttribute('data-scene-hit', 'true');
+      const fish = hit.appendChild(document.createElement('span'));
+      tap(fish);
+      advance(100);
+      tap(fish);
+      expect(shown()).toBe(true);
+      advance(1000);
+      tap(screen.getByRole('button', { name: 'Exit fullscreen' }));
+      expect(shown()).toBe(true);
+      tap(document.body);
+      expect(shown()).toBe(true);
+    });
+
+    it('a tap that closes an info card only closes it', () => {
+      const scene = start();
+      setFullscreenElement(document.documentElement);
+      const sun = screen.getByRole('button', { name: 'Sun' });
+      fireEvent.click(sun, { detail: 1 });
+      fireEvent.click(sun, { detail: 2 });
+      expect(screen.getByTestId('scene-info-card')).toBeInTheDocument();
+      advance(1000);
+
+      tap(scene);
+      expect(screen.queryByTestId('scene-info-card')).toBeNull();
+      expect(shown()).toBe(true);
+      tap(scene);
+      expect(shown()).toBe(false);
+    });
+
+    it('in the installed app: shown at start, a sky tap hides, the next shows for 10 s', () => {
+      const scene = start('(display-mode: fullscreen)');
+      advance(60_000);
+      expect(shown()).toBe(true);
+
+      tap(scene);
+      advance(60_000);
+      expect(shown()).toBe(false);
+      tap(scene);
+      expect(shown()).toBe(true);
+      advance(10_000);
+      expect(shown()).toBe(false);
+    });
+
+    it('in a browser tab: a sky tap does nothing, the controls always show', () => {
+      const scene = start();
+      tap(scene);
+      advance(60_000);
+      expect(shown()).toBe(true);
+      expect(column()).not.toHaveClass('pointer-events-none');
+    });
   });
 
   describe('screen on (ROADMAP item 90)', () => {
@@ -289,6 +435,34 @@ describe('SunTracker', () => {
     it('does not keep the screen on in a browser tab outside fullscreen', async () => {
       const request = await renderWithWakeLock(null);
       expect(request).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('radio at night (ROADMAP item 139)', () => {
+    const radioSwitch = (time: string) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(time));
+      saveManualLocation(47.78, 9.61, 'Ravensburg');
+      render(<SunTracker />);
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      return screen.getByRole('switch', { name: 'Play lo-fi music' });
+    };
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('a dark sky dims the radio switch and the volume slider', () => {
+      // 00:00 in Ravensburg: night.
+      expect(radioSwitch('2026-10-11T22:00:00Z')).toHaveClass('data-[state=unchecked]:bg-white/15');
+      expect(screen.getByRole('slider', { name: 'Volume' }).closest('.touch-none')).toHaveClass('[&_[role=slider]]:bg-white/60');
+    });
+
+    it('by day they keep their look', () => {
+      // 13:00 in Ravensburg: midday.
+      expect(radioSwitch('2026-09-30T11:00:00Z')).not.toHaveClass('data-[state=unchecked]:bg-white/15');
+      expect(screen.getByRole('slider', { name: 'Volume' }).closest('.touch-none')).not.toHaveClass('[&_[role=slider]]:bg-white/60');
     });
   });
 
@@ -1021,7 +1195,7 @@ describe('SunTracker', () => {
       advance(600);
       doubleTap(sun);
       expect(screen.getByRole('dialog', { name: 'Sun' })).toBeInTheDocument();
-      expect(JSON.parse(localStorage.getItem('collection')!)).toHaveProperty('sun');
+      expect(Object.keys(JSON.parse(localStorage.getItem('collection')!))).toEqual(['sun:midday']); // item 138: no base badge
     });
 
     it('a keyboard click on the sun (Enter, Space) opens its card at once (item 116)', () => {
@@ -1138,7 +1312,7 @@ describe('SunTracker', () => {
       expect(unlocked()).toBeNull();
     });
 
-    it('a sun tap at midday collects "sun" and "sun:midday" (item 115)', () => {
+    it('a sun tap at midday collects only "sun:midday", with one card (items 115, 138)', () => {
       vi.useFakeTimers();
       try {
         vi.setSystemTime(new Date('2026-09-30T11:00:00Z')); // 13:00 in Ravensburg: midday
@@ -1147,12 +1321,59 @@ describe('SunTracker', () => {
         act(() => {
           visProps.current!.onSceneInfo!({ type: 'sun' }, { x: 200, y: 200 }, 'sun');
         });
-        expect(Object.keys(JSON.parse(localStorage.getItem('collection')!))).toEqual(['sun', 'sun:midday']);
-        // Item 114: the two badges show one after the other.
+        expect(Object.keys(JSON.parse(localStorage.getItem('collection')!))).toEqual(['sun:midday']);
         expect(screen.getAllByTestId('badge-unlocked')).toHaveLength(1);
-        expect(unlocked()).toHaveTextContent('Badge unlocked: Sun');
-        closeCard();
         expect(unlocked()).toHaveTextContent('Badge unlocked: Midday sun');
+        expect(unlocked()).toHaveTextContent(`1 / ${BADGES.length}`);
+        closeCard();
+        expect(unlocked()).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('a moon, terrain or satellite tap collects only its state badge (item 138)', () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date('2026-09-30T11:00:00Z'));
+        render(<SunTracker />);
+        expect(visProps.current).not.toBeNull();
+        act(() => {
+          visProps.current!.onSceneInfo!({ type: 'moon' }, { x: 200, y: 200 }, 'moon');
+        });
+        act(() => {
+          visProps.current!.onSceneInfo!({ type: 'satellite', id: 25544, name: 'ISS (ZARYA)' }, { x: 200, y: 200 }, 'sat');
+        });
+        // No ridge data in this test: the terrain tap has no band, so it collects nothing.
+        act(() => {
+          visProps.current!.onSceneInfo!({ type: 'terrain', azimuth: 90 }, { x: 200, y: 500 }, 'terrain');
+        });
+        const ids = Object.keys(JSON.parse(localStorage.getItem('collection')!));
+        expect(ids).toHaveLength(2);
+        expect(ids[0]).toMatch(/^moon:/);
+        expect(ids[1]).toBe('satellite:iss');
+        expect(unlocked()).toHaveTextContent(`1 / ${BADGES.length}`);
+        closeCard();
+        expect(unlocked()).toHaveTextContent('Badge unlocked: International Space Station');
+        expect(unlocked()).toHaveTextContent(`2 / ${BADGES.length}`);
+        closeCard();
+        expect(unlocked()).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('a sun tap in the twilight collects nothing (item 138)', () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date('2026-09-30T17:35:00Z')); // 19:35 in Ravensburg: after sunset, in the twilight
+        render(<SunTracker />);
+        expect(visProps.current).not.toBeNull();
+        act(() => {
+          visProps.current!.onSceneInfo!({ type: 'sun' }, { x: 200, y: 200 }, 'sun');
+        });
+        expect(localStorage.getItem('collection')).toBeNull();
+        expect(unlocked()).toBeNull();
       } finally {
         vi.useRealTimers();
       }
@@ -1252,6 +1473,36 @@ describe('SunTracker', () => {
       expect(screen.getByTestId('disco-sky')).toBeInTheDocument();
       expect(JSON.parse(localStorage.getItem('collection')!)).toEqual({ 'egg:disco': expect.any(String) });
       vi.restoreAllMocks();
+    });
+
+    // Item 140: the winter solstice day is midwinter: its own badge, and the longest-night pill after sunset.
+    it('on the winter solstice day the pill opens midwinter, its badge counts on a double tap, and the night starts at sunset', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-12-21T11:00:00Z'));
+      try {
+        render(<SunTracker />);
+        expect(visProps.current).toMatchObject({ calendarEvent: 'solstice-shortest', longestNight: false });
+        const tapEgg = (kind: EggCardKind) => act(() => visProps.current!.onSceneInfo!({ type: 'egg', kind }, { x: 100, y: 100 }, 'egg-season'));
+        tapEgg('solstice');
+        expect(localStorage.getItem('collection')).toBeNull();
+        tapEgg('midwinter');
+        expect(Object.keys(JSON.parse(localStorage.getItem('collection')!))).toEqual(['egg:midwinter']);
+        expect(unlocked()).toHaveTextContent('Badge unlocked: Midwinter');
+        // 20:00 UTC: after the Ravensburg sunset (about 15:30 UTC).
+        act(() => vi.setSystemTime(new Date('2026-12-21T20:00:00Z')));
+        act(() => vi.advanceTimersByTime(31_000));
+        expect(visProps.current).toMatchObject({ calendarEvent: 'solstice-shortest', longestNight: true });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('?egg=midwinter forces the winter solstice day (item 140), and collects nothing', () => {
+      window.history.pushState({}, '', '/?egg=midwinter');
+      render(<SunTracker />);
+      expect(visProps.current).toMatchObject({ calendarEvent: 'solstice-shortest' });
+      act(() => visProps.current!.onSceneInfo!({ type: 'egg', kind: 'midwinter' }, { x: 100, y: 100 }, 'egg-season'));
+      expect(localStorage.getItem('collection')).toBeNull();
     });
 
     it('?egg=<festival> forces that festival (item 118), and collects nothing', () => {

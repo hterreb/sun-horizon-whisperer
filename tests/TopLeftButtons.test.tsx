@@ -19,10 +19,9 @@ describe('TopLeftButtons (ROADMAP items 22 and 23)', () => {
     vi.restoreAllMocks();
   });
 
-  const renderRow = (isFullscreen: boolean, showCursor: boolean) =>
+  const renderRow = (showCursor: boolean) =>
     render(
       <TopLeftButtons
-        isFullscreen={isFullscreen}
         showCursor={showCursor}
         onFullscreenChange={vi.fn()}
         compassStatus="idle"
@@ -32,7 +31,7 @@ describe('TopLeftButtons (ROADMAP items 22 and 23)', () => {
     );
 
   it('puts the fullscreen and compass buttons in one row, both with aria-labels', () => {
-    renderRow(false, true);
+    renderRow(true);
     const buttons = screen.getAllByRole('button');
     expect(buttons).toHaveLength(2);
     for (const button of buttons) {
@@ -41,44 +40,41 @@ describe('TopLeftButtons (ROADMAP items 22 and 23)', () => {
   });
 
   it('stacks the buttons vertically (ROADMAP item 31)', () => {
-    const { container } = renderRow(false, true);
+    const { container } = renderRow(true);
     expect(container.firstChild).toHaveClass('flex-col');
   });
 
   // ROADMAP item 31: `focus-within` also matched after a mouse click or tap (the
   // clicked fullscreen button keeps focus), so the column never faded out.
   it('comes back for keyboard focus only, not for the focus a click leaves behind', () => {
-    const { container } = renderRow(true, false);
+    const { container } = renderRow(false);
     expect(container.firstChild).toHaveClass('has-focus-visible:opacity-100');
     expect(container.firstChild).not.toHaveClass('focus-within:opacity-100');
   });
 
-  it('is fully opaque outside fullscreen, regardless of showCursor', () => {
-    const { container } = renderRow(false, false);
-    expect(container.firstChild).toHaveClass('opacity-100');
-  });
-
-  it('fades the whole row out in fullscreen once idle', () => {
-    const { container } = renderRow(true, false);
+  // Item 136: SunTracker's useIdleHide keeps showCursor true in a browser tab; in fullscreen
+  // and in the installed app it is false while the controls hide.
+  it('fades the whole row out while the controls hide', () => {
+    const { container } = renderRow(false);
     expect(container.firstChild).toHaveClass('opacity-0');
   });
 
-  it('takes no taps in fullscreen while not tappable, and always outside fullscreen (item 132)', () => {
-    const props = { showCursor: false, isTappable: false, onFullscreenChange: vi.fn(), compassStatus: 'idle' as const, onCompassEnable: vi.fn(), onCompassDisable: vi.fn() };
-    const { container, rerender } = render(<TopLeftButtons isFullscreen {...props} />);
+  it('takes no taps while not tappable (item 132)', () => {
+    const props = { showCursor: false, onFullscreenChange: vi.fn(), compassStatus: 'idle' as const, onCompassEnable: vi.fn(), onCompassDisable: vi.fn() };
+    const { container, rerender } = render(<TopLeftButtons isTappable={false} {...props} />);
     expect(container.firstChild).toHaveClass('pointer-events-none');
-    rerender(<TopLeftButtons isFullscreen={false} {...props} />);
+    rerender(<TopLeftButtons isTappable {...props} />);
     expect(container.firstChild).not.toHaveClass('pointer-events-none');
   });
 
-  it('stays visible in fullscreen while showCursor is true', () => {
-    const { container } = renderRow(true, true);
+  it('stays visible while showCursor is true', () => {
+    const { container } = renderRow(true);
     expect(container.firstChild).toHaveClass('opacity-100');
   });
 
   it('shows a feedback button, with the same visibility rule, only when Sentry feedback is available', () => {
     vi.spyOn(feedback, 'isFeedbackAvailable').mockReturnValue(true);
-    renderRow(false, true);
+    renderRow(true);
     expect(screen.getByRole('button', { name: 'Send feedback' })).toBeInTheDocument();
     expect(screen.getAllByRole('button')).toHaveLength(3);
   });
@@ -87,7 +83,7 @@ describe('TopLeftButtons (ROADMAP items 22 and 23)', () => {
   // on a phone :hover stays after a tap. tailwind-merge must drop it for the glass class.
   it('keeps the three icons white after a tap: no ghost hover text colour', () => {
     vi.spyOn(feedback, 'isFeedbackAvailable').mockReturnValue(true);
-    renderRow(false, true);
+    renderRow(true);
     const buttons = screen.getAllByRole('button');
     expect(buttons).toHaveLength(3);
     for (const button of buttons) {
@@ -99,7 +95,6 @@ describe('TopLeftButtons (ROADMAP items 22 and 23)', () => {
   it('keeps the active compass sky blue after a tap', () => {
     render(
       <TopLeftButtons
-        isFullscreen={false}
         showCursor
         onFullscreenChange={vi.fn()}
         compassStatus="active"
@@ -116,7 +111,7 @@ describe('TopLeftButtons (ROADMAP items 22 and 23)', () => {
   it('opens the feedback form when the feedback button is clicked', () => {
     vi.spyOn(feedback, 'isFeedbackAvailable').mockReturnValue(true);
     const openFeedbackForm = vi.spyOn(feedback, 'openFeedbackForm').mockResolvedValue(undefined);
-    renderRow(false, true);
+    renderRow(true);
 
     screen.getByRole('button', { name: 'Send feedback' }).click();
     expect(openFeedbackForm).toHaveBeenCalledTimes(1);

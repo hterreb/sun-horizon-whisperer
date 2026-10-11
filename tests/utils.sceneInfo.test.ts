@@ -391,7 +391,7 @@ describe('sceneInfo: easter egg cards (ROADMAP item 113)', () => {
   ];
   const kinds: EggCardKind[] = ['ufo', 'ghost', 'dragon', 'santa', 'blackCat', 'halloweenBat', 'pumpkinMoon',
     'matariki', 'conjunction', 'noctilucent', 'midnightSun', 'polarNight', 'emptyTomb', 'potOfGold', 'heartCloud', ...festivals,
-    'fireworks', 'aurora', 'meteorShower', 'solstice', 'equinox']; // item 123
+    'fireworks', 'aurora', 'meteorShower', 'solstice', 'equinox', 'midwinter']; // item 123; item 140
 
   it('gives every egg the "ultra rare" tier, a title, a field note and the rarity row', () => {
     for (const kind of kinds) {
@@ -441,6 +441,17 @@ describe('sceneInfo: easter egg cards (ROADMAP item 113)', () => {
     expect(eggCard('halloweenBat')[2]).toBe('Rarity: Ultra rare · 0.8 days a year');
     expect(eggCard('pumpkinMoon')[2]).toBe('Rarity: Ultra rare · 1 day in 5 years');
     expect(eggCard('blackCat', de, { language: 'de' })[2]).toBe('Seltenheit: Ultraselten · 1,6 Tage im Jahr');
+  });
+
+  // Item 140: the winter solstice pill opens the midwinter card, with the days a year of the shortest day.
+  it('gives midwinter a "Special event" card: Yule, Yalda and Dongzhi, 1 day a year', () => {
+    expect(getEventDaysPerYear('solstice-shortest')).toBe(1);
+    expect(info('midwinter')).toMatchObject({ kicker: 'infoKind.specialEvent', icon: 'event', tier: 'ultraRare' });
+    const [title, fact, rarity] = eggCard('midwinter');
+    expect(title).toBe('Midwinter');
+    expect(fact).toMatch(/Yule.*Yalda.*Dongzhi/);
+    expect(rarity).toBe('Rarity: Ultra rare · 1 day a year');
+    expect(eggCard('midwinter', de, { language: 'de' })[0]).toBe('Mittwinter');
   });
 
   it('gives Santa 1 day a year (Dec 24 only, not the 2 Christmas lights days)', () => {
@@ -498,7 +509,9 @@ describe('sceneInfo: item 123 rows', () => {
     expect(card({ type: 'egg', kind: 'fireworks' })[0]).toBe('Fireworks');
     expect(card({ type: 'egg', kind: 'aurora' })[0]).toBe('Aurora');
     expect(card({ type: 'egg', kind: 'meteorShower' })[0]).toBe('Meteor shower');
-    expect(card({ type: 'egg', kind: 'solstice' }, undefined, de)[0]).toBe('Sonnenwende');
+    // Item 140: the solstice card is the summer one now (the winter one is midwinter).
+    expect(card({ type: 'egg', kind: 'solstice' })[0]).toBe('Summer solstice');
+    expect(card({ type: 'egg', kind: 'solstice' }, undefined, de)[0]).toBe('Sommersonnenwende');
     expect(getSceneInfo({ type: 'egg', kind: 'equinox' }, ctx()).kicker).toBe('infoKind.specialEvent');
   });
 

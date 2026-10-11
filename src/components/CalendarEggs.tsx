@@ -35,6 +35,8 @@ interface CalendarEggsProps {
   measured?: boolean;
   // A blue moon is shown (astroEvents): its label goes in the season badge.
   blueMoon?: boolean;
+  // Item 140: the winter solstice day after sunset (calendarEvents.isLongestNight): the pill names the longest night.
+  longestNight?: boolean;
 }
 
 // Item 123: the badge is a pill; the card's ring is not drawn on it.
@@ -61,7 +63,7 @@ const BAT_EYE = 'hsl(var(--scene-bat-eye))';
 
 // The calendar easter eggs (the New Year one is SunTracker's fireworks). All motion is
 // slow straight CSS glides; reduced motion turns the moving ones off.
-const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, moon, horizonY, onInfo, infoRing = null, infoRingTier = null, santa = false, soundOn = false, measured = true, blueMoon = false }) => {
+const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, moon, horizonY, onInfo, infoRing = null, infoRingTier = null, santa = false, soundOn = false, measured = true, blueMoon = false, longestNight = false }) => {
   const prefersReducedMotion = usePrefersReducedMotion();
   const [dragonDone, setDragonDone] = useState(false);
   const [santaDone, setSantaDone] = useState(false);
@@ -74,9 +76,11 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, moon, hor
   if (santa && measured && !santaFlying && !santaDone && !prefersReducedMotion) setSantaFlying(true);
   const isNight = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
   const { t } = useLanguage();
-  const seasonKey = event ? SEASON_TEXT[event] : undefined;
+  const seasonKey = event === 'solstice-shortest' && longestNight ? 'egg.seasonLongestNight' : event ? SEASON_TEXT[event] : undefined;
   const seasonText = seasonKey ? t(seasonKey) : blueMoon && t('egg.blueMoonLabel');
-  const seasonCard: EggCardKind | null = !seasonKey ? null : event === 'solstice-longest' || event === 'solstice-shortest' ? 'solstice' : 'equinox';
+  // Item 140: the winter solstice pill opens the midwinter card, the summer one the solstice card.
+  const seasonCard: EggCardKind | null = !seasonKey ? null
+    : event === 'solstice-shortest' ? 'midwinter' : event === 'solstice-longest' ? 'solstice' : 'equinox';
   // Item 113: the wrapper of a tappable egg (pointer only, hidden from screen readers) and its
   // hit area with the ring, a child of the moving wrapper.
   // Item 116: a double tap opens the card; a single tap shows the ring for a moment.
@@ -96,7 +100,7 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, moon, hor
           data-testid="season-badge"
           // On the water, clear of the InfoPanel (top) and the arc labels (horizon).
           style={{ top: horizonY + 90 }}
-          // Item 123: a double tap on a season badge opens the solstice or equinox card (not the blue moon's label).
+          // Item 123: a double tap on a season badge opens the solstice, midwinter or equinox card (not the blue moon's label).
           data-scene-hit={seasonCard && onInfo ? '' : undefined}
           className={`absolute left-1/2 z-9 -translate-x-1/2 whitespace-nowrap rounded-full px-3 py-1 text-caption text-white ${seasonCard ? tapClass : 'pointer-events-none'} ${GLASS_SURFACE}`}
           {...(seasonCard ? tapProps(seasonCard, SEASON_RING) : {})}
