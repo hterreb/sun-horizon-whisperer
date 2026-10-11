@@ -39,6 +39,7 @@ export const fr: Record<keyof typeof en, string> = {
   'panel.collapse': "Replier le panneau",
   'location.loading': "Chargement du lieu…",
   'location.unknown': "Votre position",
+  'location.osmAttribution': "© les contributeurs d'OpenStreetMap",
   'location.change': "Changer de lieu",
   'location.latitude': "Latitude",
   'location.longitude': "Longitude",
