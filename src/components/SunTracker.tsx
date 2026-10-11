@@ -51,7 +51,8 @@ import { type WeatherType } from './CloudLayer';
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useWakeLock } from '@/hooks/useWakeLock';
-import { useIdleHide } from '@/hooks/useIdleHide';
+import { ENTER_HIDE_MS, useIdleHide } from '@/hooks/useIdleHide';
+import { DOUBLE_TAP_MS } from '@/hooks/useDoubleTap';
 import { useCompassHeading } from '@/hooks/useCompassHeading';
 import { useHorizonProfile } from '@/hooks/useHorizonProfile';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
@@ -118,6 +119,8 @@ const DEFAULT_EYE_HEIGHT_M = 1.7;
 const MANUAL_STRONG_WIND_KMH = 50;
 const HOUR_MS = 60 * 60 * 1000;
 const MAX_EYE_HEIGHT_M = 1000;
+// Item 136: a tap on these is not a tap on the empty sky (scene things, controls, cards, dialogs).
+const NOT_SKY = '[data-scene-hit], [data-share-hide], button, a, input, [role="dialog"]';
 
 const clampEyeHeight = (value: number): number =>
   Number.isFinite(value) ? Math.min(MAX_EYE_HEIGHT_M, Math.max(0, value)) : DEFAULT_EYE_HEIGHT_M;
@@ -247,8 +250,11 @@ const SunTracker: React.FC = () => {
   }, [language]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   // One idle fade for all controls: the top-left buttons, the info panel and the player (item 132).
-  const controls = useIdleHide(isFullscreen);
-  const { isVisible: showCursor, wake: wakeCursor } = controls;
+  // Item 136: also in the installed app (Play app, home-screen app), where `isFullscreen` stays
+  // false. There the controls show at start and hide only by a sky tap.
+  const canHideControls = isFullscreen || isInstalledApp();
+  const controls = useIdleHide(canHideControls, isFullscreen ? ENTER_HIDE_MS : null);
+  const { isVisible: showCursor, wake: wakeCursor, toggle: toggleControls } = controls;
   const isMobile = useIsMobile();
 
   // Loading screen hand-off (ROADMAP item 39): the top-left buttons and the radio
@@ -327,28 +333,44 @@ const SunTracker: React.FC = () => {
 
   // In fullscreen, a mouse move shows the cursor again and restarts the idle timer
   // (useIdleHide: 3 s after entering, 10 s after a wake, ROADMAP item 89).
+  // Item 136: a tap on the empty sky hides the controls, the next one shows them.
+  const lastSkyToggleRef = React.useRef(-Infinity);
+  const infoCardOpenRef = React.useRef(false);
+  const downClosesCardRef = React.useRef(false);
   useEffect(() => {
-    if (!isFullscreen) return;
+    if (!canHideControls) return;
 
-    // A tap should bring the cursor (and the fullscreen/compass toggles, which fade
-    // together with it - ROADMAP item 18) back too.
-    // Item 124: a touch on a scene thing (a double tap opens its card) does not wake them.
-    const onTouch = (event: TouchEvent) => {
-      if (event.target instanceof Element && event.target.closest('[data-scene-hit]')) return;
-      wakeCursor();
-    };
     // Item 133: a phone tap also fires a compatibility `mousemove`; only a real mouse wakes here.
     const onPointerMove = (event: PointerEvent) => {
       if (event.pointerType === 'mouse') wakeCursor();
     };
+    // The window sees the pointerdown before SceneInfoCard's outside close (document, capture):
+    // a tap that closes a card only closes it.
+    const onPointerDown = () => {
+      downClosesCardRef.current = infoCardOpenRef.current;
+    };
+    // A tap is a `click` (a swipe or a pinch fires none). Only the empty scene toggles, not a
+    // scene thing (a double tap opens its card, item 124), a control, a card or a dialog.
+    // A second sky tap within DOUBLE_TAP_MS does nothing: a double tap on the sky does not flicker.
+    const onClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (downClosesCardRef.current) return;
+      if (!(target instanceof Element) || !target.closest('[data-share-root]') || target.closest(NOT_SKY)) return;
+      const now = Date.now();
+      if (now - lastSkyToggleRef.current <= DOUBLE_TAP_MS) return;
+      lastSkyToggleRef.current = now;
+      toggleControls();
+    };
+    window.addEventListener('pointerdown', onPointerDown, true);
     document.addEventListener('pointermove', onPointerMove);
-    document.addEventListener('touchstart', onTouch);
+    document.addEventListener('click', onClick);
 
     return () => {
+      window.removeEventListener('pointerdown', onPointerDown, true);
       document.removeEventListener('pointermove', onPointerMove);
-      document.removeEventListener('touchstart', onTouch);
+      document.removeEventListener('click', onClick);
     };
-  }, [isFullscreen, wakeCursor]);
+  }, [canHideControls, wakeCursor, toggleControls]);
 
   // Update time every second for smooth clock display, every PLAY_TICK_MS during play.
   useEffect(() => {
@@ -846,6 +868,10 @@ const SunTracker: React.FC = () => {
     if (state) collect(state);
   }, [collect]);
   const handleInfoClose = useCallback(() => setInfoCard(null), []);
+  // Item 136: read by the sky tap toggle (a tap that closes the card does not toggle).
+  useEffect(() => {
+    infoCardOpenRef.current = infoCard !== null;
+  }, [infoCard]);
   // Rare lenticular and mammatus clouds (ROADMAP item 84, X1): one day in 30 per place;
   // `?egg=lenticular` or `?egg=mammatus` forces the day.
   const [cloudEggForced] = useState(() => isCloudEggForced(window.location.search));
@@ -1195,7 +1221,6 @@ const SunTracker: React.FC = () => {
         <>
           <MusicPlayer controls={controls} duck={isCountdownSounding} rainMmH={getRainMmH(weatherType, rainMmH)} night={isDarkSky} />
           <TopLeftButtons
-            isFullscreen={isFullscreen}
             showCursor={showCursor}
             isTappable={controls.isTappable}
             onFullscreenChange={setIsFullscreen}
