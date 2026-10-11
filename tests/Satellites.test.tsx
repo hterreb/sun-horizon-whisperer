@@ -33,9 +33,15 @@ describe('Satellites (ROADMAP item 97)', () => {
     expect(a.className).not.toMatch(/animate-/);
   });
 
-  it('dims all satellites with the stars\' cloud factor', () => {
-    render(<Satellites {...base} cloudFactor={0.4} tracked={[iss]} gapMs={null} />);
-    expect(screen.getByTestId('satellites').style.opacity).toBe('0.4');
+  it('hides some satellites behind clouds and shows the others at full strength (item 135)', () => {
+    // The gaps come from the ids: 1 → 0.62 (behind a 0.4 cloud factor), 25544 → 0.06 (in a gap).
+    const behind: SatelliteDot = { ...iss, id: 1, name: 'SL-16 R/B' };
+    render(<Satellites {...base} cloudFactor={0.4} tracked={[behind, iss]} gapMs={null} />);
+    const [hidden, shown] = screen.getAllByTestId('satellite-tracked');
+    expect(hidden.style.opacity).toBe('0');
+    expect(hidden.className).not.toContain('pointer-events-auto');
+    expect(shown.style.opacity).toBe('1');
+    expect(screen.getByTestId('satellites').style.opacity).toBe('');
   });
 
   it('opens the info card of a tracked satellite, with its ring', () => {

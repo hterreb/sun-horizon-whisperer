@@ -2589,6 +2589,13 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Built:** `getStarGapShow` in `weatherEffectsUtils`; `NightStars` stars have a `gap`.
 - **Checked:** `weatherEffectsUtils` and `NightStars` tests (star count at 30 % and 89 %); screenshots of the built app at 0/30/60/89 %. Not checked: a real phone.
 
+### 135. Satellites shine through cloud gaps — S — **✅ Done**
+
+- **Request (2026-10-11):** "does this also affect planes and sattelites?", then "build option 1". The satellite layer still dimmed by the total cover (89 % → 11 % opacity), and the free dots came only in clear or mainly clear weather.
+- **Spec:** as the stars (item 134): clouds hide a share of the satellites, the others shine at full strength through the gaps (`getStarGapShow`). A tracked satellite's gap comes from its NORAD id, so it stays behind its cloud or in its gap. A free dot gets a random gap; a dot behind the clouds does not come, and one on its way fades with the cover. The free dots now also come in partly cloudy and overcast weather (not in rain, snow, fog or storm); the cover decides how many get through. A hidden tracked satellite takes no tap. Planes do not change (Lutz: option 2 not built).
+- **Built:** `Satellites` (no layer opacity; a gap per dot), `isSatelliteWeather`.
+- **Checked:** `Satellites` and `satelliteUtils` tests. Not checked: a real phone.
+
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 
 Rules for all items:
