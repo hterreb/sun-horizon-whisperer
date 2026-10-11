@@ -58,7 +58,8 @@ const logSpacedDistances = (): number[] => {
 // Destination point `distanceM` along great-circle bearing `bearingDeg` (0 = North,
 // clockwise - same convention as sunUtils.getSunPosition's azimuth) from (latDeg,
 // lonDeg). Standard spherical "destination point given distance and bearing" formula.
-const destinationPoint = (
+// Exported for the ridge points of the tree land cover (ROADMAP item 141).
+export const destinationPoint = (
   latDeg: number,
   lonDeg: number,
   bearingDeg: number,

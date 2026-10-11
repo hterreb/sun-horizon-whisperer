@@ -9,7 +9,8 @@ import FullscreenButton from './FullscreenButton';
 import CompassToggle from './CompassToggle';
 
 interface TopLeftButtonsProps {
-  isFullscreen: boolean;
+  // SunTracker's idle fade (useIdleHide): false while the controls hide in fullscreen or in
+  // the installed app (item 136); always true in a browser tab.
   showCursor: boolean;
   // Item 132: false while hidden and for a moment after a wake (useIdleHide).
   isTappable?: boolean;
@@ -23,12 +24,11 @@ interface TopLeftButtonsProps {
 // fixed flex column, stacked vertically since item 31; ROADMAP item 23 adds a "Send
 // feedback" button, shown only when Sentry feedback is set up, so it's reachable in
 // fullscreen too - see isFeedbackAvailable). One visibility rule for the whole column:
-// visible when not in fullscreen, or the idle timer hasn't fired (`showCursor`), or a
-// button in it has keyboard focus - `has-[:focus-visible]`, not `focus-within`: a
-// mouse click or tap also focuses the button, and `focus-within` then kept the column
-// visible for the whole fullscreen session (ROADMAP item 31).
+// visible while the controls show (`showCursor`), or a button in it has keyboard focus -
+// `has-[:focus-visible]`, not `focus-within`: a mouse click or tap also focuses the
+// button, and `focus-within` then kept the column visible for the whole fullscreen
+// session (ROADMAP item 31).
 const TopLeftButtons: React.FC<TopLeftButtonsProps> = ({
-  isFullscreen,
   showCursor,
   isTappable = true,
   onFullscreenChange,
@@ -36,15 +36,14 @@ const TopLeftButtons: React.FC<TopLeftButtonsProps> = ({
   onCompassEnable,
   onCompassDisable
 }) => {
-  const isVisible = !isFullscreen || showCursor;
   const { t } = useLanguage();
 
   return (
     <div
       data-share-hide
       className={`animate-fade-in fixed z-40 flex flex-col items-center gap-2 transition-opacity duration-300 has-focus-visible:opacity-100 ${
-        isVisible ? 'opacity-100' : 'opacity-0'
-      } ${isFullscreen && !isTappable ? 'pointer-events-none' : ''}`}
+        showCursor ? 'opacity-100' : 'opacity-0'
+      } ${isTappable ? '' : 'pointer-events-none'}`}
       style={{
         top: 'calc(1rem + env(safe-area-inset-top))',
         left: 'calc(1rem + env(safe-area-inset-left))',

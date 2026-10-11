@@ -1,4 +1,4 @@
-import { getCalendarEvent, getSeasonInstant, getSolsticeTraceDates, isSantaTime } from '@/utils/calendarEvents';
+import { getCalendarEvent, getSeasonInstant, getSolsticeTraceDates, isLongestNight, isMidwinterForced, isSantaTime } from '@/utils/calendarEvents';
 import { getSunTimes } from '@/utils/sunUtils';
 
 // vitest pins TZ=UTC, so local dates below are UTC dates.
@@ -46,6 +46,13 @@ describe('getCalendarEvent', () => {
     expect(getCalendarEvent(new Date(2026, 11, 21, 12), 47.8)).toBe('solstice-shortest');
     expect(getCalendarEvent(new Date(2026, 11, 21, 12))).toBe('solstice-shortest'); // no latitude: north
     expect(getCalendarEvent(new Date(2026, 5, 22, 12), 47.8)).toBeNull();
+  });
+
+  // Item 140: the winter solstice day (midwinter) in Berlin and in Sydney (tests run in UTC).
+  it('gives the winter solstice day in both hemispheres', () => {
+    expect(getCalendarEvent(new Date(2026, 11, 21, 12), 52.5)).toBe('solstice-shortest'); // Berlin
+    expect(getCalendarEvent(new Date(2027, 5, 21, 12), -33.9)).toBe('solstice-shortest'); // Sydney
+    expect(getCalendarEvent(new Date(2027, 5, 21, 12), 52.5)).toBe('solstice-longest');
   });
 
   it('returns equinox on the equinox day (the March one is Nowruz, item 118)', () => {
@@ -113,6 +120,49 @@ describe('isSantaTime (Christmas Eve)', () => {
       expect(getCalendarEvent(new Date(year, 11, 24, 20))).not.toBe('christmas');
       expect(getCalendarEvent(new Date(year, 11, 25, 12))).toBe('christmas');
     }
+  });
+});
+
+// Item 140: the season pill names the longest night from sunset to midnight on the winter solstice day.
+describe('isLongestNight (midwinter)', () => {
+  const evening = { sunset: new Date(2026, 11, 21, 16, 30), polar: null };
+
+  it('is on from sunset to local midnight of the winter solstice day', () => {
+    expect(isLongestNight('solstice-shortest', new Date(2026, 11, 21, 16, 29), evening)).toBe(false);
+    expect(isLongestNight('solstice-shortest', new Date(2026, 11, 21, 16, 30), evening)).toBe(true);
+    expect(isLongestNight('solstice-shortest', new Date(2026, 11, 21, 23, 59, 59), evening)).toBe(true);
+    // Before solar midnight the sun times can hold the day before's sunset.
+    expect(isLongestNight('solstice-shortest', new Date(2026, 11, 22, 0, 30), evening)).toBe(false);
+  });
+
+  it('is off on any other event, without sun times and at polar day', () => {
+    expect(isLongestNight('solstice-longest', new Date(2026, 11, 21, 20), evening)).toBe(false);
+    expect(isLongestNight('equinox', new Date(2026, 11, 21, 20), evening)).toBe(false);
+    expect(isLongestNight(null, new Date(2026, 11, 21, 20), evening)).toBe(false);
+    expect(isLongestNight('solstice-shortest', new Date(2026, 11, 21, 20), null)).toBe(false);
+    expect(isLongestNight('solstice-shortest', new Date(2026, 5, 21, 20), getSunTimes(new Date(2026, 5, 21, 12), 80, 0))).toBe(false); // polar day
+  });
+
+  it('uses the 18:00 fallback sunset at polar night, like Santa', () => {
+    const polarNight = getSunTimes(new Date(2026, 11, 21, 12), 80, 0);
+    expect(polarNight.polar).toBe('night');
+    expect(isLongestNight('solstice-shortest', new Date(2026, 11, 21, 17), polarNight)).toBe(false);
+    expect(isLongestNight('solstice-shortest', new Date(2026, 11, 21, 18), polarNight)).toBe(true);
+  });
+
+  it('works with real sun times in Berlin on 2026-12-21', () => {
+    const times = getSunTimes(new Date(2026, 11, 21, 12), 52.5, 13.4);
+    expect(isLongestNight('solstice-shortest', new Date(times.sunset.getTime() - 60_000), times)).toBe(false);
+    expect(isLongestNight('solstice-shortest', new Date(times.sunset.getTime() + 60_000), times)).toBe(true);
+  });
+});
+
+describe('isMidwinterForced (?egg=midwinter)', () => {
+  it('reads the test link in any case', () => {
+    expect(isMidwinterForced('?egg=midwinter')).toBe(true);
+    expect(isMidwinterForced('?egg=Midwinter&lang=de')).toBe(true);
+    expect(isMidwinterForced('?egg=midsummer')).toBe(false);
+    expect(isMidwinterForced('')).toBe(false);
   });
 });
 

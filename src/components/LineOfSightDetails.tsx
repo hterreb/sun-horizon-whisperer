@@ -1,5 +1,5 @@
 import React from 'react';
-import { TERRAIN_SOURCE } from '../utils/terrainTiles';
+import { TERRAIN_SOURCE, TREE_COVER_SOURCE } from '../utils/terrainTiles';
 import { type HorizonProfileStatus } from '../hooks/useHorizonProfile';
 import { ROW, FOCUS_RING } from './InfoPanel';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -71,6 +71,7 @@ const LineOfSightDetails: React.FC<LineOfSightDetailsProps> = ({
     </div>
 
     <p className="text-caption opacity-50 mt-1">{t('terrain.attribution', { source: TERRAIN_SOURCE })}</p>
+    <p className="text-caption opacity-50">{t('terrain.treesAttribution', { source: TREE_COVER_SOURCE })}</p>
   </div>
   );
 };

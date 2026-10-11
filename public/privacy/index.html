@@ -22,7 +22,7 @@
 <body>
 <main>
   <h1>Sun Chaser — Privacy Policy</h1>
-  <p class="muted">Last updated: 6 October 2026</p>
+  <p class="muted">Last updated: 11 October 2026</p>
 
   <p>Sun Chaser is made by Lutz Berreth (contact: <a href="mailto:lutz.berreth@gmail.com">lutz.berreth@gmail.com</a>). This policy applies to the Sun Chaser app on Google Play and to the web app at <a href="https://sun-chaser.vercel.app">sun-chaser.vercel.app</a>.</p>
   <p><strong>Summary:</strong> Sun Chaser has no accounts, no ads and no tracking. We do not sell data.</p>
@@ -32,8 +32,10 @@
   <ul>
     <li><a href="https://open-meteo.com">Open-Meteo</a>: weather and forecast</li>
     <li><a href="https://www.bigdatacloud.com">BigDataCloud</a>: place name</li>
+    <li><a href="https://photon.komoot.io">Photon</a> by Komoot (OpenStreetMap data): place name, only when BigDataCloud does not answer</li>
   </ul>
   <p>For the line of sight to the horizon, the app downloads elevation tiles from Amazon Web Services (Mapzen Terrain Tiles). The tile names show your area to about 10 km.</p>
+  <p>For the trees on the horizon, the app also reads land-cover data (ESA WorldCover) from <a href="https://planetarycomputer.microsoft.com">Microsoft Planetary Computer</a>. The parts of the map it reads show your area.</p>
   <p>If you turn on "Live planes" (off by default), the app asks for the aircraft near you every 15 seconds while it is open. It sends your place, rounded to about 11 km, to our server (sun-chaser.vercel.app), which forwards it to <a href="https://adsb.lol">adsb.lol</a> (open flight data, licensed under the <a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>). Like any web server, they receive your IP address. Our server does not store your place; our host (Vercel) keeps request logs for a short time. When you tap a plane, the app asks our server for its route: it sends the plane's callsign and your rounded place, and our server sends only the callsign on to adsb.lol.</p>
   <p>You can deny location access and enter a place by hand instead.</p>
 

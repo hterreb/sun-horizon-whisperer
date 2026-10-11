@@ -51,9 +51,11 @@ import { type WeatherType } from './CloudLayer';
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useWakeLock } from '@/hooks/useWakeLock';
-import { useIdleHide } from '@/hooks/useIdleHide';
+import { ENTER_HIDE_MS, useIdleHide } from '@/hooks/useIdleHide';
+import { DOUBLE_TAP_MS } from '@/hooks/useDoubleTap';
 import { useCompassHeading } from '@/hooks/useCompassHeading';
 import { useHorizonProfile } from '@/hooks/useHorizonProfile';
+import { useTreeCover } from '@/hooks/useTreeCover';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { useSunsetCountdown, primeCountdownAudio } from '@/hooks/useSunsetCountdown';
 import { useSunsetReminder, requestReminderPermission, getNotificationPermission } from '@/hooks/useSunsetReminder';
@@ -77,7 +79,7 @@ import {
   badgeForRoute, saveCollection, stateBadgeForTarget, type BadgeId, type Collection, type StateBadgeContext,
 } from '@/utils/collection';
 import { watchSunEvent, NO_SUN_EVENT_WATCH, getCountdownTarget } from '../utils/sunEvents';
-import { getCalendarEvent, isSantaTime } from '@/utils/calendarEvents';
+import { getCalendarEvent, isLongestNight, isMidwinterForced, isSantaTime } from '@/utils/calendarEvents';
 import { getNationalDay, parseCountryOverride, parseNationalEggOverride } from '@/utils/nationalDays';
 import { badgeForNationalDay } from '@/utils/collection';
 import { BuntingContext, type Bunting } from '@/hooks/useBunting';
@@ -118,6 +120,8 @@ const DEFAULT_EYE_HEIGHT_M = 1.7;
 const MANUAL_STRONG_WIND_KMH = 50;
 const HOUR_MS = 60 * 60 * 1000;
 const MAX_EYE_HEIGHT_M = 1000;
+// Item 136: a tap on these is not a tap on the empty sky (scene things, controls, cards, dialogs).
+const NOT_SKY = '[data-scene-hit], [data-share-hide], button, a, input, [role="dialog"]';
 
 const clampEyeHeight = (value: number): number =>
   Number.isFinite(value) ? Math.min(MAX_EYE_HEIGHT_M, Math.max(0, value)) : DEFAULT_EYE_HEIGHT_M;
@@ -247,8 +251,11 @@ const SunTracker: React.FC = () => {
   }, [language]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   // One idle fade for all controls: the top-left buttons, the info panel and the player (item 132).
-  const controls = useIdleHide(isFullscreen);
-  const { isVisible: showCursor, wake: wakeCursor } = controls;
+  // Item 136: also in the installed app (Play app, home-screen app), where `isFullscreen` stays
+  // false. There the controls show at start and hide only by a sky tap.
+  const canHideControls = isFullscreen || isInstalledApp();
+  const controls = useIdleHide(canHideControls, isFullscreen ? ENTER_HIDE_MS : null);
+  const { isVisible: showCursor, wake: wakeCursor, toggle: toggleControls } = controls;
   const isMobile = useIsMobile();
 
   // Loading screen hand-off (ROADMAP item 39): the top-left buttons and the radio
@@ -313,6 +320,8 @@ const SunTracker: React.FC = () => {
     eyeHeight,
     isLineOfSightOn && location.loaded
   );
+  // Tree silhouettes on the ridge (ROADMAP item 141), loaded after the profile.
+  const trees = useTreeCover(horizonProfile, terrainStatus === 'ready', location.latitude, location.longitude);
 
   const handleCompassEnable = useCallback(() => {
     if (!hasSeenCompassCalibrationHint()) {
@@ -327,28 +336,44 @@ const SunTracker: React.FC = () => {
 
   // In fullscreen, a mouse move shows the cursor again and restarts the idle timer
   // (useIdleHide: 3 s after entering, 10 s after a wake, ROADMAP item 89).
+  // Item 136: a tap on the empty sky hides the controls, the next one shows them.
+  const lastSkyToggleRef = React.useRef(-Infinity);
+  const infoCardOpenRef = React.useRef(false);
+  const downClosesCardRef = React.useRef(false);
   useEffect(() => {
-    if (!isFullscreen) return;
+    if (!canHideControls) return;
 
-    // A tap should bring the cursor (and the fullscreen/compass toggles, which fade
-    // together with it - ROADMAP item 18) back too.
-    // Item 124: a touch on a scene thing (a double tap opens its card) does not wake them.
-    const onTouch = (event: TouchEvent) => {
-      if (event.target instanceof Element && event.target.closest('[data-scene-hit]')) return;
-      wakeCursor();
-    };
     // Item 133: a phone tap also fires a compatibility `mousemove`; only a real mouse wakes here.
     const onPointerMove = (event: PointerEvent) => {
       if (event.pointerType === 'mouse') wakeCursor();
     };
+    // The window sees the pointerdown before SceneInfoCard's outside close (document, capture):
+    // a tap that closes a card only closes it.
+    const onPointerDown = () => {
+      downClosesCardRef.current = infoCardOpenRef.current;
+    };
+    // A tap is a `click` (a swipe or a pinch fires none). Only the empty scene toggles, not a
+    // scene thing (a double tap opens its card, item 124), a control, a card or a dialog.
+    // A second sky tap within DOUBLE_TAP_MS does nothing: a double tap on the sky does not flicker.
+    const onClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (downClosesCardRef.current) return;
+      if (!(target instanceof Element) || !target.closest('[data-share-root]') || target.closest(NOT_SKY)) return;
+      const now = Date.now();
+      if (now - lastSkyToggleRef.current <= DOUBLE_TAP_MS) return;
+      lastSkyToggleRef.current = now;
+      toggleControls();
+    };
+    window.addEventListener('pointerdown', onPointerDown, true);
     document.addEventListener('pointermove', onPointerMove);
-    document.addEventListener('touchstart', onTouch);
+    document.addEventListener('click', onClick);
 
     return () => {
+      window.removeEventListener('pointerdown', onPointerDown, true);
       document.removeEventListener('pointermove', onPointerMove);
-      document.removeEventListener('touchstart', onTouch);
+      document.removeEventListener('click', onClick);
     };
-  }, [isFullscreen, wakeCursor]);
+  }, [canHideControls, wakeCursor, toggleControls]);
 
   // Update time every second for smooth clock display, every PLAY_TICK_MS during play.
   useEffect(() => {
@@ -839,13 +864,16 @@ const SunTracker: React.FC = () => {
   const handleSceneInfo = useCallback((target: SceneInfoTarget, point: { x: number; y: number }, ring: string) => {
     infoCardCount.current += 1;
     setInfoCard({ target, ...point, ring, id: infoCardCount.current });
-    // The base badge first, then the state badge (sun, moon, terrain): one collect each.
-    const badge = badgeForTarget(target);
+    // Item 138: one badge per tap. The kind's badge, or the state badge (satellite, sun, moon,
+    // terrain); no state (the sun in the twilights, a time preview) collects nothing.
+    const badge = badgeForTarget(target) ?? stateBadgeForTarget(target, stateBadgeContextRef.current);
     if (badge) collect(badge);
-    const state = stateBadgeForTarget(target, stateBadgeContextRef.current);
-    if (state) collect(state);
   }, [collect]);
   const handleInfoClose = useCallback(() => setInfoCard(null), []);
+  // Item 136: read by the sky tap toggle (a tap that closes the card does not toggle).
+  useEffect(() => {
+    infoCardOpenRef.current = infoCard !== null;
+  }, [infoCard]);
   // Rare lenticular and mammatus clouds (ROADMAP item 84, X1): one day in 30 per place;
   // `?egg=lenticular` or `?egg=mammatus` forces the day.
   const [cloudEggForced] = useState(() => isCloudEggForced(window.location.search));
@@ -854,6 +882,8 @@ const SunTracker: React.FC = () => {
   // forces Lunar New Year (item 100), `?egg=santa` Santa's flight (no snow: that is Dec 25-26).
   const [dragonForced] = useState(() => new URLSearchParams(window.location.search).get('egg') === 'dragon');
   const [santaForced] = useState(() => new URLSearchParams(window.location.search).get('egg') === 'santa');
+  // Item 140: `?egg=midwinter` forces the winter solstice day.
+  const [midwinterForced] = useState(() => isMidwinterForced(window.location.search));
   // Playful pack (ROADMAP item 117): `?egg=aprilFools|easter|valentine|stPatrick` sets that day.
   const [playfulForced] = useState(() => getPlayfulOverride(window.location.search));
   // Item 118: `?egg=<festival egg kind>` (for example `?egg=diwali`) forces a festival.
@@ -864,13 +894,15 @@ const SunTracker: React.FC = () => {
   const [countryOverride] = useState(() => parseCountryOverride(window.location.search));
   const country = countryOverride ?? (manualPlaceName ? manualCountry : detectedCountry);
   const calendarEvent = useMemo(
-    () => (dragonForced ? 'lunar-new-year' : playfulForced ? PLAYFUL_EVENT[playfulForced]
+    () => (dragonForced ? 'lunar-new-year' : midwinterForced ? 'solstice-shortest' : playfulForced ? PLAYFUL_EVENT[playfulForced]
       : festivalForced ?? getCalendarEvent(date, location.latitude, country ?? undefined)),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on passMinuteKey, not `date` itself
     [passMinuteKey, location.latitude, country]
   );
   // Christmas Eve: Santa flies once from sunset to midnight (the scene's sun times).
   const isSanta = santaForced || isSantaTime(date, sunTimes);
+  // Item 140: the winter solstice day from sunset to midnight: the pill names the longest night.
+  const longestNight = isLongestNight(calendarEvent, date, sunTimes);
   // National days (utils/nationalDays): only in the place's country, from InfoPanel's
   // reverse-geocode answer. Unknown country: none. `?country=XX` sets the country,
   // `?egg=<kind>` (for example `?egg=bastilleDay`) forces the day.
@@ -1028,7 +1060,7 @@ const SunTracker: React.FC = () => {
   // really shows (item 123: a double tap on the egg collects one; CalendarEggs' rules: dark sky = night or astronomical/nautical twilight).
   // Not for a forced egg (?egg=dragon, ?egg=santa or any ?egg) and not in a time preview.
   const isDarkSky = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
-  const calendarBadge = dragonForced || santaForced || festivalForced ? null : badgeForCalendarEvent(calendarEvent, {
+  const calendarBadge = dragonForced || santaForced || festivalForced || midwinterForced ? null : badgeForCalendarEvent(calendarEvent, {
     isNight: isDarkSky,
     moonUp: isDarkSky && moonPosition.visible && getMoonLook(weatherType, cloudCover).disc > 0,
     weatherType,
@@ -1193,9 +1225,8 @@ const SunTracker: React.FC = () => {
       </LazyPart>
       {reveal === 'done' && (
         <>
-          <MusicPlayer controls={controls} duck={isCountdownSounding} rainMmH={getRainMmH(weatherType, rainMmH)} />
+          <MusicPlayer controls={controls} duck={isCountdownSounding} rainMmH={getRainMmH(weatherType, rainMmH)} night={isDarkSky} />
           <TopLeftButtons
-            isFullscreen={isFullscreen}
             showCursor={showCursor}
             isTappable={controls.isTappable}
             onFullscreenChange={setIsFullscreen}
@@ -1246,6 +1277,7 @@ const SunTracker: React.FC = () => {
             windDirectionDeg={weatherData?.windDirectionDeg ?? null}
             compassHeading={activeCompassHeading}
             horizonProfile={horizonProfile}
+            trees={trees}
             terrainSunTimes={terrainExtras.terrainSunTimes}
             astroEvent={astroEvent}
             onFireworksRunning={setOwnFireworksRunning}
@@ -1261,6 +1293,7 @@ const SunTracker: React.FC = () => {
             infoRingTier={infoCardInfo?.tier ?? null}
             calendarEvent={calendarEvent}
             santa={isSanta}
+            longestNight={longestNight}
             easterMorning={easterMorning}
             onEggShown={handleEggShown}
             soundOn={isCountdownOn}

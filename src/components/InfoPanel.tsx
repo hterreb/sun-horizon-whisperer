@@ -28,7 +28,9 @@ import { isValidLatitude, isValidLongitude } from '../utils/manualLocation';
 import { type HorizonProfileStatus } from '../hooks/useHorizonProfile';
 import { type HorizonProfile } from '@/utils/horizonUtils';
 import { type WeatherType } from './CloudLayer';
-import { loadPlace, savePlace, fetchPlace, deviceCountry } from '@/utils/placeName';
+import {
+  type PlaceInfo, loadPlace, savePlace, fetchPlace, fetchPhotonPlace, deviceCountry, reportPlace, placeStatusOf, errorStatusOf,
+} from '@/utils/placeName';
 import { getTimeTravelRange, toDateTimeLocalValue } from '@/utils/timeTravel';
 import { formatTemperature, type TemperatureUnit } from '@/utils/temperatureUnit';
 import { SUNSET_REMINDER_MIN } from '@/utils/sunsetReminder';
@@ -215,6 +217,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   const formatLocalTime = (date: Date | null) => formatTime(date, language);
   // '' until the first lookup ends; null when the lookup found no place name.
   const [locationName, setLocationName] = useState<string | null>('');
+  // Item 137: the shown name comes from Photon (OpenStreetMap data) and needs the attribution.
+  const [isOsmName, setIsOsmName] = useState(false);
   const [loadingLocation, setLoadingLocation] = useState(false);
   // Phones (< 640 px, Tailwind `sm`) start collapsed so the first view shows the scene
   // (ROADMAP item 55). Read once at mount; later resizes do not change it.
@@ -283,6 +287,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     if (manualPlaceName) {
       const timeoutId = setTimeout(() => {
         setLocationName(manualPlaceName);
+        setIsOsmName(false);
         setLoadingLocation(false);
         onCountryChange?.(null);
       }, 0);
@@ -295,13 +300,20 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     const fetchLocationName = async () => {
       const latitude = location.latitude;
       const longitude = location.longitude;
+      const showPlace = (place: PlaceInfo) => {
+        setLocationName(place.name);
+        setIsOsmName(place.source === 'photon');
+        onCountryChange?.(place.countryCode);
+      };
       // Item 130: show the cached answer at once; ask again only when it is stale.
       const cached = loadPlace(latitude, longitude, language);
       if (cached) {
-        setLocationName(cached.place.name);
-        onCountryChange?.(cached.place.countryCode);
+        showPlace(cached.place);
         setLoadingLocation(false);
-        if (cached.fresh) return;
+        if (cached.fresh) {
+          reportPlace('cached');
+          return;
+        }
       } else {
         setLoadingLocation(true);
       }
@@ -309,14 +321,33 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
         const place = await fetchPlace(latitude, longitude, language);
         if (cancelled) return;
         savePlace(latitude, longitude, language, place);
-        onCountryChange?.(place.countryCode);
-        setLocationName(place.name);
+        showPlace(place);
+        reportPlace(placeStatusOf(place));
       } catch (error) {
         if (cancelled) return;
         console.error('Error fetching location name:', error);
-        // Keep the cached answer; without one, no name and the device time zone's country.
-        if (!cached) {
+        // Item 137: both BigDataCloud calls failed; ask Photon once.
+        let fallback: PlaceInfo | null = null;
+        let photonStatus: string;
+        try {
+          fallback = await fetchPhotonPlace(latitude, longitude, language);
+          photonStatus = placeStatusOf(fallback);
+        } catch (photonError) {
+          console.error('Error fetching location name from Photon:', photonError);
+          photonStatus = errorStatusOf(photonError);
+        }
+        if (cancelled) return;
+        reportPlace(errorStatusOf(error), photonStatus);
+        // Photon's answer, unless it is empty or has no town while the cache has one. Else keep
+        // the cached answer; without one, no name and the device time zone's country.
+        const isEmpty = !fallback || (fallback.name === null && fallback.countryCode === null);
+        const keepCachedTown = cached?.place.hasTown && !fallback?.hasTown;
+        if (fallback && !isEmpty && !keepCachedTown) {
+          savePlace(latitude, longitude, language, fallback);
+          showPlace(fallback);
+        } else if (!cached) {
           setLocationName(null);
+          setIsOsmName(false);
           onCountryChange?.(deviceCountry());
         }
       } finally {
@@ -513,6 +544,18 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 <span className="text-caption opacity-70 tabular-nums">
                   {formatNumber(language, location.latitude, 4)}°, {formatNumber(language, location.longitude, 4)}°
                 </span>
+              )}
+              {/* Item 137: a name from Photon is OpenStreetMap data (ODbL); the attribution takes
+                  the coordinates' line, so the panel is not higher than while it loads. */}
+              {isOsmName && !showCoordinates && (
+                <a
+                  href="https://www.openstreetmap.org/copyright"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`self-start text-caption opacity-70 hover:opacity-100 hover:underline ${FOCUS_RING}`}
+                >
+                  {t('location.osmAttribution')}
+                </a>
               )}
               {/* Expanded panel only (ROADMAP item 47): keeps the collapsed panel within
                   COLLAPSED_PANEL_HEIGHT in SunVisualization.tsx. */}
