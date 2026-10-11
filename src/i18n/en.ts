@@ -39,6 +39,7 @@ export const en = {
   'panel.collapse': 'Collapse info panel',
   'location.loading': 'Loading location...',
   'location.unknown': 'Your location',
+  'location.osmAttribution': '© OpenStreetMap contributors',
   'location.change': 'Change location',
   'location.latitude': 'Latitude',
   'location.longitude': 'Longitude',

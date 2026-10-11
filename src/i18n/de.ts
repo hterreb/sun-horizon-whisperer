@@ -39,6 +39,7 @@ export const de: Record<keyof typeof en, string> = {
   'panel.collapse': "Infobereich zuklappen",
   'location.loading': "Ort wird geladen…",
   'location.unknown': "Dein Standort",
+  'location.osmAttribution': "© OpenStreetMap-Mitwirkende",
   'location.change': "Ort ändern",
   'location.latitude': "Breitengrad",
   'location.longitude': "Längengrad",
