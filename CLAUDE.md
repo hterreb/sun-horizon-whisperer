@@ -24,7 +24,7 @@
 - Use the `@/` alias for imports from `src/` (for example `@/components/ui/button`).
 - UI text is not hard-coded. Add the key to `src/i18n/en.ts` and to `de.ts`, `es.ts`, `it.ts`, `fr.ts`, and show it with `useLanguage().t(key)` (`SunTracker` provides the language). `tests/i18n.test.ts` fails on a missing or unused key.
 - Do not commit debug `console.log` calls. Gate any dev-only log behind `import.meta.env.DEV`.
-- The repo is public, so every commit e-mail is public. Commit only as `Lutz Berreth <lutz.berreth@gmail.com>` (set in the repo's git config). `.githooks/pre-push` blocks a push with any other author or committer e-mail. Enable it once per clone: `git config core.hooksPath .githooks`.
+- The repo is private since 2026-10-12, but it was public before and can become public again. Commit e-mails then become public. Commit only as `Lutz Berreth <lutz.berreth@gmail.com>` (set in the repo's git config). `.githooks/pre-push` blocks a push with any other author or committer e-mail. Enable it once per clone: `git config core.hooksPath .githooks`.
 - Tailwind CSS v4: theme tokens (colours, type scale, radii, animations) are in the `@theme` block of `src/index.css`; there is no `tailwind.config.ts`. Opacity goes in the colour (`bg-white/10`): v3's `bg-opacity-*`, `border-opacity-*` and `text-opacity-*` no longer exist, and v4 drops them without an error (the colour turns solid).
 - Security headers (CSP and others) are in `public/_headers` (Cloudflare Pages) and, until the move from Vercel is done, also in `vercel.json`. `tests/headers.test.ts` fails if the two differ. A new external host (API, stream, script) must go into the CSP, or the browser blocks it.
 
