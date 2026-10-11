@@ -27,8 +27,9 @@ const squareSail = (x: number, y: number, w: number, h: number) =>
 const TALL_SHIP_MASTS: [number, number, number][] = [[18, 7.5, 9.5], [32, 3, 5], [46, 5, 7]];
 
 // `parts` are drawn in order (back to front). `lights` glow once the sun is down: points
-// in the grid, and the windows. `stern` is where the wake starts.
-const FLEET: Record<BoatKind, { parts: [Role, string][]; lights: [number, number][]; litWindows: boolean; stern: number }> = {
+// in the grid, and the windows. `stern` is where the wake starts. `lightWake` (the tall ship,
+// item 146): a fainter, shorter wake.
+const FLEET: Record<BoatKind, { parts: [Role, string][]; lights: [number, number][]; litWindows: boolean; stern: number; lightWake?: boolean }> = {
   sailboat: {
     parts: [
       ['line', 'M30 3.5V30'],
@@ -164,9 +165,12 @@ const FLEET: Record<BoatKind, { parts: [Role, string][]; lights: [number, number
       ['cabin', 'M4.3 28.6H61.6L61.2 30.4H4.8Z'],
       ...[10, 16, 22, 28, 34, 40, 46, 52].map((x): [Role, string] => ['window', rect(x, 29, 1.8, 1)]),
     ],
-    lights: TALL_SHIP_MASTS.map(([x, top]): [number, number] => [x, top]), litWindows: false, stern: 10.5,
+    lights: TALL_SHIP_MASTS.map(([x, top]): [number, number] => [x, top]), litWindows: false, stern: 10.5, lightWake: true,
   },
 };
+
+// Item 146: the tall ship's light wake, at half the strength and 60 % of the length of the others.
+const LIGHT_WAKE = { opacity: 0.5, length: 0.6 };
 
 const c = (name: string) => `hsl(var(--scene-boat-${name}))`;
 const FLAT: Partial<Record<Role, string>> = {
@@ -192,6 +196,7 @@ interface SceneBoatProps {
 const SceneBoat = ({ kind, tone, lit, wake, seaWindKmh = UNKNOWN_SEA_WIND_KMH }: SceneBoatProps) => {
   const id = useId().replace(/:/g, '');
   const boat = FLEET[kind];
+  const wakeLength = boat.lightWake ? LIGHT_WAKE.length : 1;
   // National days, Día de los Muertos and Christmas: the boats are dressed.
   const bunting = useBunting();
   const height = BOAT_HEIGHT_PX;
@@ -236,9 +241,9 @@ const SceneBoat = ({ kind, tone, lit, wake, seaWindKmh = UNKNOWN_SEA_WIND_KMH }:
         </defs>
         {/* X2: two thin pale lines from under the stern, drawn first so the hull covers their start. */}
         {wake && (
-          <g fill={`url(#${id}wake)`} data-testid="boat-wake">
-            <path d={`M${boat.stern + 2} 35.4h-34v1h34Z`} />
-            <path d={`M${boat.stern} 38.6h-21v0.8h21Z`} opacity={0.6} />
+          <g fill={`url(#${id}wake)`} data-testid="boat-wake" data-wake={boat.lightWake ? 'light' : 'full'} opacity={boat.lightWake ? LIGHT_WAKE.opacity : undefined}>
+            <path d={`M${boat.stern + 2} 35.4h-${34 * wakeLength}v1h${34 * wakeLength}Z`} />
+            <path d={`M${boat.stern} 38.6h-${21 * wakeLength}v0.8h${21 * wakeLength}Z`} opacity={0.6} />
           </g>
         )}
         {parts}

@@ -168,18 +168,18 @@ describe('pickBoat in a storm (ROADMAP item 73)', () => {
 });
 
 describe('hasBoatWake (ROADMAP item 73, X2)', () => {
-  it('gives the ferry, the freighter, the cruise liner and the paddle steamer a wake in any wind', () => {
+  it('gives the ferry, the freighter, the cruise liner, the paddle steamer and the tall ship a wake in any wind', () => {
     expect(hasBoatWake('ferry', 0)).toBe(true);
     expect(hasBoatWake('freighter', null)).toBe(true);
     expect(hasBoatWake('cruiseLiner', 0)).toBe(true); // item 146
     expect(hasBoatWake('paddleSteamer', null)).toBe(true);
+    expect(hasBoatWake('tallShip', 0)).toBe(true); // a light one (SceneBoat), decision 2026-10-12
+    expect(hasBoatWake('tallShip', 40)).toBe(true);
   });
 
-  it('gives the sailboat and the tall ship a wake only in strong wind (> 40 km/h)', () => {
+  it('gives the sailboat a wake only in strong wind (> 40 km/h)', () => {
     expect(hasBoatWake('sailboat', 40)).toBe(false);
     expect(hasBoatWake('sailboat', 41)).toBe(true);
-    expect(hasBoatWake('tallShip', 40)).toBe(false);
-    expect(hasBoatWake('tallShip', 41)).toBe(true);
   });
 
   it('never gives the rowboat, the kayak or the fishing boat a wake', () => {

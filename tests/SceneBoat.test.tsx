@@ -51,6 +51,23 @@ describe('SceneBoat: the new boats (ROADMAP item 146)', () => {
     expect(lights('cruiseLiner')).toBe(1 + 44); // the mast and 4 rows of windows
     expect(lights('tallShip')).toBe(3); // one on each masthead
   });
+
+  it('gives the tall ship a light wake: fainter and shorter than the paddle steamer\'s', () => {
+    const wakeOf = (kind: BoatKind) => {
+      const { unmount } = render(<SceneBoat kind={kind} tone="day" lit={false} wake />);
+      const wake = screen.getByTestId('boat-wake');
+      const first = wake.querySelector('path')!.getAttribute('d')!;
+      const out = { look: wake.getAttribute('data-wake'), opacity: wake.getAttribute('opacity'), length: Number(first.match(/h-([\d.]+)/)![1]) };
+      unmount();
+      return out;
+    };
+    const steamer = wakeOf('paddleSteamer');
+    const tallShip = wakeOf('tallShip');
+    expect(steamer).toEqual({ look: 'full', opacity: null, length: 34 });
+    expect(tallShip.look).toBe('light');
+    expect(Number(tallShip.opacity)).toBe(0.5);
+    expect(tallShip.length).toBeCloseTo(34 * 0.6);
+  });
 });
 
 describe('SceneBoat bunting on a national day', () => {

@@ -131,12 +131,12 @@ export const getBoatOverride = (search: string): BoatKind[] | null => {
 };
 
 // Wake (ROADMAP item 73, Fleet Styles X2): only a boat that moves fast trails one. The
-// ferry, the freighter, the cruise liner and the paddle steamer always; the sailboat and the
-// tall ship only in strong wind; the rowboat and the kayak never. The fishing boat has none.
-const WAKE_ALWAYS: BoatKind[] = [...BIG_BOATS, 'paddleSteamer'];
-const WAKE_IN_STRONG_WIND: BoatKind[] = ['sailboat', 'tallShip'];
+// ferry, the freighter, the cruise liner, the paddle steamer and the tall ship always (the tall
+// ship a light one, SceneBoat's lightWake: decision 2026-10-12); the sailboat only in strong
+// wind; the rowboat and the kayak never. The fishing boat has none.
+const WAKE_ALWAYS: BoatKind[] = [...BIG_BOATS, 'paddleSteamer', 'tallShip'];
 export const hasBoatWake = (kind: BoatKind, windKmh: number | null | undefined): boolean =>
-  WAKE_ALWAYS.includes(kind) || (WAKE_IN_STRONG_WIND.includes(kind) && (windKmh ?? 0) > STRONG_WIND_KMH);
+  WAKE_ALWAYS.includes(kind) || (kind === 'sailboat' && (windKmh ?? 0) > STRONG_WIND_KMH);
 
 // The light on the boats (ROADMAP item 73, B3): 'sun' when the sky is warm (dawn and
 // evening, the sails catch the peach light), dim in civil twilight, dark from nautical
