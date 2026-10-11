@@ -1639,6 +1639,7 @@ describe('the new boats (ROADMAP item 146)', () => {
       vi.useRealTimers();
     }
   });
+});
 
 // ROADMAP item 144 (Whale lookbook D, E, G, I): the sperm whale's calf, rise and night glow.
 describe('the sperm whale (ROADMAP item 144)', () => {
