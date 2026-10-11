@@ -38,8 +38,12 @@ export type StateBase = 'sun' | 'moon' | 'terrain' | 'plane' | 'satellite';
 export type BadgeGroup = 'fish' | 'flyer' | 'boat' | 'sky' | 'cloud' | 'egg';
 export type BadgeId =
   | `fish:${FishKind}` | `flyer:${BirdKind | 'bat'}` | `boat:${BoatKind}` | 'plane' | `cloud:${CloudType}`
-  | 'sun' | 'moon' | 'terrain' | 'satellite' | 'rainbow' | `egg:${EggKind}`
+  | 'rainbow' | `egg:${EggKind}`
   | `sun:${SunState}` | `moon:${MoonState}` | `terrain:${TerrainBand}` | `plane:${PlaneHaul}` | `satellite:${SatelliteSize}`;
+// Item 138: the old base badges of the sun, the moon, the terrain and the satellite. They are not
+// in BADGES, so they do not show and do not count. An old save keeps them in storage.
+export type RetiredBadgeId = 'sun' | 'moon' | 'terrain' | 'satellite';
+const RETIRED_IDS = new Set<string>(['sun', 'moon', 'terrain', 'satellite'] satisfies RetiredBadgeId[]);
 export interface Badge {
   id: BadgeId;
   group: BadgeGroup;
@@ -50,8 +54,8 @@ export interface Badge {
   base?: StateBase;
 }
 
-// The first-seen time (ISO) of each badge found.
-export type Collection = Partial<Record<BadgeId, string>>;
+// The first-seen time (ISO) of each badge found (and of each retired badge of an old save, item 138).
+export type Collection = Partial<Record<BadgeId | RetiredBadgeId, string>>;
 export const COLLECTION_STORAGE_KEY = 'collection';
 
 // Literal keys, so tests/i18n.test.ts finds them in src/.
@@ -136,14 +140,11 @@ export const BADGES: readonly Badge[] = [
   { id: 'rainbow', group: 'sky', name: 'scene.rainbow', rarity: RARITY_NAMES[RAINBOW_TIER] }, // item 121
   { id: 'plane', group: 'sky', name: 'plane.airliner', rarity: null },
   ...PLANE_HAULS.map(([haul, name]): Badge => ({ id: `plane:${haul}`, group: 'sky', name, rarity: RARITY_NAMES[HAUL_TIERS[haul]], base: 'plane' })),
-  { id: 'satellite', group: 'sky', name: 'scene.satellite', rarity: null },
+  // Item 115: the states, one grid row each. Item 138: the satellite, the sun, the moon and the
+  // terrain have no base badge, only their states.
   ...SATELLITE_SIZES.map(([size, name]): Badge => ({ id: `satellite:${size}`, group: 'sky', name, rarity: RARITY_NAMES[SATELLITE_TIERS[size]], base: 'satellite' })),
-  // Item 115: each base badge, then its states (one grid row each).
-  { id: 'sun', group: 'sky', name: 'scene.sun', rarity: null },
   ...SUN_STATES.map(([state, name]): Badge => ({ id: `sun:${state}`, group: 'sky', name, rarity: null, base: 'sun' })),
-  { id: 'moon', group: 'sky', name: 'scene.moon', rarity: null },
   ...MOON_STATES.map(([state, name]): Badge => ({ id: `moon:${state}`, group: 'sky', name, rarity: null, base: 'moon' })),
-  { id: 'terrain', group: 'sky', name: 'scene.terrain', rarity: null },
   ...TERRAIN_BANDS.map(([band, name]): Badge => ({ id: `terrain:${band}`, group: 'sky', name, rarity: RARITY_NAMES[TERRAIN_TIERS[band]], base: 'terrain' })),
   ...CLOUDS.map(([type, name]): Badge => ({ id: `cloud:${type}`, group: 'cloud', name, rarity: RARITY_NAMES[CLOUD_TIERS[type]] })),
   ...EGGS.map(([kind, name]): Badge => ({ id: `egg:${kind}`, group: 'egg', name, rarity: 'rarity.ultraRare' })),
@@ -161,7 +162,7 @@ export const loadCollection = (): Collection => {
     const parsed: unknown = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
     return Object.fromEntries(
-      Object.entries(parsed).filter(([id, seen]) => IDS.has(id) && typeof seen === 'string'),
+      Object.entries(parsed).filter(([id, seen]) => (IDS.has(id) || RETIRED_IDS.has(id)) && typeof seen === 'string'),
     ) as Collection;
   } catch (error) {
     console.error('Error reading collection:', error);
@@ -181,8 +182,10 @@ export const saveCollection = (collection: Collection): void => {
 export const addToCollection = (collection: Collection, id: BadgeId, now: Date): Collection | null =>
   collection[id] ? null : { ...collection, [id]: now.toISOString() };
 
-// The base badge of a thing. An egg card gives none here: item 123's eggBadgesForTarget has the
-// egg's badge, which counts only while the egg shows (the rules below and SunTracker).
+// The badge of a thing's kind. An egg card gives none here: item 123's eggBadgesForTarget has the
+// egg's badge, which counts only while the egg shows (the rules below and SunTracker). Item 138:
+// the sun, the moon, the terrain and the satellite give none here, only their state badge
+// (stateBadgeForTarget), so one tap gives one card.
 export const badgeForTarget = (target: SceneInfoTarget): BadgeId | null => {
   switch (target.type) {
     case 'fish': return `fish:${target.kind}`;
@@ -191,12 +194,13 @@ export const badgeForTarget = (target: SceneInfoTarget): BadgeId | null => {
     case 'plane':
     case 'livePlane': return 'plane';
     case 'cloud': return `cloud:${target.cloudType}`;
+    case 'rainbow': return 'rainbow';
+    // Item 138: the state badge only (stateBadgeForTarget). Item 123: an egg's badge comes from
+    // eggBadgesForTarget.
     case 'sun':
     case 'moon':
     case 'terrain':
     case 'satellite':
-    case 'rainbow': return target.type;
-    // Item 123: an egg's badge comes from eggBadgesForTarget.
     case 'egg': return null;
   }
 };
@@ -247,8 +251,9 @@ export interface StateBadgeContext {
   isTimePreview: boolean;
 }
 
-// Item 115: the state badge that a tap collects with the base badge, or null. The sun and
-// moon states depend on the time, so a time preview gives none; the ridge height does not.
+// Item 115: the state badge of a tap, or null. Item 138: it is the only badge of a sun, moon,
+// terrain or satellite tap, so no state (the sun in the twilights, a time preview) collects nothing.
+// The sun and moon states depend on the time, so a time preview gives none; the ridge height does not.
 export const stateBadgeForTarget = (target: SceneInfoTarget, ctx: StateBadgeContext): BadgeId | null => {
   switch (target.type) {
     case 'sun': {
@@ -349,5 +354,6 @@ export const isCollectionPaused = (search: string): boolean => {
   return params.has('egg') || params.has('fish') || params.has('hunt') || params.has('country');
 };
 
+// Only the badges in BADGES count: an old save's retired ids (item 138) do not.
 export const countCollected = (collection: Collection): number =>
   Object.keys(collection).filter(id => IDS.has(id)).length;

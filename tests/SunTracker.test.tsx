@@ -1021,7 +1021,7 @@ describe('SunTracker', () => {
       advance(600);
       doubleTap(sun);
       expect(screen.getByRole('dialog', { name: 'Sun' })).toBeInTheDocument();
-      expect(JSON.parse(localStorage.getItem('collection')!)).toHaveProperty('sun');
+      expect(Object.keys(JSON.parse(localStorage.getItem('collection')!))).toEqual(['sun:midday']); // item 138: no base badge
     });
 
     it('a keyboard click on the sun (Enter, Space) opens its card at once (item 116)', () => {
@@ -1138,7 +1138,7 @@ describe('SunTracker', () => {
       expect(unlocked()).toBeNull();
     });
 
-    it('a sun tap at midday collects "sun" and "sun:midday" (item 115)', () => {
+    it('a sun tap at midday collects only "sun:midday", with one card (items 115, 138)', () => {
       vi.useFakeTimers();
       try {
         vi.setSystemTime(new Date('2026-09-30T11:00:00Z')); // 13:00 in Ravensburg: midday
@@ -1147,12 +1147,59 @@ describe('SunTracker', () => {
         act(() => {
           visProps.current!.onSceneInfo!({ type: 'sun' }, { x: 200, y: 200 }, 'sun');
         });
-        expect(Object.keys(JSON.parse(localStorage.getItem('collection')!))).toEqual(['sun', 'sun:midday']);
-        // Item 114: the two badges show one after the other.
+        expect(Object.keys(JSON.parse(localStorage.getItem('collection')!))).toEqual(['sun:midday']);
         expect(screen.getAllByTestId('badge-unlocked')).toHaveLength(1);
-        expect(unlocked()).toHaveTextContent('Badge unlocked: Sun');
-        closeCard();
         expect(unlocked()).toHaveTextContent('Badge unlocked: Midday sun');
+        expect(unlocked()).toHaveTextContent(`1 / ${BADGES.length}`);
+        closeCard();
+        expect(unlocked()).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('a moon, terrain or satellite tap collects only its state badge (item 138)', () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date('2026-09-30T11:00:00Z'));
+        render(<SunTracker />);
+        expect(visProps.current).not.toBeNull();
+        act(() => {
+          visProps.current!.onSceneInfo!({ type: 'moon' }, { x: 200, y: 200 }, 'moon');
+        });
+        act(() => {
+          visProps.current!.onSceneInfo!({ type: 'satellite', id: 25544, name: 'ISS (ZARYA)' }, { x: 200, y: 200 }, 'sat');
+        });
+        // No ridge data in this test: the terrain tap has no band, so it collects nothing.
+        act(() => {
+          visProps.current!.onSceneInfo!({ type: 'terrain', azimuth: 90 }, { x: 200, y: 500 }, 'terrain');
+        });
+        const ids = Object.keys(JSON.parse(localStorage.getItem('collection')!));
+        expect(ids).toHaveLength(2);
+        expect(ids[0]).toMatch(/^moon:/);
+        expect(ids[1]).toBe('satellite:iss');
+        expect(unlocked()).toHaveTextContent(`1 / ${BADGES.length}`);
+        closeCard();
+        expect(unlocked()).toHaveTextContent('Badge unlocked: International Space Station');
+        expect(unlocked()).toHaveTextContent(`2 / ${BADGES.length}`);
+        closeCard();
+        expect(unlocked()).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('a sun tap in the twilight collects nothing (item 138)', () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date('2026-09-30T17:35:00Z')); // 19:35 in Ravensburg: after sunset, in the twilight
+        render(<SunTracker />);
+        expect(visProps.current).not.toBeNull();
+        act(() => {
+          visProps.current!.onSceneInfo!({ type: 'sun' }, { x: 200, y: 200 }, 'sun');
+        });
+        expect(localStorage.getItem('collection')).toBeNull();
+        expect(unlocked()).toBeNull();
       } finally {
         vi.useRealTimers();
       }
