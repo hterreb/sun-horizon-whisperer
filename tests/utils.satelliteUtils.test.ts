@@ -316,10 +316,13 @@ describe('decorative dots (free part)', () => {
     expect(getDotGapMs(midnight, -40, times)).toEqual([SPAWN_GAP_MS[0] * NIGHT_GAP_FACTOR, SPAWN_GAP_MS[1] * NIGHT_GAP_FACTOR]);
   });
 
-  it('show in a clear or partly cloudy sky only', () => {
+  it('show in a dry sky, not in rain or fog (item 135)', () => {
     expect(isSatelliteWeather('clear')).toBe(true);
     expect(isSatelliteWeather('partly')).toBe(true);
-    expect(isSatelliteWeather('cloudy')).toBe(false);
+    expect(isSatelliteWeather('cloudy')).toBe(true);
+    expect(isSatelliteWeather('overcast')).toBe(true);
+    expect(isSatelliteWeather('rain')).toBe(false);
+    expect(isSatelliteWeather('fog')).toBe(false);
   });
 
   it('cross in a straight line at 0.6-1.8 % of the width per second (item 131)', () => {

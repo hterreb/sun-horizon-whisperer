@@ -41,8 +41,9 @@ export const DOT_SPEED: [number, number] = [0.6, 1.8];
 // The share of dots that fade out in the middle of the sky (into the Earth's shadow).
 export const FADE_SHARE = 1 / 3;
 
-// Only a clear or partly cloudy sky shows the dots.
-export const isSatelliteWeather = (type: WeatherType): boolean => type === 'clear' || type === 'partly';
+// A dry sky shows the dots; clouds hide a share of them by the cover (item 135, as the stars).
+export const isSatelliteWeather = (type: WeatherType): boolean =>
+  type === 'clear' || type === 'partly' || type === 'cloudy' || type === 'overcast';
 
 // The gap range between two decorative dots at `now`, or null when no dot comes: the sun
 // is above -6°. Short in the 2 h after dusk (civil twilight end) and before dawn, else

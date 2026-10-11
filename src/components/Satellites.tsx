@@ -6,6 +6,7 @@ import { useDoubleTap } from '@/hooks/useDoubleTap';
 import { getSpawnGapFactor, type PlayDirection } from '@/utils/timeTravel';
 import { getSatelliteDotPx, getSatelliteGlowPx, makeDotPath, type DotPath } from '@/utils/satelliteUtils';
 import { type SceneInfoHandler } from './CloudLayer';
+import { getStarGapShow } from '@/utils/weatherEffectsUtils';
 
 // Satellites (ROADMAP item 97), behind everything else in the scene. Free: decorative white
 // dots that cross the night sky in a straight line (Web Animations, so the compositor moves
@@ -53,7 +54,11 @@ const SHADOW_FADE_MS = 8000;
 interface Decor {
   id: number;
   path: DotPath;
+  gap: number; // item 135: the cloud factor below which clouds hide this dot (as the stars, item 134)
 }
+
+// A tracked satellite's gap from its id, so the same satellite stays behind its cloud or in its gap.
+const trackedGap = (id: number): number => (id * 0.6180339887) % 1;
 
 const DecorDot: React.FC<{ decor: Decor; width: number; height: number; onDone: (id: number) => void }> = ({ decor, width, height, onDone }) => {
   const ref = useRef<HTMLSpanElement>(null);
@@ -89,6 +94,10 @@ const Satellites: React.FC<SatellitesProps> = ({
   const { tap } = useDoubleTap(onInfo);
   const containerRef = useRef<HTMLDivElement>(null);
   const [decors, setDecors] = useState<Decor[]>([]);
+  const cloudFactorRef = useRef(cloudFactor);
+  useEffect(() => {
+    cloudFactorRef.current = cloudFactor;
+  }, [cloudFactor]);
   const nextId = useRef(0);
   useScenePlaybackRate(containerRef, playDirection);
 
@@ -105,7 +114,9 @@ const Satellites: React.FC<SatellitesProps> = ({
     const spawn = () => {
       nextId.current += 1;
       const path = makeDotPath([Math.random(), Math.random(), Math.random(), Math.random(), Math.random()]);
-      setDecors((list) => [...list, { id: nextId.current, path }]);
+      const dotGap = Math.random();
+      // A dot behind the clouds does not come; the next one may cross a gap.
+      if (getStarGapShow(cloudFactorRef.current, dotGap) > 0) setDecors((list) => [...list, { id: nextId.current, path, gap: dotGap }]);
       gap = gapMin + Math.random() * (gapMax - gapMin);
       timer = setTimeout(spawn, gap * gapFactor);
     };
@@ -127,15 +138,16 @@ const Satellites: React.FC<SatellitesProps> = ({
     <div
       ref={containerRef}
       aria-hidden={tracked ? undefined : true}
-      className="absolute inset-0 pointer-events-none overflow-hidden transition-opacity duration-2000"
-      style={{ opacity: cloudFactor }}
+      className="absolute inset-0 pointer-events-none overflow-hidden"
       data-testid="satellites"
     >
       {decors.length > 0 && (
         // The sun's altitude comes in 30 s steps: a 1 min transition fades the dots smoothly.
         <div className="absolute inset-0" style={{ opacity: twilight, transition: `opacity ${TWILIGHT_TRANSITION_MS}ms linear` }} data-testid="satellite-decor-layer">
           {decors.map((decor) => (
-            <DecorDot key={decor.id} decor={decor} width={width} height={height} onDone={removeDecor} />
+            <div key={decor.id} className="absolute inset-0 transition-opacity duration-2000" style={{ opacity: getStarGapShow(cloudFactor, decor.gap) }}>
+              <DecorDot decor={decor} width={width} height={height} onDone={removeDecor} />
+            </div>
           ))}
         </div>
       )}
@@ -143,23 +155,26 @@ const Satellites: React.FC<SatellitesProps> = ({
         const ring = `satellite-${dot.id}`;
         const size = getSatelliteDotPx(dot.magnitude);
         const glow = getSatelliteGlowPx(dot.magnitude);
+        // Item 135: clouds hide some satellites; the others shine at full strength in the gaps.
+        const shown = dot.shown && getStarGapShow(cloudFactor, trackedGap(dot.id)) > 0;
+        const opacity = dot.opacity * getStarGapShow(cloudFactor, trackedGap(dot.id));
         return (
           <button
             key={dot.id}
             type="button"
             aria-label={dot.name}
-            tabIndex={dot.shown ? 0 : -1}
+            tabIndex={shown ? 0 : -1}
             onClick={(event) => {
               const box = event.currentTarget.getBoundingClientRect();
               tap({ type: 'satellite', id: dot.id, name: dot.name }, { x: box.left + box.width / 2, y: box.top + box.height / 2 }, ring, event.detail === 0);
             }}
             data-scene-hit
-            className={`absolute left-0 top-0 flex items-center justify-center rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 touch-manipulation ${dot.shown ? 'pointer-events-auto' : ''}`}
+            className={`absolute left-0 top-0 flex items-center justify-center rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 touch-manipulation ${shown ? 'pointer-events-auto' : ''}`}
             style={{
               width: HIT_PX,
               height: HIT_PX,
               transform: `translate(${dot.x - HIT_PX / 2}px, ${dot.y - HIT_PX / 2}px)`,
-              opacity: dot.shown ? dot.opacity : 0,
+              opacity: shown ? opacity : 0,
               transition,
             }}
             title={t('scene.satellite')}
