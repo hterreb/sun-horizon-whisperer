@@ -36,7 +36,7 @@ import {
 import {
   getWeatherEffects, pickBoat, hasBoatWake, getBoatTone, type BoatKind,
   pickFish, canSpawnFish, getRestStopMotion, type FishKind,
-  pickNightFish, pickMoonlitDayFish, isNightWater, MAX_FISH, MAX_NIGHT_FISH, getWaterSpeedFactor, getSceneLimit, getFishOverride,
+  pickNightFish, pickMoonlitDayFish, isNightWater, MAX_FISH, MAX_NIGHT_FISH, getWaterSpeedFactor, getSceneLimit, getFishOverride, getBoatOverride,
   pickBird, isBirdInSeason, MAX_BIRDS, type BirdKind,
 } from '../utils/weatherEffectsUtils';
 import { getSeaWindKmh, getBoatReflection } from '../utils/waveUtils';
@@ -185,6 +185,11 @@ const BOATS: Record<BoatKind, { scale: number; speed: number }> = {
   fishing: { scale: 1, speed: 1.5 },
   rowboat: { scale: 1, speed: 0.9 },
   freighter: { scale: 1.4, speed: 1.3 },
+  // Item 146: the new boats keep to the old speed range (0.7 below the rowboat, 1.4 below the ferry).
+  kayak: { scale: 0.8, speed: 0.7 },
+  paddleSteamer: { scale: 1.3, speed: 1 },
+  cruiseLiner: { scale: 1.6, speed: 1.4 },
+  tallShip: { scale: 1.5, speed: 1.1 },
 };
 const FAR_SHRINK = 0.45; // the farthest boat is 55% of the size, opacity and speed of the nearest
 // A fish's lane height spans 26 % of the scene from the farthest (depth 1) to the nearest (0).
@@ -498,6 +503,7 @@ export interface SpawnRules {
   gapFactor: number; // 1/8 during time-travel play (item 83)
   rewind: boolean; // item 83: a new spawn starts at its end and swims back
   fishOverride: FishKind | null; // `?fish=` (item 85)
+  boatOverride?: BoatKind[] | null; // `?boat=` (item 146)
   density: number; // busy and quiet phases (item 93, S3): scales the limits and the chances, 0.3-1
   view: { width: number; height: number }; // the scene in px
   poolX?: number | null; // the moon's x in % while its pool shows: a night hunt meets there (item 94)
@@ -862,7 +868,9 @@ export const spawnTick = (
       // More boats far out (item 71): the square root makes 44 % of them sail in the
       // farthest quarter, small and pale near the horizon, and fewer big ones mid-water.
       const depth = Math.sqrt(random());
-      const kind = pickBoat(weatherType, windSpeedKmh, random());
+      const r = random();
+      const kind = rules.boatOverride?.[Math.floor(r * rules.boatOverride.length)] ??
+        pickBoat(weatherType, windSpeedKmh, r, { sunDown: isSunDown, month, latitude });
       const newShip: Boat = {
         id: Date.now() + Math.random(),
         x: startX,
@@ -1080,6 +1088,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   const [huntOverride] = useState(() => getHuntOverride(window.location.search));
   // Test override (item 96): `?plane=persistent` makes a plane every 20 s with that contrail.
   const [planeOverride] = useState(() => getPlaneOverride(window.location.search));
+  // Test override (item 146): `?boat=kayak,sailboat` sends only those boats.
+  const [boatOverride] = useState(() => getBoatOverride(window.location.search));
   // The contrail from the forecast (item 96). In a ref, as the density: a new forecast hour
   // does not restart the spawn loop.
   const contrailRef = useRef(contrail);
@@ -1161,7 +1171,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     // Reduced motion: skip spawning birds, fish, ships and leaves entirely (static sky).
     if (prefersReducedMotion) return;
     const rules: Omit<SpawnRules, 'view' | 'density' | 'poolX' | 'contrail' | 'livePlanes'> = {
-      weatherType, timeOfDay, windSpeedKmh, isFullscreen, moonUp, moonY, month, latitude, gapFactor, fishOverride, huntOverride, planeOverride,
+      weatherType, timeOfDay, windSpeedKmh, isFullscreen, moonUp, moonY, month, latitude, gapFactor, fishOverride, huntOverride, planeOverride, boatOverride,
       birdSpeedFactor: effects.birdSpeedFactor,
       showLeaves: effects.showLeaves,
       rewind: playDirection < 0,
@@ -1182,7 +1192,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     return () => {
       clearInterval(intervalId);
     };
-  }, [weatherType, windSpeedKmh, timeOfDay, prefersReducedMotion, isFullscreen, effects.showLeaves, effects.birdSpeedFactor, moonUp, month, latitude, moonY, gapFactor, playDirection, fishOverride, huntOverride, planeOverride, updateEntities]);
+  }, [weatherType, windSpeedKmh, timeOfDay, prefersReducedMotion, isFullscreen, effects.showLeaves, effects.birdSpeedFactor, moonUp, month, latitude, moonY, gapFactor, playDirection, fishOverride, huntOverride, planeOverride, boatOverride, updateEntities]);
 
   // The shark hunts (item 94): a timeout per planned hunt, and per fish that dives under a boat,
   // gives the prey its hunt (CSS animations in renderFish) and puts the ripple and the bubbles

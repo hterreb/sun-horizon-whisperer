@@ -161,6 +161,10 @@ const BOATS: Record<BoatKind, { name: MessageKey; fact: MessageKey }> = {
   fishing: { name: 'boat.fishing', fact: 'boatFact.fishing' },
   rowboat: { name: 'boat.rowboat', fact: 'boatFact.rowboat' },
   freighter: { name: 'boat.freighter', fact: 'boatFact.freighter' },
+  kayak: { name: 'boat.kayak', fact: 'boatFact.kayak' }, // item 146
+  paddleSteamer: { name: 'boat.paddleSteamer', fact: 'boatFact.paddleSteamer' },
+  cruiseLiner: { name: 'boat.cruiseLiner', fact: 'boatFact.cruiseLiner' },
+  tallShip: { name: 'boat.tallShip', fact: 'boatFact.tallShip' },
 };
 
 // Item 96: the contrail that the plane leaves in the upper air of the forecast.

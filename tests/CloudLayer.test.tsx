@@ -1585,3 +1585,54 @@ describe('planes and contrails (ROADMAP item 96)', () => {
     expect(onInfo).toHaveBeenCalledWith({ type: 'plane', contrail: 'short' }, { x: 50, y: 80 }, expect.stringMatching(/^plane-/));
   });
 });
+
+// ROADMAP item 146: the new boats follow the time and season rules; `?boat=` forces them.
+describe('the new boats (ROADMAP item 146)', () => {
+  const phone = { width: 390, height: 844 };
+  const rules = (extra: Partial<SpawnRules> = {}): SpawnRules => ({
+    weatherType: 'clear', timeOfDay: 'midday', windSpeedKmh: 10, birdSpeedFactor: 1, showLeaves: false,
+    isFullscreen: false, moonUp: false, moonY: null, month: 7, latitude: 47.8, gapFactor: 1, rewind: false,
+    fishOverride: null, density: 1, view: phone, ...extra,
+  });
+  // Only the boats: the warm start fills the lake at load, the other groups wait.
+  const kindsAtLoad = (extra: Partial<SpawnRules>, seeds = 200) => {
+    const kinds: string[] = [];
+    for (let seed = 1; seed <= seeds; seed++) {
+      const last: SpawnTimes = { birds: 1e12, fish: 1e12, ships: 0, leaves: 1e12, planes: 1e12, shown: { birds: true, fish: true, ships: false } };
+      const scene = spawnTick({ birds: [], fish: [], ships: [], leaves: [], planes: [] }, last, rules(extra), 1000, 1, mulberry32(seed));
+      kinds.push(...scene.ships.map(s => s.kind));
+    }
+    return kinds;
+  };
+
+  it('sends the kayak by day only, and the paddle steamer in its season', () => {
+    expect(kindsAtLoad({})).toContain('kayak');
+    expect(kindsAtLoad({})).toContain('paddleSteamer');
+    expect(kindsAtLoad({ timeOfDay: 'night' })).not.toContain('kayak');
+    expect(kindsAtLoad({ timeOfDay: 'night' })).toContain('paddleSteamer');
+    expect(kindsAtLoad({ month: 12 })).not.toContain('paddleSteamer');
+    expect(kindsAtLoad({ windSpeedKmh: 25 })).not.toContain('kayak');
+  });
+
+  it('sends only the ?boat= kinds, also at night (the override skips the rules)', () => {
+    expect(new Set(kindsAtLoad({ timeOfDay: 'night', boatOverride: ['kayak'] }, 20))).toEqual(new Set(['kayak']));
+    expect(new Set(kindsAtLoad({ boatOverride: ['tallShip', 'sailboat'] }, 20))).toEqual(new Set(['tallShip', 'sailboat']));
+  });
+
+  it('reads ?boat= from the address', () => {
+    vi.useFakeTimers();
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
+    window.history.pushState({}, '', '/?boat=cruiseLiner');
+    try {
+      const { container } = render(<CloudLayer warmStart={false} weatherType="clear" timeOfDay="midday" />);
+      act(() => { vi.advanceTimersByTime(6000); });
+      const boats = [...container.querySelectorAll('[data-testid="scene-boat"]')];
+      expect(boats.length).toBeGreaterThan(0);
+      for (const boat of boats) expect(boat.getAttribute('data-kind')).toBe('cruiseLiner');
+    } finally {
+      window.history.pushState({}, '', '/');
+      randomSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+});

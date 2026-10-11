@@ -21,13 +21,13 @@ describe('collection (ROADMAP item 112)', () => {
     vi.restoreAllMocks();
   });
 
-  it('has 129 badges with unique ids, one for every fish, flyer, boat and cloud type', () => {
+  it('has 133 badges with unique ids, one for every fish, flyer, boat and cloud type', () => {
     const ids = BADGES.map(b => b.id);
-    expect(ids).toHaveLength(129); // item 115: 69 + 5 sun + 5 terrain + 8 moon states; + 5 sky eggs + 9 national days + 5 playful eggs + 12 festivals; item 120: + 5 hauls + 5 sizes; item 121: + rainbow
-    expect(new Set(ids).size).toBe(129);
+    expect(ids).toHaveLength(133); // item 115: 69 + 5 sun + 5 terrain + 8 moon states; + 5 sky eggs + 9 national days + 5 playful eggs + 12 festivals; item 120: + 5 hauls + 5 sizes; item 121: + rainbow; item 146: + 4 boats
+    expect(new Set(ids).size).toBe(133);
     for (const kind of [...FISH_WEIGHTS.map(([k]) => k), ...NIGHT_ONLY]) expect(ids).toContain(`fish:${kind}`);
     for (const kind of [...BIRD_WEIGHTS.map(([k]) => k), 'bat']) expect(ids).toContain(`flyer:${kind}`);
-    for (const kind of ['sailboat', 'ferry', 'fishing', 'rowboat', 'freighter']) expect(ids).toContain(`boat:${kind}`);
+    for (const kind of ['sailboat', 'ferry', 'fishing', 'rowboat', 'freighter', 'kayak', 'paddleSteamer', 'cruiseLiner', 'tallShip']) expect(ids).toContain(`boat:${kind}`);
     for (const type of ['Ci', 'Cs', 'Ac', 'As', 'Cu', 'Sc', 'St', 'Ns', 'Cb', 'Len', 'Mam']) expect(ids).toContain(`cloud:${type}`);
     expect(BADGES.filter(b => b.group === 'egg')).toHaveLength(50);
     expect(BADGES.find(b => b.id === 'plane')?.group).toBe('sky');
@@ -39,6 +39,12 @@ describe('collection (ROADMAP item 112)', () => {
     expect(tier('fish:squid')).toBe('rarity.uncommon'); // night only: the night share
     expect(tier('flyer:bat')).toBe('rarity.frequent'); // item 113: 10-25 % is frequent
     expect(tier('boat:sailboat')).toBe('rarity.common');
+    // Item 146: the new boats fill the empty tiers.
+    expect(tier('boat:freighter')).toBe('rarity.uncommon');
+    expect(tier('boat:kayak')).toBe('rarity.uncommon');
+    expect(tier('boat:paddleSteamer')).toBe('rarity.rare');
+    expect(tier('boat:cruiseLiner')).toBe('rarity.rare');
+    expect(tier('boat:tallShip')).toBe('rarity.veryRare');
     expect(tier('cloud:Cu')).toBe('rarity.common');
     expect(tier('cloud:Cb')).toBe('rarity.rare');
     expect(tier('cloud:Mam')).toBe('rarity.veryRare');
@@ -137,6 +143,7 @@ describe('collection (ROADMAP item 112)', () => {
     expect(isCollectionPaused('?fish=shark')).toBe(true);
     expect(isCollectionPaused('?hunt=1')).toBe(true);
     expect(isCollectionPaused('?country=FR')).toBe(true);
+    expect(isCollectionPaused('?boat=kayak')).toBe(true); // item 146
     expect(isCollectionPaused('?egg=bastilleDay')).toBe(true);
     expect(isCollectionPaused('')).toBe(false);
     expect(isCollectionPaused('?lang=de')).toBe(false);

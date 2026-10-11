@@ -11,6 +11,11 @@ const LINES: Record<BoatKind, [number, number][]> = {
   fishing: [[10.5, 13.2], [38, 5], [57.5, 22.8]],
   rowboat: [[19, 25.6], [46.5, 30.4]],
   freighter: [[14.6, 5.5], [59.4, 19.5]],
+  // Item 146. The kayak has no mast: its line runs over the raised paddle blade.
+  kayak: [[9.5, 31.8], [19.8, 22.5], [56.5, 31]],
+  paddleSteamer: [[4.5, 19.5], [23.5, 5], [53, 10], [62, 28]],
+  cruiseLiner: [[2.5, 24], [21.2, 5], [41, 5], [62.5, 24]],
+  tallShip: [[4, 26], [18, 7.5], [32, 3], [46, 5], [63.5, 20.5]],
 };
 const GAP = 7.5; // grid units between two pennants
 const BULB_GAP = 3.6; // Christmas bulbs sit closer: a string of lights, not flags

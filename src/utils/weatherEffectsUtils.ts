@@ -68,19 +68,38 @@ export const canFlashLightning = (lastFlashAtMs: number | null, nowMs: number): 
   lastFlashAtMs === null || nowMs - lastFlashAtMs >= LIGHTNING_MIN_GAP_MS;
 
 // Boat mix (ROADMAP item 36): which boat sails out next, weighted. Sailboats are the
-// most common. Wet, foggy or stormy weather leaves only the big boats (ferry, freighter),
-// and strong wind keeps the rowboat ashore. Hail (no boats at all) stays in CloudLayer's
-// shouldShowShips.
-export type BoatKind = 'sailboat' | 'ferry' | 'fishing' | 'rowboat' | 'freighter';
+// most common. Wet, foggy or stormy weather leaves only the big boats (ferry, freighter,
+// cruise liner), and strong wind keeps the rowboat ashore. Hail (no boats at all) stays in
+// CloudLayer's shouldShowShips.
+// Item 146: four boats for the empty tiers (RARITY_TIERS in sceneInfo, by getBoatShare): the
+// kayak uncommon, the paddle steamer and the cruise liner rare, the tall ship very rare.
+export type BoatKind = 'sailboat' | 'ferry' | 'fishing' | 'rowboat' | 'freighter'
+  | 'kayak' | 'paddleSteamer' | 'cruiseLiner' | 'tallShip';
 
+// Sum 88. Shares: sailboat 39.8 %; ferry, fishing 17.0 %, rowboat 11.4 %; freighter 5.7 %,
+// kayak 4.5 %; paddle steamer 2.3 %, cruise liner 1.7 %; tall ship 0.6 %.
 const BOAT_WEIGHTS: [BoatKind, number][] = [
   ['sailboat', 35],
   ['ferry', 15],
   ['fishing', 15],
   ['rowboat', 10],
   ['freighter', 5],
+  ['kayak', 4],
+  ['paddleSteamer', 2],
+  ['cruiseLiner', 1.5],
+  ['tallShip', 0.5],
 ];
-const BIG_BOATS: BoatKind[] = ['ferry', 'freighter'];
+const BIG_BOATS: BoatKind[] = ['ferry', 'freighter', 'cruiseLiner'];
+// Item 146: the kayak stays ashore above 20 km/h wind; the tall ship above 40 km/h, as the rowboat.
+const KAYAK_MAX_WIND_KMH = 20;
+const STRONG_WIND_ASHORE: BoatKind[] = ['rowboat', 'tallShip'];
+// Item 146: the paddle steamers sail May to October (the Lake Constance season). South of the
+// equator the season shifts by half a year, as the birds' (seasonMonth).
+const PADDLE_STEAMER_MONTHS = [5, 6, 7, 8, 9, 10];
+
+// The month (1 = January) as the season of the northern hemisphere: south of the equator the
+// seasons shift by half a year.
+const seasonMonth = (month: number, latitude: number): number => (latitude < 0 ? (month + 5) % 12 + 1 : month);
 
 // `r` is a random number in [0, 1), passed in so the pick stays pure and testable.
 const pickWeighted = <K>(mix: [K, number][], r: number): K => {
@@ -88,18 +107,36 @@ const pickWeighted = <K>(mix: [K, number][], r: number): K => {
   return (mix.find(([, weight]) => (left -= weight) < 0) ?? mix[mix.length - 1])[0];
 };
 
-export const pickBoat = (type: WeatherType, windKmh: number | null | undefined, r: number): BoatKind => {
+// When a boat sails out: the kayak only while the sun is up, the paddle steamer only in its season.
+export interface BoatTime { sunDown: boolean; month: number; latitude: number }
+
+export const pickBoat = (type: WeatherType, windKmh: number | null | undefined, r: number, time: BoatTime): BoatKind => {
   const fair = type === 'clear' || type === 'partly' || type === 'cloudy' || type === 'overcast';
-  const strongWind = (windKmh ?? 0) > STRONG_WIND_KMH;
-  return pickWeighted(BOAT_WEIGHTS.filter(([kind]) =>
-    (fair || BIG_BOATS.includes(kind)) && !(strongWind && kind === 'rowboat')), r);
+  const wind = windKmh ?? 0;
+  const strongWind = wind > STRONG_WIND_KMH;
+  const sails = (kind: BoatKind) =>
+    !(strongWind && STRONG_WIND_ASHORE.includes(kind)) &&
+    !(kind === 'kayak' && (time.sunDown || wind > KAYAK_MAX_WIND_KMH)) &&
+    !(kind === 'paddleSteamer' && !PADDLE_STEAMER_MONTHS.includes(seasonMonth(time.month, time.latitude)));
+  return pickWeighted(BOAT_WEIGHTS.filter(([kind]) => (fair || BIG_BOATS.includes(kind)) && sails(kind)), r);
+};
+
+// Test override (item 146): `?boat=<kind>` makes every boat that kind, like `?fish=`. With a list
+// (`?boat=kayak,sailboat`) each boat is one of those kinds by chance, to see a boat next to another.
+// The override skips the weather, wind, time and season rules of pickBoat.
+export const getBoatOverride = (search: string): BoatKind[] | null => {
+  const kinds = (new URLSearchParams(search).get('boat') ?? '').split(',')
+    .flatMap(k => BOAT_WEIGHTS.filter(([kind]) => kind === k.trim()).map(([kind]) => kind));
+  return kinds.length ? kinds : null;
 };
 
 // Wake (ROADMAP item 73, Fleet Styles X2): only a boat that moves fast trails one. The
-// ferry and the freighter always; the sailboat only in strong wind; the rowboat never.
-// The fishing boat has none.
+// ferry, the freighter, the cruise liner and the paddle steamer always; the sailboat and the
+// tall ship only in strong wind; the rowboat and the kayak never. The fishing boat has none.
+const WAKE_ALWAYS: BoatKind[] = [...BIG_BOATS, 'paddleSteamer'];
+const WAKE_IN_STRONG_WIND: BoatKind[] = ['sailboat', 'tallShip'];
 export const hasBoatWake = (kind: BoatKind, windKmh: number | null | undefined): boolean =>
-  BIG_BOATS.includes(kind) || (kind === 'sailboat' && (windKmh ?? 0) > STRONG_WIND_KMH);
+  WAKE_ALWAYS.includes(kind) || (WAKE_IN_STRONG_WIND.includes(kind) && (windKmh ?? 0) > STRONG_WIND_KMH);
 
 // The light on the boats (ROADMAP item 73, B3): 'sun' when the sky is warm (dawn and
 // evening, the sails catch the peach light), dim in civil twilight, dark from nautical
@@ -202,7 +239,7 @@ const BIRD_MONTHS: Partial<Record<BirdKind, number[]>> = {
 };
 
 export const isBirdInSeason = (kind: BirdKind, month: number, latitude: number): boolean =>
-  BIRD_MONTHS[kind]?.includes(latitude < 0 ? (month + 5) % 12 + 1 : month) ?? true;
+  BIRD_MONTHS[kind]?.includes(seasonMonth(month, latitude)) ?? true;
 
 // `evening` = the hour before sunset (C2), the only time the starling flocks come. The
 // gull flies all year, so the mix is never empty.

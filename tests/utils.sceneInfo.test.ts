@@ -77,8 +77,8 @@ describe('sceneInfo (ROADMAP item 95)', () => {
     expect(rarity({ type: 'bird', kind: 'bat' })).toBe('Rarity: Frequent · 22.8 %');
     expect(rarity({ type: 'bird', kind: 'bat' }, { language: 'de' }, de)).toBe('Seltenheit: Verbreitet · 22,8 %');
     expect(rarity({ type: 'bird', kind: 'stork' })).toBe('Rarity: Uncommon · 6.2 %');
-    expect(rarity({ type: 'boat', kind: 'freighter' })).toBe('Rarity: Uncommon · 6.3 %');
-    const boats: BoatKind[] = ['sailboat', 'ferry', 'fishing', 'rowboat', 'freighter'];
+    expect(rarity({ type: 'boat', kind: 'freighter' })).toBe('Rarity: Uncommon · 5.7 %'); // item 146: 5 of 88
+    const boats: BoatKind[] = ['sailboat', 'ferry', 'fishing', 'rowboat', 'freighter', 'kayak', 'paddleSteamer', 'cruiseLiner', 'tallShip'];
     for (const kind of boats) expect(rarity({ type: 'boat', kind }), kind).toMatch(/^Rarity: .+ · [\d.]+ %$/);
   });
 
@@ -127,9 +127,27 @@ describe('sceneInfo (ROADMAP item 95)', () => {
 
   it('gives a boat its type and one fact', () => {
     expect(card({ type: 'boat', kind: 'fishing' })).toEqual([
-      'Fishing boat', 'Gulls often follow fishing boats for scraps.', 'Rarity: Frequent · 18.8 %',
+      'Fishing boat', 'Gulls often follow fishing boats for scraps.', 'Rarity: Frequent · 17 %',
     ]);
     expect(card({ type: 'boat', kind: 'freighter' }, {}, de)[0]).toBe('Frachter');
+  });
+
+  it('gives the new boats their cards: name, fact and tier (item 146)', () => {
+    expect(card({ type: 'boat', kind: 'kayak' })).toEqual([
+      'Kayak', 'A kayak paddle has a blade at each end.', 'Rarity: Uncommon · 4.5 %',
+    ]);
+    expect(card({ type: 'boat', kind: 'paddleSteamer' })).toEqual([
+      'Paddle steamer', 'A paddle steamer turns a big wheel on each side.', 'Rarity: Rare · 2.3 %',
+    ]);
+    expect(card({ type: 'boat', kind: 'cruiseLiner' })).toEqual([
+      'Cruise liner', 'A big cruise liner has restaurants, pools and a theatre on board.', 'Rarity: Rare · 1.7 %',
+    ]);
+    expect(card({ type: 'boat', kind: 'tallShip' })).toEqual([
+      'Tall ship', 'A tall ship can carry more than 20 sails.', 'Rarity: Very rare · 0.6 %',
+    ]);
+    expect(card({ type: 'boat', kind: 'paddleSteamer' }, {}, de)[0]).toBe('Raddampfer');
+    expect(card({ type: 'boat', kind: 'tallShip' }, {}, de)[0]).toBe('Großsegler');
+    expect(getSceneInfo({ type: 'boat', kind: 'tallShip' }, ctx()).tier).toBe('veryRare');
   });
 
   it('gives a plane its type, one fact, the altitude band and its contrail (item 96)', () => {
