@@ -2596,6 +2596,224 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Built:** `Satellites` (no layer opacity; a gap per dot), `isSatelliteWeather`.
 - **Checked:** `Satellites` and `satelliteUtils` tests. Not checked: a real phone.
 
+### 136. A single tap on the empty sky hides or shows the controls — S — [SUN-CHASER-1B](https://ainabler.sentry.io/issues/SUN-CHASER-1B)
+
+- **Feedback (2026-10-11 15:31 CEST, Ravensburg):** "Single tap on empty screen should hide the controls. Single tap on where the controls are hidden should unhide the controls".
+- **Now:** `useIdleHide(isFullscreen)` (`src/hooks/useIdleHide.ts`, item 89) hides the controls only in browser fullscreen and only by a timer: 3 s after the user enters fullscreen (`ENTER_HIDE_MS`), 10 s after a wake (`WAKE_HIDE_MS`). In fullscreen, a `touchstart` on the document calls `wakeCursor` (`SunTracker`). A touch inside `[data-scene-hit]` does not wake (item 124), and a mouse `pointermove` wakes (item 133). So a tap on the empty sky can only show the controls, and no tap hides them. A hidden control takes no taps. After a wake, a control takes taps only after `TAP_READY_MS` (400 ms, item 132). Outside fullscreen nothing hides: `wake` returns at once and `isVisible` stays true. In the installed Play app (display-mode fullscreen) `isFullscreen` is false. iPhone Safari has no Fullscreen API. So in both, the controls never hide. The controls are `TopLeftButtons`, `InfoPanel`, `MusicPlayer` and the compass labels in `SunVisualization` (`showCursor`).
+- **Spec:**
+  1. `useIdleHide` gets `toggle()`. When the controls show, `toggle()` hides them at once (`isVisible` and `isTappable` false) and clears the timer. When they are hidden, it does the same as `wake()`: the controls show, take taps after `TAP_READY_MS` and hide after `WAKE_HIDE_MS`.
+  2. A tap is a `click` on the document (a swipe or a pinch fires no click). A tap toggles only when its target is the empty scene. It does not toggle when its target is inside `[data-scene-hit]`, `[data-share-hide]` (controls, info card, install prompt), `button`, `a`, `input` or `[role="dialog"]`.
+  3. A second sky tap within `DOUBLE_TAP_MS` after a toggle does nothing, so a double tap on the sky does not flicker. A double tap on a scene object never toggles (rule 2), so a single tap needs no 350 ms wait.
+  4. Remove the `touchstart` wake of item 124. The sky `click` shows the controls. The area of a hidden control is sky (`pointer-events-none`). The mouse `pointermove` wake stays.
+  5. A tap that closes an open info card (the outside `pointerdown` in `SceneInfoCard`) only closes the card. It does not toggle.
+  6. The toggle is active in browser fullscreen and in the installed app (`isFullscreen || isInstalledApp()`).
+- **Check:** `hooks.useIdleHide`: `toggle` hides at once with no taps, then shows, and the controls take taps after 400 ms. `SunTracker` fullscreen: a sky tap hides the controls; the next sky tap shows them; two sky taps 200 ms apart toggle once; a tap on a fish hit area or on a control does not toggle; a tap that closes a card does not toggle. Browser at 390 × 844 with touch emulation.
+- **Open:** (a) In the normal browser view: toggle too, or always show the controls? (b) Is the installed app in scope (rule 6)? (c) After a tap hides the controls, do they stay hidden until the next tap? After a tap shows them, does the 10 s idle timer still hide them? (d) Toggle at once (spec), or wait `DOUBLE_TAP_MS` first?
+- **Decision (Lutz, 2026-10-11):** Fullscreen and the installed app (rule 6). In the normal browser view the controls always show. A tap that hides the controls keeps them hidden until the next tap. A tap that shows them starts the 10 s idle timer (`WAKE_HIDE_MS`). The toggle acts at once (rule 3).
+
+### 137. Place name: a better name rule, no long empty cache, a status in Sentry — S — [SUN-CHASER-1C](https://ainabler.sentry.io/issues/SUN-CHASER-1C)
+
+- **Feedback (2026-10-11 15:37 CEST, Ravensburg):** "Why does city name not resolve?".
+- **Now:**
+  - `InfoPanel` calls `fetchPlace` (`src/utils/placeName.ts`, item 130). It calls `api.bigdatacloud.net/data/reverse-geocode-client` with the location rounded to 2 decimals. On a non-ok answer it tries once more after 2 s. When both calls fail and nothing is cached, the panel shows "Your location" (`location.unknown`). The failure goes only to `console.error`, so Sentry has no data. The feedback event has no linked error and no breadcrumbs.
+  - The CSP is correct: `connect-src` in `public/_headers` and `vercel.json` has `https://api.bigdatacloud.net` and `https://api-bdc.io`.
+  - A denied GPS is not the cause: it sets New York (`SunTracker`), and New York resolves.
+  - **Possible cause 1, IP ban:** BigDataCloud bans an IP that calls the `-client` endpoint from outside a browser. Seen on 2026-10-11 ~22:50 CEST (after the feedback): a `curl` from the spec research got HTTP 400 with body `status: 402 … this endpoint does not support server-side operations … your ip address … is now banned`. The ban covers all calls from that IP, also the browser's, and a retry cannot help. Not confirmed for the feedback at 15:37: an earlier headless run (lookbook shoots) from the same network could have caused a ban, but there is no proof.
+  - **Cause 2 (code):** `placeOf` gives `name: null` when `countryName` is empty, also when `city` or `locality` has a value.
+  - **Cause 3 (code):** `savePlace` also saves an answer with `name: null` and a country code. `loadPlace` returns it as fresh for 24 h, so the panel shows "Your location" with no new call for 24 h.
+  - Possible, not checked: a content blocker blocks `api.bigdatacloud.net`.
+- **Spec:**
+  1. Name rule: town = `city` → `locality` → `principalSubdivision`. The name is `"<town>, <country>"`, the town alone, or the country alone.
+  2. An answer without a town has a max age of 1 h in the cache, not 24 h.
+  3. `fetchOnce` throws a `PlaceError` with `httpStatus` and the body's `status` (for example 400/402).
+  4. Diagnostic: `InfoPanel` sets a Sentry tag `place` = `ok` | `country-only` | `cached` | `http-<status>[-<bodyStatus>]` | `network`, so a feedback event carries it. Once per session, when both calls fail, send `Sentry.captureMessage('place-name failed', 'warning')` with the same tag. Send no coordinates (`scrubLocation` stays).
+  5. Add a CLAUDE.md gotcha: never call `reverse-geocode-client` from curl, scripts or headless runs (the IP gets banned). Tests mock `fetch`. Lookbook shots use a cached `place-name` entry or stubs.
+- **Check:** `utils.placeName`: a city with no country; the `principalSubdivision` fallback; an answer without a town is stale after 1 h; `PlaceError` carries 400/402. `InfoPanel`: the tag value for each result; `captureMessage` only once per session.
+- **Open:** (a) Lutz: e-mail support@bigdatacloud.com to lift the ban for the home IPv6 network? (b) Add a second provider when BigDataCloud fails (Photon `photon.komoot.io/reverse` or Nominatim; each is a new CSP host and needs attribution)?
+- **Decision (Lutz, 2026-10-11):** Spec 1–5, plus a second provider: when both BigDataCloud calls fail, ask Photon (`https://photon.komoot.io/reverse`, OSM data). Add the host to the CSP (`public/_headers` and `vercel.json`). Show "© OpenStreetMap contributors" with a name that comes from Photon. Lutz e-mails BigDataCloud about the ban.
+
+### 138. Collection: completion and combo badges for sun, moon, terrain — M — [SUN-CHASER-1D](https://ainabler.sentry.io/issues/SUN-CHASER-1D)
+
+- **Feedback (2026-10-11 15:38 CEST, Ravensburg):** "No achievement just for sun moon terrain no double achievements".
+- **Now:**
+  - `BADGES` in `src/utils/collection.ts` has 129 badges (`tests/utils.collection.test.ts`).
+  - Sun: base `sun` + 5 `SUN_STATES` (dawn, morning, midday, afternoon, evening). At night and in the twilights the sun gives no state.
+  - Moon: base `moon` + 8 `MOON_STATES`.
+  - Terrain: base `terrain` + 5 `TERRAIN_BANDS`.
+  - One double tap collects 2 badges: `SunTracker.handleSceneInfo` collects `badgeForTarget` and then `stateBadgeForTarget`, so `BadgeUnlocked` shows 2 cards. The satellite does the same.
+  - There is no badge for a full row and no combo badge.
+- **Spec:**
+  1. Completion badges (group `sky`, the last cell of each row in `CollectionView`):
+     - `complete:sun` "Full day": all 5 sun states.
+     - `complete:moon` "Lunar cycle": all 8 phases.
+     - `complete:terrain` "Summit collector": all 5 bands.
+     - They are ultra rare. `collect(id)` checks the row after each state badge and shows the completion card after the state card.
+  2. Old saves: at start, add the completion badge without a card when its row is full already. Its first-seen date is the latest state date.
+  3. Combo badges (double tap, not in a time preview):
+     - `combo:sunMoon` "Sun and moon": tap the sun or the moon while both discs show.
+     - `combo:sunRidge` "Sun on the ridge": tap the sun while its altitude is 0–1° above `horizonAngleAt(profile, azimuth)`.
+     - `combo:moonRidge` "Moon on the ridge": the same for the moon.
+     - `StateBadgeContext` gets the sun and moon altitude, azimuth and shown flags.
+  4. Art: the row art with a gold ring (completion), and two small icons side by side (combo).
+  5. New keys `badge.completeSun`, `badge.completeMoon`, `badge.completeTerrain`, `badge.comboSunMoon`, `badge.comboSunRidge`, `badge.comboMoonRidge` in en/de/es/it/fr. Total 129 + 6 = 135 (more when item 140 or 146 is built first).
+- **Check:** `utils.collection`: 135 ids; completion only when all states are there; an old full save gets it at load; the combo rules at 0 / 1 / 1.1° above the ridge; none in a time preview. `SunTracker`: the 5th sun state shows 2 cards (state, then "Full day"). `CollectionView`: the completion cell at the end of the row. `tests/i18n.test.ts`.
+- **Open:** Which reading is correct? A: "there is no badge for a full sun/moon/terrain row, and no combos" (this spec). B: "no badge just for tapping the sun/moon/terrain; no two badges for one tap". B removes the base badges `sun`, `moon`, `terrain` (and `satellite`) from the grid and the count, and keeps them in storage, so one tap gives one card. B can ship with A.
+- **Decision (Lutz, 2026-10-11):** Reading B: one card per tap. Remove the base badges `sun`, `moon`, `terrain` and `satellite` from `BADGES`, the grid and the count. Old saves keep them in storage, but they do not show and do not count. A double tap collects only the state badge. When a target has no state at that time (the sun in twilight), the tap collects nothing. The completion and combo badges (spec 1–5) are not built.
+
+### 139. Dim the radio controls at night — S — [SUN-CHASER-1E](https://ainabler.sentry.io/issues/SUN-CHASER-1E)
+
+- **Feedback (2026-10-11 15:39 CEST, Ravensburg):** "Audio controls too bright at night".
+- **Now:** `MusicPlayer` (`src/components/MusicPlayer.tsx`) is a `GLASS_SURFACE` pill (`--panel-background` at 45 %, `src/utils/glassChrome.ts`). It contains a shadcn `Switch` and a shadcn `Slider` in their light-theme defaults (the app has no `.dark` class). Switch: white thumb (`bg-background`, `shadow-lg`), unchecked track `bg-input` (`214.3 31.8% 91.4%`, almost white), checked track `bg-primary` (dark navy). Slider: track `bg-secondary` (`210 40% 96.1%`, almost white), range `bg-primary`, a white 20 px thumb with `border-primary`. The icons are `text-white`, the station name and Next are `text-white/80`, and "rain off" is `text-white/50`. No control dims by time of day: `MusicPlayer` and `TopLeftButtons` get no `timeOfDay`. `InfoPanel` uses `timeOfDay` only to collapse sections. Its two `Switch`es (live planes, satellites) are as bright as the radio switch. `isDarkSky(timeOfDay)` (`src/utils/festivalEvents.ts`: night, astronomical and nautical twilight) exists.
+- **Spec:**
+  1. `SunTracker` passes `night={isDarkSky(timeOfDay)}` to `MusicPlayer`.
+  2. Night look, set from `MusicPlayer` through `className` (do not edit `src/components/ui/`). Switch root: `data-[state=unchecked]:bg-white/15 data-[state=checked]:bg-white/35`; thumb through `*:bg-white/60 *:shadow-none`. Slider root: `[&>span:first-child]:bg-white/15` (track), `[&_span_span]:bg-white/40` (range), `[&_[role=slider]]:bg-white/60 [&_[role=slider]]:border-transparent [&_[role=slider]]:h-4 [&_[role=slider]]:w-4`. Icons `text-white/60`, station name and Next `text-white/50`, "rain off" `text-white/35`.
+  3. The glass pill does not change. The focus ring stays `ring-white/70` (accessibility). Day and civil twilight keep the current look.
+  4. The look changes through `transition-colors`, so it does not jump at the twilight edge.
+- **Check:** `MusicPlayer.test.tsx`: with `night`, the switch root and the slider have the night classes and the icons have `text-white/60`; without `night`, there are no night classes. `SunTracker`: a night `timeOfDay` passes `night`. Screenshot at night, 390 × 844, radio on and off.
+- **Open:** (a) Use the dim look at all times (simpler, no prop)? (b) Use the same night tone for the `InfoPanel` switches and the `TopLeftButtons` icons? (c) Include civil twilight?
+- **Decision (Lutz, 2026-10-11):** Lutz: "only the two sliders in the audio controls are very bright". First take a screenshot of the player at night and find the two bright parts. Dim only these two (spec 2 for them), at night only (spec 1, 4). Do not change the icons, the text or the other controls.
+
+### 140. Midwinter: the longest night gets its own egg and badge — M — [SUN-CHASER-1F](https://ainabler.sentry.io/issues/SUN-CHASER-1F)
+
+- **Feedback (2026-10-11 15:51 CEST, Ravensburg):** "It's there a mid winter Easter egg same as mid summer when the sun is at the lowest points of the year?".
+- **Now:**
+  - The winter solstice is `solstice-shortest` (`getSeasonEvent` in `src/utils/calendarEvents.ts`). It applies all day, on the local day of the December solstice (north) or the June solstice (south).
+  - It shows the sun-path fan (`getSolsticeTraceDates`, `SunVisualization`) and the pill "Solstice · the shortest day of the year" (`egg.seasonShortest`, `CalendarEggs`, horizon + 90 px). A double tap opens the `solstice` card, which has no chance text.
+  - Its badge is `egg:solstice`, the same badge as the longest day (`badgeForCalendarEvent`). So the winter day gives nothing new.
+  - Midsummer (`festivalEvents.ts`, `isMidsummer`): the Friday of Jun 19–25 and the Saturday after it. 3 glowing bonfires (`BONFIRES` 18/52/83 %) on the far shore in the evening, the twilights and the night (`isLowSun`). They take taps and have their own card (`eggFact.midsummer`) and badge (`egg:midsummer`).
+  - `isMidsummer` has no latitude check, so the bonfires also show in June in the south, where it is midwinter.
+  - There is no midwinter, Yule, Yalda or Dongzhi code.
+- **Spec:**
+  1. On the `solstice-shortest` day, from civil twilight after sunset until 23:59: 3 small lanterns with a warm candle glow on the far shore at 12/47/78 % of the width (not on the bonfire places). They use `festival-glow`, 6–8 s alternate, and are static with reduced motion.
+  2. After sunset the pill text changes to "Solstice · the longest night of the year" (`egg.seasonLongestNight`).
+  3. Badges: `solstice-longest` keeps `egg:solstice`, renamed "Summer solstice". `solstice-shortest` gives the new `egg:midwinter` "Midwinter" all day (the pill shows all day). This is safe: the collection started on 2026-10-09, after the last solstice, so no save has `egg:solstice`.
+  4. Card `midwinter` (Special event, "1 day a year" from `getEventDaysPerYear`). The fact covers Yule, Yalda night and Dongzhi. A double tap on a lantern or on the pill opens it.
+  5. Midsummer only at latitude ≥ 0 (`getCalendarEvent` passes the latitude).
+  6. Add the test link `?egg=midwinter`. It pauses the collection.
+  7. Keys in en/de/es/it/fr. +1 badge.
+- **Check:** `utils.calendarEvents`: 2026-12-21 in Berlin gives `solstice-shortest`; Sydney 2027-06-21 too. `utils.collection`: shortest → `egg:midwinter`, longest → `egg:solstice`. `utils.festivalEvents`: no Midsummer at −33°. `CalendarEggs`: lanterns only after sunset; the pill text changes; a double tap opens the card; static with reduced motion. `tests/i18n.test.ts`.
+- **Open:** (a) Lanterns, a Yule log or a candle wreath? (b) Show it also on the evening before the solstice day (2 days, as Midsummer)?
+- **Decision (Lutz, 2026-10-11):** No lanterns. On the winter solstice day, show the sun-path lines as on the summer solstice and the equinoxes. First check in the built app (`?date=` on 2026-12-21) whether `getSolsticeTraceDates` draws them on `solstice-shortest` now; if not, fix it. Keep spec 2 (pill text after sunset), 3 (own badge `egg:midwinter`), 4 (card, opened from the pill), 5 (Midsummer only north), 6 and 7. Solstice day only.
+
+### 141. Terrain: tree silhouettes below the treeline — M — [SUN-CHASER-1G](https://ainabler.sentry.io/issues/SUN-CHASER-1G)
+
+- **Feedback (2026-10-11 16:02 CEST, Ravensburg):** "Can you show vegetation on the terrain?".
+- **Now:**
+  - `terrainTiles.ts` loads Terrarium elevation tiles (z12 up to 5 km, z10 up to 50 km).
+  - `computeHorizonProfile` (`horizonUtils.ts`) gives `angles`, `ridgeDistances` and `ridgeHeights` per azimuth.
+  - `SunVisualization` builds `terrainFillPath` (`buildTerrainSegments` → `buildTerrainFillPath`, `useMemo`). The scale is 1 sample per degree: 360 over the width in static mode, 91 in compass mode (`COMPASS_FOV_DEG = 90`).
+  - The path fills with one ridge colour per time of day (`--scene-ridge-*`). `SeaCanvas` mirrors it (`ridgePath`).
+  - The app has no land-cover data.
+- **Spec (heuristic, recommended):**
+  1. Treeline in m by |latitude|, linear between these points: ≤ 30° 3500, 40° 2500, 47° 1900, 55° 1300, 60° 1000, 65° 600, 70° 300, ≥ 72° 0. The density goes to 0 over the last 200 m below the treeline.
+  2. Trees only where the angle is > 0 (not the flat sea line), the ridge height is known, and the ridge distance is ≤ 8 km.
+  3. Tree height 20 m. Screen height = `atan(20 / d)` × px per degree (~9 px/° on an 844 px screen). Shown only from 1.5 px, at most 14 px.
+  4. Forest patches: seeded value noise over the azimuth (seed = rounded location), so about 55 % of the ridge has forest. The same place always looks the same.
+  5. Shapes: conifer (triangle) and broadleaf (round crown). Conifer share: 30 % below 600 m, 60 % at 600–1200 m, 90 % above 1200 m.
+  6. Season: in winter (Dec–Feb north, Jun–Aug south), broadleaves are bare (thin crown).
+  7. Colour: the ridge colour. By day only, a tint of up to 8 %: green from spring to summer, amber in autumn (Sep 20–Nov 10 north), none in winter.
+  8. Add the tree shapes to the same `d` as `terrainFillPath`. Then taps, the keyboard and the `SeaCanvas` mirror work with no change.
+  9. Performance: in the same `useMemo` (profile, size, heading, month). At most 1 tree per sample in static mode and 3 in compass mode (≤ 360 shapes, ~12 kB path). No animation, no work per frame.
+- **Data options (not recommended now):** ESA WorldCover 10 m COGs (S3; needs geotiff.js ~100 kB, range reads, a new CSP host, CORS not checked). Copernicus 100 m land cover. OSM `landuse=forest` through Overpass (rate limits). Each one adds a download and a host for little gain at ≤ 14 px.
+- **Check:** `SunVisualization` tests: the treeline at 47/60/72°; no trees above the treeline, beyond 8 km or at angle ≤ 0; the same seed gives the same trees; bare broadleaves in January (north) and July (south); the path is still one `terrain-silhouette`. Frame budget in compass mode.
+- **Open:** (a) Trees also in the share image (`ShareCardButton`)? (b) A setting to turn the trees off?
+- **Decision (Lutz, 2026-10-11):** Real land-cover data, not the heuristic. First check that a source works from the browser with no own server: ESA WorldCover (COG on AWS S3: CORS, range reads, size) or OSM forest polygons. Load the code and the data lazily (the start bundle does not grow, item 125), cache the data as `terrainTiles` does, and add the host to the CSP. Trees only where the land cover is forest. Shapes, size, season, colour and performance as spec 2–9 (the treeline rule goes). When no source works from the browser, stop and report.
+
+### 142. Contrails stay in the sky: they start at the plane, stay after it, and last longer — M — [SUN-CHASER-1H](https://ainabler.sentry.io/issues/SUN-CHASER-1H), [SUN-CHASER-1N](https://ainabler.sentry.io/issues/SUN-CHASER-1N)
+
+- **Feedback (2026-10-11 17:16 CEST, Ravensburg):** "Make the condensation strip of a plane even longer and longer lasting".
+- **Feedback (2026-10-11 17:45 CEST, Ravensburg):** "The condensate strip of a plane should not change position and start only if the plane appears and stay even after the plane is gone for a while".
+- **Now:**
+  - Scene planes (`CloudLayer` `renderPlane`, `createPlane`): a short or medium trail is one tapered gradient (`plane-trail`), `trailLength` vw wide, inside the plane's wrapper. `moveAcrossX` moves it with the plane, so each point of the trail slides across the sky ("changes position"). Item 109 makes the plane fly on past 101 % (`dx += trailLength`), so the trail slides off the right edge and then the plane goes. Only a `persistent` trail stays in the sky: 12 `getTrailPieces` pieces that grow (`planeTrailGrow`), then spread and fade (`planeTrailSpread`). The plane stays in the list until the last piece fades.
+  - Live planes (`LivePlanes` `PlaneBody`): the trail is a div attached to the plane. Its length is `hypot(dx, dy) × min(MAX_TRAIL_SEC 300, lifeSec[0])`, and its angle is the direction 1 s ahead. It is a straight line drawn backwards, not the real past path. It has its full length on the first frame, also when the plane only now shows (it enters the view, rises above 5°, comes out from behind a ridge, or takes a `pickShownPlanes` place). Its length and angle change with the screen speed. At the 360° edge, `dx = 0` makes it jump. When the plane leaves the shown set or the feed drops it (`LIVE_MAX_AGE_MS`), the trail goes in the same render.
+  - `CONTRAIL_LOOK` now: short 30 s, medium 180 s, persistent 300–600 s.
+- **Spec:**
+  1. Every trail is fixed in the sky. A point is made where the plane is, and it never moves after that. The trail grows only from the point where the plane first shows. Nothing is drawn before that point.
+  2. Each point fades on its own clock (`lifeSec` from when it was made). After the plane is gone, the trail stays and fades from its older end.
+  3. Longer and longer lasting: short 30 → 60 s, medium 180 → 300 s, persistent 300–600 → 600–900 s. The spread stays 1.5 / 2.5 / 8. `MAX_TRAIL_SEC` 300 → 600.
+  4. Scene planes: all kinds use the persistent pieces. Remove the `dx += trailLength` overrun (the plane ends at 101 %). The plane stays in the list until its last piece fades, as `persistent` does now. Piece count = clamp(ceil(10 × duration / life), 12, 24), so a short trail fades smoothly, not in steps.
+  5. Live planes: keep a trail history per `hex` in a ref. Store sky points (azimuth, elevation, time), one every 5 s, plus the live head. Store sky points, not px, so the compass view and a phone turn project the points again correctly. Draw all trails in one SVG below the planes: one polyline per plane, with the opacity of each segment set by its age. Do not join two points across the 360° edge. When a plane leaves the shown set, keep its history until its newest point fades. When a plane shows again after a gap, start a new history.
+  6. Calm: nothing jumps or swings. The trail only grows at the head and fades at the tail.
+  7. Performance limits: at most 120 points per live plane. The 40-plane compass limit (`MAX_COMPASS_PLANES`) also applies to fading trails (the oldest goes first). Measure the frame budget (item 91) with `?plane=short|medium|persistent` and 40 compass planes.
+  8. Reduced motion: no change for scene planes (there are none). Live trails get only the feed's points, one every 15 s.
+- **Check:**
+  - `utils.planes`: the new `CONTRAIL_LOOK` values and the piece count.
+  - `CloudLayer`: replace "short or medium trail that moves with the plane" with "pieces that stay; the plane ends at 101 %; the last fade removes it".
+  - `LivePlanes`: no trail on the first frame; the trail grows from the first point; a point keeps its sky place over ticks and over a compass turn; the trail stays after the plane leaves (swap, ridge, below 5°) and goes after `lifeSec`; no segment across the 360° edge.
+  - Frame budget run.
+- **Open:** (a) Are the life values right (short 60 s, medium 300 s, persistent 600–900 s)? (b) When the radar is switched off, does a trail stay or go at once?
+- **Decision (Lutz, 2026-10-11):** Lifetimes as spec 3 (60 / 300 / 600–900 s, `MAX_TRAIL_SEC` 600). When the live radar is switched off, the planes go at once, but their trails stay and fade on their own clock.
+
+### 143. Live planes point the way they fly on the screen — S — [SUN-CHASER-1J](https://ainabler.sentry.io/issues/SUN-CHASER-1J)
+
+- **Feedback (2026-10-11 17:19 CEST, Ravensburg):** "In live tracking a plane needs to be tilted in the direction it flies".
+- **Now:**
+  - `LivePlanes` `PlaneBody` draws `ScenePlane`, a side view that flies right (40 × 12 grid). The only transform is `flip ? 'scaleX(-1)'` with `flip = dx < 0`. The plane always stays level.
+  - The direction is known already: `dx`, `dy` are the projected screen step to 1 s later (`getAircraftView(sec + 1)`, through `projectSky` → `resolveAzimuth` / `altitudeToY`). Only the trail uses it (`trailAngle = atan2(dy, dx)`, rounded to 1/50 rad).
+  - The raw adsb.lol `track` cannot give the angle: the screen maps azimuth to x and elevation to y, so a plane on track 090° can move up, down or sideways on the screen.
+- **Spec:**
+  1. Angle `a = atan2(dy, dx)` from the projected positions, the same value as the trail angle.
+  2. The body gets `rotate(a)` around its centre. When the plane moves left (`dx < 0`), add `scaleY(-1)` after the rotate, so the fin stays up. For level flight this is the same as the current `scaleX(-1)`.
+  3. Calm: keep the 1/50 rad rounding, so the memoized body renders again only on a change. When the screen speed is below 0.1 px/s, or `dx` is 0 at the 360° edge, keep the last angle and flip per `hex` (in a ref). Change the flip only when `dx` passes ±0.05 px/s, so a plane that moves almost straight up or down does not flip back and forth.
+  4. The night lights turn with the body. The tap area (`HitArea`) stays level.
+  5. Scene planes do not change: they always cross level from left to right.
+- **Check:**
+  - `LivePlanes`: a plane that moves up and right gets a rotate with a negative angle; a plane that moves left is upright (`scaleY(-1)`); a still plane in compass mode keeps its last angle; no flip flicker near vertical motion.
+  - The trail (item 142) starts at the rotated tail.
+- **Open:** Limit the tilt (for example ±60°), or let a plane that flies straight up the screen point straight up?
+- **Decision (Lutz, 2026-10-11):** Lookbook first with tilt options (full angle, ±60°, ±45° and others). Build after Lutz picks one.
+
+### 144. A whale that looks like a whale — M — [SUN-CHASER-1K](https://ainabler.sentry.io/issues/SUN-CHASER-1K)
+
+- **Feedback (2026-10-11 17:42 CEST, Ravensburg):** "Whale does not look like a whale".
+- **Now:** `SHAPES.whale` in `src/components/SceneFish.tsx` (24 px grid, faces right, FS1 two-tone look, item 85). The tail is an upright, forked fish tail (`fin`, x 1.3–4.8, y 9.8–15.2). There is a small fin on the back at x 9.4 and a short fin under the belly at x 13.4. The body is an egg (x 4.2–22.4, y 8.5–17) with a blunt head and no narrow tail stock. Two throat lines (`stripe`), eye at (18.2, 12.3). A vertical gradient goes from `--scene-fish-whale-back` `215 21.3% 16.5%` to `--scene-fish-whale-belly` `215 15% 68.5%`. `FISH.whale` in `CloudLayer.tsx`: size 72, speed 0.4, haze 0.8, `glide`. Depth is always 0.75–1, so the whale is 40–48 px wide at 40–45 % opacity. Result: a big dark fish.
+- **Spec:**
+  1. A new side-view outline on the same grid (about 22 × 7 units, at least 3:1). Pointed snout at x 22.6. A mouth line from the snout to x 17. The back rises to a hump at about x 11. A small dorsal fin at about x 8.5. The body tapers to a narrow tail stock at x 3.5 (about 1 unit high).
+  2. Flukes: horizontal, seen a little from above. A flat crescent about 4.5 units wide and at most 2.2 units high, with a notch in the middle. No upright forked tail.
+  3. Pectoral fin: long and swept back, about 5 units, from (15, 14.6) to (10.5, 17.6) (humpback style).
+  4. Blowhole: a small dark notch on the top of the head at about (17.5, 10.2). Eye: r 0.85 at about (18.6, 12.9), just above the mouth line. Keep 3 throat grooves on the belly.
+  5. Spout: every 25–40 s a white puff (`--scene-glow-white`, 50 %) rises from the sea edge above the blowhole. It grows over 1.5 s and fades over 2 s. No spout with reduced motion, at night or in rain.
+  6. Colours closer to the sea hue (`SEA_HUE` 205): back `208 28% 26%`, belly `205 18% 72%`. Size 72 → 84, so the whale is 46–56 px. Speed, depth, haze and `glide` do not change: calm, no body sway.
+- **Check:** `SceneFish.test`: the whale's body box is ≥ 3:1, the flukes are wider than tall, there is a blowhole part. `CloudLayer.test`: change the "about the size of the rowboat" whale test (≤ 48 px) to the new size. Spout test: it shows only by day with motion allowed. Browser at 390 × 844 with `?fish=whale`.
+- **Open:** (a) Is 84 px OK? Item 62 asked for the size of the rowboat. (b) Is the spout wanted, or the outline only?
+- **Decision (Lutz, 2026-10-11):** Lookbook first with creative whale options. Build after Lutz picks one.
+
+### 145. Fish look underwater — M — [SUN-CHASER-1M](https://ainabler.sentry.io/issues/SUN-CHASER-1M)
+
+- **Feedback (2026-10-11 17:42 CEST, Ravensburg):** "Some fish don't look as if they are underwater".
+- **Now:** all fish are below the surface line already. The sea edge is at 65 % (`seaEdgePath` in `SunVisualization`). The top of a fish box is at `y = 67 + (1 − depth) × 26 ± 1` %, so 66–94 %. But the fish do not look wet:
+  - The `CloudLayer` root has no z-index, so the fish wrappers (`zIndex: 5`) draw over the sea fill, the `SeaCanvas` wave lines and foam, and the sun and moon glint bars.
+  - The colours are the fish's own tones (for example `--scene-fish-classic-back` at 79.8 % saturation, the trout's red band). They do not mix with `getWaterColors`, and there is no blur.
+  - Day opacity is `0.85 × (1 − 0.3 × depth) × (1 − 0.4 × haze)`. The clearest fish: trout (haze 0) 0.85, minnow 0.82, classic fish and jellyfish 0.75. Night fish have no haze (moonlit 0.75, with their own light 0.95).
+  - Fish keep their day colours at dusk. The boats dim with `getBoatTone`.
+  - The shark and the dolphins visit the surface by design (fin above the water). They do not change.
+- **Spec:**
+  1. `SunVisualization` passes `water.surface` and `water.deep` to `CloudLayer`, which sets them as CSS vars on the fish layer.
+  2. Submersion `s = 0.25 + 0.75 × haze`, so no fish is fully clear. `SceneFish` mixes each fill and stroke with the water colour: `color-mix(in oklab, <tone>, <water> t%)`, with `t = 15 + 40 × s` (trout 25 %, catfish 50 %). Far lanes use the surface colour, near lanes the deep colour.
+  3. Each fish wrapper gets the filter `saturate(1 − 0.35 × s) blur(0.6 × s px)`. It is static per fish and never animated.
+  4. Day base opacity 0.85 → 0.75. The depth, rain and lane-change factors do not change.
+  5. The fish follow the boat light: `getBoatTone` 'sun', 'twilight' and 'night' dim the fish with the boat `TONE_FILTER`. At night, moonlit fish get the tint with the moon colour. Fish with their own light keep their lights without tint.
+  6. The top of a fish box is never above 66 % (also after a lane change). No light rays.
+- **Check:** `SceneFish.test`: the fills contain `color-mix` with the water var. `CloudLayer.test`: the opacity table, and a filter with `saturate` and `blur` that grows with haze. `utils.sunUtils` does not change. The item 92 box simulation still passes. Browser at 390 × 844 and 1440 × 900: day, evening and night. Frame time with 22 fish (item 91).
+- **Open:** (a) Draw the wave lines and glints over the fish (`SeaCanvas` z 6)? Then the canvas mirror and the strong-wind fill (`matte`) hide far fish. (b) Blur OK, or tint only?
+- **Decision (Lutz, 2026-10-11):** Lookbook first with underwater looks (tint, blur, waves over the fish and others). Build after Lutz picks one.
+
+### 146. New boats for the empty rarity tiers — M — [SUN-CHASER-1P](https://ainabler.sentry.io/issues/SUN-CHASER-1P)
+
+- **Feedback (2026-10-11 17:48 CEST, Ravensburg):** "Are there other boats in the other rarity categories?".
+- **Now:** `BoatKind` = sailboat, ferry, fishing, rowboat, freighter. `BOAT_WEIGHTS` 35/15/15/10/5 (`weatherEffectsUtils`). `getBoatShare` uses the fair-weather mix. With `RARITY_TIERS` (`sceneInfo`): sailboat 43.8 % common; ferry and fishing 18.8 % and rowboat 12.5 % frequent; freighter 6.3 % uncommon. Rare and very rare have no boat. Ultra rare is for eggs only: a dressed boat (bunting, papel picado, lights) is a normal boat, and its `DRESSED_BADGES` are `egg:*` badges. 129 badges.
+- **Spec:**
+  1. Three new kinds in the B3 soft-light style (`FLEET` in `SceneBoat.tsx`, 64 × 37 grid, waterline y 36, bow to the right): `kayak`, `paddleSteamer`, `tallShip`.
+  2. Weights 4 / 2 / 0.5 (sum 86.5). New shares: sailboat 40.5 % common; ferry and fishing 17.3 % and rowboat 11.6 % frequent; freighter 5.8 % and kayak 4.6 % uncommon; paddle steamer 2.3 % rare; tall ship 0.6 % very rare. No existing boat changes its tier.
+  3. Kayak: by day only (not `isSunDown`), fair weather, wind ≤ 20 km/h. Scale 0.8, speed 0.7, no wake, no lights.
+  4. Paddle steamer: fair weather, any time. Scale 1.3, speed 1.0. A paddle box on the side, one funnel, gold window lights after sunset, always a wake.
+  5. Tall ship: fair weather, wind ≤ 40 km/h (`STRONG_WIND_KMH`). Scale 1.5, speed 1.1. Three masts with square sails, mast lights, a wake as the sailboat.
+  6. Add each kind to `BOATS` (`CloudLayer`: scale, speed), `LINES` (`BoatBunting`), `BOATS` in `sceneInfo` and `collection`, and the `CollectionView` art. 132 badges (plus the badges of item 138, if that item is built first). The tier comes from `getRarityTier(getBoatShare)`.
+  7. Keys in en/de/es/it/fr: `boat.kayak` (Kayak / Kajak / Kayak / Kayak / Kayak), `boat.paddleSteamer` (Paddle steamer / Raddampfer / Vapor de ruedas / Piroscafo a ruote / Bateau à aubes), `boat.tallShip` (Tall ship / Großsegler / Gran velero / Grande veliero / Grand voilier). Plus `boatFact.*`, for example "A kayak paddle has a blade at each end.", "A paddle steamer turns a big wheel on each side.", "A tall ship can carry more than 20 sails."
+- **Check:** `utils.weatherEffectsUtils`: the new shares and tiers, the `pickBoat` filters (no kayak at night or in wind > 20 km/h, no tall ship in wind > 40 km/h, `hasBoatWake`). `utils.collection`: 132 badges and the tiers. `utils.sceneInfo`: the 3 cards. `SceneBoat` and `BoatBunting` render every kind. `i18n.test`. Browser lineup at near size.
+- **Open:** (a) Paddle steamer only in May–October (the Lake Constance season)? `getBoatShare` ignores time, wind and season, as for the other boats. (b) A cruise liner instead of the tall ship?
+- **Decision (Lutz, 2026-10-11):** All four boats: kayak (uncommon), paddle steamer (rare, May–October only), tall ship (very rare) and a cruise liner (new; big white ship, rows of lit windows after sunset). Set the weights so that each new boat lands in its tier (cruise liner: rare) and no old boat changes its tier. The season filter is in `pickBoat`; `getBoatShare` stays season-free.
+
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 
 Rules for all items:
