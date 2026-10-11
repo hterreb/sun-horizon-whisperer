@@ -72,7 +72,8 @@ const FLYERS: [BirdKind | 'bat', MessageKey][] = [
 ];
 const BOATS: [BoatKind, MessageKey][] = [
   ['sailboat', 'boat.sailboat'], ['ferry', 'boat.ferry'], ['fishing', 'boat.fishing'], ['rowboat', 'boat.rowboat'],
-  ['freighter', 'boat.freighter'],
+  ['freighter', 'boat.freighter'], ['kayak', 'boat.kayak'], ['paddleSteamer', 'boat.paddleSteamer'], // item 146
+  ['cruiseLiner', 'boat.cruiseLiner'], ['tallShip', 'boat.tallShip'],
 ];
 const CLOUDS: [CloudType, MessageKey][] = [
   ['Ci', 'cloud.Ci'], ['Cs', 'cloud.Cs'], ['Ac', 'cloud.Ac'], ['As', 'cloud.As'], ['Cu', 'cloud.Cu'], ['Sc', 'cloud.Sc'],
@@ -350,10 +351,10 @@ export const badgeForNationalDay = (day: NationalDay | null, o: NationalBadgeOpt
   }
 };
 
-// Test links (?egg=, ?fish=, ?hunt=, ?country=) force a scene, so nothing counts while one is set.
+// Test links (?egg=, ?fish=, ?hunt=, ?country=, ?boat=) force a scene, so nothing counts while one is set.
 export const isCollectionPaused = (search: string): boolean => {
   const params = new URLSearchParams(search);
-  return params.has('egg') || params.has('fish') || params.has('hunt') || params.has('country');
+  return params.has('egg') || params.has('fish') || params.has('hunt') || params.has('country') || params.has('boat');
 };
 
 // Only the badges in BADGES count: an old save's retired ids (item 138) do not.

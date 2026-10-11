@@ -1,5 +1,6 @@
-import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, hasBoatWake, getBoatTone, pickFish, FISH_WEIGHTS, canSpawnFish, getRestStopMotion, pickNightFish, pickMoonlitDayFish, NIGHT_FISH_WEIGHTS, MAX_FISH, MAX_NIGHT_FISH, MAX_BIRDS, getFishOverride, getWaterSpeedFactor, getWaterLimit, getSceneLimit, getStarCloudFactor, getStarGapShow, getTwilightStars, getSkyOvercastMix, getSunVisibility, getMoonCloudFactor, getMoonLook, BIRD_WEIGHTS, pickBird, isBirdInSeason, getBatShare, getFlyerShare } from '../src/utils/weatherEffectsUtils';
+import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, hasBoatWake, getBoatTone, pickFish, FISH_WEIGHTS, canSpawnFish, getRestStopMotion, pickNightFish, pickMoonlitDayFish, NIGHT_FISH_WEIGHTS, MAX_FISH, MAX_NIGHT_FISH, MAX_BIRDS, getFishOverride, getWaterSpeedFactor, getWaterLimit, getSceneLimit, getStarCloudFactor, getStarGapShow, getTwilightStars, getSkyOvercastMix, getSunVisibility, getMoonCloudFactor, getMoonLook, BIRD_WEIGHTS, pickBird, isBirdInSeason, getBatShare, getFlyerShare, getBoatShare, getBoatOverride, type BoatKind, type BoatTime } from '../src/utils/weatherEffectsUtils';
 import { getSunTimes } from '../src/utils/sunUtils';
+import { rarityTier } from '../src/utils/sceneInfo';
 
 describe('getWeatherEffects (ROADMAP item 10)', () => {
   it('shows fog only for the fog type', () => {
@@ -76,19 +77,23 @@ describe('canFlashLightning (ROADMAP item 10)', () => {
   });
 });
 
+// A July day at Lake Constance: every boat can sail out.
+const SUMMER_DAY: BoatTime = { sunDown: false, month: 7, latitude: 47.8 };
+const ALL_BOATS: BoatKind[] = ['sailboat', 'ferry', 'fishing', 'rowboat', 'freighter', 'kayak', 'paddleSteamer', 'cruiseLiner', 'tallShip'];
+
 describe('pickBoat (ROADMAP item 36)', () => {
-  const picks = (type: Parameters<typeof pickBoat>[0], windKmh: number | null) =>
-    new Set(Array.from({ length: 100 }, (_, i) => pickBoat(type, windKmh, i / 100)));
+  const picks = (type: Parameters<typeof pickBoat>[0], windKmh: number | null, time = SUMMER_DAY) =>
+    new Set(Array.from({ length: 1000 }, (_, i) => pickBoat(type, windKmh, i / 1000, time)));
 
   it('sends out every boat in fair, calm weather, the sailboat most often', () => {
-    expect(picks('clear', 0)).toEqual(new Set(['sailboat', 'ferry', 'fishing', 'rowboat', 'freighter']));
-    const sailboats = Array.from({ length: 100 }, (_, i) => pickBoat('partly', 0, i / 100)).filter(k => k === 'sailboat');
-    expect(sailboats.length).toBe(44); // 35 of 80
+    expect(picks('clear', 0)).toEqual(new Set(ALL_BOATS));
+    const sailboats = Array.from({ length: 100 }, (_, i) => pickBoat('partly', 0, i / 100, SUMMER_DAY)).filter(k => k === 'sailboat');
+    expect(sailboats.length).toBe(40); // 35 of 88 (item 146)
   });
 
-  it('keeps only the ferry and the freighter out in rain, drizzle, fog and snow', () => {
+  it('keeps only the ferry, the freighter and the cruise liner out in rain, drizzle, fog and snow', () => {
     for (const type of ['rain', 'drizzle', 'fog', 'snow'] as const) {
-      expect(picks(type, 0)).toEqual(new Set(['ferry', 'freighter']));
+      expect(picks(type, 0)).toEqual(new Set(['ferry', 'freighter', 'cruiseLiner']));
     }
   });
 
@@ -98,17 +103,78 @@ describe('pickBoat (ROADMAP item 36)', () => {
   });
 });
 
+describe('pickBoat: the new boats (ROADMAP item 146)', () => {
+  const picks = (windKmh: number, time: Partial<BoatTime> = {}) =>
+    new Set(Array.from({ length: 1000 }, (_, i) => pickBoat('clear', windKmh, i / 1000, { ...SUMMER_DAY, ...time })));
+
+  it('sends the kayak out by day only, in wind up to 20 km/h', () => {
+    expect(picks(20).has('kayak')).toBe(true);
+    expect(picks(21).has('kayak')).toBe(false);
+    expect(picks(0, { sunDown: true }).has('kayak')).toBe(false);
+    expect(picks(0, { sunDown: true }).has('sailboat')).toBe(true); // the others sail on at night
+  });
+
+  it('keeps the tall ship ashore above 40 km/h wind, as the rowboat', () => {
+    expect(picks(40).has('tallShip')).toBe(true);
+    expect(picks(41).has('tallShip')).toBe(false);
+  });
+
+  it('sends the paddle steamer May to October, by day and at night', () => {
+    const months = (latitude: number) =>
+      Array.from({ length: 12 }, (_, i) => i + 1).filter(month => picks(0, { month, latitude }).has('paddleSteamer'));
+    expect(months(47.8)).toEqual([5, 6, 7, 8, 9, 10]);
+    expect(months(-33.9)).toEqual([1, 2, 3, 4, 11, 12]); // south of the equator: half a year later
+    expect(picks(0, { sunDown: true }).has('paddleSteamer')).toBe(true);
+    expect(picks(60).has('paddleSteamer')).toBe(true); // any wind
+  });
+
+  it('sends the cruise liner in any weather and wind, as the ferry; the other new boats only in fair weather', () => {
+    const storm = new Set(Array.from({ length: 1000 }, (_, i) => pickBoat('storm', 60, i / 1000, SUMMER_DAY)));
+    expect(storm).toEqual(new Set(['ferry', 'freighter', 'cruiseLiner']));
+  });
+});
+
+describe('getBoatShare: the tiers (ROADMAP item 146)', () => {
+  it('puts each new boat in its tier, and no old boat changes its tier', () => {
+    const tiers = Object.fromEntries(ALL_BOATS.map(kind => [kind, rarityTier(getBoatShare(kind))]));
+    expect(tiers).toEqual({
+      sailboat: 'common', ferry: 'frequent', fishing: 'frequent', rowboat: 'frequent', freighter: 'uncommon',
+      kayak: 'uncommon', paddleSteamer: 'rare', cruiseLiner: 'rare', tallShip: 'veryRare',
+    });
+    expect(getBoatShare('sailboat')).toBeCloseTo(39.77, 2);
+    expect(getBoatShare('kayak')).toBeCloseTo(4.55, 2);
+    expect(getBoatShare('paddleSteamer')).toBeCloseTo(2.27, 2);
+    expect(getBoatShare('cruiseLiner')).toBeCloseTo(1.70, 2);
+    expect(getBoatShare('tallShip')).toBeCloseTo(0.57, 2);
+    expect(ALL_BOATS.reduce((sum, kind) => sum + getBoatShare(kind), 0)).toBeCloseTo(100, 6);
+  });
+});
+
+describe('getBoatOverride (ROADMAP item 146)', () => {
+  it('reads one boat or a list from ?boat=, and skips unknown kinds', () => {
+    expect(getBoatOverride('?boat=kayak')).toEqual(['kayak']);
+    expect(getBoatOverride('?boat=tallShip,sailboat')).toEqual(['tallShip', 'sailboat']);
+    expect(getBoatOverride('?boat=submarine,cruiseLiner')).toEqual(['cruiseLiner']);
+    expect(getBoatOverride('?boat=submarine')).toBeNull();
+    expect(getBoatOverride('?fish=shark')).toBeNull();
+  });
+});
+
 describe('pickBoat in a storm (ROADMAP item 73)', () => {
-  it('sends out only the ferry and the freighter, never a sailboat', () => {
-    const picks = new Set(Array.from({ length: 100 }, (_, i) => pickBoat('storm', 60, i / 100)));
-    expect(picks).toEqual(new Set(['ferry', 'freighter']));
+  it('sends out only the big boats, never a sailboat', () => {
+    const picks = new Set(Array.from({ length: 100 }, (_, i) => pickBoat('storm', 60, i / 100, SUMMER_DAY)));
+    expect(picks).toEqual(new Set(['ferry', 'freighter', 'cruiseLiner']));
   });
 });
 
 describe('hasBoatWake (ROADMAP item 73, X2)', () => {
-  it('gives the ferry and the freighter a wake in any wind', () => {
+  it('gives the ferry, the freighter, the cruise liner, the paddle steamer and the tall ship a wake in any wind', () => {
     expect(hasBoatWake('ferry', 0)).toBe(true);
     expect(hasBoatWake('freighter', null)).toBe(true);
+    expect(hasBoatWake('cruiseLiner', 0)).toBe(true); // item 146
+    expect(hasBoatWake('paddleSteamer', null)).toBe(true);
+    expect(hasBoatWake('tallShip', 0)).toBe(true); // a light one (SceneBoat), decision 2026-10-12
+    expect(hasBoatWake('tallShip', 40)).toBe(true);
   });
 
   it('gives the sailboat a wake only in strong wind (> 40 km/h)', () => {
@@ -116,9 +182,10 @@ describe('hasBoatWake (ROADMAP item 73, X2)', () => {
     expect(hasBoatWake('sailboat', 41)).toBe(true);
   });
 
-  it('never gives the rowboat or the fishing boat a wake', () => {
+  it('never gives the rowboat, the kayak or the fishing boat a wake', () => {
     expect(hasBoatWake('rowboat', 80)).toBe(false);
     expect(hasBoatWake('fishing', 80)).toBe(false);
+    expect(hasBoatWake('kayak', 80)).toBe(false);
   });
 });
 
