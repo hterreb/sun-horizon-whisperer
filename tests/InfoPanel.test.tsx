@@ -402,7 +402,7 @@ describe('InfoPanel', () => {
       ({ ok: true, json: () => Promise.resolve({ features: [{ properties }] }) });
     // BigDataCloud bans the IP; Photon answers with `properties`.
     const stubBanWithPhoton = (properties: Record<string, unknown>) => {
-      const fetchMock = vi.fn((url: string) => Promise.resolve(String(url).includes('photon.komoot.io') ? photon(properties) : banned));
+      const fetchMock = vi.fn((url: string) => Promise.resolve(new URL(String(url)).hostname === 'photon.komoot.io' ? photon(properties) : banned));
       vi.stubGlobal('fetch', fetchMock);
       return fetchMock;
     };

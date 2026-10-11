@@ -198,7 +198,7 @@ describe('loadTreeCover', () => {
 
   it('throws when every read fails, and never takes a whole file', async () => {
     globalThis.fetch = serve({}, (url) =>
-      url.includes('blob.core.windows.net') ? new Response('the whole file', { status: 200 }) : (undefined as unknown as Response)
+      new URL(url).hostname.endsWith('.blob.core.windows.net') ? new Response('the whole file', { status: 200 }) : (undefined as unknown as Response)
     ) as typeof fetch;
     await expect(loadTreeCover(LAT, LON, makeProfile())).rejects.toThrow(/range read failed: 200/);
     expect(Object.keys(localStorage)).toHaveLength(0);
