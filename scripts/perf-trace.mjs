@@ -190,7 +190,7 @@ const flatTerrainPng = (elevationM) => {
 const TERRAIN_TILE = flatTerrainPng(450);
 const fixture = (name) => readFileSync(path.join(FIXTURES, name), 'utf8');
 
-// The hosts of the CSP connect-src in vercel.json, plus the radio streams (media-src).
+// The hosts of the CSP connect-src in public/_headers, plus the radio streams (media-src).
 const stubFor = (url, scene) => {
   const { hostname, pathname } = url;
   if (hostname === 'api.open-meteo.com') return json(fixture(SCENES[scene].forecast));
