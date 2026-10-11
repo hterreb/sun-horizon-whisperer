@@ -68,6 +68,12 @@ describe('InfoPanel', () => {
     expect(screen.getByText(/weather mode/i)).toBeInTheDocument();
   });
 
+  it('shows Moon Information, collapsed, when the moon is below the horizon', () => {
+    render(<InfoPanel {...defaultProps} moonPosition={{ ...defaultProps.moonPosition, altitude: -10, visible: false }} />);
+    expect(screen.getByText('Moon Information')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /expand moon/i })).toBeInTheDocument();
+  });
+
   it('shows the sunrise and sunset of the pass the arc draws, not today\'s past ones (AUDIT C-17)', () => {
     const tomorrowAt = (h: number, m: number) => {
       const d = new Date();
