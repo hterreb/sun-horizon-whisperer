@@ -178,12 +178,13 @@ export const getFishOverride = (search: string): FishKind | null => {
 // Night mix (ROADMAP item 65, Night waters lookbook), from nautical twilight on. 'moonlit'
 // is a day fish in the moon tone (NF1); pickMoonlitDayFish then picks its species with
 // the day weights of the lake fish, without the minnow school. The sea visitors swim at night
-// too (item 85, X5), in the moon pool like the moonlit fish, which gave the 1.
-export type NightFishPick = 'moonlit' | 'burbot' | 'eel' | 'lanternfish' | 'jellyfish' | 'anglerfish' | 'squid' | 'shark' | 'dolphins';
+// too (item 85, X5), in the moon pool like the moonlit fish, which gave the 1. The whale swims
+// at night with its own light, the sea sparkle (item 144, I); the lanternfish gave its 1.
+export type NightFishPick = 'moonlit' | 'burbot' | 'eel' | 'lanternfish' | 'jellyfish' | 'anglerfish' | 'squid' | 'whale' | 'shark' | 'dolphins';
 
 export const NIGHT_FISH_WEIGHTS: [NightFishPick, number][] = [
-  ['moonlit', 24], ['burbot', 15], ['eel', 12], ['lanternfish', 30], ['jellyfish', 8], ['anglerfish', 5], ['squid', 5],
-  ['shark', 0.5], ['dolphins', 0.5],
+  ['moonlit', 24], ['burbot', 15], ['eel', 12], ['lanternfish', 29], ['jellyfish', 8], ['anglerfish', 5], ['squid', 5],
+  ['whale', 1], ['shark', 0.5], ['dolphins', 0.5],
 ];
 const MOONLIT_DAY_FISH: FishKind[] = ['classic', 'perch', 'pike', 'carp', 'catfish', 'trout'];
 

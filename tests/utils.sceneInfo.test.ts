@@ -92,11 +92,15 @@ describe('sceneInfo (ROADMAP item 95)', () => {
 
   it('gives a fish its species, one fact and day or night fish', () => {
     expect(card({ type: 'fish', kind: 'lanternfish' }, { timeOfDay: 'night' })).toEqual([
-      'Lanternfish', 'Lanternfish make their own light.', 'Night fish', 'Rarity: Common · 30 %',
+      'Lanternfish', 'Lanternfish make their own light.', 'Night fish', 'Rarity: Common · 29 %',
     ]);
     expect(card({ type: 'fish', kind: 'perch' })[2]).toBe('Day fish');
     expect(card({ type: 'fish', kind: 'jellyfish' })[2]).toBe('Day and night');
     expect(card({ type: 'fish', kind: 'shark' })[2]).toBe('Day and night');
+    // Item 144: the whale is a sperm whale, by day and (with the sea sparkle) at night.
+    expect(card({ type: 'fish', kind: 'whale' }, { timeOfDay: 'night' })).toEqual([
+      'Sperm whale', 'The blow of a sperm whale leans forward: its blowhole is at the front of its head.', 'Day and night', 'Rarity: Rare · 1 %',
+    ]);
   });
 
   it('has a name and a fact for every fish, day and night (items 62, 65, 85)', () => {
@@ -320,6 +324,7 @@ describe('sceneInfo: field guide data (ROADMAP item 107)', () => {
   it('gives a Latin name to the real species only', () => {
     expect(info({ type: 'fish', kind: 'pike' }).latin).toBe('Esox lucius');
     expect(info({ type: 'fish', kind: 'eel' }).latin).toBe('Anguilla anguilla');
+    expect(info({ type: 'fish', kind: 'whale' }).latin).toBe('Physeter macrocephalus'); // item 144
     expect(info({ type: 'bird', kind: 'stork' }).latin).toBe('Ciconia ciconia');
     expect(info({ type: 'bird', kind: 'starlings' }).latin).toBe('Sturnus vulgaris');
     for (const target of [
