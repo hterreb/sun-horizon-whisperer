@@ -177,14 +177,19 @@ describe('night fish mix (ROADMAP item 65)', () => {
   it('has weights that sum to 100 and sends out every night fish', () => {
     expect(NIGHT_FISH_WEIGHTS.reduce((sum, [, weight]) => sum + weight, 0)).toBe(100);
     const picks = Array.from({ length: 200 }, (_, i) => pickNightFish(i / 200));
-    expect(new Set(picks)).toEqual(new Set(['moonlit', 'burbot', 'eel', 'lanternfish', 'jellyfish', 'anglerfish', 'squid', 'shark', 'dolphins']));
-    expect(picks.filter(k => k === 'lanternfish').length).toBe(60);
+    expect(new Set(picks)).toEqual(new Set(['moonlit', 'burbot', 'eel', 'lanternfish', 'jellyfish', 'anglerfish', 'squid', 'whale', 'shark', 'dolphins']));
+    expect(picks.filter(k => k === 'lanternfish').length).toBe(58);
   });
 
   it('sends the sea visitors at night too, 1 in 200 each; the moonlit fish gave the 1 (ROADMAP item 85, X5)', () => {
     expect(NIGHT_FISH_WEIGHTS).toContainEqual(['shark', 0.5]);
     expect(NIGHT_FISH_WEIGHTS).toContainEqual(['dolphins', 0.5]);
     expect(NIGHT_FISH_WEIGHTS).toContainEqual(['moonlit', 24]);
+  });
+
+  it('sends the whale at night too, 1 in 100, with its own light; the lanternfish gave the 1 (ROADMAP item 144, I)', () => {
+    expect(NIGHT_FISH_WEIGHTS).toContainEqual(['whale', 1]);
+    expect(NIGHT_FISH_WEIGHTS).toContainEqual(['lanternfish', 29]);
   });
 
   it('lights the lake fish by the moon, but not the minnow school (NF1)', () => {

@@ -7,6 +7,7 @@ import { getSceneDensity, getDensityCurve } from '../src/utils/sceneDensity';
 import { getSunPosition, getSunTimes, getTimeOfDay } from '../src/utils/sunUtils';
 import type { TimeOfDay } from '../src/utils/sunUtils';
 import { DEFAULT_CLOUD_LAYERS, getCloudCentre, getDaySeed, getGliderStartProgress, getSkyClouds, mulberry32 } from '../src/utils/skyCloudUtils';
+import { WHALE_SPOUT_AHEAD, WHALE_SPOUT_TOP } from '../src/components/SceneFish';
 
 const mockReducedMotion = (matches: boolean) =>
   vi.spyOn(window, 'matchMedia').mockReturnValue({
@@ -306,11 +307,14 @@ describe('CloudLayer', () => {
     };
     const always = (r: number) => () => r;
 
-    it('sends the whale always far out, about the size of the rowboat', () => {
+    it('sends the whale always far out, 46-56 px wide (item 144)', () => {
       expect(createFish('whale', false, false, 390, always(0)).depth).toBe(0.75);
       const farthest = createFish('whale', false, false, 390, always(0.999));
       expect(farthest.depth).toBeGreaterThan(0.99);
-      expect(createFish('whale', false, false, 390, always(0)).size).toBeLessThanOrEqual(48);
+      expect(farthest.size).toBe(46);
+      expect(createFish('whale', false, false, 390, always(0)).size).toBe(56);
+      // Haze 0.5 (was 0.8): about half visible by day.
+      expect(createFish('whale', false, false, 390, always(0)).opacity).toBeCloseTo(0.85 * (1 - 0.3 * 0.75) * (1 - 0.4 * 0.5), 5);
     });
 
     it('draws far fish smaller, slower, paler and higher than near ones (P3)', () => {
@@ -1583,5 +1587,128 @@ describe('planes and contrails (ROADMAP item 96)', () => {
     expect(onInfo).not.toHaveBeenCalled(); // item 116: a double tap opens the card
     fireEvent.click(hit, { clientX: 50, clientY: 80, detail: 2 });
     expect(onInfo).toHaveBeenCalledWith({ type: 'plane', contrail: 'short' }, { x: 50, y: 80 }, expect.stringMatching(/^plane-/));
+  });
+});
+
+// ROADMAP item 144 (Whale lookbook D, E, G, I): the sperm whale's calf, rise and night glow.
+describe('the sperm whale (ROADMAP item 144)', () => {
+  // createFish draws the depth and the height first (and the E1 spot after sunset), then for the
+  // whale the calf, the rise and the place of the rise: the draws in `list`, then `rest`.
+  const draws = (list: number[], rest = 0.5) => {
+    let i = 0;
+    return () => list[i++] ?? rest;
+  };
+  // Renders the layer with `?fish=whale`, each Math.random() giving `r`.
+  const forcedWhale = (props: Partial<React.ComponentProps<typeof CloudLayer>>, ms: number, r: number) => {
+    window.history.pushState({}, '', '/?fish=whale');
+    vi.useFakeTimers();
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(r);
+    try {
+      const view = render(<CloudLayer warmStart={false} weatherType="clear" timeOfDay="midday" {...props} />);
+      act(() => { vi.advanceTimersByTime(ms); });
+      return view.container;
+    } finally {
+      randomSpy.mockRestore();
+      vi.useRealTimers();
+      window.history.pushState({}, '', '/');
+    }
+  };
+  const whaleIn = (container: HTMLElement) => container.querySelector<SVGSVGElement>('[data-testid="scene-fish"][data-kind="whale"]')!;
+  // Above its water surface the whale is at the sea visitors' 95 %, not at 85 % × its haze 0.5.
+  const lift = 0.95 / (0.85 * (1 - 0.4 * 0.5));
+
+  it('swims with a calf 1 in 4 times; a whale with a calf does not rise (E)', () => {
+    const withCalf = createFish('whale', false, false, 390, draws([0.5, 0.5, 0.24, 0]));
+    expect(withCalf.calf).toBe(true);
+    expect(withCalf.surface).toBeUndefined();
+    expect(createFish('whale', false, false, 390, draws([0.5, 0.5, 0.25])).calf).toBe(false);
+    expect(createFish('classic', false, false, 390, draws([0.5, 0.5])).calf).toBeUndefined();
+  });
+
+  it('rises in 1 in 2 crossings, with its middle at 25-65 % of the width; not at night or in rain (G)', () => {
+    for (const width of [390, 1280]) {
+      for (const pick of [0, 0.999]) {
+        const whale = createFish('whale', false, false, width, draws([0.5, 0.5, 0.3, 0.49, pick]));
+        // It glides: its left edge `surface` s into the crossing, plus half its width.
+        const left = whale.x + (whale.dx / whale.duration) * whale.surface!;
+        expect(left + (whale.width / width) * 50).toBeCloseTo(25 + 40 * pick, 5);
+      }
+    }
+    expect(createFish('whale', false, false, 390, draws([0.5, 0.5, 0.3, 0.5])).surface).toBeUndefined();
+    expect(createFish('whale', false, true, 390, draws([0.5, 0.5, 0.3, 0])).surface).toBeUndefined(); // rain
+    expect(createFish('whale', false, false, 390, draws([0.5, 0.5, 0.3, 0]), true).surface).toBeUndefined(); // night
+    // At dusk (the E1 spot draws first) it rises.
+    expect(createFish('whale', true, false, 390, draws([0.5, 0.5, 0.9, 0.3, 0])).surface).toBeGreaterThan(0);
+  });
+
+  it('keeps the water above and ahead of a rising whale free for its spout (the lane plan, item 92)', () => {
+    const view = { width: 390, height: 844 };
+    const spawnWhale = (r: number) => {
+      const last: SpawnTimes = { birds: 1e9, fish: 0, ships: 1e9, leaves: 1e9, planes: 1e9, shown: { birds: true, fish: true, ships: true } };
+      const rules: SpawnRules = {
+        weatherType: 'clear', timeOfDay: 'midday', windSpeedKmh: 10, birdSpeedFactor: 1, showLeaves: false,
+        isFullscreen: false, moonUp: false, moonY: null, month: 10, latitude: 47.8, gapFactor: 1, rewind: false,
+        fishOverride: 'whale', density: 1, view,
+      };
+      return spawnTick({ birds: [], fish: [], ships: [], leaves: [], planes: [] }, last, rules, 60_000, 60, () => r).fish[0];
+    };
+    const rising = spawnWhale(0.3);
+    expect(rising.surface).toBeGreaterThan(0);
+    const unit = rising.size / 24;
+    expect(rising.y - rising.path!.y).toBeCloseTo(((WHALE_SPOUT_TOP * unit) / view.height) * 100, 6);
+    expect(rising.path!.height).toBeCloseTo(((rising.size + WHALE_SPOUT_TOP * unit) / view.height) * 100, 6);
+    expect(rising.path!.width).toBeCloseTo(((rising.width + WHALE_SPOUT_AHEAD * unit) / view.width) * 100, 6);
+    // A whale with a calf keeps its plain box.
+    const withCalf = spawnWhale(0.2);
+    expect(withCalf.calf).toBe(true);
+    expect(withCalf.path!.y).toBe(withCalf.y);
+    expect(withCalf.path!.height).toBeCloseTo((withCalf.size / view.height) * 100, 6);
+  });
+
+  it('draws a rising whale crisp above its water surface, and keeps its wrappers so it rises once (G)', () => {
+    const svg = whaleIn(forcedWhale({}, 9000, 0.3));
+    // No warm start: the rise starts `surface` s after the mount.
+    expect(svg.querySelector<SVGElement>('[data-testid="whale-spout"]')!.style.animation).toMatch(/^scene-whale-spout 17\.5s linear \d+(\.\d+)?s 1 both$/);
+    const swimmer = svg.closest<HTMLElement>('[style*="moveAcrossX"]')!;
+    const depth = 0.75 + 0.3 * 0.25;
+    expect(Number(swimmer.style.opacity)).toBeCloseTo(0.95 * (1 - 0.3 * depth), 5);
+    expect(Number(svg.querySelector('g[clip-path*="under"]')!.getAttribute('opacity'))).toBeCloseTo(1 / lift, 5);
+    // The lane change's wrapper and the dive's wrapper are there from the start, so neither
+    // mounts the whale again (its rise would start over).
+    const dive = svg.parentElement!;
+    const laneChange = dive.parentElement!;
+    expect(laneChange.parentElement).toBe(swimmer);
+    expect(laneChange.getAttribute('data-testid')).toBeNull();
+  });
+
+  it('does not rise when the system asks for reduced motion', () => {
+    const listeners: (() => void)[] = [];
+    const query = {
+      matches: false, media: '', onchange: null, addListener: () => {}, removeListener: () => {},
+      addEventListener: (_: string, listener: () => void) => { listeners.push(listener); }, removeEventListener: () => {},
+      dispatchEvent: () => false,
+    };
+    const mediaSpy = vi.spyOn(window, 'matchMedia').mockReturnValue(query as unknown as MediaQueryList);
+    try {
+      const container = forcedWhale({}, 9000, 0.3);
+      expect(container.querySelector('[data-testid="whale-spout"]')).not.toBeNull();
+      query.matches = true;
+      act(() => listeners.forEach(listener => listener()));
+      expect(whaleIn(container)).not.toBeNull(); // the whale swims on
+      expect(container.querySelector('[data-testid="whale-spout"]')).toBeNull();
+    } finally {
+      mediaSpy.mockRestore();
+    }
+  });
+
+  it('swims at night with the sea sparkle, also without the moon (I)', () => {
+    const whale = createFish('whale', false, false, 390, () => 0, true);
+    expect(whale.light).toBe('own');
+    expect(whale.opacity).toBeCloseTo(0.95 * (1 - 0.3 * 0.75), 5);
+    // A night check every 15-25 s. No moonlight: only a fish with its own light comes.
+    const svg = whaleIn(forcedWhale({ timeOfDay: 'night' }, 22000, 0.3));
+    expect(svg.closest('[data-testid="moonlit-fish"]')).toBeNull();
+    expect(svg.querySelectorAll('[data-testid="whale-spark"]')).toHaveLength(5);
+    expect(svg.querySelector('[data-testid="whale-spout"]')).toBeNull();
   });
 });
