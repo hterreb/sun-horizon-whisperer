@@ -653,7 +653,8 @@ export const spawnTick = (
   // shark and its prey keep their lane, as the hunt is planned on it.
   // Item 122: the new lane is nearer or farther, so the fish takes its depth: its size, opacity
   // and speed change in the same LANE_SHIFT_SEC. The lane is checked again with the new size and
-  // speed; with no lane then, it dives.
+  // speed. When the search then gives another lane, that lane has another depth, so it is checked
+  // again with the size and speed there (3 checks at most); with no lane then, it dives.
   const dodge = (f: FishEntity & { path: ScenePath }, at: number, others: ScenePath[]): FishEntity => {
     if (f.shift === undefined && !f.hunt && !fish.some(g => g.hunt?.preyId === f.id)) {
       const from = Math.max(sceneTime, at - LANE_SHIFT_SEC - 1);
@@ -666,17 +667,20 @@ export const spawnTick = (
         const path = { ...warpPath(f.path, from, LANE_SHIFT_SEC, scale), width: grown.width, height: grown.height, y };
         return { path, scale, fade: (1 - 0.3 * depth) / (1 - 0.3 * f.depth) };
       };
-      const first = lane({ ...f.path, band, view }, others, from);
-      const y = first === null || first === f.path.y ? null : lane({ ...atLane(first).path, band, view }, others, from);
-      if (y !== null && y !== f.path.y) {
+      let y = lane({ ...f.path, band, view }, others, from);
+      for (let checks = 0; checks < 3 && y !== null && y !== f.path.y; checks++) {
         // `path` is the new lane; until the change the fish is on its old one (`hold`).
         const { path, scale, fade } = atLane(y);
-        return {
-          ...f, path, hold: f.path, duration: path.duration, curve: path.curve,
-          // Without a speed change (the depth is at its end already) the old easing stays.
-          easing: path.curve ? toLinearEasing(path.curve) : f.easing,
-          shift: { at: from, dy: ((y - f.path.y) * view.height) / 100, scale, fade },
-        };
+        const next = lane({ ...path, band, view }, others, from);
+        if (next === y) {
+          return {
+            ...f, path, hold: f.path, duration: path.duration, curve: path.curve,
+            // Without a speed change (the depth is at its end already) the old easing stays.
+            easing: path.curve ? toLinearEasing(path.curve) : f.easing,
+            shift: { at: from, dy: ((y - f.path.y) * view.height) / 100, scale, fade },
+          };
+        }
+        y = next;
       }
     }
     return { ...f, dive: Math.min(f.dive ?? Infinity, Math.max(sceneTime, at - 2)) };

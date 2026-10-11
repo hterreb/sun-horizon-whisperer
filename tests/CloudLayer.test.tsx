@@ -1346,6 +1346,29 @@ describe('the shark hunt (ROADMAP item 94)', () => {
     expect(moved.easing).toBeUndefined();
   });
 
+  // Each lane has its own depth, so its own size and speed: a lane that the second check moves
+  // the fish to is checked again with the path the fish takes there (the warm start, seed 4).
+  it('checks the lane a fish changes to with its size and speed on that lane (item 122)', () => {
+    const fish = { ...createFish('carp', false, false, 390, mulberry32(1)), id: 7, depth: 0.5 };
+    const path: ScenePath = { start: 0, duration: 1000, x: 30, dx: 75, width: 5, y: 0, height: 100 };
+    const last: SpawnTimes = { birds: 1e9, fish: 1e9, ships: 0, leaves: 1e9, planes: 1e9, shown: { birds: true, fish: true, ships: true } };
+    // The fish's first pick is 13; with its size and speed there, the search gives 6.5.
+    const answers = [null, undefined, 13, 6.5];
+    const approved: ScenePath[] = [];
+    const lane = (candidate: ScenePath) => {
+      const a = answers.shift();
+      if (a !== undefined) return a;
+      approved.push(candidate);
+      return candidate.y;
+    };
+    const moved = spawnTick(
+      { birds: [], fish: [{ ...fish, path }], ships: [], leaves: [], planes: [] }, last, rules({ fishOverride: null }),
+      200_000, 10, () => 0.3, lane,
+    ).fish[0];
+    expect(moved.path!.y).toBe(6.5);
+    expect(approved.at(-1)).toMatchObject(moved.path!);
+  });
+
   it('spawns a fish with no free lane anyway, and it dodges the first thing it meets (item 102)', () => {
     const blocker = { ...createFish('carp', false, false, 390, mulberry32(2)), id: 8 };
     const path: ScenePath = { start: 0, duration: 1000, x: 0, dx: 1, width: 100, y: 0, height: 100 };
