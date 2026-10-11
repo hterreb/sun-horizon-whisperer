@@ -129,6 +129,8 @@ interface SunVisualizationProps {
   calendarEvent?: CalendarEvent | null;
   // Christmas Eve from sunset to midnight, or ?egg=santa: Santa flies once (CalendarEggs).
   santa?: boolean;
+  // Item 140: the winter solstice day after sunset: the season pill names the longest night (CalendarEggs).
+  longestNight?: boolean;
   // Playful pack (ROADMAP item 117): Easter Sunday from sunrise to 12:00 (or ?egg=easter), and
   // the callback for an egg that really shows (its badge).
   easterMorning?: boolean;
@@ -615,6 +617,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   infoRingTier = null,
   calendarEvent = null,
   santa = false,
+  longestNight = false,
   easterMorning = false,
   onEggShown,
   soundOn = false,
@@ -1361,6 +1364,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         infoRingTier={infoRingTier}
         santa={santa}
         soundOn={soundOn}
+        longestNight={longestNight}
       />
       <SkyEggs
         event={astroEvent}

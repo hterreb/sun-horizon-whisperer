@@ -4,6 +4,7 @@ import {
   Sparkles, Star, Sun, SunMoon, Sunrise, Sunset, TreePine, X, type LucideIcon,
   CloudMoon, Orbit, Sparkle, SunDim,
   Cherry, Drama, FlameKindling, Flower, Lamp, Palette, Rabbit, Sprout,
+  Snowflake,
 } from 'lucide-react';
 import { Crown, Flag, Plane } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
@@ -75,6 +76,7 @@ const EGG_ICONS: Record<Exclude<EggKind, 'ufo' | 'santa'>, [LucideIcon, string]>
   friday13: [Cat, 'text-white'],
   lunarNewYear: [Flame, 'text-brand-coral'],
   solstice: [SunMoon, 'text-brand-gold-light'],
+  midwinter: [Snowflake, 'text-brand-sky'], // item 140
   equinox: [Sunset, 'text-brand-peach'],
   halloweenPumpkin: [MoonStar, 'text-brand-sunset'],
   halloweenBats: [Bat, 'text-white'],

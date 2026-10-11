@@ -72,6 +72,17 @@ describe('festival dates', () => {
     expect(isMidsummer(day(2028, 6, 23))).toBe(true);
   });
 
+  // Item 140: in June the south has its midwinter, so Midsummer shows only at latitude >= 0.
+  it('shows Midsummer only in the north', () => {
+    expect(getFestivalSpan(day(2027, 6, 25))).toBe('midsummer'); // no latitude: north
+    expect(getFestivalSpan(day(2027, 6, 25), null, 59.3)).toBe('midsummer');
+    expect(getFestivalSpan(day(2027, 6, 25), null, 0)).toBe('midsummer');
+    expect(getFestivalSpan(day(2027, 6, 25), null, -33.9)).toBeNull();
+    expect(getCalendarEvent(day(2027, 6, 25), 59.3)).toBe('midsummer');
+    expect(getCalendarEvent(day(2027, 6, 25), -33.9)).toBeNull(); // Sydney
+    expect(getCalendarEvent(day(2027, 6, 26), -33.9)).toBeNull();
+  });
+
   it('shows Hanami from March 25 to April 10, only in Japan when the country is known', () => {
     expect(getFestivalSpan(day(2027, 3, 24))).toBeNull();
     expect(getFestivalSpan(day(2027, 3, 25))).toBe('hanami');

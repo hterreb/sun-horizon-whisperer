@@ -1254,6 +1254,36 @@ describe('SunTracker', () => {
       vi.restoreAllMocks();
     });
 
+    // Item 140: the winter solstice day is midwinter: its own badge, and the longest-night pill after sunset.
+    it('on the winter solstice day the pill opens midwinter, its badge counts on a double tap, and the night starts at sunset', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-12-21T11:00:00Z'));
+      try {
+        render(<SunTracker />);
+        expect(visProps.current).toMatchObject({ calendarEvent: 'solstice-shortest', longestNight: false });
+        const tapEgg = (kind: EggCardKind) => act(() => visProps.current!.onSceneInfo!({ type: 'egg', kind }, { x: 100, y: 100 }, 'egg-season'));
+        tapEgg('solstice');
+        expect(localStorage.getItem('collection')).toBeNull();
+        tapEgg('midwinter');
+        expect(Object.keys(JSON.parse(localStorage.getItem('collection')!))).toEqual(['egg:midwinter']);
+        expect(unlocked()).toHaveTextContent('Badge unlocked: Midwinter');
+        // 20:00 UTC: after the Ravensburg sunset (about 15:30 UTC).
+        act(() => vi.setSystemTime(new Date('2026-12-21T20:00:00Z')));
+        act(() => vi.advanceTimersByTime(31_000));
+        expect(visProps.current).toMatchObject({ calendarEvent: 'solstice-shortest', longestNight: true });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('?egg=midwinter forces the winter solstice day (item 140), and collects nothing', () => {
+      window.history.pushState({}, '', '/?egg=midwinter');
+      render(<SunTracker />);
+      expect(visProps.current).toMatchObject({ calendarEvent: 'solstice-shortest' });
+      act(() => visProps.current!.onSceneInfo!({ type: 'egg', kind: 'midwinter' }, { x: 100, y: 100 }, 'egg-season'));
+      expect(localStorage.getItem('collection')).toBeNull();
+    });
+
     it('?egg=<festival> forces that festival (item 118), and collects nothing', () => {
       window.history.pushState({}, '', '/?egg=loyKrathong');
       render(<SunTracker />);

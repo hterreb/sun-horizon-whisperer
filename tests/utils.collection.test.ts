@@ -21,15 +21,15 @@ describe('collection (ROADMAP item 112)', () => {
     vi.restoreAllMocks();
   });
 
-  it('has 129 badges with unique ids, one for every fish, flyer, boat and cloud type', () => {
+  it('has 130 badges with unique ids, one for every fish, flyer, boat and cloud type', () => {
     const ids = BADGES.map(b => b.id);
-    expect(ids).toHaveLength(129); // item 115: 69 + 5 sun + 5 terrain + 8 moon states; + 5 sky eggs + 9 national days + 5 playful eggs + 12 festivals; item 120: + 5 hauls + 5 sizes; item 121: + rainbow
-    expect(new Set(ids).size).toBe(129);
+    expect(ids).toHaveLength(130); // item 115: 69 + 5 sun + 5 terrain + 8 moon states; + 5 sky eggs + 9 national days + 5 playful eggs + 12 festivals; item 120: + 5 hauls + 5 sizes; item 121: + rainbow; item 140: + midwinter
+    expect(new Set(ids).size).toBe(130);
     for (const kind of [...FISH_WEIGHTS.map(([k]) => k), ...NIGHT_ONLY]) expect(ids).toContain(`fish:${kind}`);
     for (const kind of [...BIRD_WEIGHTS.map(([k]) => k), 'bat']) expect(ids).toContain(`flyer:${kind}`);
     for (const kind of ['sailboat', 'ferry', 'fishing', 'rowboat', 'freighter']) expect(ids).toContain(`boat:${kind}`);
     for (const type of ['Ci', 'Cs', 'Ac', 'As', 'Cu', 'Sc', 'St', 'Ns', 'Cb', 'Len', 'Mam']) expect(ids).toContain(`cloud:${type}`);
-    expect(BADGES.filter(b => b.group === 'egg')).toHaveLength(50);
+    expect(BADGES.filter(b => b.group === 'egg')).toHaveLength(51);
     expect(BADGES.find(b => b.id === 'plane')?.group).toBe('sky');
   });
 
@@ -96,8 +96,11 @@ describe('collection (ROADMAP item 112)', () => {
   });
 
   it('maps a calendar event to its badge only when the scene shows it', () => {
+    // Item 140: the longest day keeps the solstice badge, the shortest day gives midwinter (all day).
     expect(badgeForCalendarEvent('solstice-longest', shown)).toBe('egg:solstice');
-    expect(badgeForCalendarEvent('solstice-shortest', shown)).toBe('egg:solstice');
+    expect(badgeForCalendarEvent('solstice-shortest', shown)).toBe('egg:midwinter');
+    expect(badgeForCalendarEvent('solstice-shortest', { ...shown, isNight: false, reducedMotion: true })).toBe('egg:midwinter');
+    expect(badgeForCalendarEvent('solstice-shortest', { ...shown, isTimePreview: true })).toBeNull();
     expect(badgeForCalendarEvent('equinox', { ...shown, reducedMotion: true })).toBe('egg:equinox');
     expect(badgeForCalendarEvent(null, shown)).toBeNull();
     expect(badgeForCalendarEvent('new-year', shown)).toBeNull();
@@ -138,6 +141,7 @@ describe('collection (ROADMAP item 112)', () => {
     expect(isCollectionPaused('?hunt=1')).toBe(true);
     expect(isCollectionPaused('?country=FR')).toBe(true);
     expect(isCollectionPaused('?egg=bastilleDay')).toBe(true);
+    expect(isCollectionPaused('?egg=midwinter')).toBe(true); // item 140
     expect(isCollectionPaused('')).toBe(false);
     expect(isCollectionPaused('?lang=de')).toBe(false);
   });
@@ -319,7 +323,7 @@ describe('eggBadgesForTarget (ROADMAP item 123)', () => {
     'matariki', 'conjunction', 'noctilucent', 'midnightSun', 'polarNight', ...NATIONAL_DAYS.map(d => d.kind),
     'emptyTomb', 'potOfGold', 'heartCloud',
     'loyKrathong', 'diwali', 'eidAlFitr', 'midAutumn', 'hanami', 'tanabata', 'diaDeMuertos', 'hanukkah', 'nowruz', 'midsummer', 'carnival',
-    'fireworks', 'aurora', 'meteorShower', 'solstice', 'equinox'];
+    'fireworks', 'aurora', 'meteorShower', 'solstice', 'equinox', 'midwinter'];
 
   it('maps every egg card but the ghost to real badges', () => {
     for (const kind of cards) {
@@ -337,6 +341,9 @@ describe('eggBadgesForTarget (ROADMAP item 123)', () => {
     expect(eggBadgesForTarget({ type: 'egg', kind: 'fireworks' })).toEqual(['egg:newYear']);
     expect(eggBadgesForTarget({ type: 'egg', kind: 'nowruz' })).toEqual(['egg:nowruz', NOWRUZ_ALSO]);
     expect(eggBadgesForTarget({ type: 'egg', kind: 'bastilleDay' })).toEqual(['egg:bastilleDay']);
+    // Item 140: the summer and the winter solstice pill give different badges.
+    expect(eggBadgesForTarget({ type: 'egg', kind: 'solstice' })).toEqual(['egg:solstice']);
+    expect(eggBadgesForTarget({ type: 'egg', kind: 'midwinter' })).toEqual(['egg:midwinter']);
   });
 
   it('lets the sun, the moon, a dressed boat and a cloud carry their events', () => {
