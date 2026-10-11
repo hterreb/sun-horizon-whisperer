@@ -84,10 +84,11 @@ export const getFestivalDay = (date: Date): FestivalEvent | null => {
 
 // The festivals of several days, shortest first. They come after Christmas.
 // Hanami: Mar 25 - Apr 10, in Japan only when the country is known (ISO 3166 code).
-export const getFestivalSpan = (date: Date, country?: string | null): FestivalEvent | null => {
+// Midsummer only in the north (item 140): in June the south has its midwinter.
+export const getFestivalSpan = (date: Date, country?: string | null, latitude = 0): FestivalEvent | null => {
   const month = date.getMonth();
   const day = date.getDate();
-  if (isMidsummer(date)) return 'midsummer';
+  if (latitude >= 0 && isMidsummer(date)) return 'midsummer';
   if (month === 10 && (day === 1 || day === 2)) return 'dia-de-muertos';
   if (isCarnival(date)) return 'carnival';
   if (getHanukkahNight(date) !== null) return 'hanukkah';

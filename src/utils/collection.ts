@@ -22,7 +22,7 @@ import { ridgeAt, type HorizonProfile } from './horizonUtils';
 
 export type EggKind =
   | 'sunglasses' | 'ufo' | 'disco'
-  | 'newYear' | 'friday13' | 'lunarNewYear' | 'solstice' | 'equinox' | 'halloweenPumpkin' | 'halloweenBats' | 'christmas' | 'santa'
+  | 'newYear' | 'friday13' | 'lunarNewYear' | 'solstice' | 'midwinter' | 'equinox' | 'halloweenPumpkin' | 'halloweenBats' | 'christmas' | 'santa'
   | 'solarEclipse' | 'lunarEclipse' | 'greenFlash' | 'supermoon' | 'blueMoon' | 'meteorShower' | 'aurora'
   | 'matariki' | 'conjunction' | 'noctilucent' | 'midnightSun' | 'polarNight'
   | NationalDayKind
@@ -106,7 +106,8 @@ export const SATELLITE_SIZES: [SatelliteSize, MessageKey][] = [
 const EGGS: [EggKind, MessageKey][] = [
   ['sunglasses', 'egg.sunglasses'], ['ufo', 'egg.ufo'], ['disco', 'egg.disco'],
   ['newYear', 'egg.newYear'], ['friday13', 'egg.friday13'], ['lunarNewYear', 'egg.lunarNewYear'],
-  ['solstice', 'egg.solstice'], ['equinox', 'egg.equinox'], ['halloweenPumpkin', 'egg.halloweenPumpkin'],
+  // Item 140: the summer solstice and midwinter (the winter solstice) have a badge each.
+  ['solstice', 'egg.solstice'], ['midwinter', 'egg.midwinter'], ['equinox', 'egg.equinox'], ['halloweenPumpkin', 'egg.halloweenPumpkin'],
   ['halloweenBats', 'egg.halloweenBats'], ['christmas', 'egg.christmas'], ['santa', 'egg.santa'],
   ['solarEclipse', 'egg.solarEclipse'], ['lunarEclipse', 'egg.lunarEclipse'], ['greenFlash', 'egg.greenFlash'],
   ['supermoon', 'egg.supermoon'], ['blueMoon', 'egg.blueMoon'], ['meteorShower', 'egg.meteorShower'], ['aurora', 'egg.aurora'],
@@ -296,8 +297,9 @@ export const badgeForCalendarEvent = (event: CalendarEvent | null, o: CalendarBa
   }
   switch (event) {
     case 'new-year': return null;
-    case 'solstice-longest':
-    case 'solstice-shortest': return 'egg:solstice';
+    // Item 140: the longest day keeps the solstice badge; the shortest day is midwinter, all day.
+    case 'solstice-longest': return 'egg:solstice';
+    case 'solstice-shortest': return 'egg:midwinter';
     case 'equinox': return 'egg:equinox';
     case 'halloween-pumpkin': return o.moonUp ? 'egg:halloweenPumpkin' : null;
     case 'halloween-bats': return o.isNight && !o.reducedMotion ? 'egg:halloweenBats' : null;

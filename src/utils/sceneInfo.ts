@@ -33,7 +33,9 @@ export type EggCardKind = 'ufo' | 'ghost' | 'dragon' | 'santa' | 'blackCat' | 'h
   // Item 118: the festival eggs (FestivalEggs). Holi tints the clouds, which keep their cloud cards.
   | Exclude<FestivalEgg, 'holi'>
   // Item 123: the fireworks show, the aurora, the meteor shower's star field and the season badge.
-  | 'fireworks' | 'aurora' | 'meteorShower' | 'solstice' | 'equinox';
+  | 'fireworks' | 'aurora' | 'meteorShower' | 'solstice' | 'equinox'
+  // Item 140: the season badge on the winter solstice day.
+  | 'midwinter';
 
 // Item 123: a boat on a bunting day, at Día de los Muertos or at Christmas carries this (useBunting).
 export type BoatDress = 'pennant' | 'picado' | 'lights';
@@ -292,6 +294,8 @@ const EGGS: Record<EggCardKind, { name: MessageKey; fact: MessageKey; hidden: bo
   meteorShower: { name: 'egg.meteorShower', fact: 'eggFact.meteorShower', hidden: false, chance: null },
   solstice: { name: 'egg.solstice', fact: 'eggFact.solstice', hidden: false, chance: null },
   equinox: { name: 'egg.equinox', fact: 'eggFact.equinox', hidden: false, chance: null },
+  // Item 140: the winter solstice day, with its days a year ("1 day a year").
+  midwinter: { name: 'egg.midwinter', fact: 'eggFact.midwinter', hidden: false, chance: { event: 'solstice-shortest' } },
 };
 
 // Item 123: the event row of the sun and the moon card (the moon card has its own supermoon row).

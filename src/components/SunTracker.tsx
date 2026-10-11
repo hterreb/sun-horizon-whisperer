@@ -78,7 +78,7 @@ import {
   badgeForRoute, saveCollection, stateBadgeForTarget, type BadgeId, type Collection, type StateBadgeContext,
 } from '@/utils/collection';
 import { watchSunEvent, NO_SUN_EVENT_WATCH, getCountdownTarget } from '../utils/sunEvents';
-import { getCalendarEvent, isSantaTime } from '@/utils/calendarEvents';
+import { getCalendarEvent, isLongestNight, isMidwinterForced, isSantaTime } from '@/utils/calendarEvents';
 import { getNationalDay, parseCountryOverride, parseNationalEggOverride } from '@/utils/nationalDays';
 import { badgeForNationalDay } from '@/utils/collection';
 import { BuntingContext, type Bunting } from '@/hooks/useBunting';
@@ -879,6 +879,8 @@ const SunTracker: React.FC = () => {
   // forces Lunar New Year (item 100), `?egg=santa` Santa's flight (no snow: that is Dec 25-26).
   const [dragonForced] = useState(() => new URLSearchParams(window.location.search).get('egg') === 'dragon');
   const [santaForced] = useState(() => new URLSearchParams(window.location.search).get('egg') === 'santa');
+  // Item 140: `?egg=midwinter` forces the winter solstice day.
+  const [midwinterForced] = useState(() => isMidwinterForced(window.location.search));
   // Playful pack (ROADMAP item 117): `?egg=aprilFools|easter|valentine|stPatrick` sets that day.
   const [playfulForced] = useState(() => getPlayfulOverride(window.location.search));
   // Item 118: `?egg=<festival egg kind>` (for example `?egg=diwali`) forces a festival.
@@ -889,13 +891,15 @@ const SunTracker: React.FC = () => {
   const [countryOverride] = useState(() => parseCountryOverride(window.location.search));
   const country = countryOverride ?? (manualPlaceName ? manualCountry : detectedCountry);
   const calendarEvent = useMemo(
-    () => (dragonForced ? 'lunar-new-year' : playfulForced ? PLAYFUL_EVENT[playfulForced]
+    () => (dragonForced ? 'lunar-new-year' : midwinterForced ? 'solstice-shortest' : playfulForced ? PLAYFUL_EVENT[playfulForced]
       : festivalForced ?? getCalendarEvent(date, location.latitude, country ?? undefined)),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on passMinuteKey, not `date` itself
     [passMinuteKey, location.latitude, country]
   );
   // Christmas Eve: Santa flies once from sunset to midnight (the scene's sun times).
   const isSanta = santaForced || isSantaTime(date, sunTimes);
+  // Item 140: the winter solstice day from sunset to midnight: the pill names the longest night.
+  const longestNight = isLongestNight(calendarEvent, date, sunTimes);
   // National days (utils/nationalDays): only in the place's country, from InfoPanel's
   // reverse-geocode answer. Unknown country: none. `?country=XX` sets the country,
   // `?egg=<kind>` (for example `?egg=bastilleDay`) forces the day.
@@ -1053,7 +1057,7 @@ const SunTracker: React.FC = () => {
   // really shows (item 123: a double tap on the egg collects one; CalendarEggs' rules: dark sky = night or astronomical/nautical twilight).
   // Not for a forced egg (?egg=dragon, ?egg=santa or any ?egg) and not in a time preview.
   const isDarkSky = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
-  const calendarBadge = dragonForced || santaForced || festivalForced ? null : badgeForCalendarEvent(calendarEvent, {
+  const calendarBadge = dragonForced || santaForced || festivalForced || midwinterForced ? null : badgeForCalendarEvent(calendarEvent, {
     isNight: isDarkSky,
     moonUp: isDarkSky && moonPosition.visible && getMoonLook(weatherType, cloudCover).disc > 0,
     weatherType,
@@ -1285,6 +1289,7 @@ const SunTracker: React.FC = () => {
             infoRingTier={infoCardInfo?.tier ?? null}
             calendarEvent={calendarEvent}
             santa={isSanta}
+            longestNight={longestNight}
             easterMorning={easterMorning}
             onEggShown={handleEggShown}
             soundOn={isCountdownOn}

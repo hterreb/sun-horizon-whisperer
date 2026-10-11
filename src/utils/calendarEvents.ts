@@ -83,8 +83,8 @@ const isHalloweenFullMoon = (year: number) => getNextFullMoon(new Date(year, 9, 
 // the New Year minute, then single days (Lunar New Year, the one-day festivals of item 118,
 // Friday the 13th, solstice/equinox/Nowruz, Halloween), then the 2 Christmas days, then the
 // festivals of several days (Midsummer, Día de los Muertos, Carnival, Hanukkah, Hanami).
-// Without a latitude, the north is assumed. `country` (ISO 3166 code) limits Hanami to Japan;
-// without it, Hanami shows for everyone.
+// Without a latitude, the north is assumed; Midsummer shows only in the north (item 140).
+// `country` (ISO 3166 code) limits Hanami to Japan; without it, Hanami shows for everyone.
 export const getCalendarEvent = (date: Date, latitude = 0, country?: string | null): CalendarEvent | null => {
   const month = date.getMonth();
   const day = date.getDate();
@@ -102,8 +102,12 @@ export const getCalendarEvent = (date: Date, latitude = 0, country?: string | nu
   if (month === 2 && day === 17) return 'st-patrick';
   if (month === 9 && day === 31) return isHalloweenFullMoon(date.getFullYear()) ? 'halloween-pumpkin' : 'halloween-bats';
   if (month === 11 && day >= 25 && day <= 26) return 'christmas';
-  return getFestivalSpan(date, country);
+  return getFestivalSpan(date, country, latitude);
 };
+
+// Item 140: `?egg=midwinter` (any case) forces the winter solstice day ('solstice-shortest'), for testing.
+export const isMidwinterForced = (search: string): boolean =>
+  new URLSearchParams(search).get('egg')?.toLowerCase() === 'midwinter';
 
 // Item 113 (egg info cards): the mean number of days a year that show this event, over the
 // years of the Lunar New Year list. It asks getCalendarEvent at noon of each day, so it follows
@@ -136,6 +140,18 @@ export const isSantaTime = (date: Date, sunTimes: Pick<SunTimes, 'sunset' | 'pol
   if (!sunTimes || sunTimes.polar === 'day') return false;
   if (!sameLocalDay(sunTimes.sunset, date)) return false;
   return date.getTime() >= sunTimes.sunset.getTime();
+};
+
+// Item 140: on the winter solstice day, from sunset to local midnight, the season pill names
+// the longest night. `sunTimes` are the scene's sun times for this day, with isSantaTime's rules
+// (the sunset must be on the same local day; at polar night the 18:00 fallback sunset).
+export const isLongestNight = (
+  event: CalendarEvent | null,
+  date: Date,
+  sunTimes: Pick<SunTimes, 'sunset' | 'polar'> | null
+): boolean => {
+  if (event !== 'solstice-shortest' || !sunTimes || sunTimes.polar === 'day') return false;
+  return sameLocalDay(sunTimes.sunset, date) && date.getTime() >= sunTimes.sunset.getTime();
 };
 
 // Info-card ring ids of the lazy calendar eggs. Here, not in their component files, so
