@@ -627,9 +627,10 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   // below (the heading's own low-pass filter already smooths the motion).
   const compassActive = compassHeading !== null;
   // Cardinal labels fade out together with the top-left buttons while idle in
-  // fullscreen (ROADMAP item 29), but stay visible in compass mode, where they're
-  // needed to aim the phone.
-  const cardinalLabelsVisible = compassActive || !isFullscreen || showCursor;
+  // fullscreen (ROADMAP item 29) or hidden by a sky tap (item 136; `showCursor` is
+  // SunTracker's idle fade), but stay visible in compass mode, where they're needed
+  // to aim the phone.
+  const cardinalLabelsVisible = compassActive || showCursor;
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerDimensions, setContainerDimensions] = useState({ width: 0, height: 0 });
   useEffect(() => {

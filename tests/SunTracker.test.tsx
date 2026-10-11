@@ -220,13 +220,15 @@ describe('SunTracker', () => {
       advance(1);
       expect(scene).toHaveClass('cursor-none');
 
-      // Item 124: a touch on a scene hit area (a double tap on a fish) does not wake.
+      // Item 124: a tap on a scene hit area (a double tap on a fish) does not wake.
       const hit = document.createElement('span');
       hit.setAttribute('data-scene-hit', 'true');
       const inner = hit.appendChild(document.createElement('span'));
-      document.body.appendChild(hit);
+      scene.appendChild(hit);
       fireEvent.touchStart(inner);
+      fireEvent.click(inner);
       fireEvent.touchStart(inner);
+      fireEvent.click(inner);
       expect(scene).toHaveClass('cursor-none');
       // Item 133: the compatibility mouse events of a tap do not wake.
       fireEvent.mouseMove(inner);
@@ -237,7 +239,10 @@ describe('SunTracker', () => {
       // Item 132: the hidden buttons take no taps; after a wake only once a double tap is over.
       const column = screen.getByRole('button', { name: 'Exit fullscreen' }).parentElement!;
       expect(column).toHaveClass('pointer-events-none');
-      fireEvent.touchStart(document);
+      // Item 136: a touch alone does not wake; a tap (click) on the empty sky does.
+      fireEvent.touchStart(scene);
+      expect(scene).toHaveClass('cursor-none');
+      fireEvent.click(scene);
       expect(scene).not.toHaveClass('cursor-none');
       expect(column).toHaveClass('pointer-events-none');
       advance(TAP_READY_MS);
@@ -253,6 +258,147 @@ describe('SunTracker', () => {
       delete (document as { fullscreenElement?: Element | null }).fullscreenElement;
       vi.useRealTimers();
     }
+  });
+
+  describe('a tap on the empty sky hides or shows the controls (ROADMAP item 136)', () => {
+    const advance = (ms: number) => act(() => {
+      vi.advanceTimersByTime(ms);
+    });
+    const setFullscreenElement = (element: Element | null) => act(() => {
+      Object.defineProperty(document, 'fullscreenElement', { value: element, configurable: true });
+      document.dispatchEvent(new Event('fullscreenchange'));
+    });
+    // A phone tap: pointerdown (SceneInfoCard closes on it), then the click.
+    const tap = (el: Element) => {
+      fireEvent.pointerDown(el);
+      fireEvent.click(el);
+    };
+    const column = () => screen.getByRole('button', { name: /fullscreen/i }).parentElement!;
+    const shown = () => column().classList.contains('opacity-100');
+    const start = (displayMode: string | null = null) => {
+      vi.useFakeTimers();
+      // Midday: the sun shows (a tap on it opens a card).
+      vi.setSystemTime(new Date('2026-09-30T11:00:00Z'));
+      vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 1, longitude: 2 } }) } });
+      vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
+        matches: query === displayMode,
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }));
+      const { container } = render(<SunTracker />);
+      // The top-left buttons mount after the 200 ms fade.
+      advance(250);
+      return container.querySelector('[data-share-root]')!;
+    };
+
+    afterEach(() => {
+      delete (document as { fullscreenElement?: Element | null }).fullscreenElement;
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    it('in fullscreen: a sky tap hides at once and for good, the next shows for 10 s', () => {
+      const scene = start();
+      setFullscreenElement(document.documentElement);
+      advance(1000);
+      expect(shown()).toBe(true);
+
+      tap(scene);
+      expect(shown()).toBe(false);
+      expect(column()).toHaveClass('pointer-events-none');
+      advance(60_000);
+      expect(shown()).toBe(false);
+
+      tap(scene);
+      expect(shown()).toBe(true);
+      expect(column()).toHaveClass('pointer-events-none');
+      advance(TAP_READY_MS);
+      expect(column()).not.toHaveClass('pointer-events-none');
+      advance(10_000 - TAP_READY_MS - 1);
+      expect(shown()).toBe(true);
+      advance(1);
+      expect(shown()).toBe(false);
+
+      // A mouse move still wakes (item 133).
+      act(() => {
+        const event = new MouseEvent('pointermove', { bubbles: true });
+        Object.defineProperty(event, 'pointerType', { value: 'mouse' });
+        document.dispatchEvent(event);
+      });
+      expect(shown()).toBe(true);
+    });
+
+    it('two sky taps 200 ms apart toggle once: a double tap on the sky does not flicker', () => {
+      const scene = start();
+      setFullscreenElement(document.documentElement);
+      tap(scene);
+      advance(200);
+      tap(scene);
+      expect(shown()).toBe(false);
+      advance(400);
+      tap(scene);
+      expect(shown()).toBe(true);
+    });
+
+    it('a tap on a scene thing, a control or outside the scene does not toggle', () => {
+      const scene = start();
+      setFullscreenElement(document.documentElement);
+      const hit = scene.appendChild(document.createElement('span'));
+      hit.setAttribute('data-scene-hit', 'true');
+      const fish = hit.appendChild(document.createElement('span'));
+      tap(fish);
+      advance(100);
+      tap(fish);
+      expect(shown()).toBe(true);
+      advance(1000);
+      tap(screen.getByRole('button', { name: 'Exit fullscreen' }));
+      expect(shown()).toBe(true);
+      tap(document.body);
+      expect(shown()).toBe(true);
+    });
+
+    it('a tap that closes an info card only closes it', () => {
+      const scene = start();
+      setFullscreenElement(document.documentElement);
+      const sun = screen.getByRole('button', { name: 'Sun' });
+      fireEvent.click(sun, { detail: 1 });
+      fireEvent.click(sun, { detail: 2 });
+      expect(screen.getByTestId('scene-info-card')).toBeInTheDocument();
+      advance(1000);
+
+      tap(scene);
+      expect(screen.queryByTestId('scene-info-card')).toBeNull();
+      expect(shown()).toBe(true);
+      tap(scene);
+      expect(shown()).toBe(false);
+    });
+
+    it('in the installed app: shown at start, a sky tap hides, the next shows for 10 s', () => {
+      const scene = start('(display-mode: fullscreen)');
+      advance(60_000);
+      expect(shown()).toBe(true);
+
+      tap(scene);
+      advance(60_000);
+      expect(shown()).toBe(false);
+      tap(scene);
+      expect(shown()).toBe(true);
+      advance(10_000);
+      expect(shown()).toBe(false);
+    });
+
+    it('in a browser tab: a sky tap does nothing, the controls always show', () => {
+      const scene = start();
+      tap(scene);
+      advance(60_000);
+      expect(shown()).toBe(true);
+      expect(column()).not.toHaveClass('pointer-events-none');
+    });
   });
 
   describe('screen on (ROADMAP item 90)', () => {

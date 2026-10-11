@@ -345,8 +345,10 @@ describe('SunVisualization (rendered): static cardinal direction labels (ROADMAP
     rerender(<SunVisualization {...props} isFullscreen={true} showCursor={true} />);
     expect(screen.getByTestId('cardinal-labels')).toHaveClass('opacity-100');
 
+    // Item 136: showCursor alone decides (SunTracker keeps it true in a browser tab), so the
+    // labels also fade in the installed app, where isFullscreen is false.
     rerender(<SunVisualization {...props} isFullscreen={false} showCursor={false} />);
-    expect(screen.getByTestId('cardinal-labels')).toHaveClass('opacity-100');
+    expect(screen.getByTestId('cardinal-labels')).toHaveClass('opacity-0');
   });
 
   it('stays visible in compass mode even when idle in fullscreen (ROADMAP item 29)', () => {
