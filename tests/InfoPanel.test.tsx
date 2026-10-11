@@ -826,6 +826,8 @@ describe('InfoPanel: line of sight as an icon at the sun and moon rows (ROADMAP 
     render(<InfoPanel {...defaultProps} terrainStatus="loading" />);
     fireEvent.click(getSunLineOfSightButton());
     expect(screen.getByText(/Mapzen \/ AWS Terrain Tiles/)).toBeInTheDocument();
+    // The trees' land cover, CC BY 4.0 (ROADMAP item 141).
+    expect(screen.getByText(/© ESA WorldCover project 2021/)).toBeInTheDocument();
     expect(screen.getByLabelText(/eye height/i)).toBeInTheDocument();
   });
 

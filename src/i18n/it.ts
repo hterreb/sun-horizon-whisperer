@@ -165,6 +165,7 @@ export const it: Record<keyof typeof en, string> = {
   'terrain.moonHidden': "la luna resta dietro il terreno",
   'terrain.eyeHeight': "Altezza degli occhi (m) — es. piano, torre",
   'terrain.attribution': "Terreno: {source}",
+  'terrain.treesAttribution': "Alberi: {source}",
 
   // Moon
   'moon.title': "Info luna",

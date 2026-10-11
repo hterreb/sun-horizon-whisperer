@@ -165,6 +165,7 @@ export const en = {
   'terrain.moonHidden': 'moon stays behind terrain',
   'terrain.eyeHeight': 'Eye height (m) — e.g. floor, tower',
   'terrain.attribution': 'Terrain: {source}',
+  'terrain.treesAttribution': 'Trees: {source}',
 
   // Moon
   'moon.title': 'Moon Information',
