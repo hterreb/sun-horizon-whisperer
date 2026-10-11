@@ -55,6 +55,7 @@ import { ENTER_HIDE_MS, useIdleHide } from '@/hooks/useIdleHide';
 import { DOUBLE_TAP_MS } from '@/hooks/useDoubleTap';
 import { useCompassHeading } from '@/hooks/useCompassHeading';
 import { useHorizonProfile } from '@/hooks/useHorizonProfile';
+import { useTreeCover } from '@/hooks/useTreeCover';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { useSunsetCountdown, primeCountdownAudio } from '@/hooks/useSunsetCountdown';
 import { useSunsetReminder, requestReminderPermission, getNotificationPermission } from '@/hooks/useSunsetReminder';
@@ -319,6 +320,8 @@ const SunTracker: React.FC = () => {
     eyeHeight,
     isLineOfSightOn && location.loaded
   );
+  // Tree silhouettes on the ridge (ROADMAP item 141), loaded after the profile.
+  const trees = useTreeCover(horizonProfile, terrainStatus === 'ready', location.latitude, location.longitude);
 
   const handleCompassEnable = useCallback(() => {
     if (!hasSeenCompassCalibrationHint()) {
@@ -1274,6 +1277,7 @@ const SunTracker: React.FC = () => {
             windDirectionDeg={weatherData?.windDirectionDeg ?? null}
             compassHeading={activeCompassHeading}
             horizonProfile={horizonProfile}
+            trees={trees}
             terrainSunTimes={terrainExtras.terrainSunTimes}
             astroEvent={astroEvent}
             onFireworksRunning={setOwnFireworksRunning}
