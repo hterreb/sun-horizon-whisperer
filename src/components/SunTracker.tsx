@@ -861,11 +861,10 @@ const SunTracker: React.FC = () => {
   const handleSceneInfo = useCallback((target: SceneInfoTarget, point: { x: number; y: number }, ring: string) => {
     infoCardCount.current += 1;
     setInfoCard({ target, ...point, ring, id: infoCardCount.current });
-    // The base badge first, then the state badge (sun, moon, terrain): one collect each.
-    const badge = badgeForTarget(target);
+    // Item 138: one badge per tap. The kind's badge, or the state badge (satellite, sun, moon,
+    // terrain); no state (the sun in the twilights, a time preview) collects nothing.
+    const badge = badgeForTarget(target) ?? stateBadgeForTarget(target, stateBadgeContextRef.current);
     if (badge) collect(badge);
-    const state = stateBadgeForTarget(target, stateBadgeContextRef.current);
-    if (state) collect(state);
   }, [collect]);
   const handleInfoClose = useCallback(() => setInfoCard(null), []);
   // Item 136: read by the sky tap toggle (a tap that closes the card does not toggle).

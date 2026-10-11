@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import {
-  ArrowLeftRight, Cat, Coins, Eclipse, Flame, Glasses, Heart, Hourglass, Moon, MoonStar, Mountain, PartyPopper, Rainbow, Satellite,
+  ArrowLeftRight, Cat, Coins, Eclipse, Flame, Glasses, Heart, Hourglass, Moon, MoonStar, PartyPopper, Rainbow, Satellite,
   Sparkles, Star, Sun, SunMoon, Sunrise, Sunset, TreePine, X, type LucideIcon,
   CloudMoon, Orbit, Sparkle, SunDim,
   Cherry, Drama, FlameKindling, Flower, Lamp, Palette, Rabbit, Sprout,
@@ -55,8 +55,8 @@ const STATE_BASES: StateBase[] = ['plane', 'satellite', 'sun', 'moon', 'terrain'
 const isStateRow = (badge: Badge): boolean => badge.base !== undefined || (STATE_BASES as string[]).includes(badge.id);
 
 // The grids of a group. In the sky group, the plane, the satellite, the sun, the moon and the
-// terrain each have their own row: the base badge, then its states (items 115, 120). The order
-// is the BADGES order; an empty row is left out.
+// terrain each have their own row: the base badge (only the plane has one since item 138), then
+// its states (items 115, 120). The order is the BADGES order; an empty row is left out.
 const groupRows = (group: BadgeGroup): Badge[][] => {
   const badges = BADGES.filter((badge) => badge.group === group);
   if (group !== 'sky') return [badges];
@@ -122,11 +122,8 @@ const EGG_ICONS: Record<Exclude<EggKind, 'ufo' | 'santa'>, [LucideIcon, string]>
   carnival: [Drama, 'text-brand-cyan'],
 };
 
-const SKY_ICONS: Record<'sun' | 'moon' | 'terrain' | 'satellite' | 'rainbow', [LucideIcon, string]> = {
-  sun: [Sun, 'text-brand-gold'],
-  moon: [Moon, 'text-white'],
-  terrain: [Mountain, 'text-white'],
-  satellite: [Satellite, 'text-white'],
+// Item 138: the sun, the moon, the terrain and the satellite have no base badge, so no icon here.
+const SKY_ICONS: Record<'rainbow', [LucideIcon, string]> = {
   rainbow: [Rainbow, 'text-white'], // item 121
 };
 
