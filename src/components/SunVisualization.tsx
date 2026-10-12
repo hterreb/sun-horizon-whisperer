@@ -6,6 +6,7 @@ import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
 import { getSunArcLabels, getMoonArcLabels, getTerrainArcLabels, getTerrainMoonArcLabels, type ArcLabels, type ArcLabelPoint } from '../utils/arcLabels';
 import { shortestHeadingDelta } from '../utils/compassUtils';
 import { type HorizonProfile, horizonAngleAt } from '../utils/horizonUtils';
+import { type RidgePoint, type TreeLayer } from '@/utils/treeSilhouettes';
 import CloudLayer, { type SceneInfoHandler, type WeatherType } from './CloudLayer';
 import Fireworks from './Fireworks';
 import SunSunglasses from './SunSunglasses';
@@ -98,6 +99,9 @@ interface SunVisualizationProps {
   // feature is disabled/loading/unavailable - null draws the flat horizon only, same
   // as before the feature existed.
   horizonProfile?: HorizonProfile | null;
+  // Tree silhouettes on the ridge (ROADMAP item 141): the land cover at the ridge points and
+  // the lazily loaded tree code (useTreeCover); null: the bare ridge.
+  trees?: TreeLayer | null;
   // Line-of-sight sunrise/sunset from SunTracker (terrainExtras.terrainSunTimes), drawn as
   // extra sun-arc labels where the arc meets the ridge (ROADMAP item 42). Null = none.
   terrainSunTimes?: { sunrise: Date | null; sunset: Date | null } | null;
@@ -134,6 +138,8 @@ interface SunVisualizationProps {
   calendarEvent?: CalendarEvent | null;
   // Christmas Eve from sunset to midnight, or ?egg=santa: Santa flies once (CalendarEggs).
   santa?: boolean;
+  // Item 140: the winter solstice day after sunset: the season pill names the longest night (CalendarEggs).
+  longestNight?: boolean;
   // Playful pack (ROADMAP item 117): Easter Sunday from sunrise to 12:00 (or ?egg=easter), and
   // the callback for an egg that really shows (its badge).
   easterMorning?: boolean;
@@ -465,7 +471,8 @@ const getTerrainAzimuths = (compassHeading: number | null): number[] => {
   return Array.from({ length: COMPASS_FOV_DEG + 1 }, (_, i) => (((start + i) % 360) + 360) % 360);
 };
 
-// Builds the terrain silhouette as one or more contiguous point runs (screen x/y),
+// Builds the terrain silhouette as one or more contiguous point runs (screen x/y, and the
+// azimuth for the trees of item 141),
 // splitting into a new run wherever a point is outside the compass field of view or
 // the azimuth->x mapping wraps (same idea as buildArcPath's gap detection, ROADMAP
 // item 17/13) - static mode's southern-hemisphere shift can otherwise jump straight
@@ -478,12 +485,12 @@ export const buildTerrainSegments = (
   height: number,
   latitude: number,
   compassHeading: number | null
-): { x: number; y: number }[][] => {
+): RidgePoint[][] => {
   if (width === 0 || height === 0) return [];
 
   const azimuths = getTerrainAzimuths(compassHeading);
-  const segments: { x: number; y: number }[][] = [];
-  let current: { x: number; y: number }[] = [];
+  const segments: RidgePoint[][] = [];
+  let current: RidgePoint[] = [];
   let prevX: number | null = null;
 
   for (const azimuth of azimuths) {
@@ -502,7 +509,7 @@ export const buildTerrainSegments = (
     }
 
     const angle = Math.max(0, horizonAngleAt(profile, azimuth));
-    current.push({ x, y: altitudeToY(angle, height) });
+    current.push({ x, y: altitudeToY(angle, height), azimuth });
     prevX = x;
   }
   if (current.length > 1) segments.push(current);
@@ -603,6 +610,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   sunTimes = null,
   compassHeading = null,
   horizonProfile = null,
+  trees = null,
   terrainSunTimes = null,
   terrainMoonTimes = null,
   sunsetCountdown = null,
@@ -620,6 +628,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   infoRingTier = null,
   calendarEvent = null,
   santa = false,
+  longestNight = false,
   easterMorning = false,
   onEggShown,
   soundOn = false,
@@ -632,9 +641,10 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   // below (the heading's own low-pass filter already smooths the motion).
   const compassActive = compassHeading !== null;
   // Cardinal labels fade out together with the top-left buttons while idle in
-  // fullscreen (ROADMAP item 29), but stay visible in compass mode, where they're
-  // needed to aim the phone.
-  const cardinalLabelsVisible = compassActive || !isFullscreen || showCursor;
+  // fullscreen (ROADMAP item 29) or hidden by a sky tap (item 136; `showCursor` is
+  // SunTracker's idle fade), but stay visible in compass mode, where they're needed
+  // to aim the phone.
+  const cardinalLabelsVisible = compassActive || showCursor;
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerDimensions, setContainerDimensions] = useState({ width: 0, height: 0 });
   useEffect(() => {
@@ -692,14 +702,31 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   // Terrain silhouette (ROADMAP item 13): replaces the flat horizon line with the
   // real profile when one is loaded, using the same altitude->y mapping as the sun/
   // moon dots and the same azimuth->x mapping (static full circle or compass FOV).
-  const terrainFillPath = useMemo(() => {
+  // The trees (item 141) go into the same path, so the taps, the keyboard and the sea's
+  // mirror take them as terrain. Rebuilt only when the profile, the size, the heading or
+  // the month change; no work per frame.
+  const treeMonth = date.getMonth();
+  const terrain = useMemo(() => {
     const { width, height } = containerDimensions;
-    if (!horizonProfile || width === 0 || height === 0) return '';
+    if (!horizonProfile || width === 0 || height === 0) return { fill: '', trees: '' };
 
     const horizonY = height * 0.65;
     const segments = buildTerrainSegments(horizonProfile, width, height, latitude, compassHeading);
-    return buildTerrainFillPath(segments, horizonY);
-  }, [horizonProfile, containerDimensions, latitude, compassHeading]);
+    const fill = buildTerrainFillPath(segments, horizonY);
+    const treePath = trees
+      ? trees.lib.buildTreePath(segments, horizonProfile, trees.cover, (angle) => altitudeToY(angle, height), {
+          perDegree: compassHeading === null ? 1 : 3,
+          bare: trees.lib.isBareSeason(treeMonth, latitude),
+          latitude,
+          longitude,
+        })
+      : '';
+    return { fill: treePath ? `${fill} ${treePath}` : fill, trees: treePath };
+  }, [horizonProfile, containerDimensions, latitude, longitude, compassHeading, trees, treeMonth]);
+  const terrainFillPath = terrain.fill;
+  // By day only, the trees get up to 8 % green or amber over the ridge colour (item 141).
+  const isDaylight = timeOfDay === 'morning' || timeOfDay === 'midday' || timeOfDay === 'afternoon';
+  const treeTint = terrain.trees && isDaylight ? trees?.lib.getTreeTint(date, latitude) : null;
 
   // Item 116: the sun, the moon and the terrain open their card on a double tap; a single tap
   // shows the sun's or the moon's ring for a moment. The keyboard (Enter, Space) opens at once.
@@ -1374,6 +1401,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         infoRingTier={infoRingTier}
         santa={santa}
         soundOn={soundOn}
+        longestNight={longestNight}
       />
       <SkyEggs
         event={astroEvent}
@@ -1451,6 +1479,16 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             onClick={handleTerrainTap}
             onKeyDown={handleTerrainKey}
             data-testid="terrain-silhouette"
+          />
+        )}
+        {treeTint && (
+          // The trees' season tint (item 141), over the ridge colour; taps go through to the ridge.
+          <path
+            d={terrain.trees}
+            fill={`hsl(var(--scene-tree-${treeTint}))`}
+            fillOpacity={0.08}
+            pointerEvents="none"
+            data-testid="tree-tint"
           />
         )}
         <path

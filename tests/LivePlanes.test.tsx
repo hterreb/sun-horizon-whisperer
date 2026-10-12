@@ -175,6 +175,100 @@ describe('LivePlanes (ROADMAP item 96)', () => {
     expect(screen.getAllByTestId('live-plane')).toHaveLength(20);
   });
 
+  describe('points the way it flies on the screen (item 143, option H)', () => {
+    const body = () => screen.getByTestId('live-plane-body');
+    const angle = () => Number(body().style.transform.match(/rotate\(([-\d.e]+)rad\)/)![1]);
+    const scaleY = (el: Element) => Number((el as HTMLElement).style.transform.match(/scaleY\(([-\d.]+)\)/)![1]);
+    const side = () => screen.getByTestId('live-plane-side');
+    const under = () => screen.getByTestId('live-plane-under');
+    // 50 km south, flying east: facing south, east is on the left, so it moves left, about level.
+    const east = { ...south, speedKt: 450, track: 90 };
+    // 15 km south, flying (almost) north towards the observer: it climbs steeply on the screen.
+    const towards = { ...south, lat: PLACE.lat - 15 / KM_PER_DEG, speedKt: 450, track: 2 };
+    const withTimers = (test: () => void) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000);
+      try { test(); } finally { vi.useRealTimers(); }
+    };
+
+    it('mirrors a plane that moves left in the side view, so the fin stays up', () => withTimers(() => {
+      renderScene({ livePlanes: feed([east]) });
+      expect(Math.abs(angle() - Math.PI)).toBeLessThan(0.1);
+      expect(scaleY(side())).toBe(1);
+      expect(scaleY(side().firstElementChild!)).toBe(-1);
+      expect(scaleY(under())).toBe(0);
+    }));
+
+    it('shows a steep plane from below, pointing up along its way, with no clamp', () => withTimers(() => {
+      renderScene({ livePlanes: feed([towards]) });
+      expect(scaleY(side())).toBe(0);
+      expect(scaleY(under())).toBe(1);
+      expect(angle()).toBeLessThan(-75 * Math.PI / 180);
+      expect(angle()).toBeGreaterThan(-105 * Math.PI / 180);
+    }));
+
+    it('has no transition on its first frame; then it turns over 2 s and rolls in 2 × 0.75 s', () => withTimers(() => {
+      renderScene({ livePlanes: feed([east]) });
+      expect(body().style.transition).toBe('none');
+      expect(side().style.transition).toBe('none');
+      act(() => { vi.advanceTimersByTime(250); });
+      expect(body().style.transition).toBe('transform 2s ease-in-out');
+      expect(side().firstElementChild!.getAttribute('style')).toContain('transition: transform 2s ease-in-out');
+      // The shown view opens after the hidden one has gone edge-on.
+      expect(side().style.transition).toBe('transform 0.75s ease-out 0.75s');
+      expect(under().style.transition).toBe('transform 0.75s ease-in');
+    }));
+
+    it('jumps to the new angle and view with reduced motion', () => withTimers(() => {
+      const reduce = vi.spyOn(window, 'matchMedia').mockImplementation(query => ({
+        matches: query.includes('reduce'), media: query, onchange: null,
+        addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+      }));
+      try {
+        const { rerender } = renderScene({ livePlanes: feed([east]) });
+        rerender(
+          <SunVisualization
+            sunPosition={{ azimuth: 200, altitude: 30 }}
+            moonPosition={{ azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false }}
+            sunPath={[]} moonPath={[]} timeOfDay="midday" weatherType="clear" latitude={PLACE.lat} longitude={PLACE.lon}
+            livePlanes={{ feed: { now: 2_000, aircraft: [east] }, receivedAt: 2_000 }} compassHeading={180}
+          />,
+        );
+        expect([body(), side(), under()].map(el => el.style.transition)).toEqual(['none', 'none', 'none']);
+      } finally {
+        reduce.mockRestore();
+      }
+    }));
+
+    it('keeps the last angle, side and view of a plane that stops; the tap area stays level', () => withTimers(() => {
+      const onSceneInfo = vi.fn();
+      const { rerender } = renderScene({ livePlanes: feed([east]), onSceneInfo });
+      const before = angle();
+      // The next answer: the same plane, now with no speed (compass mode shows a still plane).
+      rerender(
+        <SunVisualization
+          sunPosition={{ azimuth: 200, altitude: 30 }}
+          moonPosition={{ azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false }}
+          sunPath={[]} moonPath={[]} timeOfDay="midday" weatherType="clear" latitude={PLACE.lat} longitude={PLACE.lon}
+          livePlanes={feed([{ ...east, speedKt: 0 }])} compassHeading={180} onSceneInfo={onSceneInfo}
+        />,
+      );
+      expect(angle()).toBe(before);
+      expect(scaleY(side().firstElementChild!)).toBe(-1);
+      expect(scaleY(side())).toBe(1);
+      const hit = screen.getByTestId('live-plane').querySelector<HTMLElement>('[data-plane-hit]')!;
+      expect(body().contains(hit)).toBe(false);
+      expect(hit.style.transform).toBe('');
+    }));
+
+    it('shows both wingtip lights from below at night, and one wing light in the side view', () => withTimers(() => {
+      renderScene({ timeOfDay: 'night', livePlanes: feed([towards]) });
+      expect(under().querySelectorAll('[data-testid="plane-tip-light"]')).toHaveLength(2);
+      expect(under().querySelectorAll('[data-testid="plane-tip-strobe"]')).toHaveLength(2);
+      expect(side().querySelectorAll('[data-testid="plane-wing-light"]')).toHaveLength(1);
+    }));
+  });
+
   it('in the normal view shows only the 2 nearest that visibly move (item 110)', () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_000);

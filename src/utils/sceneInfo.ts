@@ -33,7 +33,9 @@ export type EggCardKind = 'ufo' | 'ghost' | 'dragon' | 'santa' | 'blackCat' | 'h
   // Item 118: the festival eggs (FestivalEggs). Holi tints the clouds, which keep their cloud cards.
   | Exclude<FestivalEgg, 'holi'>
   // Item 123: the fireworks show, the aurora, the meteor shower's star field and the season badge.
-  | 'fireworks' | 'aurora' | 'meteorShower' | 'solstice' | 'equinox';
+  | 'fireworks' | 'aurora' | 'meteorShower' | 'solstice' | 'equinox'
+  // Item 140: the season badge on the winter solstice day.
+  | 'midwinter';
 
 // Item 123: a boat on a bunting day, at Día de los Muertos or at Christmas carries this (useBunting).
 export type BoatDress = 'pennant' | 'picado' | 'lights';
@@ -110,8 +112,9 @@ export interface SceneInfoContext {
 }
 
 // Item 107: the Latin name where the kind is one species. Group names (fish, ray, sea turtle,
-// jellyfish, seahorse, whale, pufferfish, lanternfish, anglerfish, shark, dolphins) have none.
-// The catfish of a European lake is the wels; the glowing squid is the firefly squid.
+// jellyfish, seahorse, pufferfish, lanternfish, anglerfish, shark, dolphins) have none.
+// The catfish of a European lake is the wels; the glowing squid is the firefly squid; the
+// whale is a sperm whale (item 144).
 const FISH: Record<FishKind, { name: MessageKey; fact: MessageKey; latin?: string }> = {
   classic: { name: 'fish.classic', fact: 'fishFact.classic' },
   minnow: { name: 'fish.minnow', fact: 'fishFact.minnow', latin: 'Phoxinus phoxinus' },
@@ -124,7 +127,7 @@ const FISH: Record<FishKind, { name: MessageKey; fact: MessageKey; latin?: strin
   turtle: { name: 'fish.turtle', fact: 'fishFact.turtle' },
   jellyfish: { name: 'fish.jellyfish', fact: 'fishFact.jellyfish' },
   seahorse: { name: 'fish.seahorse', fact: 'fishFact.seahorse' },
-  whale: { name: 'fish.whale', fact: 'fishFact.whale' },
+  whale: { name: 'fish.whale', fact: 'fishFact.whale', latin: 'Physeter macrocephalus' },
   pufferfish: { name: 'fish.pufferfish', fact: 'fishFact.pufferfish' },
   burbot: { name: 'fish.burbot', fact: 'fishFact.burbot', latin: 'Lota lota' },
   eel: { name: 'fish.eel', fact: 'fishFact.eel', latin: 'Anguilla anguilla' },
@@ -134,10 +137,10 @@ const FISH: Record<FishKind, { name: MessageKey; fact: MessageKey; latin?: strin
   shark: { name: 'fish.shark', fact: 'fishFact.shark' },
   dolphins: { name: 'fish.dolphins', fact: 'fishFact.dolphins' },
 };
-// Item 65: these swim only at night. The jellyfish and the sea visitors (item 85) come day
-// and night; all other fish are day fish (at night only in the moonlight).
+// Item 65: these swim only at night. The jellyfish, the whale (item 144) and the sea visitors
+// (item 85) come day and night; all other fish are day fish (at night only in the moonlight).
 const NIGHT_ONLY: FishKind[] = ['burbot', 'eel', 'lanternfish', 'anglerfish', 'squid'];
-const DAY_AND_NIGHT: FishKind[] = ['jellyfish', 'shark', 'dolphins'];
+const DAY_AND_NIGHT: FishKind[] = ['jellyfish', 'whale', 'shark', 'dolphins'];
 
 // Item 74's seasons (BIRD_MONTHS in weatherEffectsUtils), as words, so they hold in both
 // hemispheres. The bats fly at dusk all year.
@@ -161,6 +164,10 @@ const BOATS: Record<BoatKind, { name: MessageKey; fact: MessageKey }> = {
   fishing: { name: 'boat.fishing', fact: 'boatFact.fishing' },
   rowboat: { name: 'boat.rowboat', fact: 'boatFact.rowboat' },
   freighter: { name: 'boat.freighter', fact: 'boatFact.freighter' },
+  kayak: { name: 'boat.kayak', fact: 'boatFact.kayak' }, // item 146
+  paddleSteamer: { name: 'boat.paddleSteamer', fact: 'boatFact.paddleSteamer' },
+  cruiseLiner: { name: 'boat.cruiseLiner', fact: 'boatFact.cruiseLiner' },
+  tallShip: { name: 'boat.tallShip', fact: 'boatFact.tallShip' },
 };
 
 // Item 96: the contrail that the plane leaves in the upper air of the forecast.
@@ -292,6 +299,8 @@ const EGGS: Record<EggCardKind, { name: MessageKey; fact: MessageKey; hidden: bo
   meteorShower: { name: 'egg.meteorShower', fact: 'eggFact.meteorShower', hidden: false, chance: null },
   solstice: { name: 'egg.solstice', fact: 'eggFact.solstice', hidden: false, chance: null },
   equinox: { name: 'egg.equinox', fact: 'eggFact.equinox', hidden: false, chance: null },
+  // Item 140: the winter solstice day, with its days a year ("1 day a year").
+  midwinter: { name: 'egg.midwinter', fact: 'eggFact.midwinter', hidden: false, chance: { event: 'solstice-shortest' } },
 };
 
 // Item 123: the event row of the sun and the moon card (the moon card has its own supermoon row).

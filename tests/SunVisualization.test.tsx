@@ -19,6 +19,7 @@ import SunVisualization, {
   getAzimuthAtFraction,
 } from '../src/components/SunVisualization';
 import type { HorizonProfile } from '../src/utils/horizonUtils';
+import * as treeLib from '../src/utils/treeSilhouettes';
 import { getSunTimes, formatTime, getWaterColors } from '../src/utils/sunUtils';
 import { getSunArcLabels, getMoonArcLabels } from '../src/utils/arcLabels';
 
@@ -345,8 +346,10 @@ describe('SunVisualization (rendered): static cardinal direction labels (ROADMAP
     rerender(<SunVisualization {...props} isFullscreen={true} showCursor={true} />);
     expect(screen.getByTestId('cardinal-labels')).toHaveClass('opacity-100');
 
+    // Item 136: showCursor alone decides (SunTracker keeps it true in a browser tab), so the
+    // labels also fade in the installed app, where isFullscreen is false.
     rerender(<SunVisualization {...props} isFullscreen={false} showCursor={false} />);
-    expect(screen.getByTestId('cardinal-labels')).toHaveClass('opacity-100');
+    expect(screen.getByTestId('cardinal-labels')).toHaveClass('opacity-0');
   });
 
   it('stays visible in compass mode even when idle in fullscreen (ROADMAP item 29)', () => {
@@ -443,6 +446,22 @@ describe('SunVisualization (rendered): static cardinal direction labels (ROADMAP
       expect.stringMatching(/^false Jun · 16 h \d+ min$/),
       expect.stringMatching(/^false Dec · 8 h \d+ min$/),
     ]);
+
+    // Item 140: the December solstice (midwinter) draws the same fan, December bold and gold,
+    // by day and after sunset; after sunset the pill names the longest night.
+    for (const hour of [12, 20]) {
+      rerender(<SunVisualization {...props} date={new Date(2027, 11, 22, hour)} calendarEvent="solstice-shortest" longestNight={hour === 20} />);
+      const traces = screen.getAllByTestId('solstice-trace');
+      expect(traces.map((p) => p.getAttribute('data-today'))).toEqual(['false', 'false', 'true']);
+      expect(traces[2].getAttribute('stroke')).toBe('hsl(var(--scene-solstice-trace))');
+      expect(traces[2].getAttribute('stroke-width')).toBe('3');
+      expect(pillTexts()).toEqual([
+        expect.stringMatching(/^true Today · 8 h \d+ min$/),
+        expect.stringMatching(/^false Jun · 16 h \d+ min$/),
+        expect.stringMatching(/^false Equinox · 12 h \d+ min$/),
+      ]);
+      expect(screen.getByTestId('season-badge').textContent).toBe(hour === 20 ? 'Solstice · the longest night of the year' : 'Solstice · the shortest day of the year');
+    }
 
     rerender(<SunVisualization {...props} date={new Date(2027, 5, 22, 12)} calendarEvent={null} />);
     expect(screen.queryByTestId('solstice-trace')).toBeNull();
@@ -1050,6 +1069,95 @@ describe('SunVisualization (rendered): terrain silhouette (ROADMAP item 13)', ()
     expect(dayFill).toBe('hsl(var(--scene-ridge-day))');
     expect(nightFill).not.toBe(dayFill);
     expect(screen.getByTestId('terrain-silhouette').getAttribute('fill-opacity')).toBeNull();
+  });
+});
+
+describe('SunVisualization (rendered): tree silhouettes on the ridge (ROADMAP item 141)', () => {
+  const originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+  const originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
+
+  beforeEach(() => {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { value: 390, configurable: true });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { value: 844, configurable: true });
+  });
+
+  afterEach(() => {
+    if (originalClientWidth) Object.defineProperty(HTMLElement.prototype, 'clientWidth', originalClientWidth);
+    if (originalClientHeight) Object.defineProperty(HTMLElement.prototype, 'clientHeight', originalClientHeight);
+  });
+
+  const treeProfile: HorizonProfile = {
+    angles: new Array(360).fill(3),
+    observerElevation: 500,
+    eyeHeight: 1.7,
+    ridgeDistances: new Array(360).fill(1500),
+    ridgeHeights: new Array(360).fill(800),
+  };
+  const trees = { cover: '1'.repeat(360), lib: treeLib };
+  const june = new Date(2026, 5, 15, 12);
+
+  const props = {
+    sunPosition: { azimuth: 180, altitude: 30 },
+    moonPosition: { azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false },
+    sunPath: [],
+    moonPath: [],
+    timeOfDay: 'midday' as const,
+    weatherType: 'clear' as const,
+    latitude: 47.78,
+    longitude: 9.61,
+    date: june,
+    horizonProfile: treeProfile,
+  };
+
+  it('adds the trees to the one terrain path, which stays the tap target', () => {
+    const { unmount } = render(<SunVisualization {...props} />);
+    const bare = screen.getByTestId('terrain-silhouette').getAttribute('d')!;
+    unmount();
+
+    render(<SunVisualization {...props} trees={trees} />);
+    expect(screen.getAllByTestId('terrain-silhouette')).toHaveLength(1);
+    const withTrees = screen.getByTestId('terrain-silhouette').getAttribute('d')!;
+    expect(withTrees.startsWith(bare)).toBe(true);
+    // One tree per degree in static mode.
+    expect(withTrees.slice(bare.length).trim().split('M').filter(Boolean)).toHaveLength(360);
+    expect(screen.getByTestId('tree-tint').getAttribute('d')).toBe(withTrees.slice(bare.length + 1));
+  });
+
+  it('draws no trees where the land cover is not tree cover', () => {
+    const { unmount } = render(<SunVisualization {...props} />);
+    const bare = screen.getByTestId('terrain-silhouette').getAttribute('d');
+    unmount();
+    render(<SunVisualization {...props} trees={{ ...trees, cover: '0'.repeat(360) }} />);
+    expect(screen.getByTestId('terrain-silhouette').getAttribute('d')).toBe(bare);
+    expect(screen.queryByTestId('tree-tint')).not.toBeInTheDocument();
+  });
+
+  it('tints the trees green by day in June, amber in October, and not at night or in January', () => {
+    const tint = (extra: Partial<typeof props>) => {
+      const { unmount } = render(<SunVisualization {...props} {...extra} trees={trees} />);
+      const fill = screen.queryByTestId('tree-tint')?.getAttribute('fill') ?? null;
+      unmount();
+      return fill;
+    };
+    expect(tint({})).toBe('hsl(var(--scene-tree-green))');
+    expect(tint({ date: new Date(2026, 9, 10, 12) })).toBe('hsl(var(--scene-tree-amber))');
+    expect(tint({ timeOfDay: 'night' })).toBeNull();
+    expect(tint({ date: new Date(2026, 0, 15, 12) })).toBeNull();
+  });
+
+  it('lets taps through the tint to the ridge', () => {
+    render(<SunVisualization {...props} trees={trees} />);
+    expect(screen.getByTestId('tree-tint').getAttribute('pointer-events')).toBe('none');
+    expect(screen.getByTestId('tree-tint').getAttribute('fill-opacity')).toBe('0.08');
+  });
+
+  it('draws three trees per degree in compass mode', () => {
+    const { unmount } = render(<SunVisualization {...props} compassHeading={180.5} />);
+    const bare = screen.getByTestId('terrain-silhouette').getAttribute('d')!;
+    unmount();
+    render(<SunVisualization {...props} compassHeading={180.5} trees={trees} />);
+    const withTrees = screen.getByTestId('terrain-silhouette').getAttribute('d')!;
+    expect(withTrees.slice(bare.length).trim().split('M').filter(Boolean)).toHaveLength(270);
   });
 });
 
