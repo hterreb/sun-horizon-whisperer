@@ -1064,7 +1064,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     (altitude: number, azimuth: number) => getArcScreenPosition(altitude, azimuth, sceneWidth, sceneHeight, latitude, compassHeading),
     [sceneWidth, sceneHeight, latitude, compassHeading]
   );
-  const showLivePlanes = !!livePlanes && sceneWidth > 0 && isPlaneWeather(weatherType);
+  // Mounted also while the radar is off: the trails of its planes stay and fade (item 142).
+  const showLivePlanes = sceneWidth > 0 && isPlaneWeather(weatherType);
 
   // Satellites (ROADMAP item 97): azimuth -> x and elevation -> y as for the sun and moon
   // (compass field of view included); a tracked satellite behind the terrain is hidden.

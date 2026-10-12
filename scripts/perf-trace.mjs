@@ -5,7 +5,7 @@
 // Prints a markdown table and writes JSON to scripts/perf-results/ (gitignored).
 // Usage: npm run perf:trace -- [--seconds 60] [--runs 1] [--scenes day,night,rain,fullscreen]
 //          [--profiles phone,desktop] [--warmup 20] [--build] [--url URL] [--cpu-profile] [--headed]
-//          [--screenshots DIR] [--live-planes N]
+//          [--screenshots DIR] [--live-planes N] [--compass DEG] [--contrail KIND] [--query ?a=b]
 //
 // Sources of the numbers:
 // - Scripting, rendering (style + layout), main-thread busy time and JS heap: deltas of
@@ -37,6 +37,14 @@
 //
 // --live-planes N turns on the live radar (ROADMAP item 96) through the panel's switch and
 // answers /api/planes with N aircraft around the place (a fixed set, 20-100 km, 9-12 km high).
+// The aircraft fly on between two answers (their position age grows), as real ones do.
+//
+// --compass DEG turns on compass mode facing DEG (a `deviceorientationabsolute` event every
+// second) and puts the live aircraft within 40° of that direction (item 142: 40 compass planes).
+//
+// --contrail short|medium|persistent adds the upper air for that contrail to the forecast
+// (item 142: the live planes' trails). --query appends a query to the app URL, for example
+// `--query ?plane=persistent` (item 96: a decorative plane every 20 s with that contrail).
 //
 // --screenshots DIR saves a PNG of each scene after its measured window (so it does not
 // change the numbers), named <profile>-<scene>-run<N>.png, to compare the look before and
@@ -83,6 +91,7 @@ const parseArgs = (argv) => {
   const opts = {
     seconds: 60, warmup: 20, runs: 1, scenes: Object.keys(SCENES), profiles: Object.keys(PROFILES),
     url: null, livePlanes: 0, build: false, cpuProfile: false, headed: false, screenshots: null, out: path.join(ROOT, 'scripts/perf-results'),
+    compass: null, contrail: null, query: '',
   };
   for (let i = 0; i < argv.length; i++) {
     const [flag, inline] = argv[i].split('=', 2);
@@ -100,12 +109,17 @@ const parseArgs = (argv) => {
       case '--headed': opts.headed = true; break;
       case '--screenshots': opts.screenshots = path.resolve(value()); break;
       case '--live-planes': opts.livePlanes = Number(value()); break;
+      case '--compass': opts.compass = Number(value()); break;
+      case '--contrail': opts.contrail = value(); break;
+      case '--query': opts.query = value(); break;
       default: throw new Error(`Unknown option ${argv[i]} (see the summary at the top of scripts/perf-trace.mjs)`);
     }
   }
   for (const s of opts.scenes) if (!SCENES[s]) throw new Error(`Unknown scene "${s}". Scenes: ${Object.keys(SCENES)}`);
   for (const p of opts.profiles) if (!PROFILES[p]) throw new Error(`Unknown profile "${p}". Profiles: ${Object.keys(PROFILES)}`);
   for (const k of ['seconds', 'warmup', 'runs']) if (!(opts[k] > 0)) throw new Error(`--${k} must be a positive number`);
+  if (opts.compass !== null && !(opts.compass >= 0 && opts.compass < 360)) throw new Error('--compass must be a direction, 0-359');
+  if (opts.contrail !== null && !UPPER_AIR[opts.contrail]) throw new Error(`--contrail must be one of ${Object.keys(UPPER_AIR)}`);
   if (opts.scenes.includes('fullscreen') && opts.warmup * 1000 <= FULLSCREEN_IDLE_MS) {
     throw new Error(`--warmup must be more than ${FULLSCREEN_IDLE_MS / 1000} s for the fullscreen scene (the chrome hides after 10 s)`);
   }
@@ -191,9 +205,21 @@ const TERRAIN_TILE = flatTerrainPng(450);
 const fixture = (name) => readFileSync(path.join(FIXTURES, name), 'utf8');
 
 // The hosts of the CSP connect-src in vercel.json, plus the radio streams (media-src).
-const stubFor = (url, scene) => {
+// The upper air (250 hPa) of each contrail kind (item 96 `getContrail`): −50 °C and the humidity.
+const UPPER_AIR = { short: 30, medium: 50, persistent: 80 };
+const forecastFor = (scene, contrail) => {
+  const forecast = JSON.parse(fixture(SCENES[scene].forecast));
+  if (contrail) {
+    // `getUpperAirAt` counts hours from the first time; the fixtures have a time every 6 h.
+    forecast.hourly.temperature_250hPa = Array(72).fill(-50);
+    forecast.hourly.relative_humidity_250hPa = Array(72).fill(UPPER_AIR[contrail]);
+  }
+  return forecast;
+};
+
+const stubFor = (url, scene, opts) => {
   const { hostname, pathname } = url;
-  if (hostname === 'api.open-meteo.com') return json(fixture(SCENES[scene].forecast));
+  if (hostname === 'api.open-meteo.com') return json(forecastFor(scene, opts.contrail));
   if (hostname === 'geocoding-api.open-meteo.com') return json({ results: [] });
   if (hostname === 'api.bigdatacloud.net' || hostname === 'api-bdc.io') return json(fixture('bigdatacloud.json'));
   if (hostname === 's3.amazonaws.com' && pathname.startsWith('/elevation-tiles-prod/')) {
@@ -204,17 +230,22 @@ const stubFor = (url, scene) => {
 };
 
 // The live radar's answer (item 96): `count` aircraft around the place, the same on each run.
-const liveFeed = (count, nowMs) => ({
+// Their positions are of the context's start; the age grows, so the app moves them on from
+// there with their speed and track (no jump back with each answer). With `compass`, all within
+// 40° of that direction.
+const liveFeed = (count, nowMs, elapsedSec, compass) => ({
   now: nowMs,
   aircraft: Array.from({ length: count }, (_, i) => {
-    const bearing = (i * 137.5) % 360; // spread around the observer
+    const bearing = compass === null
+      ? (i * 137.5) % 360 // spread around the observer
+      : compass - 40 + ((i * 37.5) % 80);
     const km = 20 + ((i * 37) % 81);
     return {
       hex: (0xa00000 + i).toString(16), callsign: `DLH${100 + i}`, type: 'A320', altM: 9000 + ((i * 53) % 3000),
       speedKt: 420 + (i % 7) * 10, track: (i * 71) % 360,
       lat: PLACE.latitude + (km / 111.2) * Math.cos((bearing * Math.PI) / 180),
       lon: PLACE.longitude + (km / (111.2 * Math.cos((PLACE.latitude * Math.PI) / 180))) * Math.sin((bearing * Math.PI) / 180),
-      ageSec: 1,
+      ageSec: 1 + elapsedSec,
     };
   }),
 });
@@ -291,6 +322,9 @@ const sceneCheck = () => {
     birds: count('scene-bird') + count('scene-bat'),
     rainCanvas: count('rain-canvas'),
     livePlanes: count('live-plane'),
+    liveTrails: count('live-plane-trail'),
+    trailPaths: document.querySelectorAll('[data-testid="live-plane-trail"] path').length,
+    planeTrailPieces: count('plane-trail-piece'),
     canvases: document.querySelectorAll('canvas').length,
     runningAnimations: document.getAnimations().filter((a) => a.playState === 'running').length,
     fullscreenElement: !!document.fullscreenElement,
@@ -453,7 +487,8 @@ const measureScene = async (browser, browserCdp, appUrl, opts, profileName, scen
     locale: 'en-US',
     timezoneId: 'Europe/Berlin',
     geolocation: PLACE,
-    permissions: ['geolocation'],
+    // The compass asks for the motion sensors (DeviceOrientationEvent.requestPermission).
+    permissions: opts.compass === null ? ['geolocation'] : ['geolocation', 'accelerometer', 'gyroscope', 'magnetometer'],
     serviceWorkers: 'block',
     reducedMotion: 'no-preference',
   });
@@ -463,11 +498,12 @@ const measureScene = async (browser, browserCdp, appUrl, opts, profileName, scen
     const url = new URL(route.request().url());
     if (url.origin === appOrigin) {
       if (opts.livePlanes > 0 && url.pathname === '/api/planes') {
-        return route.fulfill(json(liveFeed(opts.livePlanes, Date.parse(scene.start) + (Date.now() - contextStart))));
+        const elapsedMs = Date.now() - contextStart;
+        return route.fulfill(json(liveFeed(opts.livePlanes, Date.parse(scene.start) + elapsedMs, elapsedMs / 1000, opts.compass)));
       }
       return route.continue();
     }
-    const stub = stubFor(url, sceneName);
+    const stub = stubFor(url, sceneName, opts);
     if (!stub) {
       network.blocked.push(url.href);
       return route.abort('blockedbyclient');
@@ -482,7 +518,7 @@ const measureScene = async (browser, browserCdp, appUrl, opts, profileName, scen
     const cdp = await context.newCDPSession(page);
     await cdp.send('Performance.enable');
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: profile.cpuThrottle });
-    await page.goto(appUrl);
+    await page.goto(appUrl + opts.query);
     // TopLeftButtons render when the start reveal is done.
     const fullscreenButton = page.getByRole('button', { name: 'Enter fullscreen' });
     await fullscreenButton.waitFor({ timeout: 60_000 });
@@ -495,6 +531,17 @@ const measureScene = async (browser, browserCdp, appUrl, opts, profileName, scen
       if (collapsed) await tap(expand);
       await tap(page.getByRole('switch', { name: 'Live planes' }));
       if (collapsed) await tap(page.getByRole('button', { name: 'Collapse info panel' }));
+    }
+
+    if (opts.compass !== null) {
+      // Compass mode: the phone held up, facing `compass` (heading = 360° − alpha with beta 90°).
+      const button = page.getByRole('button', { name: 'Enable compass' });
+      await (profile.hasTouch ? button.tap() : button.click());
+      await page.evaluate((alpha) => {
+        const send = () => window.dispatchEvent(Object.assign(new Event('deviceorientationabsolute'), { absolute: true, alpha, beta: 90, gamma: 0 }));
+        send();
+        setInterval(send, 1000);
+      }, (360 - opts.compass) % 360);
     }
 
     let fullscreen = null;
@@ -661,7 +708,7 @@ const main = async () => {
           r.run = i;
           runs.push(r);
           const e = r.check.end;
-          console.log(`fish ${e.fish}, boats ${e.boats}, birds ${e.birds}, live planes ${e.livePlanes}, rain ${e.rainCanvas}, animations ${e.runningAnimations}, ` +
+          console.log(`fish ${e.fish}, boats ${e.boats}, birds ${e.birds}, live planes ${e.livePlanes} (trails ${e.liveTrails ?? 0}, paths ${e.trailPaths ?? 0}), trail pieces ${e.planeTrailPieces ?? 0}, rain ${e.rainCanvas}, animations ${e.runningAnimations}, ` +
             `clock ${r.check.start.clockText ?? '–'} → ${e.clockText ?? '–'}${r.fullscreen ? `, fullscreen ${r.fullscreen}` : ''}`);
           for (const w of warnings(r)) console.warn(`  WARNING: ${w}`);
         }

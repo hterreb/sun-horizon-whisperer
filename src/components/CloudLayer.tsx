@@ -27,7 +27,8 @@ import {
 import ScenePlane, { PLANE_ASPECT, PLANE_TRAIL_X, PLANE_TRAIL_Y } from './ScenePlane';
 import {
   CONTRAIL_LOOK, MAX_PLANES, PLANE_BAND, PLANE_GAP_MIN_MS, PLANE_GAP_RANGE_MS, PLANE_OVERRIDE_GAP_MS, PLANE_WIDTH_PX, TRAIL_PX,
-  getPlaneLook, getPlaneOverride, getTrailColour, getTrailLength, getTrailPieces, isPlaneWeather, showsPlaneLights, type ContrailKind,
+  getPlaneLook, getPlaneOverride, getTrailColour, getTrailKeyframes, getTrailPieceCount, getTrailPieces, isPlaneWeather,
+  showsPlaneLights, type ContrailKind,
 } from '@/utils/planes';
 import { getPrecipitationSlantPx } from '../utils/cloudLayoutUtils';
 import {
@@ -428,7 +429,6 @@ interface PlaneEntity extends MovingEntity {
   height: number;
   contrail: ContrailKind;
   lifeSec: number; // how long a point of the trail lasts
-  trailLength: number; // % of the width: a short or medium trail moves with the plane
   lights?: 'red' | 'green'; // at night only the lights show, with this wing light
   path?: ScenePath; // the lane plan (item 92), set at spawn
 }
@@ -442,15 +442,13 @@ export const createPlane = (
   const speed = look.speed * getWaterSpeedFactor(viewportWidth); // the phone's px/s on wide screens (item 66)
   const life = contrail === 'none' ? 0 : CONTRAIL_LOOK[contrail].lifeSec[0] +
     random() * (CONTRAIL_LOOK[contrail].lifeSec[1] - CONTRAIL_LOOK[contrail].lifeSec[0]);
-  const trailLength = getTrailLength(speed, life);
-  // A short or medium trail moves with the plane: the plane flies on past the edge until the
-  // trail's end is off the screen too, so the long trail (item 109) does not go at once.
-  const dx = 101 - startX + (contrail === 'persistent' ? 0 : trailLength);
+  // The plane ends just off the right edge (101 %); its trail stays in the sky (item 142).
+  const dx = 101 - startX;
   return {
     id: Date.now() + Math.random(),
     x: startX, y: look.y, dx, duration: dx / speed,
     depth: look.depth, width: look.width, height: look.width * PLANE_ASPECT,
-    contrail, lifeSec: life, trailLength,
+    contrail, lifeSec: life,
     lights: lights ? (random() < 0.5 ? 'red' : 'green') : undefined,
   };
 };
@@ -943,7 +941,7 @@ export const spawnTick = (
   // Planes (item 96): about one every 3-6 min, day and night, in a lane clear of the birds and
   // the other planes. None when the sky is hidden (fog, a deck, rain, a storm). The gap is
   // rolled once per plane; with no free lane, the next check tries again. A plane with a
-  // persistent trail stays in the list until its trail fades, but counts only while it crosses.
+  // trail stays in the list until its trail fades, but counts only while it crosses.
   if (isPlaneWeather(weatherType) && !rules.livePlanes) {
     last.planeGap ??= rules.planeOverride ? PLANE_OVERRIDE_GAP_MS : PLANE_GAP_MIN_MS + random() * PLANE_GAP_RANGE_MS;
     if (now - last.planes > last.planeGap * gapFactor) {
@@ -1356,10 +1354,10 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   };
 
   // Planes (item 96). The contrail takes the light of the high clouds (item 84): white by day,
-  // gold and pink at sunset. A short or medium trail is a fixed shape that moves with the plane:
-  // thin and bright at the engine, wider and fainter behind (each point is older there). A
-  // persistent trail stays where the plane made it: pieces that grow with the plane (the same
-  // clock as its crossing), then spread to a band and fade. Only transform and opacity move.
+  // gold and pink at sunset. Every trail stays where the plane made it (item 142): pieces that
+  // grow with the plane (the same clock as its crossing), then spread to a band and fade, each
+  // on its own clock. So the trail starts where the plane comes in, its points never move, and
+  // it fades from its older end after the plane has gone. Only transform and opacity move.
   const lightAltitude = sun ? Math.round(sun.altitude * 2) / 2 : getTimeOfDayAltitude(timeOfDay);
   const trailColour = useMemo(
     () => getTrailColour(weatherType, lightAltitude),
@@ -1368,15 +1366,20 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   const renderPlane = (plane: PlaneEntity) => {
     const remove = () => updateEntities(prev => ({ ...prev, planes: prev.planes.filter(p => p.id !== plane.id) }));
     const look = plane.contrail === 'none' ? null : CONTRAIL_LOOK[plane.contrail];
-    const persistent = plane.contrail === 'persistent';
     const thin = TRAIL_PX * (plane.width / PLANE_WIDTH_PX);
     const trailY = plane.height * PLANE_TRAIL_Y;
     const trailX = plane.width * PLANE_TRAIL_X;
     const delay = plane.delay ?? 0;
-    const pieces = persistent ? getTrailPieces(plane.x, plane.dx, plane.duration) : [];
+    const pieces = look
+      ? getTrailPieces(plane.x, plane.dx, plane.duration, getTrailPieceCount(plane.duration, plane.lifeSec))
+      : [];
     const band = thin * (look?.spread ?? 1);
+    const thinRatio = 1 / (look?.spread ?? 1);
+    // One animation per piece, with this plane's keyframes (its grow time and life).
+    const trailName = `planeTrail${String(plane.id).replace(/\W/g, '_')}`;
     return (
       <React.Fragment key={plane.id}>
+        {pieces.length > 0 && <style>{getTrailKeyframes(trailName, pieces[0].growSec, plane.lifeSec, thinRatio)}</style>}
         {pieces.map((piece, i) => (
           <div
             key={i}
@@ -1386,24 +1389,19 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
               top: `calc(${plane.y}% + ${trailY - band / 2}px)`,
               width: `${piece.width}%`,
               height: band,
+              background: `linear-gradient(to bottom, transparent, ${trailColour}, transparent)`,
               transformOrigin: 'left',
-              animation: `planeTrailGrow ${piece.growSec}s linear ${delay + piece.growAt}s both`,
+              // Before its start the piece waits in its first keyframe as a plain style.
+              transform: `scale(0, ${thinRatio})`,
+              opacity: 0.9,
+              animation: `${trailName} ${plane.lifeSec}s linear ${delay + piece.growAt}s forwards`,
             }}
-          >
-            <div
-              className="h-full w-full"
-              style={{
-                background: `linear-gradient(to bottom, transparent, ${trailColour}, transparent)`,
-                ['--trail-thin' as string]: 1 / (look?.spread ?? 1),
-                animation: `planeTrailSpread ${plane.lifeSec}s linear ${delay + piece.growAt}s both`,
-              }}
-              data-testid="plane-trail-piece"
-              // The last piece fades last (and, in rewind, its reversed end comes last): the plane goes.
-              onAnimationEnd={i === pieces.length - 1
-                ? (event => { if (event.target === event.currentTarget && event.animationName === 'planeTrailSpread') remove(); })
-                : undefined}
-            />
-          </div>
+            data-testid="plane-trail-piece"
+            // The last piece fades last (and, in rewind, its reversed end comes last): the plane goes.
+            onAnimationEnd={i === pieces.length - 1
+              ? (event => { if (event.target === event.currentTarget && event.animationName === trailName) remove(); })
+              : undefined}
+          />
         ))}
         <div
           {...tappable({ type: 'plane', contrail: plane.contrail }, `plane-${plane.id}`)}
@@ -1414,23 +1412,10 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             ['--dx' as string]: `${plane.dx}vw`,
             animation: `moveAcrossX ${plane.duration}s linear ${delay}s forwards`,
           }}
-          onAnimationEnd={event => { if (endsCrossing(event) && !persistent) remove(); }}
+          // A plane without a trail goes at the end of its crossing; else its last piece takes it.
+          onAnimationEnd={event => { if (endsCrossing(event) && !look) remove(); }}
         >
           <div className="relative" style={{ width: plane.width, height: plane.height }}>
-            {look && !persistent && (
-              <div
-                className="absolute"
-                style={{
-                  right: plane.width - trailX,
-                  top: trailY - band / 2,
-                  width: `${plane.trailLength}vw`,
-                  height: band,
-                  background: `linear-gradient(to right, transparent, ${trailColour})`,
-                  clipPath: `polygon(0 0, 100% ${50 - 50 / look.spread}%, 100% ${50 + 50 / look.spread}%, 0 100%)`,
-                }}
-                data-testid="plane-trail"
-              />
-            )}
             <div
               className="relative"
               style={{ opacity: plane.lights ? 1 : 0.5 * (1 - 0.3 * plane.depth), color: 'hsl(var(--scene-critter-silhouette))' }}
@@ -1725,29 +1710,6 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
           }
           5% {
             opacity: 1;
-          }
-        }
-
-        @keyframes planeTrailGrow {
-          from {
-            transform: scaleX(0);
-          }
-          to {
-            transform: scaleX(1);
-          }
-        }
-
-        @keyframes planeTrailSpread {
-          0% {
-            opacity: 0.9;
-            transform: scaleY(var(--trail-thin));
-          }
-          40% {
-            opacity: 0.6;
-          }
-          100% {
-            opacity: 0;
-            transform: scaleY(1);
           }
         }
 
