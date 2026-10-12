@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import SunVisualization from '../src/components/SunVisualization';
+import LivePlanes from '../src/components/LivePlanes';
 import { type LivePlanesState } from '../src/hooks/useLivePlanes';
 import { type LiveAircraft } from '../src/utils/planeFeed';
 import type { HorizonProfile } from '../src/utils/horizonUtils';
@@ -130,17 +131,238 @@ describe('LivePlanes (ROADMAP item 96)', () => {
     expect(screen.queryAllByTestId('live-plane')).toHaveLength(0);
   });
 
-  it('draws the contrail of the forecast above 8 km only, along its way across the screen', () => {
+  it('draws the contrail of the forecast above 8 km only', () => {
     const east = { ...south, speedKt: 450, track: 90 };
     vi.useFakeTimers();
     vi.setSystemTime(1_000);
-    renderScene({ contrail: 'medium', livePlanes: feed([east, { ...east, hex: 'b1b2b3', altM: 7_000 }]) });
-    vi.useRealTimers();
-    const trails = screen.getAllByTestId('live-plane-trail');
-    expect(trails).toHaveLength(1);
-    // Flying east, south of the observer: facing south, east is on the left, so it moves left
-    // and its trail points right, behind it.
-    expect(Math.abs(parseFloat(trails[0].style.transform.slice(7)))).toBeGreaterThan(3);
+    try {
+      renderScene({ contrail: 'medium', livePlanes: feed([east, { ...east, hex: 'b1b2b3', altM: 7_000 }]) });
+      act(() => { vi.advanceTimersByTime(10_000); });
+      expect(screen.getAllByTestId('live-plane')).toHaveLength(2);
+      expect(screen.getAllByTestId('live-plane-trail')).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // Item 142: the trail is fixed in the sky.
+  describe('contrails that stay in the sky (item 142)', () => {
+    const east = { ...south, speedKt: 450, track: 90 };
+    // The points of all trail paths, in drawing order, per sub-path ("M … L …").
+    const subpaths = () => screen.queryAllByTestId('live-plane-trail').flatMap(trail =>
+      [...trail.querySelectorAll('path')].flatMap(path => path.getAttribute('d')!.split('M').filter(Boolean).map(sub =>
+        sub.split('L').map(pair => pair.split(' ').map(Number) as [number, number]))));
+    // The trail's points, oldest first: the paths of the fade steps share their end points.
+    const points = () => subpaths().flat().filter((p, i, all) => i === 0 || p[0] !== all[i - 1][0] || p[1] !== all[i - 1][1]);
+    // The clock in ticks: one render per tick, as in the browser (one act would batch them all).
+    const run = (ms: number) => {
+      for (let i = 0; i < ms; i += 250) act(() => { vi.advanceTimersByTime(Math.min(250, ms - i)); });
+    };
+    const scene =(props: Partial<React.ComponentProps<typeof SunVisualization>> = {}) => (
+      <SunVisualization
+        sunPosition={{ azimuth: 200, altitude: 30 }}
+        moonPosition={{ azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false }}
+        sunPath={[]} moonPath={[]} timeOfDay="midday" weatherType="clear" latitude={PLACE.lat} longitude={PLACE.lon}
+        contrail="medium" livePlanes={feed([east])} compassHeading={180}
+        {...props}
+      />
+    );
+    // The engine of a 15 px plane (50 km) that faces left: right of and below its middle.
+    const ENGINE = { x: 0.04 * 15, y: 0.22 * 15 * 0.3 };
+
+    it('draws no trail on the first frame; it grows from the plane\'s first place, and its points never move', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000);
+      try {
+        renderScene({ contrail: 'medium', livePlanes: feed([east]) });
+        const first = start(screen.getByTestId('live-plane'));
+        expect(screen.getAllByTestId('live-plane-trail')).toHaveLength(1);
+        expect(points()).toEqual([]);
+        run(250);
+        const [p0] = points();
+        expect(p0[0]).toBeCloseTo(first.x + ENGINE.x, 0);
+        expect(p0[1]).toBeCloseTo(first.y + ENGINE.y, 0);
+        run(20_000);
+        // The first point stays; the head is at the plane's engine now, left of the start.
+        expect(points()[0]).toEqual(p0);
+        const now = start(screen.getByTestId('live-plane'));
+        const head = points()[points().length - 1];
+        expect(head[0]).toBeCloseTo(now.x + ENGINE.x, 0);
+        expect(head[1]).toBeCloseTo(now.y + ENGINE.y, 0);
+        expect(now.x).toBeLessThan(first.x - 30);
+        // A point every 5 s plus the head: 5 points, all on the plane's way.
+        expect(points().length).toBeGreaterThanOrEqual(5);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('keeps each point at its sky place over a compass turn', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000);
+      try {
+        const { rerender } = renderScene({ contrail: 'medium', livePlanes: feed([east]) });
+        run(10_000);
+        const before = points();
+        rerender(scene({ compassHeading: 170 }));
+        const after = points();
+        expect(after).toHaveLength(before.length);
+        // 10° in the 90° field of view of 800 px: every point 88.9 px to the right, none up or down.
+        after.forEach(([x, y], i) => {
+          expect(x - before[i][0]).toBeCloseTo(800 / 9, 0);
+          expect(y).toBe(before[i][1]);
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('keeps the trail when the plane goes behind a ridge, and lets it go after its life', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000);
+      try {
+        const { rerender } = renderScene({ contrail: 'medium', livePlanes: feed([east]) });
+        run(20_000);
+        const trail = points();
+        const ridge: HorizonProfile = { angles: Array(360).fill(12), observerElevation: 0, eyeHeight: 1.7 };
+        rerender(scene({ horizonProfile: ridge }));
+        run(1_000);
+        expect(screen.queryByTestId('live-plane')).toBeNull();
+        expect(points()).toEqual(trail);
+        // Medium: 5 min. The older end fades first, then the trail goes.
+        run(300_000 - 21_000 + 250);
+        expect(points().length).toBeLessThan(trail.length);
+        expect(points()[points().length - 1]).toEqual(trail[trail.length - 1]);
+        run(20_000);
+        expect(screen.queryAllByTestId('live-plane-trail')).toHaveLength(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('when the radar is switched off, the planes go at once and their trails fade on their own clock', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000);
+      try {
+        const { rerender } = renderScene({ contrail: 'medium', livePlanes: feed([east]) });
+        run(20_000);
+        const trail = points();
+        rerender(scene({ livePlanes: null }));
+        expect(screen.queryByTestId('live-plane')).toBeNull();
+        expect(points()).toEqual(trail);
+        run(200_000);
+        expect(points()).toEqual(trail); // the points stay where they are
+        run(101_000);
+        expect(screen.queryByTestId('live-planes')).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('does not join two points across the 360° edge', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000);
+      try {
+        // 10 km north, 3° east of north, at 10 km, flying west at 450 kt: about 3 px/s across
+        // the 800 px 360° view, over north (x = 0 and 800) in about 2 s.
+        const north = {
+          ...east, hex: 'e00000', track: 270,
+          lat: PLACE.lat + (10 * Math.cos(3 * Math.PI / 180)) / KM_PER_DEG,
+          lon: PLACE.lon + (10 * Math.sin(3 * Math.PI / 180)) / (KM_PER_DEG * Math.cos(PLACE.lat * Math.PI / 180)),
+        };
+        renderScene({ compassHeading: null, contrail: 'medium', livePlanes: feed([north]) });
+        run(12_000);
+        expect(screen.getAllByTestId('live-plane')).toHaveLength(1);
+        const all = points();
+        expect(all.some(([x]) => x < 20)).toBe(true); // the first point, east of north
+        expect(all.some(([x]) => x > 760)).toBe(true); // the newer ones, west of north
+        subpaths().forEach(sub => sub.slice(1).forEach(([x], i) => expect(Math.abs(x - sub[i][0])).toBeLessThan(400)));
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    // Item 143 turns the body: the head sits at the tail as the body is drawn now.
+    describe('the head at the turned tail (item 143)', () => {
+      const DEG = Math.PI / 180;
+      const transformOf = (testId: string) => screen.getByTestId(testId).style.transform;
+      const headOf = (plane: LiveAircraft) => {
+        renderScene({ contrail: 'medium', livePlanes: feed([plane]) });
+        run(2_000);
+        const p = start(screen.getByTestId('live-plane'));
+        const angle = Number(transformOf('live-plane-body').match(/rotate\(([-\d.e]+)rad\)/)![1]);
+        const under = transformOf('live-plane-under') === 'scaleY(1)';
+        const side = Number((screen.getByTestId('live-plane-side').firstElementChild as HTMLElement).style.transform.match(/scaleY\(([-\d.]+)\)/)![1]);
+        const w = Number(screen.getByTestId(under ? 'scene-plane-under' : 'scene-plane').getAttribute('width'));
+        // The tail in the body's own frame, from its middle: the engine of the side view (mirrored
+        // by the side), or the end of the fuselage from below; then turned by the body's angle.
+        const [lx, ly] = under ? [(2 / 40 - 0.5) * w, 0] : [(0.46 - 0.5) * w, side * (0.72 - 0.5) * 0.3 * w];
+        const expected = { x: p.x + lx * Math.cos(angle) - ly * Math.sin(angle), y: p.y + lx * Math.sin(angle) + ly * Math.cos(angle) };
+        const head = points()[points().length - 1];
+        return { angle, under, side, head, expected };
+      };
+      const expectAt = ({ head, expected }: ReturnType<typeof headOf>) => {
+        expect(Math.abs(head[0] - expected.x)).toBeLessThan(0.15);
+        expect(Math.abs(head[1] - expected.y)).toBeLessThan(0.15);
+      };
+      const withTimers = (test: () => void) => {
+        vi.useFakeTimers();
+        vi.setSystemTime(1_000);
+        try { test(); } finally { vi.useRealTimers(); }
+      };
+
+      it('side view, climbing about 30° to the right', () => withTimers(() => {
+        // 20 km south, flying north-north-west: west is right when facing south, and it comes nearer.
+        const climber = { ...south, lat: PLACE.lat - 20 / KM_PER_DEG, speedKt: 450, track: 336 };
+        const at = headOf(climber);
+        expect(at.under).toBe(false);
+        expect(at.side).toBe(1);
+        expect(at.angle).toBeLessThan(-15 * DEG);
+        expect(at.angle).toBeGreaterThan(-45 * DEG);
+        expectAt(at);
+      }));
+
+      it('side view, a plane that moves left (mirrored)', () => withTimers(() => {
+        const at = headOf(east);
+        expect(at.under).toBe(false);
+        expect(at.side).toBe(-1);
+        expectAt(at);
+        // Behind the plane: to the right of its middle.
+        expect(at.head[0]).toBeGreaterThan(start(screen.getByTestId('live-plane')).x);
+      }));
+
+      it('underside view, a plane that climbs steeply: the end of the fuselage, below it', () => withTimers(() => {
+        const towards = { ...south, lat: PLACE.lat - 15 / KM_PER_DEG, speedKt: 450, track: 2 };
+        const at = headOf(towards);
+        expect(at.under).toBe(true);
+        expectAt(at);
+        expect(at.head[1] - start(screen.getByTestId('live-plane')).y).toBeGreaterThan(5);
+      }));
+    });
+
+    it('with reduced motion stores only the feed\'s points, one with each answer', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000);
+      try {
+        const props = {
+          observer: { lat: PLACE.lat, lon: PLACE.lon, elevationM: 1.7 },
+          project: (altitude: number, azimuth: number) => ({ x: (azimuth - 135) * (800 / 90), y: 390 - altitude * 10 }),
+          width: 800, compass: true, profile: null, lights: false, contrail: 'medium' as const, trailColour: 'white',
+          reducedMotion: true,
+        };
+        const { rerender } = render(<LivePlanes state={feed([east])} {...props} />);
+        act(() => { vi.advanceTimersByTime(14_000); });
+        expect(points()).toEqual([]); // no tick moves the plane
+        // The next answer, 15 s later (the plane 15 s on).
+        rerender(<LivePlanes state={{ feed: { now: 1_000, aircraft: [east] }, receivedAt: 16_000 }} {...props} />);
+        expect(subpaths()).toHaveLength(1);
+        expect(points()).toHaveLength(2);
+        act(() => { vi.advanceTimersByTime(10_000); });
+        expect(points()).toHaveLength(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   it('shows no live plane in fog, and only the lights at night', () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getLiveTilt, type LiveTilt } from '../src/utils/liveTilt';
+import { getLiveTilt, getTailOffset, type LiveTilt } from '../src/utils/liveTilt';
 
 // ROADMAP item 143 (option H): a live plane points along its way across the screen.
 const DEG = Math.PI / 180;
@@ -102,5 +102,50 @@ describe('getLiveTilt (ROADMAP item 143)', () => {
     const c = getLiveTilt(b, ...step(47, -1));
     expect(c.angle).toBe(b.angle);
     expect(c).toEqual(b);
+  });
+});
+
+// ROADMAP item 142 after item 143: the trail leaves the body where it is drawn.
+describe('getTailOffset', () => {
+  const W = 20; // px: the side box is 20 × 6, the underside box 20 × 20
+  // The engine of the side view from the box's middle, before the turn: 0.04 W behind, 0.066 W below.
+  const ENGINE = { x: (0.46 - 0.5) * W, y: (0.72 - 0.5) * W * 0.3 };
+
+  it('is the engine of a level plane that flies right', () => {
+    const tail = getTailOffset({ angle: 0, side: 1, view: 'side' }, W);
+    expect(tail.x).toBeCloseTo(ENGINE.x);
+    expect(tail.y).toBeCloseTo(ENGINE.y);
+  });
+
+  it('turns with a plane that climbs 30° to the right', () => {
+    // The body turns by -30° (y down), nose up: the engine below the fuselage comes forward and down.
+    const a = -30 * DEG;
+    const tail = getTailOffset({ angle: a, side: 1, view: 'side' }, W);
+    expect(tail.x).toBeCloseTo(ENGINE.x * Math.cos(a) - ENGINE.y * Math.sin(a));
+    expect(tail.y).toBeCloseTo(ENGINE.x * Math.sin(a) + ENGINE.y * Math.cos(a));
+    expect(tail.x).toBeGreaterThan(ENGINE.x);
+    expect(tail.y).toBeGreaterThan(ENGINE.y);
+  });
+
+  it('is mirrored for a plane that flies left: behind it on the right, still below the fuselage', () => {
+    const level = getTailOffset({ angle: Math.PI, side: -1, view: 'side' }, W);
+    expect(level.x).toBeCloseTo(-ENGINE.x);
+    expect(level.y).toBeCloseTo(ENGINE.y);
+    // Climbing 30° to the left: the body turns by 180° + 30°, mirrored.
+    const a = Math.PI + 30 * DEG;
+    const climb = getTailOffset({ angle: a, side: -1, view: 'side' }, W);
+    expect(climb.x).toBeCloseTo(ENGINE.x * Math.cos(a) + ENGINE.y * Math.sin(a));
+    expect(climb.y).toBeCloseTo(ENGINE.x * Math.sin(a) - ENGINE.y * Math.cos(a));
+  });
+
+  it('is the end of the fuselage from below, straight behind along the way', () => {
+    // Straight up the screen: the tail is 0.45 W below the middle.
+    const up = getTailOffset({ angle: -90 * DEG, side: 1, view: 'under' }, W);
+    expect(up.x).toBeCloseTo(0);
+    expect(up.y).toBeCloseTo(0.45 * W);
+    const a = -70 * DEG;
+    const steep = getTailOffset({ angle: a, side: -1, view: 'under' }, W);
+    expect(steep.x).toBeCloseTo(-0.45 * W * Math.cos(a));
+    expect(steep.y).toBeCloseTo(-0.45 * W * Math.sin(a));
   });
 });

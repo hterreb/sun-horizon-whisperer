@@ -28,14 +28,14 @@ export const getContrail = (tempC: number | null | undefined, rhPercent: number 
   return 'medium';
 };
 
-// How long a point of the trail lasts (s) and how wide it spreads (× its first width). A
-// persistent trail stays, spreads to a band and fades over 5-10 min (a random life per plane).
-// Short 30 s and medium 3 min (item 109, SUN-CHASER-13: "longer and last a long time before it
-// fades away"): a long band that fades slowly along its length.
+// How long a point of the trail lasts (s) and how wide it spreads (× its first width). Every
+// trail stays where the plane made it and fades from its older end (item 142, SUN-CHASER-1H and
+// 1N: "even longer and longer lasting"): short 1 min, medium 5 min, persistent 10-15 min (a
+// random life per plane) that spreads to a wide band.
 export const CONTRAIL_LOOK: Record<Exclude<ContrailKind, 'none'>, { lifeSec: [number, number]; spread: number }> = {
-  short: { lifeSec: [30, 30], spread: 1.5 },
-  medium: { lifeSec: [180, 180], spread: 2.5 },
-  persistent: { lifeSec: [300, 600], spread: 8 },
+  short: { lifeSec: [60, 60], spread: 1.5 },
+  medium: { lifeSec: [300, 300], spread: 2.5 },
+  persistent: { lifeSec: [600, 900], spread: 8 },
 };
 
 // The planes cannot be seen through fog, a cloud deck, rain or a storm. Drizzle, snow and hail
@@ -72,22 +72,40 @@ export const getPlaneLook = (depth: number): PlaneLook => ({
   width: Math.round(PLANE_WIDTH_PX * (1 - 0.4 * depth)),
 });
 
-// A short or medium trail moves with its plane: each point of it is `age` s old at
-// `age × speed` behind the plane, so its length is the life × the speed (in % of the width).
-export const getTrailLength = (speedPercentPerSec: number, lifeSec: number): number => speedPercentPerSec * lifeSec;
-
-// A persistent trail stays where the plane made it: `count` pieces along the crossing. Each
+// A trail stays where the plane made it (item 142): `count` pieces along the crossing. Each
 // piece grows with the plane while the plane passes it (the same clock as the crossing), then
 // spreads and fades over the trail's life. Times are in s from the plane's start.
 export interface TrailPiece { left: number; width: number; growAt: number; growSec: number }
-export const PERSISTENT_PIECES = 12;
-export const getTrailPieces = (x: number, dx: number, duration: number, count = PERSISTENT_PIECES): TrailPiece[] =>
+// 12-24 pieces: as many as it takes to make a piece in a tenth of the trail's life (at most 24),
+// so a short trail fades along its length in small steps.
+export const MIN_TRAIL_PIECES = 12;
+export const MAX_TRAIL_PIECES = 24;
+export const getTrailPieceCount = (duration: number, lifeSec: number): number =>
+  Math.min(MAX_TRAIL_PIECES, Math.max(MIN_TRAIL_PIECES, Math.ceil((10 * duration) / lifeSec)));
+export const getTrailPieces = (x: number, dx: number, duration: number, count: number): TrailPiece[] =>
   Array.from({ length: count }, (_, i) => ({
     left: x + (dx * i) / count,
     width: dx / count,
     growAt: (duration * i) / count,
     growSec: duration / count,
   }));
+
+// A point of a trail at `a` = its age / its life (0-1): 0.9 when made, 0.6 at 40 % of its life,
+// then down to 0. The same for the pieces here and the live trails (item 142).
+export const getTrailOpacity = (a: number): number => (a < 0.4 ? 0.9 - 0.75 * a : Math.max(0, 1 - a));
+
+// The keyframes of one plane's trail pieces, one animation per piece (item 142: every running
+// animation costs main-thread time in each frame, so not one to grow and one to fade). From its
+// start a piece grows from its left end in `growSec` (scaleX 0 → 1, with the plane), and over
+// `lifeSec` spreads from `thin` × its band to the full band (scaleY) and fades.
+export const getTrailKeyframes = (name: string, growSec: number, lifeSec: number, thin: number): string => {
+  const grown = Math.min(1, growSec / lifeSec);
+  const round = (n: number) => Math.round(n * 10_000) / 10_000;
+  const stops = [...new Set([0, grown, 0.4, 1])].sort((a, b) => a - b);
+  return `@keyframes ${name}{${stops.map(o =>
+    `${round(o * 100)}%{transform:scale(${round(Math.min(1, o / grown))},${round(thin + (1 - thin) * o)});opacity:${round(getTrailOpacity(o))}}`,
+  ).join('')}}`;
+};
 
 // Test override: `?plane=persistent` (or `medium`, `short`, `none`): a plane every 20 s, with
 // that contrail whatever the forecast says.

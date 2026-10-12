@@ -4,6 +4,7 @@ import CloudLayer, { WeatherType, createFish, createBird, spawnTick, type SceneE
 import { findLane, firstMeeting, xAt, type ScenePath } from '../src/utils/scenePaths';
 import { FISH_WEIGHTS, NIGHT_FISH_WEIGHTS, MAX_FISH, MAX_NIGHT_FISH, getWaterSpeedFactor, getSceneLimit } from '../src/utils/weatherEffectsUtils';
 import { getSceneDensity, getDensityCurve } from '../src/utils/sceneDensity';
+import { getTrailPieceCount } from '../src/utils/planes';
 import { getSunPosition, getSunTimes, getTimeOfDay } from '../src/utils/sunUtils';
 import type { TimeOfDay } from '../src/utils/sunUtils';
 import { DEFAULT_CLOUD_LAYERS, getCloudCentre, getDaySeed, getGliderStartProgress, getSkyClouds, mulberry32 } from '../src/utils/skyCloudUtils';
@@ -1505,10 +1506,9 @@ describe('planes and contrails (ROADMAP item 96)', () => {
       expect(speed).toBeGreaterThanOrEqual(0.3 * getWaterSpeedFactor(phone.width) - 1e-9);
       expect(speed).toBeLessThanOrEqual(0.6 * getWaterSpeedFactor(phone.width) + 1e-9);
       expect(plane.contrail).toBe('medium');
-      expect(plane.lifeSec).toBe(180);
-      expect(plane.trailLength).toBeCloseTo(speed * 180);
-      // It flies on past the edge until the end of its trail is off the screen too (item 109).
-      expect(plane.x + plane.dx - plane.trailLength).toBeCloseTo(101);
+      expect(plane.lifeSec).toBe(300);
+      // It ends just off the right edge; its trail stays in the sky (item 142).
+      expect(plane.x + plane.dx).toBeCloseTo(101);
       expect(plane.lights).toBeUndefined(); // by day the silhouette
       expect(plane.path).toBeDefined(); // a lane, planned with the birds
     }
@@ -1539,8 +1539,8 @@ describe('planes and contrails (ROADMAP item 96)', () => {
     const overridden = firstPlaneAt({ planeOverride: 'persistent' }, 4)!;
     expect(overridden.ms).toBe(20_500);
     expect(overridden.plane.contrail).toBe('persistent');
-    expect(overridden.plane.lifeSec).toBeGreaterThanOrEqual(300);
-    expect(overridden.plane.lifeSec).toBeLessThanOrEqual(600);
+    expect(overridden.plane.lifeSec).toBeGreaterThanOrEqual(600);
+    expect(overridden.plane.lifeSec).toBeLessThanOrEqual(900);
     expect(firstPlaneAt({ contrail: undefined }, 4)!.plane.contrail).toBe('none');
   });
 
@@ -1570,12 +1570,35 @@ describe('planes and contrails (ROADMAP item 96)', () => {
   const wrapperOf = (container: HTMLElement) =>
     container.querySelector('[data-testid="scene-plane"]')!.closest<HTMLElement>('[style*="moveAcrossX"]')!;
 
-  it('draws a short or medium trail that moves with the plane, and removes the plane at the end of its crossing', () => {
-    const { container } = planeScene('?plane=medium');
-    expect(container.querySelectorAll('[data-testid="scene-plane"]')).toHaveLength(1);
-    const trail = container.querySelector<HTMLElement>('[data-testid="plane-trail"]')!;
-    expect(wrapperOf(container).contains(trail)).toBe(true); // the same animation moves it
-    expect(trail.style.background).toContain('linear-gradient');
+  it('draws a short or medium trail in pieces that stay; the plane ends at 101 %, the last fade removes it (item 142)', () => {
+    for (const [kind, life] of [['short', 60], ['medium', 300]] as const) {
+      const { container, unmount } = planeScene(`?plane=${kind}`);
+      expect(container.querySelectorAll('[data-testid="scene-plane"]')).toHaveLength(1);
+      const wrapper = wrapperOf(container);
+      // The plane ends just off the right edge: no overrun for its trail (item 109).
+      expect(parseFloat(wrapper.style.left) + parseFloat(wrapper.style.getPropertyValue('--dx'))).toBeCloseTo(101);
+      const pieces = [...container.querySelectorAll<HTMLElement>('[data-testid="plane-trail-piece"]')];
+      // A piece in at most a tenth of the life: the short trail has the most pieces.
+      const count = getTrailPieceCount(parseFloat(wrapper.style.animation.split(' ')[1]), life);
+      expect(pieces).toHaveLength(count);
+      if (kind === 'short') expect(count).toBe(24);
+      // Not inside the plane's wrapper: the trail does not move with the plane.
+      pieces.forEach(piece => expect(wrapper.contains(piece)).toBe(false));
+      // The first piece starts where the plane comes in; each fades on its own clock.
+      const pieceLeft = pieces[0].style.left.match(/calc\(([-\d.]+)%/)![1];
+      expect(parseFloat(pieceLeft)).toBeCloseTo(parseFloat(wrapper.style.left));
+      expect(pieces[0].style.animation).toMatch(new RegExp(`^planeTrail\\w+ ${life}s linear 0s forwards$`));
+      const trailName = pieces[0].style.animation.split(' ')[0];
+      endAnimation(wrapper, 'moveAcrossX');
+      expect(container.querySelectorAll('[data-testid="scene-plane"]')).toHaveLength(1); // the trail stays
+      endAnimation(pieces[count - 1], trailName);
+      expect(container.querySelectorAll('[data-testid="scene-plane"]')).toHaveLength(0);
+      unmount();
+    }
+  });
+
+  it('removes a plane without a trail at the end of its crossing', () => {
+    const { container } = planeScene('?plane=none');
     expect(container.querySelectorAll('[data-testid="plane-trail-piece"]')).toHaveLength(0);
     endAnimation(wrapperOf(container), 'moveAcrossX');
     expect(container.querySelectorAll('[data-testid="scene-plane"]')).toHaveLength(0);
@@ -1587,17 +1610,20 @@ describe('planes and contrails (ROADMAP item 96)', () => {
     expect(pieces).toHaveLength(12);
     const wrapper = wrapperOf(container);
     const crossing = parseFloat(wrapper.style.animation.split(' ')[1]);
-    // Each piece grows while the plane passes it (a twelfth of the crossing), then spreads and fades.
-    const grow = pieces[11].parentElement!.style.animation;
-    expect(grow).toMatch(/^planeTrailGrow /);
-    expect(parseFloat(grow.split(' ')[1])).toBeCloseTo(crossing / 12);
-    expect(parseFloat(grow.split(' ')[3])).toBeCloseTo((crossing * 11) / 12);
-    expect(pieces[0].style.animation).toMatch(/^planeTrailSpread \d+(\.\d+)?s linear 0s both$/);
+    // Each piece starts when the plane passes its left end, with one animation: the plane's
+    // keyframes grow it in a twelfth of the crossing, then it spreads and fades (item 142).
+    const [trailName, life, , start] = pieces[11].style.animation.split(' ');
+    expect(parseFloat(start)).toBeCloseTo((crossing * 11) / 12);
+    expect(pieces[0].style.animation).toBe(`${trailName} ${life} linear 0s forwards`);
+    const keyframes = [...container.querySelectorAll('style')].map(style => style.textContent).find(css => css?.includes(trailName))!;
+    // The stop where the piece is grown: scaleX 1 from a twelfth of the crossing on.
+    const grownAt = parseFloat(keyframes.match(/([\d.]+)%\{transform:scale\(1,/)![1]);
+    expect(grownAt).toBeCloseTo((100 * crossing) / 12 / parseFloat(life), 3);
     endAnimation(wrapper, 'moveAcrossX');
     expect(container.querySelectorAll('[data-testid="plane-trail-piece"]')).toHaveLength(12); // the trail stays
-    endAnimation(pieces[0], 'planeTrailSpread');
+    endAnimation(pieces[0], trailName);
     expect(container.querySelectorAll('[data-testid="plane-trail-piece"]')).toHaveLength(12);
-    endAnimation(pieces[11], 'planeTrailSpread');
+    endAnimation(pieces[11], trailName);
     expect(container.querySelectorAll('[data-testid="plane-trail-piece"]')).toHaveLength(0);
   });
 
@@ -1606,7 +1632,7 @@ describe('planes and contrails (ROADMAP item 96)', () => {
     expect(container.querySelectorAll('[data-testid="plane-wing-light"]')).toHaveLength(1);
     expect(container.querySelector<HTMLElement>('[data-testid="plane-strobe"]')!.style.animation).toBe('planeStrobe 2s linear infinite');
     expect(container.querySelector('[data-testid="scene-plane"] path')).toBeNull();
-    expect(container.querySelector('[data-testid="plane-trail"]')).toBeNull();
+    expect(container.querySelector('[data-testid="plane-trail-piece"]')).toBeNull();
   });
 
   it('opens the card on a tap, with the contrail kind', () => {

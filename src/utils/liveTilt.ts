@@ -8,6 +8,8 @@
 // `dx`, `dy`: the screen step (px) to 1 s later, y down. Pure: the caller keeps the last tilt
 // per plane and passes it back as `prev`.
 
+import { PLANE_ASPECT, PLANE_TRAIL_X, PLANE_TRAIL_Y, PLANE_UNDER_TAIL_X } from '@/components/ScenePlane';
+
 export type LiveView = 'side' | 'under';
 
 export interface LiveTilt {
@@ -47,4 +49,17 @@ export const getLiveTilt = (prev: LiveTilt | undefined, dx: number, dy: number):
   const climb = Math.max(-SIDE_MAX_TILT_RAD, Math.min(SIDE_MAX_TILT_RAD, Math.atan2(-dy, dx * side)));
   const angle = roundAngle(view === 'under' ? Math.atan2(dy, dx) : side > 0 ? -climb : Math.PI + climb);
   return { angle: prev ? unwrap(angle, prev.angle) : angle, side, view, first: !prev };
+};
+
+// Where the trail leaves the body as it is drawn (item 142), in px from the plane's middle (y
+// down): in the side view the engine (PLANE_TRAIL_X/Y), mirrored with the body when it faces left
+// (scaleY(-1)); from below the rear end of the fuselage. Both turned by the body's angle (the
+// angle the body glides to).
+export const getTailOffset = (tilt: Pick<LiveTilt, 'angle' | 'side' | 'view'>, planeWidth: number): { x: number; y: number } => {
+  const [x, y] = tilt.view === 'under'
+    ? [(PLANE_UNDER_TAIL_X - 0.5) * planeWidth, 0]
+    : [(PLANE_TRAIL_X - 0.5) * planeWidth, tilt.side * (PLANE_TRAIL_Y - 0.5) * planeWidth * PLANE_ASPECT];
+  const cos = Math.cos(tilt.angle);
+  const sin = Math.sin(tilt.angle);
+  return { x: x * cos - y * sin, y: x * sin + y * cos };
 };

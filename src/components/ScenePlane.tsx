@@ -27,6 +27,9 @@ const UNDER = [
   'M19.6 14Q19.6 13.2 21.6 13.2L23.9 13.3Q24.4 14 23.9 14.7L21.6 14.8Q19.6 14.8 19.6 14Z', // engine, right
   'M19.6 26Q19.6 25.2 21.6 25.2L23.9 25.3Q24.4 26 23.9 26.7L21.6 26.8Q19.6 26.8 19.6 26Z', // engine, left
 ];
+// Where the trail leaves the plane seen from below (item 142): the rear end of the fuselage, as a
+// share of the box's width (on its middle line).
+export const PLANE_UNDER_TAIL_X = 2 / 40;
 // The wingtip lights from below. Seen from below with the nose up, the left wing (red) is on the
 // viewer's right; with the nose to the right (+x) that is the lower wing (+y).
 const UNDER_TIP_RED = { cx: 12.1, cy: 36.8 };
