@@ -77,8 +77,8 @@ describe('sceneInfo (ROADMAP item 95)', () => {
     expect(rarity({ type: 'bird', kind: 'bat' })).toBe('Rarity: Frequent · 22.8 %');
     expect(rarity({ type: 'bird', kind: 'bat' }, { language: 'de' }, de)).toBe('Seltenheit: Verbreitet · 22,8 %');
     expect(rarity({ type: 'bird', kind: 'stork' })).toBe('Rarity: Uncommon · 6.2 %');
-    expect(rarity({ type: 'boat', kind: 'freighter' })).toBe('Rarity: Uncommon · 6.3 %');
-    const boats: BoatKind[] = ['sailboat', 'ferry', 'fishing', 'rowboat', 'freighter'];
+    expect(rarity({ type: 'boat', kind: 'freighter' })).toBe('Rarity: Uncommon · 5.7 %'); // item 146: 5 of 88
+    const boats: BoatKind[] = ['sailboat', 'ferry', 'fishing', 'rowboat', 'freighter', 'kayak', 'paddleSteamer', 'cruiseLiner', 'tallShip'];
     for (const kind of boats) expect(rarity({ type: 'boat', kind }), kind).toMatch(/^Rarity: .+ · [\d.]+ %$/);
   });
 
@@ -92,11 +92,15 @@ describe('sceneInfo (ROADMAP item 95)', () => {
 
   it('gives a fish its species, one fact and day or night fish', () => {
     expect(card({ type: 'fish', kind: 'lanternfish' }, { timeOfDay: 'night' })).toEqual([
-      'Lanternfish', 'Lanternfish make their own light.', 'Night fish', 'Rarity: Common · 30 %',
+      'Lanternfish', 'Lanternfish make their own light.', 'Night fish', 'Rarity: Common · 29 %',
     ]);
     expect(card({ type: 'fish', kind: 'perch' })[2]).toBe('Day fish');
     expect(card({ type: 'fish', kind: 'jellyfish' })[2]).toBe('Day and night');
     expect(card({ type: 'fish', kind: 'shark' })[2]).toBe('Day and night');
+    // Item 144: the whale is a sperm whale, by day and (with the sea sparkle) at night.
+    expect(card({ type: 'fish', kind: 'whale' }, { timeOfDay: 'night' })).toEqual([
+      'Sperm whale', 'The blow of a sperm whale leans forward: its blowhole is at the front of its head.', 'Day and night', 'Rarity: Rare · 1 %',
+    ]);
   });
 
   it('has a name and a fact for every fish, day and night (items 62, 65, 85)', () => {
@@ -127,9 +131,27 @@ describe('sceneInfo (ROADMAP item 95)', () => {
 
   it('gives a boat its type and one fact', () => {
     expect(card({ type: 'boat', kind: 'fishing' })).toEqual([
-      'Fishing boat', 'Gulls often follow fishing boats for scraps.', 'Rarity: Frequent · 18.8 %',
+      'Fishing boat', 'Gulls often follow fishing boats for scraps.', 'Rarity: Frequent · 17 %',
     ]);
     expect(card({ type: 'boat', kind: 'freighter' }, {}, de)[0]).toBe('Frachter');
+  });
+
+  it('gives the new boats their cards: name, fact and tier (item 146)', () => {
+    expect(card({ type: 'boat', kind: 'kayak' })).toEqual([
+      'Kayak', 'A kayak paddle has a blade at each end.', 'Rarity: Uncommon · 4.5 %',
+    ]);
+    expect(card({ type: 'boat', kind: 'paddleSteamer' })).toEqual([
+      'Paddle steamer', 'A paddle steamer turns a big wheel on each side.', 'Rarity: Rare · 2.3 %',
+    ]);
+    expect(card({ type: 'boat', kind: 'cruiseLiner' })).toEqual([
+      'Cruise liner', 'A big cruise liner has restaurants, pools and a theatre on board.', 'Rarity: Rare · 1.7 %',
+    ]);
+    expect(card({ type: 'boat', kind: 'tallShip' })).toEqual([
+      'Tall ship', 'A tall ship can carry more than 20 sails.', 'Rarity: Very rare · 0.6 %',
+    ]);
+    expect(card({ type: 'boat', kind: 'paddleSteamer' }, {}, de)[0]).toBe('Raddampfer');
+    expect(card({ type: 'boat', kind: 'tallShip' }, {}, de)[0]).toBe('Großsegler');
+    expect(getSceneInfo({ type: 'boat', kind: 'tallShip' }, ctx()).tier).toBe('veryRare');
   });
 
   it('gives a plane its type, one fact, the altitude band and its contrail (item 96)', () => {
@@ -302,6 +324,7 @@ describe('sceneInfo: field guide data (ROADMAP item 107)', () => {
   it('gives a Latin name to the real species only', () => {
     expect(info({ type: 'fish', kind: 'pike' }).latin).toBe('Esox lucius');
     expect(info({ type: 'fish', kind: 'eel' }).latin).toBe('Anguilla anguilla');
+    expect(info({ type: 'fish', kind: 'whale' }).latin).toBe('Physeter macrocephalus'); // item 144
     expect(info({ type: 'bird', kind: 'stork' }).latin).toBe('Ciconia ciconia');
     expect(info({ type: 'bird', kind: 'starlings' }).latin).toBe('Sturnus vulgaris');
     for (const target of [
@@ -373,7 +396,7 @@ describe('sceneInfo: easter egg cards (ROADMAP item 113)', () => {
   ];
   const kinds: EggCardKind[] = ['ufo', 'ghost', 'dragon', 'santa', 'blackCat', 'halloweenBat', 'pumpkinMoon',
     'matariki', 'conjunction', 'noctilucent', 'midnightSun', 'polarNight', 'emptyTomb', 'potOfGold', 'heartCloud', ...festivals,
-    'fireworks', 'aurora', 'meteorShower', 'solstice', 'equinox']; // item 123
+    'fireworks', 'aurora', 'meteorShower', 'solstice', 'equinox', 'midwinter']; // item 123; item 140
 
   it('gives every egg the "ultra rare" tier, a title, a field note and the rarity row', () => {
     for (const kind of kinds) {
@@ -423,6 +446,17 @@ describe('sceneInfo: easter egg cards (ROADMAP item 113)', () => {
     expect(eggCard('halloweenBat')[2]).toBe('Rarity: Ultra rare · 0.8 days a year');
     expect(eggCard('pumpkinMoon')[2]).toBe('Rarity: Ultra rare · 1 day in 5 years');
     expect(eggCard('blackCat', de, { language: 'de' })[2]).toBe('Seltenheit: Ultraselten · 1,6 Tage im Jahr');
+  });
+
+  // Item 140: the winter solstice pill opens the midwinter card, with the days a year of the shortest day.
+  it('gives midwinter a "Special event" card: Yule, Yalda and Dongzhi, 1 day a year', () => {
+    expect(getEventDaysPerYear('solstice-shortest')).toBe(1);
+    expect(info('midwinter')).toMatchObject({ kicker: 'infoKind.specialEvent', icon: 'event', tier: 'ultraRare' });
+    const [title, fact, rarity] = eggCard('midwinter');
+    expect(title).toBe('Midwinter');
+    expect(fact).toMatch(/Yule.*Yalda.*Dongzhi/);
+    expect(rarity).toBe('Rarity: Ultra rare · 1 day a year');
+    expect(eggCard('midwinter', de, { language: 'de' })[0]).toBe('Mittwinter');
   });
 
   it('gives Santa 1 day a year (Dec 24 only, not the 2 Christmas lights days)', () => {
@@ -480,7 +514,9 @@ describe('sceneInfo: item 123 rows', () => {
     expect(card({ type: 'egg', kind: 'fireworks' })[0]).toBe('Fireworks');
     expect(card({ type: 'egg', kind: 'aurora' })[0]).toBe('Aurora');
     expect(card({ type: 'egg', kind: 'meteorShower' })[0]).toBe('Meteor shower');
-    expect(card({ type: 'egg', kind: 'solstice' }, undefined, de)[0]).toBe('Sonnenwende');
+    // Item 140: the solstice card is the summer one now (the winter one is midwinter).
+    expect(card({ type: 'egg', kind: 'solstice' })[0]).toBe('Summer solstice');
+    expect(card({ type: 'egg', kind: 'solstice' }, undefined, de)[0]).toBe('Sommersonnenwende');
     expect(getSceneInfo({ type: 'egg', kind: 'equinox' }, ctx()).kicker).toBe('infoKind.specialEvent');
   });
 

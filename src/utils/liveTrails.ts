@@ -21,9 +21,13 @@ export const MAX_TRAILS = MAX_COMPASS_PLANES;
 export const TRAIL_GAP_MS = 30_000;
 // The fade in steps over the life: the segments of one step are drawn as one path.
 export const TRAIL_FADE_STEPS = 20;
+// The head follows the plane's tail when the body turns or rolls (item 143: a 2 s glide) at
+// most this fast, so it lags a little but never jumps. Reduced motion has no glide: its updates
+// are 15 s apart, so the head takes the new place at once.
+export const TAIL_SHIFT_PX_S = 4;
 
-// A point of the trail: where the plane was in the sky, when, and where its engine was on the
-// screen relative to that place (px), so that the trail leaves the plane at the engine.
+// A point of the trail: where the plane was in the sky, when, and where its tail was on the
+// screen relative to that place (px; `getTailOffset`), so that the trail leaves the plane there.
 export interface SkyPoint {
   az: number;
   el: number;
@@ -72,7 +76,11 @@ export const updateLiveTrails = (
     let updated = trail;
     if (plane) {
       continued.add(plane.hex);
-      const head: SkyPoint = { az: plane.az, el: plane.el, t, ox: plane.ox, oy: plane.oy };
+      // The tail's offset moves towards the plane's new one at most TAIL_SHIFT_PX_S.
+      const shiftX = plane.ox - trail.head.ox;
+      const shiftY = plane.oy - trail.head.oy;
+      const k = Math.min(1, (TAIL_SHIFT_PX_S * Math.max(0, t - trail.head.t)) / 1000 / (Math.hypot(shiftX, shiftY) || 1));
+      const head: SkyPoint = { az: plane.az, el: plane.el, t, ox: trail.head.ox + k * shiftX, oy: trail.head.oy + k * shiftY };
       const last = trail.points[trail.points.length - 1];
       const points = !last || t - last.t >= spacingMs ? [...trail.points, head].slice(-MAX_TRAIL_POINTS) : trail.points;
       updated = { ...trail, points, head };

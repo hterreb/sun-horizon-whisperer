@@ -1,9 +1,12 @@
 import { render } from '@testing-library/react';
 import BoatBunting from '../src/components/BoatBunting';
 
+// Every boat, the new ones of item 146 too.
+const ALL_BOATS = ['sailboat', 'ferry', 'fishing', 'rowboat', 'freighter', 'kayak', 'paddleSteamer', 'cruiseLiner', 'tallShip'] as const;
+
 // National days: the pennant strings on the boats.
 describe('BoatBunting', () => {
-  it.each(['sailboat', 'ferry', 'fishing', 'rowboat', 'freighter'] as const)('hangs pennants on the %s, the colours in turn', (kind) => {
+  it.each(ALL_BOATS)('hangs pennants on the %s, the colours in turn', (kind) => {
     const colors = ['red', 'white', 'blue'];
     const { container } = render(<svg><BoatBunting kind={kind} colors={colors} /></svg>);
     const pennants = [...container.querySelectorAll('[data-testid="bunting-pennant"]')];
@@ -30,7 +33,7 @@ describe('BoatBunting', () => {
         addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
       } as unknown as MediaQueryList);
 
-    it.each(['sailboat', 'ferry', 'fishing', 'rowboat', 'freighter'] as const)('hangs warm bulbs and a gold star on the %s', (kind) => {
+    it.each(ALL_BOATS)('hangs warm bulbs and a gold star on the %s', (kind) => {
       const colors = ['amber', 'gold'];
       const { container } = render(<svg><BoatBunting kind={kind} colors={colors} shape="lights" /></svg>);
       const bulbs = [...container.querySelectorAll('[data-testid="christmas-bulb"]')];

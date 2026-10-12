@@ -7,6 +7,13 @@ import { type WeatherType } from '../src/components/CloudLayer';
 import { type WeatherData } from '../src/utils/weatherUtils';
 import { PremiumContext, type PremiumValue } from '../src/hooks/usePremium';
 
+vi.mock('@sentry/react', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@sentry/react')>()),
+  setTag: vi.fn(),
+  captureMessage: vi.fn(),
+}));
+import { setTag } from '@sentry/react';
+
 const premiumValue = (overrides: Partial<PremiumValue>): PremiumValue => ({
   isPremium: false,
   isBillingAvailable: true,
@@ -66,6 +73,12 @@ describe('InfoPanel', () => {
     expect(screen.getByRole('heading', { name: /midday/i })).toBeInTheDocument();
     // Or check for 'Weather Mode' section
     expect(screen.getByText(/weather mode/i)).toBeInTheDocument();
+  });
+
+  it('shows Moon Information, collapsed, when the moon is below the horizon', () => {
+    render(<InfoPanel {...defaultProps} moonPosition={{ ...defaultProps.moonPosition, altitude: -10, visible: false }} />);
+    expect(screen.getByText('Moon Information')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /expand moon/i })).toBeInTheDocument();
   });
 
   it('shows the sunrise and sunset of the pass the arc draws, not today\'s past ones (AUDIT C-17)', () => {
@@ -315,9 +328,9 @@ describe('InfoPanel', () => {
       vi.stubGlobal('fetch', fetchMock);
       vi.spyOn(console, 'error').mockImplementation(() => {});
       render(<InfoPanel {...defaultProps} onCountryChange={onCountryChange} />);
-      // Item 130: one retry after 2 s, then the device zone (UTC in the tests: no country).
+      // Item 130: one retry after 2 s, then (item 137) Photon, then the device zone (UTC in the tests: no country).
       await waitFor(() => expect(onCountryChange).toHaveBeenCalledWith(null), { timeout: 3500 });
-      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
     });
 
     it('uses the device time zone\'s country when both calls fail and nothing is cached (item 130)', async () => {
@@ -332,6 +345,9 @@ describe('InfoPanel', () => {
       render(<InfoPanel {...defaultProps} onCountryChange={onCountryChange} />);
       await waitFor(() => expect(onCountryChange).toHaveBeenCalledWith('DE'), { timeout: 3500 });
       expect(screen.getByText('Your location')).toBeInTheDocument();
+      // Item 137: Photon failed too; both failures go to Sentry as tags.
+      expect(setTag).toHaveBeenCalledWith('place', 'http-429');
+      expect(setTag).toHaveBeenCalledWith('place-photon', 'http-429');
       vi.restoreAllMocks();
     });
 
@@ -356,7 +372,8 @@ describe('InfoPanel', () => {
       const location = { latitude: 40.7128, longitude: -74.006, loaded: true };
       const { unmount } = render(<InfoPanel {...defaultProps} location={location} onCountryChange={onCountryChange} />);
       await screen.findByText('Old City, Testland');
-      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2), { timeout: 3500 });
+      // Two BigDataCloud calls and Photon (item 137), all failed.
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3), { timeout: 3500 });
       await new Promise((resolve) => setTimeout(resolve, 50));
       expect(screen.getByText('Old City, Testland')).toBeInTheDocument();
       expect(onCountryChange).not.toHaveBeenCalledWith(null);
@@ -376,6 +393,84 @@ describe('InfoPanel', () => {
       render(<InfoPanel {...defaultProps} manualPlaceName="Roma, Italia" onCountryChange={onCountryChange} />);
       await waitFor(() => expect(onCountryChange).toHaveBeenCalledWith(null));
       expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Photon fallback and the Sentry status (item 137)', () => {
+    const banned = { ok: false, status: 400, json: () => Promise.resolve({ status: 402 }) };
+    const photon = (properties: Record<string, unknown>) =>
+      ({ ok: true, json: () => Promise.resolve({ features: [{ properties }] }) });
+    // BigDataCloud bans the IP; Photon answers with `properties`.
+    const stubBanWithPhoton = (properties: Record<string, unknown>) => {
+      const fetchMock = vi.fn((url: string) => Promise.resolve(new URL(String(url)).hostname === 'photon.komoot.io' ? photon(properties) : banned));
+      vi.stubGlobal('fetch', fetchMock);
+      return fetchMock;
+    };
+    const osmLink = () => screen.queryByRole('link', { name: '© OpenStreetMap contributors' });
+    beforeEach(() => {
+      vi.mocked(setTag).mockClear();
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+    });
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      vi.restoreAllMocks();
+    });
+
+    it('tags a BigDataCloud answer ok, country-only or cached, with no attribution', async () => {
+      vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ city: 'Roma', countryName: 'Italia', countryCode: 'IT' }) })));
+      const { unmount } = render(<InfoPanel {...defaultProps} />);
+      await screen.findByText('Roma, Italia');
+      expect(setTag).toHaveBeenCalledWith('place', 'ok');
+      expect(osmLink()).not.toBeInTheDocument();
+      unmount();
+
+      // Now cached: no call.
+      vi.stubGlobal('fetch', vi.fn());
+      const cached = render(<InfoPanel {...defaultProps} />);
+      await screen.findByText('Roma, Italia');
+      expect(setTag).toHaveBeenLastCalledWith('place-photon', undefined);
+      expect(setTag).toHaveBeenCalledWith('place', 'cached');
+      cached.unmount();
+
+      localStorage.clear();
+      vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ countryName: 'Italia', countryCode: 'IT' }) })));
+      render(<InfoPanel {...defaultProps} />);
+      await screen.findByText('Italia');
+      expect(setTag).toHaveBeenCalledWith('place', 'country-only');
+    });
+
+    it('asks Photon when both BigDataCloud calls fail, shows its name with the OSM attribution, and caches it', async () => {
+      const fetchMock = stubBanWithPhoton({ city: 'Ravensburg', state: 'Baden-Württemberg', country: 'Germany', countrycode: 'DE' });
+      const onCountryChange = vi.fn();
+      const { unmount } = render(<InfoPanel {...defaultProps} location={{ latitude: 47.7812, longitude: 9.6123, loaded: true }} onCountryChange={onCountryChange} />);
+      await screen.findByText('Ravensburg, Germany', undefined, { timeout: 3500 });
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(String(fetchMock.mock.calls[2][0])).toBe('https://photon.komoot.io/reverse?lat=47.78&lon=9.61&lang=en');
+      expect(onCountryChange).toHaveBeenLastCalledWith('DE');
+      expect(osmLink()).toHaveAttribute('href', 'https://www.openstreetmap.org/copyright');
+      expect(screen.queryByText(/47\.7812/)).not.toBeInTheDocument();
+      expect(setTag).toHaveBeenCalledWith('place', 'http-400-402');
+      expect(setTag).toHaveBeenCalledWith('place-photon', 'ok');
+      unmount();
+
+      // The cached Photon name keeps its attribution, with no new call.
+      fetchMock.mockClear();
+      render(<InfoPanel {...defaultProps} location={{ latitude: 47.7812, longitude: 9.6123, loaded: true }} />);
+      await screen.findByText('Ravensburg, Germany');
+      expect(osmLink()).toBeInTheDocument();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('keeps a cached town when Photon has only the country', async () => {
+      const stale = { key: '0,0', language: 'en', savedAt: Date.now() - 2 * 24 * 3600 * 1000, name: 'Old City, Testland', countryCode: 'US', hasTown: true, source: 'bigdatacloud' };
+      localStorage.setItem('place-name', JSON.stringify(stale));
+      const fetchMock = stubBanWithPhoton({ country: 'Testland', countrycode: 'US' });
+      render(<InfoPanel {...defaultProps} />);
+      await screen.findByText('Old City, Testland');
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3), { timeout: 3500 });
+      await waitFor(() => expect(setTag).toHaveBeenCalledWith('place-photon', 'country-only'));
+      expect(screen.getByText('Old City, Testland')).toBeInTheDocument();
+      expect(osmLink()).not.toBeInTheDocument();
     });
   });
 
@@ -826,6 +921,8 @@ describe('InfoPanel: line of sight as an icon at the sun and moon rows (ROADMAP 
     render(<InfoPanel {...defaultProps} terrainStatus="loading" />);
     fireEvent.click(getSunLineOfSightButton());
     expect(screen.getByText(/Mapzen \/ AWS Terrain Tiles/)).toBeInTheDocument();
+    // The trees' land cover, CC BY 4.0 (ROADMAP item 141).
+    expect(screen.getByText(/© ESA WorldCover project 2021/)).toBeInTheDocument();
     expect(screen.getByLabelText(/eye height/i)).toBeInTheDocument();
   });
 

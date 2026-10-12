@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  MAX_TRAIL_POINTS, MAX_TRAILS, TRAIL_FADE_STEPS, TRAIL_GAP_MS, TRAIL_POINT_MS, getTrailFadeTime,
+  MAX_TRAIL_POINTS, MAX_TRAILS, TAIL_SHIFT_PX_S, TRAIL_FADE_STEPS, TRAIL_GAP_MS, TRAIL_POINT_MS, getTrailFadeTime,
   getTrailPaths, getTrailWidth, updateLiveTrails, type LiveTrail, type SkyPoint, type TrailPlane,
 } from '@/utils/liveTrails';
 import { getTrailOpacity } from '@/utils/planes';
@@ -73,6 +73,22 @@ describe('updateLiveTrails', () => {
     const later = updateLiveTrails(trails, [plane('a', 95)], 10_500 + TRAIL_GAP_MS + 1, TRAIL_POINT_MS);
     expect(later.filter(trail => trail.active)).toHaveLength(1);
     expect(later.find(trail => trail.active)!.points).toHaveLength(1);
+  });
+
+  it('moves the head to a new tail place (the body turns or rolls) at most 4 px/s: no jump', () => {
+    // A new trail takes the tail's place at once (the body has no transition on its first frame).
+    let trails = updateLiveTrails([], [plane('a', 90, { ox: -1, oy: 1 })], 0, TRAIL_POINT_MS);
+    expect([trails[0].head.ox, trails[0].head.oy]).toEqual([-1, 1]);
+    // The plane rolls to the underside view: the tail is now 7 px behind.
+    const rolled = { ox: -7, oy: 1 };
+    trails = updateLiveTrails(trails, [plane('a', 90, rolled)], 250, TRAIL_POINT_MS);
+    expect(trails[0].head.ox).toBeCloseTo(-1 - TAIL_SHIFT_PX_S * 0.25);
+    for (let t = 500; t <= 1_500; t += 250) trails = updateLiveTrails(trails, [plane('a', 90, rolled)], t, TRAIL_POINT_MS);
+    expect(trails[0].head.ox).toBeCloseTo(-7);
+    expect(trails[0].points[0].ox).toBe(-1); // the first point keeps its own place
+    // With reduced motion the updates are 15 s apart: the head takes the new place at once.
+    trails = updateLiveTrails(trails, [plane('a', 90, { ox: 2, oy: -3 })], 16_500, 0);
+    expect([trails[0].head.ox, trails[0].head.oy]).toEqual([2, -3]);
   });
 
   it('with reduced motion stores each update (each answer of the feed)', () => {

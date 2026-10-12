@@ -8,6 +8,10 @@ import { DOUBLE_TAP_MS } from './useDoubleTap';
 // Item 132: hidden controls take no taps (`isTappable` false). After a wake they take taps
 // again only after TAP_READY_MS, longer than a double tap: the second tap of a double tap
 // cannot click a control that the first tap brought back.
+// Item 136: `toggle` (a tap on the empty sky) hides at once and with no timer, so the controls
+// stay hidden until the next toggle or wake; when they are hidden, it does the same as `wake`.
+// `enterHideMs` null (the installed app, where nobody enters fullscreen): no hide before the
+// first toggle.
 export const ENTER_HIDE_MS = 3000;
 export const WAKE_HIDE_MS = 10000;
 export const TAP_READY_MS = DOUBLE_TAP_MS + 50;
@@ -16,9 +20,10 @@ export interface IdleHide {
   isVisible: boolean;
   isTappable: boolean;
   wake: () => void;
+  toggle: () => void;
 }
 
-export const useIdleHide = (isActive: boolean): IdleHide => {
+export const useIdleHide = (isActive: boolean, enterHideMs: number | null = ENTER_HIDE_MS): IdleHide => {
   const [isVisible, setIsVisible] = useState(true);
   const [isTappable, setIsTappable] = useState(true);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -34,36 +39,46 @@ export const useIdleHide = (isActive: boolean): IdleHide => {
     setIsTappable(true);
   }
 
-  const hideAfter = useCallback((ms: number) => {
+  const hide = useCallback(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => {
-      hasHiddenRef.current = true;
-      if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
-      setIsVisible(false);
-      setIsTappable(false);
-    }, ms);
+    if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
+    hasHiddenRef.current = true;
+    setIsVisible(false);
+    setIsTappable(false);
   }, []);
+
+  // `null`: no timer, the controls stay as they are.
+  const hideAfter = useCallback((ms: number | null) => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (ms !== null) timeoutRef.current = setTimeout(hide, ms);
+  }, [hide]);
 
   useEffect(() => {
     if (!isActive) return;
     hasHiddenRef.current = false;
-    hideAfter(ENTER_HIDE_MS);
+    hideAfter(enterHideMs);
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
     };
-  }, [isActive, hideAfter]);
+  }, [isActive, enterHideMs, hideAfter]);
 
   const wake = useCallback(() => {
     if (!isActive) return;
     setIsVisible(true);
     if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
     tapTimeoutRef.current = setTimeout(() => setIsTappable(true), TAP_READY_MS);
-    hideAfter(hasHiddenRef.current ? WAKE_HIDE_MS : ENTER_HIDE_MS);
-  }, [isActive, hideAfter]);
+    hideAfter(hasHiddenRef.current ? WAKE_HIDE_MS : enterHideMs);
+  }, [isActive, enterHideMs, hideAfter]);
 
-  return { isVisible, isTappable: !isActive || isTappable, wake };
+  const toggle = useCallback(() => {
+    if (!isActive) return;
+    if (isVisible) hide();
+    else wake();
+  }, [isActive, isVisible, hide, wake]);
+
+  return { isVisible, isTappable: !isActive || isTappable, wake, toggle };
 };
 
 // Outside SunTracker (tests, or no fullscreen): always shown, always takes taps.
-export const ALWAYS_SHOWN: IdleHide = { isVisible: true, isTappable: true, wake: () => {} };
+export const ALWAYS_SHOWN: IdleHide = { isVisible: true, isTappable: true, wake: () => {}, toggle: () => {} };

@@ -282,6 +282,64 @@ describe('LivePlanes (ROADMAP item 96)', () => {
       }
     });
 
+    // Item 143 turns the body: the head sits at the tail as the body is drawn now.
+    describe('the head at the turned tail (item 143)', () => {
+      const DEG = Math.PI / 180;
+      const transformOf = (testId: string) => screen.getByTestId(testId).style.transform;
+      const headOf = (plane: LiveAircraft) => {
+        renderScene({ contrail: 'medium', livePlanes: feed([plane]) });
+        run(2_000);
+        const p = start(screen.getByTestId('live-plane'));
+        const angle = Number(transformOf('live-plane-body').match(/rotate\(([-\d.e]+)rad\)/)![1]);
+        const under = transformOf('live-plane-under') === 'scaleY(1)';
+        const side = Number((screen.getByTestId('live-plane-side').firstElementChild as HTMLElement).style.transform.match(/scaleY\(([-\d.]+)\)/)![1]);
+        const w = Number(screen.getByTestId(under ? 'scene-plane-under' : 'scene-plane').getAttribute('width'));
+        // The tail in the body's own frame, from its middle: the engine of the side view (mirrored
+        // by the side), or the end of the fuselage from below; then turned by the body's angle.
+        const [lx, ly] = under ? [(2 / 40 - 0.5) * w, 0] : [(0.46 - 0.5) * w, side * (0.72 - 0.5) * 0.3 * w];
+        const expected = { x: p.x + lx * Math.cos(angle) - ly * Math.sin(angle), y: p.y + lx * Math.sin(angle) + ly * Math.cos(angle) };
+        const head = points()[points().length - 1];
+        return { angle, under, side, head, expected };
+      };
+      const expectAt = ({ head, expected }: ReturnType<typeof headOf>) => {
+        expect(Math.abs(head[0] - expected.x)).toBeLessThan(0.15);
+        expect(Math.abs(head[1] - expected.y)).toBeLessThan(0.15);
+      };
+      const withTimers = (test: () => void) => {
+        vi.useFakeTimers();
+        vi.setSystemTime(1_000);
+        try { test(); } finally { vi.useRealTimers(); }
+      };
+
+      it('side view, climbing about 30° to the right', () => withTimers(() => {
+        // 20 km south, flying north-north-west: west is right when facing south, and it comes nearer.
+        const climber = { ...south, lat: PLACE.lat - 20 / KM_PER_DEG, speedKt: 450, track: 336 };
+        const at = headOf(climber);
+        expect(at.under).toBe(false);
+        expect(at.side).toBe(1);
+        expect(at.angle).toBeLessThan(-15 * DEG);
+        expect(at.angle).toBeGreaterThan(-45 * DEG);
+        expectAt(at);
+      }));
+
+      it('side view, a plane that moves left (mirrored)', () => withTimers(() => {
+        const at = headOf(east);
+        expect(at.under).toBe(false);
+        expect(at.side).toBe(-1);
+        expectAt(at);
+        // Behind the plane: to the right of its middle.
+        expect(at.head[0]).toBeGreaterThan(start(screen.getByTestId('live-plane')).x);
+      }));
+
+      it('underside view, a plane that climbs steeply: the end of the fuselage, below it', () => withTimers(() => {
+        const towards = { ...south, lat: PLACE.lat - 15 / KM_PER_DEG, speedKt: 450, track: 2 };
+        const at = headOf(towards);
+        expect(at.under).toBe(true);
+        expectAt(at);
+        expect(at.head[1] - start(screen.getByTestId('live-plane')).y).toBeGreaterThan(5);
+      }));
+    });
+
     it('with reduced motion stores only the feed\'s points, one with each answer', () => {
       vi.useFakeTimers();
       vi.setSystemTime(1_000);
@@ -337,6 +395,100 @@ describe('LivePlanes (ROADMAP item 96)', () => {
     const north = { ...south, hex: 'c00000', lat: PLACE.lat + 30 / KM_PER_DEG };
     renderScene({ livePlanes: feed([...many, north]) });
     expect(screen.getAllByTestId('live-plane')).toHaveLength(20);
+  });
+
+  describe('points the way it flies on the screen (item 143, option H)', () => {
+    const body = () => screen.getByTestId('live-plane-body');
+    const angle = () => Number(body().style.transform.match(/rotate\(([-\d.e]+)rad\)/)![1]);
+    const scaleY = (el: Element) => Number((el as HTMLElement).style.transform.match(/scaleY\(([-\d.]+)\)/)![1]);
+    const side = () => screen.getByTestId('live-plane-side');
+    const under = () => screen.getByTestId('live-plane-under');
+    // 50 km south, flying east: facing south, east is on the left, so it moves left, about level.
+    const east = { ...south, speedKt: 450, track: 90 };
+    // 15 km south, flying (almost) north towards the observer: it climbs steeply on the screen.
+    const towards = { ...south, lat: PLACE.lat - 15 / KM_PER_DEG, speedKt: 450, track: 2 };
+    const withTimers = (test: () => void) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000);
+      try { test(); } finally { vi.useRealTimers(); }
+    };
+
+    it('mirrors a plane that moves left in the side view, so the fin stays up', () => withTimers(() => {
+      renderScene({ livePlanes: feed([east]) });
+      expect(Math.abs(angle() - Math.PI)).toBeLessThan(0.1);
+      expect(scaleY(side())).toBe(1);
+      expect(scaleY(side().firstElementChild!)).toBe(-1);
+      expect(scaleY(under())).toBe(0);
+    }));
+
+    it('shows a steep plane from below, pointing up along its way, with no clamp', () => withTimers(() => {
+      renderScene({ livePlanes: feed([towards]) });
+      expect(scaleY(side())).toBe(0);
+      expect(scaleY(under())).toBe(1);
+      expect(angle()).toBeLessThan(-75 * Math.PI / 180);
+      expect(angle()).toBeGreaterThan(-105 * Math.PI / 180);
+    }));
+
+    it('has no transition on its first frame; then it turns over 2 s and rolls in 2 × 0.75 s', () => withTimers(() => {
+      renderScene({ livePlanes: feed([east]) });
+      expect(body().style.transition).toBe('none');
+      expect(side().style.transition).toBe('none');
+      act(() => { vi.advanceTimersByTime(250); });
+      expect(body().style.transition).toBe('transform 2s ease-in-out');
+      expect(side().firstElementChild!.getAttribute('style')).toContain('transition: transform 2s ease-in-out');
+      // The shown view opens after the hidden one has gone edge-on.
+      expect(side().style.transition).toBe('transform 0.75s ease-out 0.75s');
+      expect(under().style.transition).toBe('transform 0.75s ease-in');
+    }));
+
+    it('jumps to the new angle and view with reduced motion', () => withTimers(() => {
+      const reduce = vi.spyOn(window, 'matchMedia').mockImplementation(query => ({
+        matches: query.includes('reduce'), media: query, onchange: null,
+        addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+      }));
+      try {
+        const { rerender } = renderScene({ livePlanes: feed([east]) });
+        rerender(
+          <SunVisualization
+            sunPosition={{ azimuth: 200, altitude: 30 }}
+            moonPosition={{ azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false }}
+            sunPath={[]} moonPath={[]} timeOfDay="midday" weatherType="clear" latitude={PLACE.lat} longitude={PLACE.lon}
+            livePlanes={{ feed: { now: 2_000, aircraft: [east] }, receivedAt: 2_000 }} compassHeading={180}
+          />,
+        );
+        expect([body(), side(), under()].map(el => el.style.transition)).toEqual(['none', 'none', 'none']);
+      } finally {
+        reduce.mockRestore();
+      }
+    }));
+
+    it('keeps the last angle, side and view of a plane that stops; the tap area stays level', () => withTimers(() => {
+      const onSceneInfo = vi.fn();
+      const { rerender } = renderScene({ livePlanes: feed([east]), onSceneInfo });
+      const before = angle();
+      // The next answer: the same plane, now with no speed (compass mode shows a still plane).
+      rerender(
+        <SunVisualization
+          sunPosition={{ azimuth: 200, altitude: 30 }}
+          moonPosition={{ azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false }}
+          sunPath={[]} moonPath={[]} timeOfDay="midday" weatherType="clear" latitude={PLACE.lat} longitude={PLACE.lon}
+          livePlanes={feed([{ ...east, speedKt: 0 }])} compassHeading={180} onSceneInfo={onSceneInfo}
+        />,
+      );
+      expect(angle()).toBe(before);
+      expect(scaleY(side().firstElementChild!)).toBe(-1);
+      expect(scaleY(side())).toBe(1);
+      const hit = screen.getByTestId('live-plane').querySelector<HTMLElement>('[data-plane-hit]')!;
+      expect(body().contains(hit)).toBe(false);
+      expect(hit.style.transform).toBe('');
+    }));
+
+    it('shows both wingtip lights from below at night, and one wing light in the side view', () => withTimers(() => {
+      renderScene({ timeOfDay: 'night', livePlanes: feed([towards]) });
+      expect(under().querySelectorAll('[data-testid="plane-tip-light"]')).toHaveLength(2);
+      expect(under().querySelectorAll('[data-testid="plane-tip-strobe"]')).toHaveLength(2);
+      expect(side().querySelectorAll('[data-testid="plane-wing-light"]')).toHaveLength(1);
+    }));
   });
 
   it('in the normal view shows only the 2 nearest that visibly move (item 110)', () => {

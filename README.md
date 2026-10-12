@@ -62,6 +62,7 @@ supabase/functions/ Stripe subscription Edge Functions (Deno, not yet wired to t
 - **Open-Meteo** (`api.open-meteo.com`) — current weather and the sunset score. No API key. The app sends your latitude/longitude rounded to 2 decimals (about 1 km).
 - **Open-Meteo geocoding** (`geocoding-api.open-meteo.com`) — place search. The app sends the text you type.
 - **BigDataCloud** (`api.bigdatacloud.net`) — reverse geocoding (place name for your coordinates). No API key. The app sends your latitude/longitude rounded to 2 decimals.
+- **Photon** (`photon.komoot.io`, OpenStreetMap data) — the reverse geocoding when both BigDataCloud calls fail. No API key. The app sends your latitude/longitude rounded to 2 decimals and shows "© OpenStreetMap contributors" with a name from Photon.
 - **AWS Terrain Tiles** (`s3.amazonaws.com/elevation-tiles-prod`, Mapzen Terrarium) — elevation for line of sight. The tile numbers in the URL path show your area to about 10 km.
 - Lo-fi radio streams — third-party internet radio endpoints played through an `<audio>` element.
 - **Sentry** (sentry.io, org `ainabler`, project `sun-chaser`) — error reports and anonymous feedback (no name, email or screenshot). No tracing, no replay. Location query values (`latitude`, `longitude`, `lat`, `lon`, `name`) are removed before sending (`src/utils/sentryScrub.ts`). The terrain tile paths in breadcrumbs are not removed.

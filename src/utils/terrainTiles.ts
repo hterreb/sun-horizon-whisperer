@@ -11,6 +11,10 @@ import {
 
 // Shown as "Terrain: <source>" in the UI language (ROADMAP item 67).
 export const TERRAIN_SOURCE = 'Mapzen / AWS Terrain Tiles';
+// The trees' land cover (ROADMAP item 141), CC BY 4.0, in the wording ESA asks for. Here and
+// not in landCover.ts: a static import of that module would put it in the start bundle.
+export const TREE_COVER_SOURCE =
+  '© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium';
 
 // Terrarium PNG encoding: elevation in metres from the R/G/B channels (0-255 each).
 export const decodeTerrarium = (r: number, g: number, b: number): number =>

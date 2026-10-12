@@ -42,8 +42,8 @@ describe('BadgeUnlocked (ROADMAP item 114)', () => {
   });
 
   it('has no tier word for a badge without a tier', () => {
-    const { card } = renderCard({ badgeId: 'sun' });
-    expect(card()).toHaveTextContent('Badge unlocked: Sun');
+    const { card } = renderCard({ badgeId: 'sun:midday' });
+    expect(card()).toHaveTextContent('Badge unlocked: Midday sun');
     expect(card()).not.toHaveTextContent('·');
   });
 
