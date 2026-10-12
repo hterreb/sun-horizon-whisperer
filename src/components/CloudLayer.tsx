@@ -2,10 +2,10 @@ import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react'
 import { Leaf } from 'lucide-react';
 import SceneBoat, { BOAT_HEIGHT_PX, BOAT_WIDTH_PX } from './SceneBoat';
 import SceneBird from './SceneBird';
-import SceneFish from './SceneFish';
+import SceneFish, { WHALE_SPOUT_AHEAD, WHALE_SPOUT_TOP } from './SceneFish';
 import SceneHuntFx from './SceneHuntFx';
 import SceneVisitor, {
-  DOLPHIN_SPACING, VISITOR_GRID, VISITOR_VIEW_HEIGHT, SHARK_ABOVE_WATER, DOLPHINS_ABOVE_WATER,
+  DOLPHIN_SPACING, VISITOR_GRID, VISITOR_VIEW_HEIGHT, SHARK_ABOVE_WATER, DOLPHINS_ABOVE_WATER, getVisitorGlint,
 } from './SceneVisitor';
 import RainCanvas from './RainCanvas';
 import SkyClouds from './SkyClouds';
@@ -214,7 +214,8 @@ const FISH: Record<FishKind, { size: number; speed: number; haze: number; patter
   turtle: { size: 26, speed: 0.55, haze: 0.5, pattern: 'rest' },
   jellyfish: { size: 18, speed: 0.4, haze: 0.3, pattern: 'glide' },
   seahorse: { size: 18, speed: 0.4, haze: 0.4, pattern: 'glide' },
-  whale: { size: 72, speed: 0.4, haze: 0.8, pattern: 'glide' },
+  // Item 144: the sperm whale, 46-56 px far out; haze 0.5, as at 0.8 it was too faint by day.
+  whale: { size: 84, speed: 0.4, haze: 0.5, pattern: 'glide' },
   pufferfish: { size: 20, speed: 0.45, haze: 0.4, pattern: 'rest' },
   // Night only (ROADMAP item 65).
   burbot: { size: 30, speed: 0.55, haze: 0, pattern: 'glide' },
@@ -227,8 +228,17 @@ const FISH: Record<FishKind, { size: number; speed: number; haze: number; patter
   dolphins: { size: 40, speed: 0.7, haze: 0, pattern: 'pod' },
 };
 const VISITORS: FishKind[] = ['shark', 'dolphins'];
-// Night fish with their own light (item 65); all other fish at night are lit by the moon.
-const GLOWING_AT_NIGHT: FishKind[] = ['lanternfish', 'anglerfish', 'squid', 'jellyfish'];
+// Night fish with their own light (item 65); all other fish at night are lit by the moon. The
+// whale's light is the sea sparkle around it (item 144, I).
+const GLOWING_AT_NIGHT: FishKind[] = ['lanternfish', 'anglerfish', 'squid', 'jellyfish', 'whale'];
+// Item 144 (Whale lookbook E, G): 1 in 4 whales swims with a calf. 1 in 2 of the others rises to
+// the surface once on the way and blows, by day and at dusk and not in rain. A whale with a calf
+// does not rise: the calf swims above its back, so it would come out of the water.
+const WHALE_CALF_SHARE = 0.25;
+const WHALE_SURFACE_SHARE = 0.5;
+// The part of a rising whale above its water surface is crisp, at the sea visitors' 95 %, not
+// at the whale's 85 % with its haze.
+const WHALE_LIFT = 0.95 / (0.85 * (1 - 0.4 * FISH.whale.haze));
 // P5: a minnow school's fixed formation, in minnow widths x 1.15, the leader in front.
 const SCHOOL_FORMATION: [number, number][] = [[0, 0], [-1.4, -0.9], [-1.6, 0.9], [-2.9, -0.1], [-3.1, 1.6], [-4.2, -1.1], [-4.5, 0.7]];
 // P6 (item 104): a pair keeps at least 1.5 fish widths of water between the lead's tail and
@@ -259,6 +269,8 @@ interface FishEntity extends MovingEntity {
   hold?: ScenePath; // item 103: the old lane of a lane change, kept free for the rest of the crossing
   shifted?: boolean; // item 102: the lane change has started
   hunted?: PreyHunt; // item 94: the hunt that plays on this fish
+  calf?: boolean; // item 144 (E): a whale with its calf
+  surface?: number; // item 144 (G): s into the crossing when the whale starts to rise
 }
 
 // Builds one fish (ROADMAP item 62). `wet` = rain or drizzle, where fish swim deeper (E2).
@@ -301,7 +313,7 @@ export const createFish = (
   const rest = spec.pattern === 'rest'
     ? getRestStopMotion(dx, speed, 30 + random() * 35 - startX, 5 + random() * 3)
     : null;
-  return {
+  const fish: FishEntity = {
     id: Date.now() + Math.random(),
     kind, depth, size, width, height, school, light, rolls,
     x: startX,
@@ -328,6 +340,15 @@ export const createFish = (
           dy: ((side: number) => Math.sign(side || 1) * (PAIR_DY * (height / viewportHeight) * 100 + Math.abs(side) * 2.8))(random() - 0.5),
         }
       : undefined,
+  };
+  if (kind !== 'whale') return fish;
+  // Item 144 (E, G): the calf, or the rise, timed so the whale's middle is at 25-65 % of the width.
+  const calf = random() < WHALE_CALF_SHARE;
+  const rises = !calf && !night && !wet && random() < WHALE_SURFACE_SHARE;
+  return {
+    ...fish,
+    calf,
+    surface: rises ? (25 + random() * 40 - (width / viewportWidth) * 50 - startX) / speed : undefined,
   };
 };
 
@@ -545,10 +566,12 @@ const fishLane = (fish: FishEntity, view: View, rewind: boolean): LaneShape => {
   // A pair (P6): the second fish is `dy` % lower and `lag` s behind. A pair that spawns in
   // rewind swims side by side (item 83).
   const dy = fish.companion?.dy ?? 0;
+  // Item 144 (G): a whale that rises blows its spout above its box and a little ahead of it.
+  const spout = fish.surface !== undefined ? fish.size / 24 : 0;
   return {
-    width: percentOfWidth(fish.width, view),
-    above: Math.max(0, -dy),
-    height: percentOfHeight(fish.height, view) + Math.abs(dy),
+    width: percentOfWidth(fish.width + spout * WHALE_SPOUT_AHEAD, view),
+    above: Math.max(0, -dy) + percentOfHeight(spout * WHALE_SPOUT_TOP, view),
+    height: percentOfHeight(fish.height + spout * WHALE_SPOUT_TOP, view) + Math.abs(dy),
     band: FISH_BAND,
     lag: rewind ? undefined : fish.companion?.lag,
     curve: fish.curve,
@@ -630,7 +653,8 @@ export const spawnTick = (
   // shark and its prey keep their lane, as the hunt is planned on it.
   // Item 122: the new lane is nearer or farther, so the fish takes its depth: its size, opacity
   // and speed change in the same LANE_SHIFT_SEC. The lane is checked again with the new size and
-  // speed; with no lane then, it dives.
+  // speed. When the search then gives another lane, that lane has another depth, so it is checked
+  // again with the size and speed there (3 checks at most); with no lane then, it dives.
   const dodge = (f: FishEntity & { path: ScenePath }, at: number, others: ScenePath[]): FishEntity => {
     if (f.shift === undefined && !f.hunt && !fish.some(g => g.hunt?.preyId === f.id)) {
       const from = Math.max(sceneTime, at - LANE_SHIFT_SEC - 1);
@@ -643,17 +667,20 @@ export const spawnTick = (
         const path = { ...warpPath(f.path, from, LANE_SHIFT_SEC, scale), width: grown.width, height: grown.height, y };
         return { path, scale, fade: (1 - 0.3 * depth) / (1 - 0.3 * f.depth) };
       };
-      const first = lane({ ...f.path, band, view }, others, from);
-      const y = first === null || first === f.path.y ? null : lane({ ...atLane(first).path, band, view }, others, from);
-      if (y !== null && y !== f.path.y) {
+      let y = lane({ ...f.path, band, view }, others, from);
+      for (let checks = 0; checks < 3 && y !== null && y !== f.path.y; checks++) {
         // `path` is the new lane; until the change the fish is on its old one (`hold`).
         const { path, scale, fade } = atLane(y);
-        return {
-          ...f, path, hold: f.path, duration: path.duration, curve: path.curve,
-          // Without a speed change (the depth is at its end already) the old easing stays.
-          easing: path.curve ? toLinearEasing(path.curve) : f.easing,
-          shift: { at: from, dy: ((y - f.path.y) * view.height) / 100, scale, fade },
-        };
+        const next = lane({ ...path, band, view }, others, from);
+        if (next === y) {
+          return {
+            ...f, path, hold: f.path, duration: path.duration, curve: path.curve,
+            // Without a speed change (the depth is at its end already) the old easing stays.
+            easing: path.curve ? toLinearEasing(path.curve) : f.easing,
+            shift: { at: from, dy: ((y - f.path.y) * view.height) / 100, scale, fade },
+          };
+        }
+        y = next;
       }
     }
     return { ...f, dive: Math.min(f.dive ?? Infinity, Math.max(sceneTime, at - 2)) };
@@ -1255,7 +1282,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       ? `drop-shadow(0 0 ${kind === 'jellyfish' ? 2 : 3}px hsl(var(--scene-fish-${kind === 'jellyfish' ? 'jellyfish-glow' : 'squid'})))`
       : undefined;
     const remove = () => updateEntities(prev => ({ ...prev, fish: prev.fish.filter(f => f.id !== fishItem.id) }));
-    const { hunted } = fishItem;
+    const { hunted, shift } = fishItem;
+    // Item 144 (G): a whale that rises, never with reduced motion. Its rise is a CSS animation that
+    // starts at the mount, so it keeps its wrappers from the start (`steady`): a later lane change
+    // or dive then does not mount it again, and it rises only once.
+    const surfaceAt = prefersReducedMotion ? undefined : fishItem.surface;
+    const steady = surfaceAt !== undefined;
     const body = kind === 'shark' || kind === 'dolphins' ? (
       <SceneVisitor
         kind={kind}
@@ -1284,7 +1316,18 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         ))}
       </div>
     ) : (
-      <SceneFish kind={kind} light={fishItem.light} size={fishItem.size} glow={fishItem.glow} />
+      <SceneFish
+        kind={kind}
+        light={fishItem.light}
+        size={fishItem.size}
+        glow={fishItem.glow}
+        calf={fishItem.calf}
+        surface={surfaceAt === undefined ? undefined : {
+          delay: surfaceAt + (fishItem.delay ?? 0),
+          under: 1 / WHALE_LIFT,
+          glint: getVisitorGlint(boatTone === 'day' ? 'day' : boatTone === 'night' ? 'moon' : 'dusk'),
+        }}
+      />
     );
     // The hit area: a shark's or a pod's box reaches above the waterline `y` (item 85).
     const visitorUnit = fishItem.size / VISITOR_GRID;
@@ -1307,7 +1350,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
           >
             {body}
           </div>
-        ) : body}
+        ) : steady ? <div>{body}</div> : body}
         {onInfo && <HitArea {...hitBox} {...ringOf(`fish-${fishItem.id}-${key}`)} />}
       </>
     );
@@ -1320,8 +1363,9 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
           top: `${fishItem.y + dy}%`,
           zIndex: 5,
           // Item 122: a fish that gets brighter on its new lane draws at the brighter opacity, and
-          // the lane-change wrapper dims it to its old one until the change.
-          opacity: fishItem.opacity * Math.max(1, fishItem.shift?.fade ?? 1),
+          // the lane-change wrapper dims it to its old one until the change. Item 144: a whale that
+          // rises draws at the opacity of its part above the water, and dims the part under it.
+          opacity: fishItem.opacity * (steady ? WHALE_LIFT : 1) * Math.max(1, shift?.fade ?? 1),
           filter: halo,
           ['--dx' as string]: `${fishItem.dx}vw`,
           animation: `moveAcrossX ${fishItem.duration}s linear ${lag + (fishItem.delay ?? 0)}s forwards${fishItem.fadeIn ? FADE_IN : ''}`,
@@ -1336,19 +1380,19 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       >
         {/* Item 102: the lane change, in a wrapper from its plan on, so its start does not mount
             the fish again; the pair's second fish changes `lag` s later. */}
-        {fishItem.shift ? (
+        {shift || steady ? (
           <div
-            data-testid="lane-shift"
-            style={{
-              ['--shift-dy' as string]: `${fishItem.shift.dy}px`,
-              ['--shift-scale' as string]: fishItem.shift.scale,
-              ['--shift-o0' as string]: 1 / Math.max(1, fishItem.shift.fade),
-              ['--shift-o1' as string]: fishItem.shift.fade / Math.max(1, fishItem.shift.fade),
+            data-testid={shift ? 'lane-shift' : undefined}
+            style={shift && {
+              ['--shift-dy' as string]: `${shift.dy}px`,
+              ['--shift-scale' as string]: shift.scale,
+              ['--shift-o0' as string]: 1 / Math.max(1, shift.fade),
+              ['--shift-o1' as string]: shift.fade / Math.max(1, shift.fade),
               // Item 122: it grows from its top left corner, as its box in the lane plan does.
               transformOrigin: '0 0',
               ...(fishItem.shifted
                 ? { animation: `sceneLaneShift ${LANE_SHIFT_SEC}s ease-in-out ${lag}s both` }
-                : { opacity: 1 / Math.max(1, fishItem.shift.fade) }),
+                : { opacity: 1 / Math.max(1, shift.fade) }),
             }}
           >
             {contentOf(key)}

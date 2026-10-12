@@ -637,8 +637,9 @@
     --scene-fish-jellyfish-belly: 285 42% 91.9%;
     --scene-fish-seahorse-back: 30 72.3% 33%;
     --scene-fish-seahorse-belly: 30 51% 82%;
-    --scene-fish-whale-back: 215 21.3% 16.5%;
-    --scene-fish-whale-belly: 215 15% 68.5%;
+    /* The whale is a sperm whale (item 144, Whale lookbook D): grey, with a paler jaw. */
+    --scene-fish-whale-back: 213 14% 28%;
+    --scene-fish-whale-belly: 213 10% 58%;
     --scene-fish-pufferfish-back: 50 76.5% 31.9%;
     --scene-fish-pufferfish-belly: 50 54% 81.1%;
     --scene-fish-eye: 216 30% 10%;

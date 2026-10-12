@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import ScenePlane, { PLANE_ASPECT } from './ScenePlane';
 import { HitArea, type SceneInfoHandler } from './CloudLayer';
 import { type LivePlanesState } from '@/hooks/useLivePlanes';
@@ -10,6 +10,7 @@ import {
 } from '@/utils/liveRadar';
 import { CONTRAIL_LOOK, TRAIL_PX, PLANE_WIDTH_PX, type ContrailKind } from '@/utils/planes';
 import { type HorizonProfile } from '@/utils/horizonUtils';
+import { getLiveTilt, type LiveTilt, type LiveView } from '@/utils/liveTilt';
 
 // The live flight radar (ROADMAP item 96, Premium): the real aircraft within 100 km at their
 // direction (x) and elevation angle (y) in the sky, dead-reckoned to the current time.
@@ -24,6 +25,9 @@ const STROBE_MS = 2000;
 // A trail longer than this (s at the plane's screen speed) is not drawn: a persistent trail
 // moves with the plane here, as a long band, and does not stay in the sky (5 min, item 109).
 const MAX_TRAIL_SEC = 300;
+// Item 143: the body turns to a new way over 2 s and rolls between its two views in 2 × 0.75 s.
+const TURN_SEC = 2;
+const ROLL_SEC = 0.75;
 
 // A plane's trail, silhouette (or lights) and tap area. Memoized: the 4 Hz tick moves the
 // plane's wrapper, and the body renders again only when its look changes.
@@ -32,7 +36,11 @@ interface PlaneBodyProps {
   planeWidth: number;
   light?: 'red' | 'green';
   strobeOn?: boolean;
-  flip: boolean;
+  // Item 143: the body's turn (rad, unwrapped), the side view's left or right, and the view.
+  angle: number;
+  side: 1 | -1;
+  view: LiveView;
+  glide: boolean; // false on the plane's first frame and with reduced motion: no transition
   opacity: number;
   trailLength: number; // px; 0 = no trail
   trailAngle: number; // rad, the plane's way across the screen
@@ -43,9 +51,14 @@ interface PlaneBodyProps {
   onInfo?: SceneInfoHandler;
 }
 const PlaneBody = React.memo(({
-  ac, planeWidth, light, strobeOn, flip, opacity, trailLength, trailAngle, band, spread, trailColour, ringOn, onInfo,
+  ac, planeWidth, light, strobeOn, angle, side, view, glide, opacity, trailLength, trailAngle, band, spread, trailColour,
+  ringOn, onInfo,
 }: PlaneBodyProps) => {
   const height = planeWidth * PLANE_ASPECT;
+  // The roll between the two views: the old view goes edge-on (scaleY 0) in 0.75 s, then the new
+  // one opens from edge-on in 0.75 s.
+  const roll = (shown: boolean) => (glide ? `transform ${ROLL_SEC}s ${shown ? `ease-out ${ROLL_SEC}s` : 'ease-in'}` : 'none');
+  const turn = glide ? `transform ${TURN_SEC}s ease-in-out` : 'none';
   return (
     <>
       {trailLength > 0 && (
@@ -65,16 +78,32 @@ const PlaneBody = React.memo(({
         />
       )}
       <div
-        className="absolute"
+        className="absolute left-0 top-0"
         style={{
-          left: -planeWidth / 2,
-          top: -height / 2,
-          transform: flip ? 'scaleX(-1)' : undefined, // facing its way across the screen
+          transform: `rotate(${angle}rad)`, // its way across the screen
+          transition: turn,
           opacity,
           color: 'hsl(var(--scene-critter-silhouette))',
         }}
+        data-testid="live-plane-body"
       >
-        <ScenePlane width={planeWidth} lights={light} strobeOn={strobeOn} />
+        <div
+          className="absolute"
+          style={{ left: -planeWidth / 2, top: -height / 2, transform: `scaleY(${view === 'side' ? 1 : 0})`, transition: roll(view === 'side') }}
+          data-testid="live-plane-side"
+        >
+          {/* Moving left: mirrored, so the fin stays up. A change rolls over in 2 s. */}
+          <div style={{ transform: `scaleY(${side})`, transition: turn }}>
+            <ScenePlane width={planeWidth} lights={light} strobeOn={strobeOn} />
+          </div>
+        </div>
+        <div
+          className="absolute"
+          style={{ left: -planeWidth / 2, top: -planeWidth / 2, transform: `scaleY(${view === 'under' ? 1 : 0})`, transition: roll(view === 'under') }}
+          data-testid="live-plane-under"
+        >
+          <ScenePlane width={planeWidth} lights={light} strobeOn={strobeOn} view="under" />
+        </div>
       </div>
       {onInfo && (
         <span
@@ -120,6 +149,8 @@ const LivePlanes: React.FC<LivePlanesProps> = ({
   // Item 116: a double tap opens the card; a single tap shows the ring for a moment.
   const { tap } = useDoubleTap(onInfo);
   const [now, setNow] = useState(() => Date.now());
+  // Item 143: each shown plane's last tilt (turn, side, view), by hex.
+  const tiltsRef = useRef(new Map<string, LiveTilt>());
   useEffect(() => {
     if (reducedMotion) return;
     const id = setInterval(() => setNow(Date.now()), TICK_MS);
@@ -144,15 +175,24 @@ const LivePlanes: React.FC<LivePlanesProps> = ({
     const dy = q.y - p.y;
     return { ac, view, p, dx, dy, inView: p.x >= -50 && p.x <= width + 50, screenSpeedPxS: Math.hypot(dx, dy) };
   });
+  const shown = pickShownPlanes(nearest, compass);
+  // Each tilt follows from the plane's last one (getLiveTilt is pure, so a second render with the
+  // same step gives the same tilt). A plane that is not shown drops out, so when it shows again
+  // it starts fresh, with no transition.
+  /* eslint-disable react-hooks/refs -- the per-plane memory across the 4 Hz renders (item 143 spec: a ref per hex) */
+  const tilts = new Map(shown.map(({ ac, dx, dy }) => [ac.hex, getLiveTilt(tiltsRef.current.get(ac.hex), dx, dy)]));
+  tiltsRef.current = tilts;
+  /* eslint-enable react-hooks/refs */
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none" data-testid="live-planes">
-      {pickShownPlanes(nearest, compass).map(({ ac, view, p, dx, dy }) => {
+      {shown.map(({ ac, view, p, dx, dy }) => {
         const planeWidth = getLivePlaneWidth(view.distanceM);
         const kind = getLiveContrail(ac.altM, contrail);
         const look = kind === 'none' ? null : CONTRAIL_LOOK[kind];
         const trailLength = look ? Math.hypot(dx, dy) * Math.min(MAX_TRAIL_SEC, look.lifeSec[0]) : 0;
         const band = TRAIL_PX * (planeWidth / PLANE_WIDTH_PX) * (look?.spread ?? 1);
         const id = parseInt(ac.hex.replace('~', ''), 16);
+        const tilt = tilts.get(ac.hex)!;
         return (
           <div
             key={ac.hex}
@@ -166,7 +206,10 @@ const LivePlanes: React.FC<LivePlanesProps> = ({
               light={lights ? (id % 2 ? 'red' : 'green') : undefined}
               // One flash of a tick every 2 s, each plane at its own moment.
               strobeOn={lights ? (now + (id % 8) * TICK_MS) % STROBE_MS < TICK_MS : undefined}
-              flip={dx < 0}
+              angle={tilt.angle}
+              side={tilt.side}
+              view={tilt.view}
+              glide={!tilt.first && !reducedMotion}
               opacity={lights ? 1 : Math.round(50 * (1 - 0.3 * Math.min(1, Math.max(0, (view.distanceM - 20_000) / 80_000)))) / 100}
               // Rounded, so the body renders again only when its look changes, not on each tick.
               trailLength={Math.round(trailLength)}
