@@ -399,8 +399,8 @@ describe('CloudLayer', () => {
       for (const kind of ['lanternfish', 'anglerfish', 'squid'] as const) {
         expect(createFish(kind, false, false, 390, always(0), true).opacity).toBeCloseTo(0.95, 5);
       }
-      // By day the jellyfish keeps its day look (85 % since FS1, item 85).
-      expect(createFish('jellyfish', false, false, 390, always(0)).opacity).toBeCloseTo(0.85 * (1 - 0.4 * 0.3), 5);
+      // By day the jellyfish keeps its day look (75 % since item 145; 85 % with FS1, item 85).
+      expect(createFish('jellyfish', false, false, 390, always(0)).opacity).toBeCloseTo(0.75 * (1 - 0.4 * 0.3), 5);
     });
 
     it('swims no fish faster than the sailboat, none slower than 0.4 %/s (ROADMAP item 66)', () => {
@@ -528,8 +528,16 @@ describe('CloudLayer', () => {
       expect(three.rolls![2] - three.rolls![1]).toBeCloseTo(1.5, 5);
     });
 
-    it('draws day fish at 85 % (FS1), visitors at 95 %, the night jellyfish at 60 % (item 82)', () => {
-      expect(createFish('trout', false, false, 390, always(0)).opacity).toBeCloseTo(0.85, 5);
+    it('draws day fish at 75 % (item 145; FS1 had 85 %), visitors at 95 %, the night jellyfish at 60 % (item 82)', () => {
+      // The nearest lane: 0.75 × (1 − 0.4 × haze). The depth, night and rain factors do not change.
+      const day = (kind: Parameters<typeof createFish>[0]) => createFish(kind, false, false, 390, always(0)).opacity;
+      expect(day('trout')).toBeCloseTo(0.75, 5);
+      expect(day('minnow')).toBeCloseTo(0.72, 5);
+      expect(day('classic')).toBeCloseTo(0.66, 5);
+      expect(day('catfish')).toBeCloseTo(0.495, 5);
+      expect(createFish('trout', false, true, 390, always(0)).opacity).toBeCloseTo(0.75 * 0.75, 5); // rain
+      expect(createFish('trout', false, false, 390, always(0.999)).opacity).toBeCloseTo(0.75 * (1 - 0.3 * 0.999), 5);
+      expect(createFish('classic', false, false, 390, always(0), true).opacity).toBeCloseTo(0.75, 5); // moonlit
       expect(createFish('shark', false, false, 390, always(0)).opacity).toBeCloseTo(0.95 * (1 - 0.3 * 0.3), 5);
       expect(createFish('burbot', false, false, 390, always(0), true).opacity).toBeCloseTo(0.75, 5);
       expect(createFish('jellyfish', false, false, 390, always(0), true).opacity).toBeCloseTo(0.6, 5);
@@ -1583,5 +1591,87 @@ describe('planes and contrails (ROADMAP item 96)', () => {
     expect(onInfo).not.toHaveBeenCalled(); // item 116: a double tap opens the card
     fireEvent.click(hit, { clientX: 50, clientY: 80, detail: 2 });
     expect(onInfo).toHaveBeenCalledWith({ type: 'plane', contrail: 'short' }, { x: 50, y: 80 }, expect.stringMatching(/^plane-/));
+  });
+});
+
+// ROADMAP item 145 (Underwater Fish lookbook, option H): the fish take the water colour at their height.
+describe('CloudLayer fish under water (ROADMAP item 145)', () => {
+  // A 844 px scene; the sea fill's box starts 6 px over the sea line (65 %).
+  const sea = { surface: 'hsl(200, 60%, 50%)', deep: 'hsl(210, 70%, 20%)', top: 542.6, height: 844 };
+  const scene = (search: string, props: Partial<React.ComponentProps<typeof CloudLayer>>, ms: number, random = 0) => {
+    window.history.pushState({}, '', search);
+    vi.useFakeTimers();
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(random);
+    try {
+      const view = render(<CloudLayer warmStart={false} weatherType="clear" timeOfDay="midday" sea={sea} {...props} />);
+      act(() => { vi.advanceTimersByTime(ms); });
+      return view.container;
+    } finally {
+      randomSpy.mockRestore();
+      vi.useRealTimers();
+      window.history.pushState({}, '', '/');
+    }
+  };
+  const fishIn = (container: HTMLElement) => container.querySelector('[data-testid="scene-fish"]') as SVGSVGElement;
+  // The swimmer: the wrapper with the crossing animation.
+  const swimmerOf = (el: Element) => {
+    let node = el.parentElement;
+    while (node && !node.style.animation.startsWith('moveAcrossX')) node = node.parentElement;
+    return node as HTMLElement;
+  };
+  const waterOf = (el: Element) => swimmerOf(el).style.getPropertyValue('--scene-fish-water');
+  const finOf = (svg: SVGSVGElement) => (svg.querySelector('path') as SVGElement).style.fill;
+
+  it('sets the sea colours on the layer', () => {
+    const layer = scene('/', {}, 0).firstElementChild as HTMLElement;
+    expect(layer.style.getPropertyValue('--scene-water-surface')).toBe(sea.surface);
+    expect(layer.style.getPropertyValue('--scene-water-deep')).toBe(sea.deep);
+  });
+
+  it('mixes a near trout 25 % with the water at its middle, near the deep colour', () => {
+    const trout = fishIn(scene('/?fish=trout', {}, 9000));
+    expect(trout.getAttribute('data-kind')).toBe('trout');
+    // depth 0: the box top at 92 % (776.5 px), its middle 11 px lower: 81 % of the way to the bottom.
+    const [, deep] = /^color-mix\(in srgb, var\(--scene-water-surface\), var\(--scene-water-deep\) ([\d.]+)%\)$/.exec(waterOf(trout)) ?? [];
+    expect(Number(deep)).toBeCloseTo(((0.92 * 844 + 11 - sea.top) / (844 - sea.top)) * 100, 0);
+    expect(finOf(trout)).toBe('color-mix(in oklab, hsl(var(--scene-fish-trout-back)), var(--scene-fish-water) 25%)');
+    expect(swimmerOf(trout).style.filter).toBe('');
+  });
+
+  it('mixes the deep swimmers more: the catfish 50.5 %', () => {
+    expect(finOf(fishIn(scene('/?fish=catfish', {}, 9000)))).toContain('var(--scene-fish-water) 50.5%)');
+  });
+
+  it('dims a day fish at dusk in the colour mix, with no filter, and keeps the E1 spot gold', () => {
+    const container = scene('/?fish=trout', { timeOfDay: 'civil-twilight' }, 9000);
+    const trout = fishIn(container);
+    expect(finOf(trout)).toContain('longer hue');
+    expect(finOf(trout)).toMatch(/black 28%\)$/);
+    expect(swimmerOf(trout).style.filter).toBe('');
+    expect((container.querySelector('[data-testid="fish-glow"]') as SVGElement).style.fill).toBe('hsl(var(--brand-gold-light))');
+  });
+
+  it('mixes a moonlit fish with the moonlit water, without the night dimming', () => {
+    const fish = fishIn(scene('/', { timeOfDay: 'night', moonlight: { x: 0.5, strength: 1 } }, 16000));
+    expect(fish.closest('[data-testid="moonlit-fish"]')).not.toBeNull();
+    expect(waterOf(fish)).toMatch(/^color-mix\(in oklab, color-mix\(in srgb, .*\), hsl\(var\(--scene-moon\)\) 25%\)$/);
+    expect(finOf(fish)).toBe('color-mix(in oklab, hsl(var(--scene-fish-moon-back)), var(--scene-fish-water) 34%)');
+  });
+
+  it('keeps the fish with their own light and the sea visitors as they are', () => {
+    // A roll of 0.6 picks the lanternfish at night (item 65).
+    const lanternfish = fishIn(scene('/', { timeOfDay: 'night' }, 22000, 0.6));
+    expect(lanternfish.getAttribute('data-kind')).toBe('lanternfish');
+    expect(finOf(lanternfish)).toBe('hsl(var(--scene-fish-own-back))');
+    expect(waterOf(lanternfish)).toBe('');
+    const shark = scene('/?fish=shark', {}, 9000).querySelector('[data-testid="scene-visitor"]') as SVGSVGElement;
+    expect(waterOf(shark)).toBe('');
+    expect(shark.innerHTML).not.toContain('--scene-fish-water');
+  });
+
+  it('keeps the own colours without the sea (the old callers)', () => {
+    const trout = fishIn(scene('/?fish=trout', { sea: null }, 9000));
+    expect(finOf(trout)).toBe('hsl(var(--scene-fish-trout-back))');
+    expect(waterOf(trout)).toBe('');
   });
 });

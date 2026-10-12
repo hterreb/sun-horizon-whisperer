@@ -48,6 +48,11 @@ import { useDoubleTap } from '@/hooks/useDoubleTap';
 // a stable constant, not `new Date()`, so it never changes identity across renders.
 const DEFAULT_SEED_DATE = new Date(0);
 
+// The sheen under the sea line (ROADMAP item 145, lookbook option H): the horizon sky from the
+// top of the sea fill to SEA_SHEEN_PX under the sea line, [offset, opacity].
+const SEA_SHEEN_PX = 26;
+const SEA_SHEEN_STOPS: [number, number][] = [[0, 0.45], [0.3, 0.26], [0.6, 0.1], [1, 0]];
+
 interface SunVisualizationProps {
   sunPosition: SunPosition;
   moonPosition: MoonPosition;
@@ -678,6 +683,11 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     return path;
   }, [containerDimensions]);
   const svgPath = seaEdgePath && `${seaEdgePath}L${containerDimensions.width},${containerDimensions.height} L0,${containerDimensions.height} Z`;
+  // The top of the sea fill's box, where its gradient starts (item 145): the highest crest, as a
+  // quadratic curve peaks halfway to its control point.
+  const seaTop = containerDimensions.height * 0.65 - Math.max(0, ...Array.from(
+    { length: Math.ceil(containerDimensions.width / 80) }, (_, i) => Math.sin(i * 0.5) * 8 + 4,
+  )) / 2;
 
   // Terrain silhouette (ROADMAP item 13): replaces the flat horizon line with the
   // real profile when one is loaded, using the same altitude->y mapping as the sun/
@@ -1137,6 +1147,9 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         rainMmH={rainMmH}
         isFullscreen={isFullscreen}
         moonlight={{ x: containerDimensions.width > 0 ? moonX / containerDimensions.width : 0.5, strength: moonPool }}
+        sea={containerDimensions.height > 0
+          ? { surface: water.surface, deep: water.deep, top: seaTop, height: containerDimensions.height }
+          : null}
         moon={isMoonVisible && (moonLook.disc > 0 || moonLook.corona > 0) && containerDimensions.height > 0
           ? { x: (moonX / containerDimensions.width) * 100, y: (moonY / containerDimensions.height) * 100, r: moonRadius, light: moonBright }
           : null}
@@ -1454,6 +1467,27 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         )}
       </svg>
 
+      {svgPath && (
+        // Under water (item 145, lookbook option H): a still sheen of the horizon sky in the first
+        // 26 px under the sea line. Over the fish (z 5, after them in DOM order), under the wave
+        // lines (the upper sea canvas comes next) and the boats.
+        <svg
+          className="absolute inset-x-0 w-full pointer-events-none"
+          style={{ top: seaTop, height: containerDimensions.height * 0.65 + SEA_SHEEN_PX - seaTop, zIndex: 5 }}
+          aria-hidden="true"
+          data-testid="sea-sheen"
+        >
+          <defs>
+            <linearGradient id="seaSheen" gradientUnits="userSpaceOnUse" x1="0" y1={seaTop} x2="0" y2={containerDimensions.height * 0.65 + SEA_SHEEN_PX}>
+              {SEA_SHEEN_STOPS.map(([offset, opacity]) => (
+                <stop key={offset} offset={offset} stopColor={water.sky} stopOpacity={opacity} />
+              ))}
+            </linearGradient>
+          </defs>
+          <path d={svgPath} transform={`translate(0 ${-seaTop})`} fill="url(#seaSheen)" />
+        </svg>
+      )}
+
       <SeaCanvas
         width={containerDimensions.width}
         height={containerDimensions.height}
@@ -1503,7 +1537,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         const bandHeight = (containerDimensions.height - horizonLabelY) * rowSpacing;
 
         return (
-          <svg className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true" data-testid="water-reflection">
+          // Over the fish (item 145; z 5, after them and the upper sea canvas in DOM order), under the boats.
+          <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 5 }} aria-hidden="true" data-testid="water-reflection">
             {/* The pool of moonlight the night fish swim through (item 65): a faint cone
                 under the moon, 40 % of the width, from the horizon down. The rect is twice
                 the water's height, so the gradient's ellipse fades out at its sides and at

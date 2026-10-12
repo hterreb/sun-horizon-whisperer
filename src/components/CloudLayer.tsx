@@ -85,6 +85,9 @@ interface CloudLayerProps {
   // The pool of moonlight for the night fish (ROADMAP item 65): the moon's x as a fraction
   // of the width, and the pool's strength (0 = no pool, 1 = a full moon in a clear sky).
   moonlight?: { x: number; strength: number } | null;
+  // The sea fill (ROADMAP item 145): its gradient from `surface` at its top (`top`, px) to `deep`
+  // at the bottom of the scene (`height`, px). The fish take the water colour at their height.
+  sea?: { surface: string; deep: string; top: number; height: number } | null;
   // The moon while it shows (ROADMAP item 74, W14), in % of the width and height, so the
   // night geese can cross it; with its radius (px) and brightness (0-1) for the clouds'
   // silver lining (item 76).
@@ -222,6 +225,10 @@ const FISH: Record<FishKind, { size: number; speed: number; haze: number; patter
   dolphins: { size: 40, speed: 0.7, haze: 0, pattern: 'pod' },
 };
 const VISITORS: FishKind[] = ['shark', 'dolphins'];
+// Under water (ROADMAP item 145, lookbook option H): the share (%) of the water colour in a
+// fish's colours. Submersion 0.25 + 0.75 × haze, so no fish is fully clear: the trout 25 %,
+// the catfish 50.5 %.
+const waterShare = (kind: FishKind) => Math.round((15 + 40 * (0.25 + 0.75 * FISH[kind].haze)) * 10) / 10;
 // Night fish with their own light (item 65); all other fish at night are lit by the moon.
 const GLOWING_AT_NIGHT: FishKind[] = ['lanternfish', 'anglerfish', 'squid', 'jellyfish'];
 // P5: a minnow school's fixed formation, in minnow widths x 1.15, the leader in front.
@@ -308,10 +315,10 @@ export const createFish = (
     duration: rest ? rest.duration : dx / speed,
     easing: rest?.easing,
     curve: rest?.curve,
-    // Paler with distance (P3), with depth (P9 haze) and in rain (E2). FS1 (item 85): 85 % by
-    // day; at night moonlit fish at 75 % and fish with their own light at 95 % (the jellyfish
-    // 60 %, item 82), without the depth haze. The sea visitors at 95 %, day and night.
-    opacity: (visitor ? 0.95 : light === 'own' ? (kind === 'jellyfish' ? 0.6 : 0.95) : light ? 0.75 : 0.85) *
+    // Paler with distance (P3), with depth (P9 haze) and in rain (E2). 75 % by day (item 145,
+    // under water; FS1 had 85 %) and for moonlit fish at night; fish with their own light at 95 %
+    // (the jellyfish 60 %, item 82), without the depth haze. The sea visitors at 95 %, day and night.
+    opacity: (visitor ? 0.95 : light === 'own' ? (kind === 'jellyfish' ? 0.6 : 0.95) : 0.75) *
       (1 - 0.3 * depth) * (light ? 1 : 1 - 0.4 * spec.haze) * (wet ? 0.75 : 1),
     glow: sunDown && !night && !visitor && spec.pattern !== 'school' && random() < 0.35, // E1
     companion: spec.pattern === 'companions' && random() < 0.35 // P6
@@ -1016,6 +1023,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   rainMmH = null,
   isFullscreen = false,
   moonlight = null,
+  sea = null,
   moon = null,
   playDirection = 0,
   sun = null,
@@ -1246,6 +1254,18 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       : undefined;
     const remove = () => updateEntities(prev => ({ ...prev, fish: prev.fish.filter(f => f.id !== fishItem.id) }));
     const { hunted } = fishItem;
+    // Item 145: the fish mix with the water at their height. The sea visitors and the fish with
+    // their own light keep their look.
+    const water = sea && !VISITORS.includes(kind) && fishItem.light !== 'own' ? waterShare(kind) : undefined;
+    // The water colour at the middle of the fish, as the sea fill's gradient (sRGB); for a moonlit
+    // fish the moonlit water (25 % moon colour). Set once per fish; a lane change keeps it.
+    const waterAt = (dy: number) => {
+      if (!sea || water === undefined) return undefined;
+      const middle = ((fishItem.y + dy) / 100) * sea.height + fishItem.height / 2;
+      const deep = Math.min(1, Math.max(0, (middle - sea.top) / (sea.height - sea.top)));
+      const colour = `color-mix(in srgb, var(--scene-water-surface), var(--scene-water-deep) ${Math.round(deep * 1000) / 10}%)`;
+      return fishItem.light === 'moon' ? `color-mix(in oklab, ${colour}, hsl(var(--scene-moon)) 25%)` : colour;
+    };
     const body = kind === 'shark' || kind === 'dolphins' ? (
       <SceneVisitor
         kind={kind}
@@ -1261,6 +1281,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             kind={kind}
             light={fishItem.light}
             size={fishItem.size}
+            water={water}
+            boatTone={boatTone}
             className="absolute"
             style={{
               left: spot.left, top: spot.top,
@@ -1274,7 +1296,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         ))}
       </div>
     ) : (
-      <SceneFish kind={kind} light={fishItem.light} size={fishItem.size} glow={fishItem.glow} />
+      <SceneFish kind={kind} light={fishItem.light} size={fishItem.size} glow={fishItem.glow} water={water} boatTone={boatTone} />
     );
     // The hit area: a shark's or a pod's box reaches above the waterline `y` (item 85).
     const visitorUnit = fishItem.size / VISITOR_GRID;
@@ -1313,6 +1335,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
           // the lane-change wrapper dims it to its old one until the change.
           opacity: fishItem.opacity * Math.max(1, fishItem.shift?.fade ?? 1),
           filter: halo,
+          ['--scene-fish-water' as string]: waterAt(dy),
           ['--dx' as string]: `${fishItem.dx}vw`,
           animation: `moveAcrossX ${fishItem.duration}s linear ${lag + (fishItem.delay ?? 0)}s forwards${fishItem.fadeIn ? FADE_IN : ''}`,
           // Rest stop (P8). A browser without CSS linear() ignores it and glides straight. Set
@@ -1452,7 +1475,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     <div
       ref={sceneRef}
       className="absolute inset-0 overflow-hidden pointer-events-none"
-      style={{ ['--slant' as string]: `${precipSlantPx}px` }}
+      style={{
+        ['--slant' as string]: `${precipSlantPx}px`,
+        // The sea fill's colours for the fish (item 145).
+        ['--scene-water-surface' as string]: sea?.surface,
+        ['--scene-water-deep' as string]: sea?.deep,
+      }}
     >
       <div data-testid="iceberg" />
       {/* Planes (ROADMAP item 96): before the clouds, so the clouds pass in front of them. */}

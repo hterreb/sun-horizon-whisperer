@@ -1,5 +1,5 @@
 import { useId, type CSSProperties } from 'react';
-import { type FishKind } from '../utils/weatherEffectsUtils';
+import { type BoatTone, type FishKind } from '../utils/weatherEffectsUtils';
 
 // The fish in the Fish Redone lookbook's FS1 "Silhouettes" (ROADMAP item 85): filled bodies
 // in two tones, a dark back over a pale belly, no outline, on lucide's 24 px grid, facing
@@ -253,21 +253,56 @@ const palette = (kind: keyof typeof SHAPES, light: 'moon' | 'own' | undefined) =
   return { back: fish(`${kind}-back`), belly: fish(`${kind}-belly`), line: fish(`${kind}-back`) };
 };
 
+// The boat light (SceneBoat's TONE_FILTER, ROADMAP item 73) on a fish (item 145), without a filter.
+const DIM: Partial<Record<BoatTone, { brightness: number; saturate: number }>> = {
+  sun: { brightness: 0.92, saturate: 1.05 },
+  twilight: { brightness: 0.72, saturate: 0.7 },
+  night: { brightness: 0.36, saturate: 0.5 },
+};
+const percent = (share: number) => `${Math.round(share * 1000) / 10}%`;
+
+// Under water (ROADMAP item 145, lookbook option H): the colour mixes with the water at the
+// fish's height (`--scene-fish-water`, set by CloudLayer), `water` % of it. The boat light then
+// dims it in the same mix. Saturation: a mix in oklab with the colour's complement (the same
+// colour with the hue turned 180°, a `longer hue` mix of the colour with itself) takes
+// 2 × its share of the chroma away. A mix cannot add colour, so the sunset's saturate(1.05) is
+// left out (under 0.01 in oklab). Brightness: a mix with black in sRGB, as CSS brightness().
+const underWater = (color: string, water: number, dim?: { brightness: number; saturate: number }) => {
+  const wet = `color-mix(in oklab, ${color}, var(--scene-fish-water) ${water}%)`;
+  if (!dim) return wet;
+  const muted = dim.saturate < 1
+    ? `color-mix(in oklab, ${wet}, color-mix(in oklch longer hue, ${wet}, ${wet}) ${percent((1 - dim.saturate) / 2)})`
+    : wet;
+  return `color-mix(in srgb, ${muted}, black ${percent(1 - dim.brightness)})`;
+};
+
 interface SceneFishProps {
   kind: keyof typeof SHAPES;
   light?: 'moon' | 'own'; // night fish (item 65): lit by the moon, or by its own light
   size: number; // px
   glow?: boolean; // the E1 spot after sunset (item 62)
+  // Item 145: the share (%) of the water colour in each fill and line, none without. A fish with
+  // its own light keeps its colours.
+  water?: number;
+  // Item 145: the boat light (getBoatTone) dims a fish without a night light, as it dims the boats.
+  boatTone?: BoatTone;
   className?: string;
   style?: CSSProperties;
 }
 
-const SceneFish = ({ kind, light, size, glow = false, className, style }: SceneFishProps) => {
+const SceneFish = ({ kind, light, size, glow = false, water, boatTone = 'day', className, style }: SceneFishProps) => {
   const id = useId().replace(/:/g, '');
   const shape = SHAPES[kind];
   const tone = light ?? (shape.night ? 'moon' : undefined);
-  const { back, belly, line } = palette(kind, tone);
-  const mid = `color-mix(in hsl, ${back}, ${belly})`;
+  const base = palette(kind, tone);
+  // The lights and the E1 spot keep their colours.
+  const paint = (color: string) =>
+    water === undefined || light === 'own' ? color : underWater(color, water, light ? undefined : DIM[boatTone]);
+  const back = paint(base.back);
+  const belly = paint(base.belly);
+  const line = paint(base.line);
+  const mid = paint(`color-mix(in hsl, ${base.back}, ${base.belly})`);
+  const eye = paint(fish('eye'));
   const jelly = shape.grad === 'jelly';
   const lights = tone === 'own' ? shape.lights ?? [] : [];
   const spot = glow && shape.glow ? [shape.glow] : [];
@@ -286,10 +321,10 @@ const SceneFish = ({ kind, light, size, glow = false, className, style }: SceneF
     if (isDot(part)) {
       const [role, cx, cy] = part;
       if (role === 'spot') return <circle key={i} cx={cx} cy={cy} r={0.6} style={{ fill: shape.spotPale ? belly : back }} />;
-      if (role === 'eye') return <circle key={i} cx={cx} cy={cy} r={0.85} style={{ fill: shape.eyePale ? belly : fish('eye') }} />;
+      if (role === 'eye') return <circle key={i} cx={cx} cy={cy} r={0.85} style={{ fill: shape.eyePale ? belly : eye }} />;
       return (
         <g key={i}>
-          <circle cx={cx} cy={cy} r={1.35} style={{ fill: fish('eye') }} />
+          <circle cx={cx} cy={cy} r={1.35} style={{ fill: eye }} />
           <circle cx={cx + 0.4} cy={cy - 0.4} r={0.4} style={{ fill: belly }} />
         </g>
       );
@@ -300,7 +335,7 @@ const SceneFish = ({ kind, light, size, glow = false, className, style }: SceneF
       role === 'limb' ? stroke(back, 2.2) :
       role === 'body' ? { fill: `url(#${id}body)` } :
       role === 'side' ? { fill: mid } :
-      role === 'band' ? stroke(fish('trout-band'), 1.6, 0.75) :
+      role === 'band' ? stroke(paint(fish('trout-band')), 1.6, 0.75) :
       role === 'stripe' ? (jelly ? stroke(belly, 1, 0.9) : stroke(back, 1.3, 0.5)) :
       role === 'spike' ? stroke(back, 1.4) :
       stroke(jelly ? line : back, shape.thin ?? (jelly ? 1.1 : 1), jelly ? 0.85 : undefined); // whisker
