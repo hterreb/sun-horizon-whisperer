@@ -1655,6 +1655,44 @@ describe('SunVisualization (rendered): waves by wind strength (ROADMAP item 79)'
     expect(canvas.compareDocumentPosition(reflection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  // Item 145 (lookbook option H): the fish (z 5 in CloudLayer) swim under the sheen, the wave
+  // lines and the glints (z 5, later in DOM order), and over the mirror and the paws (no z-index).
+  it('puts the sheen, the wave lines and the glints over the fish, the mirror under them (item 145)', () => {
+    const { container } = render(<SunVisualization {...waveProps} windSpeedKmh={20} />);
+    const under = screen.getByTestId('sea-canvas');
+    const sheen = screen.getByTestId('sea-sheen');
+    const over = screen.getByTestId('sea-canvas-over');
+    const reflection = screen.getByTestId('water-reflection');
+    const fishLayer = container.querySelector('[data-testid="moonlit-fish"]') as HTMLElement;
+    expect(under.style.zIndex).toBe('');
+    for (const layer of [sheen, over, reflection]) expect(layer.style.zIndex).toBe(fishLayer.style.zIndex);
+    const order = [fishLayer, sheen, under, over, reflection];
+    order.slice(1).forEach((el, i) => expect(order[i].compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy());
+    // Under the boats (z 7) and the floating festival eggs (z 6).
+    expect(Number(over.style.zIndex)).toBeLessThan(6);
+  });
+
+  it('lays a 26 px sheen of the horizon sky under the sea line (item 145)', () => {
+    const skyGradient = 'linear-gradient(to bottom, #0EA5E9 0%, #33C3F0 62%, #FEC6A1 100%)';
+    render(<SunVisualization {...waveProps} skyGradient={skyGradient} />);
+    const sheen = screen.getByTestId('sea-sheen');
+    // The sea line at 390 px (65 % of 600), the highest crest 6 px over it.
+    const top = parseFloat(sheen.style.top);
+    expect(top).toBeCloseTo(390 - 6, 0);
+    expect(top + parseFloat(sheen.style.height)).toBeCloseTo(390 + 26, 5);
+    const stops = [...sheen.querySelectorAll('stop')];
+    expect(stops.map(stop => Number(stop.getAttribute('stop-opacity')))).toEqual([0.45, 0.26, 0.1, 0]);
+    expect(stops[0].getAttribute('stop-color')).toBe(getWaterColors(skyGradient).sky);
+  });
+
+  it('gives the fish the sea colours (item 145)', () => {
+    const skyGradient = 'linear-gradient(to bottom, #0EA5E9 0%, #33C3F0 62%, #FEC6A1 100%)';
+    render(<SunVisualization {...waveProps} skyGradient={skyGradient} />);
+    const fishLayer = screen.getByTestId('moonlit-fish').parentElement as HTMLElement;
+    expect(fishLayer.style.getPropertyValue('--scene-water-surface')).toBe(getWaterColors(skyGradient).surface);
+    expect(fishLayer.style.getPropertyValue('--scene-water-deep')).toBe(getWaterColors(skyGradient).deep);
+  });
+
   it('lays out the reflection bars by the wind: 10 in calm water, 7 in light air or without a reading, pieces in strong wind', () => {
     const bars = (windSpeedKmh: number | null) => {
       const { unmount } = render(<SunVisualization {...waveProps} windSpeedKmh={windSpeedKmh} />);

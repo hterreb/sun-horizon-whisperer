@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react';
 import SceneFish from '../src/components/SceneFish';
+import SceneBoat from '../src/components/SceneBoat';
 
 // ROADMAP item 85, FS1: two-tone silhouettes for the 13 day and the 5 night species.
 const DAY = ['classic', 'minnow', 'perch', 'pike', 'carp', 'catfish', 'trout', 'ray', 'turtle', 'jellyfish', 'seahorse', 'whale', 'pufferfish'] as const;
@@ -67,6 +68,69 @@ describe('SceneFish (ROADMAP item 85, FS1)', () => {
   it('lights the gold E1 spot after sunset only when asked (item 62)', () => {
     expect(draw('perch', undefined, true).querySelectorAll('[data-testid="fish-glow"]')).toHaveLength(1);
     expect(draw('perch').querySelector('[data-testid="fish-glow"]')).toBeNull();
+  });
+});
+
+// ROADMAP item 145 (Underwater Fish lookbook, option H): the colours mix with the water.
+describe('SceneFish under water (ROADMAP item 145)', () => {
+  type Props = Partial<React.ComponentProps<typeof SceneFish>>;
+  const wet = (kind: Kind, props: Props) =>
+    render(<SceneFish kind={kind} size={20} {...props} />).container.querySelector('svg') as SVGSVGElement;
+  const strokes = (svg: SVGSVGElement) => [...svg.querySelectorAll('path')].map(el => (el as SVGElement).style.stroke).filter(Boolean);
+  const all = (svg: SVGSVGElement) => [...fills(svg), ...strokes(svg), ...stops(svg)].filter(c => c && c !== 'none' && !c.startsWith('url('));
+  const mix = (token: string, share: number) => `color-mix(in oklab, hsl(var(--scene-fish-${token})), var(--scene-fish-water) ${share}%)`;
+
+  it('mixes each fill, line and stop with the water var, the eye and the trout band too', () => {
+    const trout = wet('trout', { water: 25 });
+    expect(fills(trout)[0]).toBe(mix('trout-back', 25));
+    expect(stops(trout)).toContain(mix('trout-belly', 25));
+    expect(strokes(trout)).toContain(mix('trout-band', 25));
+    expect(fills(trout)).toContain(mix('eye', 25));
+    for (const color of all(trout)) expect(color).toContain('var(--scene-fish-water) 25%');
+    // The side tone mixes the two tones first, then the water.
+    expect(fills(wet('classic', { water: 34 }))).toContain(
+      'color-mix(in oklab, color-mix(in hsl, hsl(var(--scene-fish-classic-back)), hsl(var(--scene-fish-classic-belly))), var(--scene-fish-water) 34%)',
+    );
+  });
+
+  it('keeps the gold E1 spot, the lights and the fish with their own light in their colours', () => {
+    const spot = wet('perch', { water: 39, glow: true }).querySelector('[data-testid="fish-glow"]') as SVGElement;
+    expect(spot.style.fill).toBe('hsl(var(--brand-gold-light))');
+    const lanternfish = wet('lanternfish', { light: 'own', water: 25, boatTone: 'night' });
+    expect(all(lanternfish).some(c => c.includes('color-mix(in oklab'))).toBe(false);
+    expect(fills(lanternfish)[0]).toBe('hsl(var(--scene-fish-own-back))');
+    expect(lanternfish.querySelectorAll('[data-testid="fish-light"]')).toHaveLength(5);
+  });
+
+  it('tints a moonlit fish without the night dimming', () => {
+    const burbot = wet('burbot', { light: 'moon', water: 25, boatTone: 'night' });
+    expect(fills(burbot)[0]).toBe(mix('moon-back', 25));
+    expect(all(burbot).some(c => c.includes('black'))).toBe(false);
+  });
+
+  it('dims a day fish with the boat light in the colour mix, not with a filter', () => {
+    const fin = (boatTone: Props['boatTone']) => fills(wet('classic', { water: 34, boatTone }))[0];
+    expect(fin('day')).toBe(mix('classic-back', 34));
+    const wetFin = mix('classic-back', 34);
+    expect(fin('sun')).toBe(`color-mix(in srgb, ${wetFin}, black 8%)`);
+    expect(fin('twilight')).toBe(
+      `color-mix(in srgb, color-mix(in oklab, ${wetFin}, color-mix(in oklch longer hue, ${wetFin}, ${wetFin}) 15%), black 28%)`,
+    );
+    expect(fin('night')).toContain('longer hue');
+    expect(fin('night')).toMatch(/\) 25%\), black 64%\)$/);
+    expect(wet('classic', { water: 34, boatTone: 'twilight' }).getAttribute('style') ?? '').not.toContain('filter');
+  });
+
+  it('dims by the same numbers as the boats (SceneBoat TONE_FILTER)', () => {
+    for (const tone of ['sun', 'twilight', 'night'] as const) {
+      const boat = render(<SceneBoat kind="sailboat" tone={tone} lit={false} wake={false} />).container.querySelector('svg') as SVGSVGElement;
+      const [, brightness, saturate] = /brightness\(([\d.]+)\) saturate\(([\d.]+)\)/.exec(boat.style.filter) ?? [];
+      const fin = fills(wet('classic', { water: 34, boatTone: tone }))[0];
+      expect(fin, tone).toContain(`black ${Math.round((1 - Number(brightness)) * 100)}%)`);
+      // A mix cannot add colour: only a saturation below 1 is in the mix.
+      if (Number(saturate) < 1) expect(fin, tone).toContain(`) ${Math.round(((1 - Number(saturate)) / 2) * 100)}%), black`);
+      else expect(fin, tone).not.toContain('longer hue');
+    }
   });
 });
 
@@ -201,5 +265,64 @@ describe('SceneFish whale (ROADMAP item 144)', () => {
     });
     // The calf glows too.
     expect(whale({ light: 'own', calf: true }).querySelector('[data-testid="whale-calf"] [data-testid="whale-outline"]')).not.toBeNull();
+  });
+});
+
+// Items 144 and 145: only the whale's body under the water takes the water's tint.
+describe('SceneFish whale under water (ROADMAP items 144 and 145)', () => {
+  const whale = (props: Partial<React.ComponentProps<typeof SceneFish>> = {}) =>
+    render(<SceneFish kind="whale" size={56} water={40} {...props} />).container.querySelector('svg') as SVGSVGElement;
+  const surface = { delay: 12, under: 0.7, glint: 'hsl(var(--scene-glow-white) / 0.75)' };
+  // The colours of everything inside `el`: fills, strokes, gradient stops (the gradient a body uses).
+  const coloursIn = (svg: SVGSVGElement, el: Element) => [...el.querySelectorAll<SVGElement>('path, circle')].flatMap(part => {
+    const gradient = /^url\(#(.+)\)$/.exec(part.style.fill)?.[1];
+    const stopColours = gradient ? [...svg.querySelectorAll<SVGElement>(`[id="${gradient}"] stop`)].map(stop => stop.style.stopColor) : [];
+    return [part.style.fill, part.style.stroke, ...stopColours].filter(c => c && c !== 'none' && !c.startsWith('url('));
+  });
+  const wet = (colours: string[]) => colours.filter(c => c.includes('var(--scene-fish-water)'));
+
+  it('tints the part of a rising whale under its water line, not the part above it, the spout or the glint', () => {
+    const svg = whale({ surface });
+    const under = coloursIn(svg, svg.querySelector('[data-testid="whale-under"]')!);
+    const above = coloursIn(svg, svg.querySelector('[data-testid="whale-above"]')!);
+    expect(under.length).toBeGreaterThanOrEqual(6); // fins, the body's stops, the jaw, the eye
+    expect(wet(under)).toEqual(under);
+    expect(above).toEqual([
+      'hsl(var(--scene-fish-whale-back))', 'hsl(var(--scene-fish-whale-back))',
+      'hsl(var(--scene-fish-whale-back))', 'hsl(var(--scene-fish-whale-back))', 'hsl(var(--scene-fish-whale-belly))', 'hsl(var(--scene-fish-whale-belly))',
+      'hsl(var(--scene-fish-whale-belly))', 'hsl(var(--scene-fish-eye))',
+    ]);
+    const spout = svg.querySelector<SVGElement>('[data-testid="whale-spout"] path')!;
+    expect(spout.style.fill).toBe('hsl(var(--scene-glow-white))');
+    expect(svg.querySelector<SVGElement>('[data-testid="whale-glint"]')!.style.stroke).toBe(surface.glint);
+  });
+
+  it('dims the part above the water with the boat light at dusk, without the water', () => {
+    const svg = whale({ surface, boatTone: 'twilight' });
+    const above = coloursIn(svg, svg.querySelector('[data-testid="whale-above"]')!);
+    expect(wet(above)).toEqual([]);
+    for (const colour of above) expect(colour).toMatch(/black 28%\)$/);
+    for (const colour of coloursIn(svg, svg.querySelector('[data-testid="whale-under"]')!)) {
+      expect(colour).toContain('var(--scene-fish-water) 40%');
+      expect(colour).toMatch(/black 28%\)$/);
+    }
+  });
+
+  it('gives the calf its mother\'s tint', () => {
+    const svg = whale({ calf: true });
+    const calf = coloursIn(svg, svg.querySelector('[data-testid="whale-calf"]')!);
+    expect(calf.length).toBeGreaterThanOrEqual(6);
+    expect(wet(calf)).toEqual(calf);
+    const all = coloursIn(svg, svg);
+    expect(new Set(all)).toEqual(new Set(calf)); // the same colours as its mother
+  });
+
+  it('keeps the sea sparkle at night out of the mix: the cyan outline, the sparks and the body with its own light', () => {
+    const svg = whale({ light: 'own', boatTone: 'night' });
+    expect(wet(coloursIn(svg, svg))).toEqual([]);
+    expect(svg.querySelector<SVGElement>('[data-testid="whale-outline"]')!.style.stroke).toBe('hsl(var(--scene-fish-jellyfish-glow))');
+    for (const spark of svg.querySelectorAll<SVGElement>('[data-testid="whale-spark"]')) {
+      expect(spark.style.fill).toBe('hsl(var(--scene-fish-jellyfish-glow))');
+    }
   });
 });

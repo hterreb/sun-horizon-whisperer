@@ -1,5 +1,5 @@
-import { useId, type CSSProperties } from 'react';
-import { type FishKind } from '../utils/weatherEffectsUtils';
+import { useId, type CSSProperties, type ReactNode } from 'react';
+import { type BoatTone, type FishKind } from '../utils/weatherEffectsUtils';
 
 // The fish in the Fish Redone lookbook's FS1 "Silhouettes" (ROADMAP item 85): filled bodies
 // in two tones, a dark back over a pale belly, no outline, on lucide's 24 px grid, facing
@@ -330,6 +330,34 @@ const palette = (kind: keyof typeof SHAPES, light: 'moon' | 'own' | undefined) =
   return { back: fish(`${kind}-back`), belly: fish(`${kind}-belly`), line: fish(`${kind}-back`) };
 };
 
+// The boat light (SceneBoat's TONE_FILTER, ROADMAP item 73) on a fish (item 145), without a filter.
+const DIM: Partial<Record<BoatTone, { brightness: number; saturate: number }>> = {
+  sun: { brightness: 0.92, saturate: 1.05 },
+  twilight: { brightness: 0.72, saturate: 0.7 },
+  night: { brightness: 0.36, saturate: 0.5 },
+};
+const percent = (share: number) => `${Math.round(share * 1000) / 10}%`;
+
+// The boat light as a colour mix (item 145). Saturation: a mix in oklab with the colour's
+// complement (the same colour with the hue turned 180°, a `longer hue` mix of the colour with
+// itself) takes 2 × its share of the chroma away. A mix cannot add colour, so the sunset's
+// saturate(1.05) is left out (under 0.01 in oklab). Brightness: a mix with black in sRGB, as
+// CSS brightness().
+const dimmed = (color: string, dim: { brightness: number; saturate: number }) => {
+  const muted = dim.saturate < 1
+    ? `color-mix(in oklab, ${color}, color-mix(in oklch longer hue, ${color}, ${color}) ${percent((1 - dim.saturate) / 2)})`
+    : color;
+  return `color-mix(in srgb, ${muted}, black ${percent(1 - dim.brightness)})`;
+};
+
+// Under water (ROADMAP item 145, lookbook option H): the colour mixes with the water at the
+// fish's height (`--scene-fish-water`, set by CloudLayer), `water` % of it. The boat light then
+// dims it in the same mix.
+const underWater = (color: string, water: number, dim?: { brightness: number; saturate: number }) => {
+  const wet = `color-mix(in oklab, ${color}, var(--scene-fish-water) ${water}%)`;
+  return dim ? dimmed(wet, dim) : wet;
+};
+
 interface SceneFishProps {
   kind: keyof typeof SHAPES;
   light?: 'moon' | 'own'; // night fish (item 65): lit by the moon, or by its own light
@@ -340,60 +368,91 @@ interface SceneFishProps {
   // part under its water surface, as a share of the wrapper's (which has the part above it);
   // `glint` is the colour of the line on the water.
   surface?: { delay: number; under: number; glint: string };
+  // Item 145: the share (%) of the water colour in each fill and line, none without. A fish with
+  // its own light keeps its colours.
+  water?: number;
+  // Item 145: the boat light (getBoatTone) dims a fish without a night light, as it dims the boats.
+  boatTone?: BoatTone;
   className?: string;
   style?: CSSProperties;
 }
 
-const SceneFish = ({ kind, light, size, glow = false, calf = false, surface, className, style }: SceneFishProps) => {
+const SceneFish = ({ kind, light, size, glow = false, calf = false, surface, water, boatTone = 'day', className, style }: SceneFishProps) => {
   const id = useId().replace(/:/g, '');
   const shape = SHAPES[kind];
   const tone = light ?? (shape.night ? 'moon' : undefined);
-  const { back, belly, line } = palette(kind, tone);
-  const mid = `color-mix(in hsl, ${back}, ${belly})`;
+  const base = palette(kind, tone);
   const jelly = shape.grad === 'jelly';
   const lights = tone === 'own' ? shape.lights ?? [] : [];
   const spot = glow && shape.glow ? [shape.glow] : [];
   const blue = kind === 'squid';
-  const stops: [number, string, number?][] =
-    jelly ? [[0, belly, 0.95], [0.7, line, 0.6], [1, line, 0.35]] :
-    shape.grad === 'radial' ? [[0, back], [0.55, back], [1, mid]] :
-    [[0, back], [0.36, back], [0.66, belly], [1, belly]];
-  const stopEls = stops.map(([offset, color, opacity]) => (
-    <stop key={offset} offset={offset} style={{ stopColor: color, stopOpacity: opacity }} />
-  ));
-  const stroke = (color: string, width: number, opacity?: number): CSSProperties =>
-    ({ fill: 'none', stroke: color, strokeWidth: width, strokeLinecap: 'round', opacity });
-
-  const draw = (part: Part, i: number) => {
-    if (isDot(part)) {
-      const [role, cx, cy] = part;
-      if (role === 'spot') return <circle key={i} cx={cx} cy={cy} r={0.6} style={{ fill: shape.spotPale ? belly : back }} />;
-      if (role === 'eye') return <circle key={i} cx={cx} cy={cy} r={0.85} style={{ fill: shape.eyePale ? belly : fish('eye') }} />;
-      return (
-        <g key={i}>
-          <circle cx={cx} cy={cy} r={1.35} style={{ fill: fish('eye') }} />
-          <circle cx={cx + 0.4} cy={cy - 0.4} r={0.4} style={{ fill: belly }} />
-        </g>
-      );
-    }
-    const [role, d] = part;
-    const look: CSSProperties =
-      role === 'fin' ? { fill: back } :
-      role === 'limb' ? stroke(back, 2.2) :
-      role === 'body' ? { fill: `url(#${id}body)` } :
-      role === 'side' ? { fill: mid } :
-      role === 'flipper' ? { fill: belly } :
-      role === 'band' ? stroke(fish('trout-band'), 1.6, 0.75) :
-      role === 'stripe' ? (jelly ? stroke(belly, 1, 0.9) : stroke(back, 1.3, 0.5)) :
-      role === 'spike' ? stroke(back, 1.4) :
-      stroke(jelly ? line : back, shape.thin ?? (jelly ? 1.1 : 1), jelly ? 0.85 : undefined); // whisker
-    return <path key={i} d={d} style={look} />;
-  };
-
   // Item 144: the whale's sea sparkle at night (I) and its rise to the surface (G).
   const sparkle = kind === 'whale' && tone === 'own';
   const rise = kind === 'whale' ? surface : undefined;
-  const parts = ROLE_ORDER.flatMap(role => shape.parts.filter(part => part[0] === role)).map(draw);
+
+  // Item 145: the colours under water, and in the air for the part of a rising whale above its
+  // water line (no water there, only the boat light). The lights, the E1 spot, the whale's sea
+  // sparkle, spout and glint line keep their colours.
+  const dim = light ? undefined : DIM[boatTone];
+  const coloursOf = (paint: (color: string) => string) => ({
+    back: paint(base.back),
+    belly: paint(base.belly),
+    line: paint(base.line),
+    mid: paint(`color-mix(in hsl, ${base.back}, ${base.belly})`),
+    eye: paint(fish('eye')),
+    band: paint(fish('trout-band')),
+  });
+  type Colours = ReturnType<typeof coloursOf>;
+  const wet = water !== undefined && light !== 'own';
+  const under = coloursOf(color => (water !== undefined && light !== 'own' ? underWater(color, water, dim) : color));
+  const air = rise && wet ? coloursOf(color => (dim ? dimmed(color, dim) : color)) : under;
+
+  const gradientOf = (gradientId: string, { back, belly, line, mid }: Colours) => {
+    const stops: [number, string, number?][] =
+      jelly ? [[0, belly, 0.95], [0.7, line, 0.6], [1, line, 0.35]] :
+      shape.grad === 'radial' ? [[0, back], [0.55, back], [1, mid]] :
+      [[0, back], [0.36, back], [0.66, belly], [1, belly]];
+    const stopEls = stops.map(([offset, color, opacity]) => (
+      <stop key={offset} offset={offset} style={{ stopColor: color, stopOpacity: opacity }} />
+    ));
+    return shape.grad === 'radial' ? (
+      <radialGradient id={gradientId} cx="0.55" cy="0.5" r="0.55">{stopEls}</radialGradient>
+    ) : (
+      <linearGradient id={gradientId} x1="0" y1="0" x2={shape.grad === 'h' ? 1 : 0} y2={shape.grad === 'h' ? 0 : 1}>{stopEls}</linearGradient>
+    );
+  };
+  const stroke = (color: string, width: number, opacity?: number): CSSProperties =>
+    ({ fill: 'none', stroke: color, strokeWidth: width, strokeLinecap: 'round', opacity });
+
+  const partsOf = ({ back, belly, line, mid, eye, band }: Colours, gradientId: string) => {
+    const draw = (part: Part, i: number) => {
+      if (isDot(part)) {
+        const [role, cx, cy] = part;
+        if (role === 'spot') return <circle key={i} cx={cx} cy={cy} r={0.6} style={{ fill: shape.spotPale ? belly : back }} />;
+        if (role === 'eye') return <circle key={i} cx={cx} cy={cy} r={0.85} style={{ fill: shape.eyePale ? belly : eye }} />;
+        return (
+          <g key={i}>
+            <circle cx={cx} cy={cy} r={1.35} style={{ fill: eye }} />
+            <circle cx={cx + 0.4} cy={cy - 0.4} r={0.4} style={{ fill: belly }} />
+          </g>
+        );
+      }
+      const [role, d] = part;
+      const look: CSSProperties =
+        role === 'fin' ? { fill: back } :
+        role === 'limb' ? stroke(back, 2.2) :
+        role === 'body' ? { fill: `url(#${gradientId})` } :
+        role === 'side' ? { fill: mid } :
+        role === 'flipper' ? { fill: belly } :
+        role === 'band' ? stroke(band, 1.6, 0.75) :
+        role === 'stripe' ? (jelly ? stroke(belly, 1, 0.9) : stroke(back, 1.3, 0.5)) :
+        role === 'spike' ? stroke(back, 1.4) :
+        stroke(jelly ? line : back, shape.thin ?? (jelly ? 1.1 : 1), jelly ? 0.85 : undefined); // whisker
+      return <path key={i} d={d} style={look} />;
+    };
+    return ROLE_ORDER.flatMap(role => shape.parts.filter(part => part[0] === role)).map(draw);
+  };
+  const parts = partsOf(under, `${id}body`);
   // I: a faint cyan line around the fins, the body and the jaw, with a soft glow.
   const outline = sparkle && (
     <g
@@ -404,9 +463,9 @@ const SceneFish = ({ kind, light, size, glow = false, calf = false, surface, cla
       {shape.parts.flatMap(part => (isDot(part) ? [] : [<path key={part[1]} d={part[1]} />]))}
     </g>
   );
-  const animal = (
+  const animalOf = (drawn: ReactNode) => (
     <>
-      {parts}
+      {drawn}
       {outline}
       {lights.map(([cx, cy, r]) => (
         <circle
@@ -449,11 +508,8 @@ const SceneFish = ({ kind, light, size, glow = false, calf = false, surface, cla
     >
       {(rise || sparkle) && <style>{WHALE_CSS}</style>}
       <defs>
-        {shape.grad === 'radial' ? (
-          <radialGradient id={`${id}body`} cx="0.55" cy="0.5" r="0.55">{stopEls}</radialGradient>
-        ) : (
-          <linearGradient id={`${id}body`} x1="0" y1="0" x2={shape.grad === 'h' ? 1 : 0} y2={shape.grad === 'h' ? 0 : 1}>{stopEls}</linearGradient>
-        )}
+        {gradientOf(`${id}body`, under)}
+        {air !== under && gradientOf(`${id}air`, air)}
         {(lights.length > 0 || spot.length > 0) && (
           // The boat lights' glow (item 73): gold, or blue for the firefly squid.
           <filter id={`${id}glow`} x="-200%" y="-200%" width="500%" height="500%" colorInterpolationFilters="sRGB">
@@ -475,15 +531,17 @@ const SceneFish = ({ kind, light, size, glow = false, calf = false, surface, cla
           </>
         )}
       </defs>
+      {/* E: the calf takes its mother's colours (under water). */}
       {calf && <g transform={WHALE_CALF} data-testid="whale-calf">{parts}{outline}</g>}
       {rise ? (
         <>
-          {/* Under its water surface the whale keeps its haze; above it, it is crisp (as SceneVisitor). */}
-          <g clipPath={`url(#${id}under)`} opacity={rise.under}>
-            <g style={{ animation: `scene-whale-rise ${timing}` }}>{animal}</g>
+          {/* Under its water surface the whale keeps its haze and the water's tint (item 145);
+              above it, it is crisp and dry (as SceneVisitor). */}
+          <g clipPath={`url(#${id}under)`} opacity={rise.under} data-testid="whale-under">
+            <g style={{ animation: `scene-whale-rise ${timing}` }}>{animalOf(parts)}</g>
           </g>
-          <g clipPath={`url(#${id}above)`}>
-            <g style={{ animation: `scene-whale-rise ${timing}` }}>{animal}</g>
+          <g clipPath={`url(#${id}above)`} data-testid="whale-above">
+            <g style={{ animation: `scene-whale-rise ${timing}` }}>{animalOf(air === under ? parts : partsOf(air, `${id}air`))}</g>
           </g>
           <path
             d={`M7.8 ${WHALE_WL}H23.4`}
@@ -496,7 +554,7 @@ const SceneFish = ({ kind, light, size, glow = false, calf = false, surface, cla
             </g>
           </g>
         </>
-      ) : animal}
+      ) : animalOf(parts)}
       {sparkle && SPARKS.map(([cx, cy, r], i) => (
         <circle
           key={cx}

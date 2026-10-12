@@ -3,12 +3,15 @@ import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import { getWaterLimit } from '../utils/weatherEffectsUtils';
 import { getWaveLook, smoothStep, waveHash } from '../utils/waveUtils';
 
-// Waves by wind strength (ROADMAP item 79): one canvas over the sea fill and under the
-// boats and fish (CloudLayer's z-indexed layers). It draws the picks WV6 mirror to matte,
-// WV4 cat's paws, WV1 ripple lines, WV2 whitecaps and X3 foam from getWaveLook. One rAF
-// loop at about 30 fps with the frame ID in a ref (CLAUDE.md); reduced motion draws one
-// still frame. Things near the horizon are smaller, slower and fainter (depth p, 0 at the
-// horizon, 1 at the bottom). Everything only fades and drifts downwind in a straight line.
+// Waves by wind strength (ROADMAP item 79): the picks WV6 mirror to matte, WV4 cat's paws,
+// WV1 ripple lines, WV2 whitecaps and X3 foam from getWaveLook, on two canvases over the sea
+// fill (item 145, lookbook option H). The lower one, under the fish, has the mirror, the matte
+// and the paws, so strong wind does not hide the fish. The upper one, over the fish (z 5, after
+// CloudLayer in DOM order) and under the boats, has the ripple lines, the caps and the foam:
+// the fish swim under the surface. One rAF loop draws the upper one at about 30 fps and the
+// lower one at 10 fps, with the frame ID in a ref (CLAUDE.md); reduced motion draws one still frame. Things near the horizon are
+// smaller, slower and fainter (depth p, 0 at the horizon, 1 at the bottom). Everything only
+// fades and drifts downwind in a straight line.
 
 interface SeaCanvasProps {
   width: number;
@@ -46,6 +49,10 @@ interface Sea {
 }
 
 const FRAME_MS = 1000 / 30;
+// The lower canvas draws on every third frame (10 fps, item 145): each visible canvas costs
+// main-thread time per update, and the mirror and the paws change slowly (drifts of at most
+// 3.2 px/s, fades over seconds), so the step does not show.
+const UNDER_EVERY = 3;
 const STILL_T = 40; // s: the still frame for reduced motion, a moment mid-cycle
 const MIRROR_SLICE_PX = 2;
 
@@ -234,37 +241,53 @@ const drawFoam = (s: Sea, t: number, foam: number) => {
   ctx.stroke(s.edge);
 };
 
-const drawSea = (s: Sea, look: WaveLook, t: number) => {
+// Each layer clipped to the sea: under the fish, then over them (item 145).
+const drawLayer = (s: Sea, draw: () => void) => {
   const { ctx, w, h, dpr } = s;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.globalAlpha = 1;
   ctx.clearRect(0, 0, w, h);
   ctx.save();
   ctx.clip(s.clip);
-  drawMirror(s, t, look.mirror);
-  drawPaws(s, t, look.paws);
-  drawRipples(s, t, look.ripples);
-  drawCaps(s, t, look.caps);
-  drawFoam(s, t, look.foam);
+  draw();
   ctx.restore();
+};
+
+const drawSea = (under: Sea, over: Sea, look: WaveLook, t: number, withUnder = true) => {
+  if (withUnder) {
+    drawLayer(under, () => {
+      drawMirror(under, t, look.mirror);
+      drawPaws(under, t, look.paws);
+    });
+  }
+  drawLayer(over, () => {
+    drawRipples(over, t, look.ripples);
+    drawCaps(over, t, look.caps);
+    drawFoam(over, t, look.foam);
+  });
 };
 
 const SeaCanvas: React.FC<SeaCanvasProps> = ({
   width, height, seaPath, seaEdgePath, ridgePath, ridgeColor, skyColor, crestColor, troughColor, gain, windKmh, driftDirection,
 }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const underRef = useRef<HTMLCanvasElement>(null);
+  const overRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<number | null>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
-    const canvas = canvasRef.current;
+    const canvas = underRef.current;
     const ctx = canvas?.getContext('2d');
+    const overCanvas = overRef.current;
+    const overCtx = overCanvas?.getContext('2d');
     // jsdom has no 2D context and no Path2D.
-    if (!canvas || !ctx || width === 0 || height === 0 || !seaPath || typeof Path2D === 'undefined') return;
+    if (!canvas || !ctx || !overCanvas || !overCtx || width === 0 || height === 0 || !seaPath || typeof Path2D === 'undefined') return;
 
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    canvas.width = Math.round(width * dpr);
-    canvas.height = Math.round(height * dpr);
+    for (const layer of [canvas, overCanvas]) {
+      layer.width = Math.round(width * dpr);
+      layer.height = Math.round(height * dpr);
+    }
     const y0 = height * 0.65;
     const look = getWaveLook(windKmh);
     const crestRgb = toRgb(ctx, crestColor);
@@ -278,16 +301,18 @@ const SeaCanvas: React.FC<SeaCanvasProps> = ({
         ? buildMirror(width, height, dpr, y0, ridgePath ? new Path2D(ridgePath) : null, rgba(toRgb(ctx, ridgeColor), 1), toRgb(ctx, skyColor))
         : null,
     };
+    const over: Sea = { ...sea, ctx: overCtx };
 
     if (prefersReducedMotion) {
-      drawSea(sea, look, STILL_T);
+      drawSea(sea, over, look, STILL_T);
       return;
     }
     let last = -Infinity;
+    let tick = 0;
     const loop = (now: number) => {
       if (now - last >= FRAME_MS) {
         last = now;
-        drawSea(sea, look, now / 1000);
+        drawSea(sea, over, look, now / 1000, tick++ % UNDER_EVERY === 0);
       }
       frameRef.current = requestAnimationFrame(loop);
     };
@@ -298,7 +323,13 @@ const SeaCanvas: React.FC<SeaCanvasProps> = ({
     };
   }, [width, height, seaPath, seaEdgePath, ridgePath, ridgeColor, skyColor, crestColor, troughColor, gain, windKmh, driftDirection, prefersReducedMotion]);
 
-  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true" data-testid="sea-canvas" />;
+  const layer = 'absolute inset-0 w-full h-full pointer-events-none';
+  return (
+    <>
+      <canvas ref={underRef} className={layer} aria-hidden="true" data-testid="sea-canvas" />
+      <canvas ref={overRef} className={layer} style={{ zIndex: 5 }} aria-hidden="true" data-testid="sea-canvas-over" />
+    </>
+  );
 };
 
 export default SeaCanvas;
