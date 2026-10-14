@@ -7,6 +7,7 @@ import { resolveInfoText, type SceneIconId, type SceneInfo } from '@/utils/scene
 import { santaCounters } from '@/utils/santaTracker';
 import { formatNumber, type MessageKey } from '@/i18n';
 import { Bat } from './sceneIcons';
+import { OPTIC_ICONS } from './opticIcons';
 
 // Info cards (ROADMAP item 95): one small glass card above the tapped point, inside the
 // screen. It closes on a tap outside, on Escape, or after CARD_CLOSE_MS. SunTracker shows
@@ -37,6 +38,15 @@ const KICKER: Record<SceneIconId, { Icon: LucideIcon; colour: string }> = {
   egg: { Icon: Egg, colour: 'text-tier-ultra-rare' },
   event: { Icon: PartyPopper, colour: 'text-tier-ultra-rare' },
   rainbow: { Icon: Rainbow, colour: 'text-kind-cloud' }, // item 121
+  // Item 148: the sky optics, each with its badge icon, in the rainbow's weather colour.
+  'optic:rays': { Icon: OPTIC_ICONS.rays, colour: 'text-kind-cloud' },
+  'optic:sunDogs': { Icon: OPTIC_ICONS.sunDogs, colour: 'text-kind-cloud' },
+  'optic:halo': { Icon: OPTIC_ICONS.halo, colour: 'text-kind-cloud' },
+  'optic:doubleRainbow': { Icon: OPTIC_ICONS.doubleRainbow, colour: 'text-kind-cloud' },
+  'optic:fogBow': { Icon: OPTIC_ICONS.fogBow, colour: 'text-kind-cloud' },
+  'optic:moonbow': { Icon: OPTIC_ICONS.moonbow, colour: 'text-kind-cloud' },
+  'optic:sunPillar': { Icon: OPTIC_ICONS.sunPillar, colour: 'text-kind-cloud' },
+  'optic:moonHalo': { Icon: OPTIC_ICONS.moonHalo, colour: 'text-kind-cloud' },
 };
 
 // The rarity meter: one bar per tier, lit up to the card's tier.

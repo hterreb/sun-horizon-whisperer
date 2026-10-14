@@ -1741,3 +1741,76 @@ describe('SunVisualization (rendered): decorative planes and the live radar (ite
     expect(planeCount(1)).toBe(0);
   });
 });
+
+describe('SunVisualization (rendered): sky optics (ROADMAP item 148)', () => {
+  const originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+  const originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
+  beforeEach(() => {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { value: 390, configurable: true });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { value: 844, configurable: true });
+  });
+  afterEach(() => {
+    if (originalClientWidth) Object.defineProperty(HTMLElement.prototype, 'clientWidth', originalClientWidth);
+    if (originalClientHeight) Object.defineProperty(HTMLElement.prototype, 'clientHeight', originalClientHeight);
+    window.history.pushState({}, '', '/');
+  });
+
+  // A low sun in the south-west; the full moon below the horizon.
+  const props = {
+    sunPosition: { azimuth: 230, altitude: 20 },
+    moonPosition: { azimuth: 60, altitude: -10, phase: 0.5, illumination: 1, visible: false },
+    sunPath: [], moonPath: [], timeOfDay: 'afternoon' as const, weatherType: 'cloudy' as const, latitude: 47.8,
+  };
+  // The optics that show; one that just ended fades out for 5 s (data-leaving).
+  const shown = () => [...document.querySelectorAll('[data-testid="sky-optic"]:not([data-leaving])')].map((el) => el.getAttribute('data-optic'));
+
+  it('shows the optics the weather triggers: thin high cloud gives sun dogs and the halo', () => {
+    render(<SunVisualization {...props} cloudLayers={{ low: 5, mid: 10, high: 70 }} onSceneInfo={vi.fn()} />);
+    expect(shown()).toEqual(['sunDogs', 'halo']);
+    const layer = screen.getByTestId('sky-optics-layer');
+    // Where the rainbow's layer is (no rainbow now), with no z-index: the clouds, the sun, planes
+    // and birds paint over it.
+    expect(screen.getByTestId('sun-visualization').firstElementChild).toBe(layer);
+    expect(layer.style.zIndex).toBe('');
+    expect(layer.className).not.toMatch(/\bz-/);
+    expect(layer.compareDocumentPosition(screen.getByTestId('sea')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(layer.querySelectorAll('[data-testid="optic-hit"]').length).toBeGreaterThan(0);
+  });
+
+  it('shows none in a clear sky, and reads the visibility and the temperature', () => {
+    const { rerender } = render(<SunVisualization {...props} weatherType="clear" />);
+    expect(shown()).toEqual([]);
+    // A frosty sunset under high cloud: the sun pillar; with haze and gaps in the clouds: the rays.
+    const dusk = { ...props, sunPosition: { azimuth: 250, altitude: 1 } };
+    rerender(<SunVisualization {...dusk} cloudLayers={{ low: 0, mid: 5, high: 45 }} temperatureC={-4} />);
+    expect(shown()).toContain('sunPillar');
+    rerender(<SunVisualization {...dusk} cloudLayers={{ low: 35, mid: 30, high: 10 }} visibilityM={14_000} temperatureC={5} />);
+    expect(shown()).toEqual(['rays']);
+    expect(document.querySelector('[data-optic="sunPillar"]')!.hasAttribute('data-leaving')).toBe(true);
+  });
+
+  it('adds the second bow to the rainbow in heavy rain', () => {
+    render(<SunVisualization {...props} weatherType="rain" rainMmH={1.5} />);
+    expect(screen.getByTestId('sun-visualization').firstElementChild).toBe(screen.getByTestId('rainbow-layer'));
+    expect(screen.getByTestId('rainbow-layer').nextElementSibling).toBe(screen.getByTestId('sky-optics-layer'));
+    expect(shown()).toEqual(['doubleRainbow']);
+  });
+
+  it('shows the moonbow and the moon halo at night by the full moon', () => {
+    const night = {
+      ...props, sunPosition: { azimuth: 0, altitude: -30 }, timeOfDay: 'night' as const,
+      moonPosition: { azimuth: 120, altitude: 22, phase: 0.5, illumination: 0.98, visible: true },
+    };
+    const { rerender } = render(<SunVisualization {...night} weatherType="rain" cloudLayers={{ low: 40, mid: 30, high: 10 }} />);
+    expect(shown()).toEqual(['moonbow']);
+    rerender(<SunVisualization {...night} cloudLayers={{ low: 5, mid: 10, high: 70 }} />);
+    expect(shown()).toContain('moonHalo');
+  });
+
+  it('?optic= shows those optics whatever the weather; ?optic=doubleRainbow also the first bow', () => {
+    window.history.pushState({}, '', '/?optic=halo,fogBow,doubleRainbow');
+    render(<SunVisualization {...props} weatherType="clear" />);
+    expect(shown()).toEqual(['halo', 'doubleRainbow', 'fogBow']);
+    expect(screen.getByTestId('rainbow-layer')).toBeInTheDocument();
+  });
+});

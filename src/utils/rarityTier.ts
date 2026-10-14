@@ -30,6 +30,15 @@ export const TIER_RING_BORDER: Record<RarityTier, string> = {
   ultraRare: 'border-tier-ultra-rare/80',
 };
 export const NEUTRAL_RING_BORDER = 'border-white/70';
+// The same ring as an SVG stroke, around a drawn hit path (the rainbow, the sky optics: item 148).
+export const TIER_RING_STROKE: Record<RarityTier, string> = {
+  common: 'stroke-tier-common/80',
+  frequent: 'stroke-tier-frequent/80',
+  uncommon: 'stroke-tier-uncommon/80',
+  rare: 'stroke-tier-rare/80',
+  veryRare: 'stroke-tier-very-rare/80',
+  ultraRare: 'stroke-tier-ultra-rare/80',
+};
 
 export const cardBorderClass = (tier: RarityTier | null | undefined): string =>
   tier ? TIER_CARD_BORDER[tier] : NEUTRAL_CARD_BORDER;

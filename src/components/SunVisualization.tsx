@@ -22,6 +22,8 @@ import { type CalendarEvent, type SeasonPath, getSolsticeTraceDates } from '@/ut
 import PremiumBadge from './PremiumBadge';
 import WeatherEffects from './WeatherEffects';
 import RainbowLayer from './RainbowLayer';
+import SkyOpticsLayer from './SkyOpticsLayer';
+import { getOpticOverride, getSkyOptics, type OpticKind } from '@/utils/skyOptics';
 import SolarEclipse from '@/components/SolarEclipse';
 import GreenFlash from '@/components/GreenFlash';
 import MoonTint from '@/components/MoonTint';
@@ -29,7 +31,7 @@ import { type AstroEvent } from '@/utils/astroEvents';
 import { getSunVisibility, getMoonCloudFactor, getMoonLook, getStarCloudFactor } from '@/utils/weatherEffectsUtils';
 import { getSeaWindKmh, getReflectionBars } from '@/utils/waveUtils';
 import { getCloudDriftDirection } from '@/utils/cloudLayoutUtils';
-import { type CloudLayers } from '@/utils/skyCloudUtils';
+import { getCloudLayers, type CloudLayers } from '@/utils/skyCloudUtils';
 import SeaCanvas from '@/components/SeaCanvas';
 import { getRainMmH, getRainMistOpacity } from '@/utils/rainUtils';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -82,6 +84,8 @@ interface SunVisualizationProps {
   rainMmH?: number | null;
   // The current hour's cover per layer (ROADMAP item 84, C1); null: the weather type's own.
   cloudLayers?: CloudLayers | null;
+  // The forecast hour's visibility in m (item 148, the sky optics); null: unknown.
+  visibilityM?: number | null;
   // The planes' contrails from the forecast's upper air (ROADMAP item 96).
   contrail?: ContrailKind;
   // The live radar's feed while it is on (ROADMAP item 96, Premium); null: the decorative planes.
@@ -608,6 +612,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   windDirectionDeg = null,
   rainMmH = null,
   cloudLayers = null,
+  visibilityM = null,
   contrail = 'none',
   livePlanes = null,
   livePlanesShown = 0,
@@ -1068,18 +1073,43 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       return pill ? [...kept, pill] : kept;
     }, []);
 
+  // Item 148: the test link `?optic=` shows those optics whatever the weather.
+  const [opticOverride] = useState(() => getOpticOverride(window.location.search));
   // Rainbow (ROADMAP item 10): raining/drizzling, opposite the sun's azimuth, using the
-  // same azimuth->x mapping as the sun/moon.
+  // same azimuth->x mapping as the sun/moon. `?optic=doubleRainbow` also shows the first bow.
   const rainbowGeometry = useMemo(
     () => getRainbowGeometry(
-      weatherType === 'rain' || weatherType === 'drizzle',
+      weatherType === 'rain' || weatherType === 'drizzle' || !!opticOverride?.includes('doubleRainbow'),
       sunPosition.altitude,
       sunPosition.azimuth,
       latitude,
       compassHeading
     ),
-    [weatherType, sunPosition.altitude, sunPosition.azimuth, latitude, compassHeading]
+    [weatherType, opticOverride, sunPosition.altitude, sunPosition.azimuth, latitude, compassHeading]
   );
+  // The sky optics (item 148): the bows opposite the sun and the moon use the rainbow's geometry.
+  const antisolarGeometry = useMemo(
+    () => getRainbowGeometry(true, sunPosition.altitude, sunPosition.azimuth, latitude, compassHeading),
+    [sunPosition.altitude, sunPosition.azimuth, latitude, compassHeading]
+  );
+  const antilunarGeometry = useMemo(
+    () => getRainbowGeometry(true, moonPosition.altitude, moonPosition.azimuth, latitude, compassHeading),
+    [moonPosition.altitude, moonPosition.azimuth, latitude, compassHeading]
+  );
+  // A key, so the list keeps its identity while the same optics show (no new fade).
+  const opticKey = (opticOverride ?? getSkyOptics({
+    weatherType,
+    layers: getCloudLayers(weatherType, cloudLayers),
+    visibilityM,
+    temperatureC,
+    rainMmH: getRainMmH(weatherType, rainMmH),
+    timeOfDay,
+    sunAltitude: sunPosition.altitude,
+    moonAltitude: moonPosition.altitude,
+    moonIllumination: moonPosition.illumination,
+    rainbow: rainbowGeometry.visible,
+  })).join(',');
+  const optics = useMemo(() => (opticKey ? opticKey.split(',') as OpticKind[] : []), [opticKey]);
 
   // Off-screen hint (ROADMAP item 19): in compass mode, when the body currently shown
   // (the moon by night, else the sun) sits outside the field of view, point an arrow
@@ -1132,6 +1162,18 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         timeOfDay={timeOfDay}
         containerWidth={containerDimensions.width}
         containerHeight={containerDimensions.height}
+        onInfo={onSceneInfo}
+        infoRing={infoRing}
+      />
+      {/* Item 148: the sky optics, also with no z-index, under everything that follows. */}
+      <SkyOpticsLayer
+        optics={optics}
+        containerWidth={containerDimensions.width}
+        containerHeight={containerDimensions.height}
+        sun={sunDotVisible ? { x: sunX, y: sunY } : null}
+        moon={moonDotVisible ? { x: moonX, y: moonY } : null}
+        antisolar={antisolarGeometry}
+        antilunar={antilunarGeometry}
         onInfo={onSceneInfo}
         infoRing={infoRing}
       />

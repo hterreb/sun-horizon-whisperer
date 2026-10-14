@@ -19,6 +19,7 @@ import { type PlayfulEgg } from './playfulEggs';
 import { type TimeOfDay } from './sunUtils';
 import { getMoonPhaseIndex } from './moonUtils';
 import { ridgeAt, type HorizonProfile } from './horizonUtils';
+import { OPTICS, type OpticKind } from './skyOptics';
 
 export type EggKind =
   | 'sunglasses' | 'ufo' | 'disco'
@@ -38,7 +39,7 @@ export type StateBase = 'sun' | 'moon' | 'terrain' | 'plane' | 'satellite';
 export type BadgeGroup = 'fish' | 'flyer' | 'boat' | 'sky' | 'cloud' | 'egg';
 export type BadgeId =
   | `fish:${FishKind}` | `flyer:${BirdKind | 'bat'}` | `boat:${BoatKind}` | 'plane' | `cloud:${CloudType}`
-  | 'rainbow' | `egg:${EggKind}`
+  | 'rainbow' | `optic:${OpticKind}` | `egg:${EggKind}`
   | `sun:${SunState}` | `moon:${MoonState}` | `terrain:${TerrainBand}` | `plane:${PlaneHaul}` | `satellite:${SatelliteSize}`;
 // Item 138: the old base badges of the sun, the moon, the terrain and the satellite. They are not
 // in BADGES, so they do not show and do not count. An old save keeps them in storage.
@@ -140,6 +141,8 @@ export const BADGES: readonly Badge[] = [
   ...BOATS.map(([kind, name]): Badge => ({ id: `boat:${kind}`, group: 'boat', name, rarity: getRarityTier(getBoatShare(kind)) })),
   // Item 121: first in the sky group, as CollectionView shows the sky badges without a state row first.
   { id: 'rainbow', group: 'sky', name: 'scene.rainbow', rarity: RARITY_NAMES[RAINBOW_TIER] }, // item 121
+  // Item 148: the sky optics join the rainbow's row, each with its fixed tier.
+  ...OPTICS.map(({ kind, name, tier }): Badge => ({ id: `optic:${kind}`, group: 'sky', name, rarity: RARITY_NAMES[tier] })),
   { id: 'plane', group: 'sky', name: 'plane.airliner', rarity: null },
   ...PLANE_HAULS.map(([haul, name]): Badge => ({ id: `plane:${haul}`, group: 'sky', name, rarity: RARITY_NAMES[HAUL_TIERS[haul]], base: 'plane' })),
   // Item 115: the states, one grid row each. Item 138: the satellite, the sun, the moon and the
@@ -197,6 +200,7 @@ export const badgeForTarget = (target: SceneInfoTarget): BadgeId | null => {
     case 'livePlane': return 'plane';
     case 'cloud': return `cloud:${target.cloudType}`;
     case 'rainbow': return 'rainbow';
+    case 'optic': return `optic:${target.kind}`;
     // Item 138: the state badge only (stateBadgeForTarget). Item 123: an egg's badge comes from
     // eggBadgesForTarget.
     case 'sun':
@@ -346,10 +350,10 @@ export const badgeForNationalDay = (day: NationalDay | null, o: NationalBadgeOpt
   }
 };
 
-// Test links (?egg=, ?fish=, ?hunt=, ?country=, ?boat=) force a scene, so nothing counts while one is set.
+// Test links (?egg=, ?fish=, ?hunt=, ?country=, ?boat=, ?optic=) force a scene, so nothing counts while one is set.
 export const isCollectionPaused = (search: string): boolean => {
   const params = new URLSearchParams(search);
-  return params.has('egg') || params.has('fish') || params.has('hunt') || params.has('country') || params.has('boat');
+  return params.has('egg') || params.has('fish') || params.has('hunt') || params.has('country') || params.has('boat') || params.has('optic');
 };
 
 // Only the badges in BADGES count: an old save's retired ids (item 138) do not.
