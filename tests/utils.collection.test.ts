@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   BADGES, COLLECTION_STORAGE_KEY, addToCollection, badgeForAstroEvent, badgeForRoute, getPlaneHaul, badgeForCalendarEvent, badgeForSanta, badgeForTarget,
   countCollected, getMoonState, getSunState, getTerrainBand, isCollectionPaused, loadCollection, saveCollection,
-  NOWRUZ_ALSO, eggBadgesForTarget, stateBadgeForTarget, type BadgeId, type CalendarBadgeOptions, type StateBadgeContext,
+  eggBadgesForTarget, stateBadgeForTarget, type BadgeId, type CalendarBadgeOptions, type StateBadgeContext,
 } from '@/utils/collection';
 import { type HorizonProfile } from '@/utils/horizonUtils';
 import { type EggCardKind } from '@/utils/sceneInfo';
@@ -301,7 +301,6 @@ describe('state badges (ROADMAP item 115)', () => {
     expect(badgeForCalendarEvent('carnival', day)).toBe('egg:carnival');
     expect(badgeForCalendarEvent('carnival', night)).toBeNull();
     expect(badgeForCalendarEvent('nowruz', day)).toBe('egg:nowruz');
-    expect(NOWRUZ_ALSO).toBe('egg:equinox');
     expect(badgeForCalendarEvent('diwali', { ...night, isTimePreview: true })).toBeNull();
     expect(badgeForCalendarEvent('diwali', shown)).toBeNull(); // no time of day
     for (const kind of ['loyKrathong', 'diwali', 'eidAlFitr', 'midAutumn', 'hanami', 'tanabata', 'diaDeMuertos', 'holi', 'hanukkah', 'nowruz', 'midsummer', 'carnival']) {
@@ -359,12 +358,12 @@ describe('eggBadgesForTarget (ROADMAP item 123)', () => {
     }
   });
 
-  it('maps the renamed cards to their badges; Nowruz also gives the equinox', () => {
+  it('maps the renamed cards to their badges; Nowruz gives only its own (item 138)', () => {
     expect(eggBadgesForTarget({ type: 'egg', kind: 'dragon' })).toEqual(['egg:lunarNewYear']);
     expect(eggBadgesForTarget({ type: 'egg', kind: 'blackCat' })).toEqual(['egg:friday13']);
     expect(eggBadgesForTarget({ type: 'egg', kind: 'potOfGold' })).toEqual(['egg:stPatrick']);
     expect(eggBadgesForTarget({ type: 'egg', kind: 'fireworks' })).toEqual(['egg:newYear']);
-    expect(eggBadgesForTarget({ type: 'egg', kind: 'nowruz' })).toEqual(['egg:nowruz', NOWRUZ_ALSO]);
+    expect(eggBadgesForTarget({ type: 'egg', kind: 'nowruz' })).toEqual(['egg:nowruz']);
     expect(eggBadgesForTarget({ type: 'egg', kind: 'bastilleDay' })).toEqual(['egg:bastilleDay']);
     // Item 140: the summer and the winter solstice pill give different badges.
     expect(eggBadgesForTarget({ type: 'egg', kind: 'solstice' })).toEqual(['egg:solstice']);

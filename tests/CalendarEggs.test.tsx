@@ -329,10 +329,16 @@ describe('CalendarEggs', () => {
     expect(onInfo).not.toHaveBeenCalled();
     fireEvent.click(badge, { detail: 2 });
     expect(onInfo).toHaveBeenCalledWith({ type: 'egg', kind: 'solstice' }, expect.anything(), 'egg-season');
-    rerender(<CalendarEggs {...base} event="nowruz" onInfo={onInfo} />);
+    rerender(<CalendarEggs {...base} event="equinox" onInfo={onInfo} />);
     fireEvent.click(screen.getByTestId('season-badge'), { detail: 1 });
     fireEvent.click(screen.getByTestId('season-badge'), { detail: 2 });
     expect(onInfo).toHaveBeenLastCalledWith({ type: 'egg', kind: 'equinox' }, expect.anything(), 'egg-season');
+    // Item 138: the Nowruz pill (the March equinox from noon) opens the Nowruz card.
+    rerender(<CalendarEggs {...base} event="nowruz" onInfo={onInfo} />);
+    expect(screen.getByTestId('season-badge')).toHaveTextContent('Nowruz');
+    fireEvent.click(screen.getByTestId('season-badge'), { detail: 1 });
+    fireEvent.click(screen.getByTestId('season-badge'), { detail: 2 });
+    expect(onInfo).toHaveBeenLastCalledWith({ type: 'egg', kind: 'nowruz' }, expect.anything(), 'egg-season');
     rerender(<CalendarEggs {...base} event={null} blueMoon onInfo={onInfo} />);
     expect(screen.getByTestId('season-badge').className).toContain('pointer-events-none');
   });

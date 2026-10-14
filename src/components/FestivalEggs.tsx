@@ -38,9 +38,9 @@ const PETALS = Array.from({ length: 14 }, (_, i) => ({ top: (i * 23) % 50, durat
 const MARIGOLDS = Array.from({ length: 14 }, (_, i) => ({ left: (i * 41 + 4) % 96, dy: 40 + ((i * 67) % 200), dx: i % 2 ? -20 : 20, duration: 80 + (i % 5) * 9 }));
 const CONFETTI = Array.from({ length: 18 }, (_, i) => ({ left: (i * 29 + 3) % 100, duration: 50 + (i % 4) * 7, delay: -i * 3.4, colour: PASTELS[i % 5], tilt: (i * 47) % 90 }));
 const BONFIRES = [18, 52, 83];
-// Nowruz: 7 blossoms in a gentle arc that frames the equinox pill (px from the pill's top
-// centre): the ends beside the pill, the others under it, clear of its edges.
-const BLOSSOMS = [[-140, 12, 34], [-98, 46, 28], [-50, 60, 28], [0, 64, 36], [50, 60, 28], [98, 46, 28], [140, 12, 34]]
+// Nowruz: 7 blossoms in a close arc that frames the Nowruz pill (about 68 × 24 px; px from the
+// pill's top centre): the ends beside the pill, the others under it, clear of its edges.
+const BLOSSOMS = [[-55, 12, 30], [-51, 41, 28], [-30, 60, 28], [0, 66, 32], [30, 60, 28], [51, 41, 28], [55, 12, 30]]
   .map(([x, y, size]) => ({ x, y, size }));
 // A few loose petals sink from the arc, very slowly (about 1.3 px/s), and fade out.
 const NOWRUZ_PETALS = [BLOSSOMS[1], BLOSSOMS[3], BLOSSOMS[5]].map((b, n) => ({ x: b.x, y: b.y, dx: n % 2 ? -12 : 12, duration: 28 + n * 5, delay: -n * 9 }));
@@ -329,7 +329,7 @@ const FestivalEggs: React.FC<FestivalEggsProps> = ({
       )}
 
       {event === 'nowruz' && (
-        // A gentle arc of spring blossoms framing the equinox pill (CalendarEggs draws the pill
+        // A close arc of spring blossoms framing the Nowruz pill (CalendarEggs draws the pill
         // at horizon + 90 px). Under reduced motion the blossoms stay and the petals are hidden.
         <div data-testid="festival-nowruz" className="absolute left-1/2 z-9" style={{ top: horizonY + 90 }}>
           {BLOSSOMS.map((b, i) => (

@@ -1430,6 +1430,26 @@ describe('SunTracker', () => {
       }
     });
 
+    it('the March equinox day is the equinox until noon, then Nowruz, each with its own badge (item 138)', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2027-03-20T10:00:00Z')); // 11:00 in Ravensburg
+      try {
+        const { unmount } = render(<SunTracker />);
+        expect(visProps.current).toMatchObject({ calendarEvent: 'equinox' });
+        act(() => visProps.current!.onSceneInfo!({ type: 'egg', kind: 'equinox' }, { x: 100, y: 100 }, 'egg-season'));
+        expect(Object.keys(JSON.parse(localStorage.getItem('collection')!))).toEqual(['egg:equinox']);
+        unmount();
+        vi.setSystemTime(new Date('2027-03-20T12:00:00Z')); // 13:00
+        render(<SunTracker />);
+        expect(visProps.current).toMatchObject({ calendarEvent: 'nowruz' });
+        act(() => visProps.current!.onSceneInfo!({ type: 'egg', kind: 'nowruz' }, { x: 100, y: 100 }, 'egg-season'));
+        expect(Object.keys(JSON.parse(localStorage.getItem('collection')!))).toEqual(['egg:equinox', 'egg:nowruz']);
+        expect(screen.getAllByTestId('badge-unlocked')).toHaveLength(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('the April Fools sun counts on a double tap on the sun once the scene reported it (item 123)', () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date('2027-04-01T10:00:00Z'));
@@ -1762,6 +1782,20 @@ describe('SunTracker national days', () => {
     doubleTapBoat();
     expect(JSON.parse(localStorage.getItem('collection') ?? '{}')).toHaveProperty('egg:christmas');
     expect(screen.getByTestId('scene-info-card')).toHaveTextContent('Christmas lights');
+  });
+
+  it('a new egg badge wins the tap: the boat badge comes on the next double tap (item 138)', async () => {
+    vi.setSystemTime(new Date('2026-12-25T12:00:00Z'));
+    answer('DE');
+    render(<SunTracker />);
+    await waitFor(() => expect(screen.getAllByTestId('christmas-bulb').length).toBeGreaterThan(0));
+    const collected = () => Object.keys(JSON.parse(localStorage.getItem('collection') ?? '{}'));
+    doubleTapBoat();
+    expect(collected()).toEqual(['egg:christmas']);
+    expect(screen.getAllByTestId('badge-unlocked')).toHaveLength(1);
+    doubleTapBoat();
+    expect(collected()).toHaveLength(2);
+    expect(collected()[1]).toMatch(/^boat:/);
   });
 
   it('?egg=festaRepubblica flies the jets on any day and counts no badge', async () => {

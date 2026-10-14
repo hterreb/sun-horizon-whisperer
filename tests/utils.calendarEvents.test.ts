@@ -55,8 +55,11 @@ describe('getCalendarEvent', () => {
     expect(getCalendarEvent(new Date(2027, 5, 21, 12), 52.5)).toBe('solstice-longest');
   });
 
-  it('returns equinox on the equinox day (the March one is Nowruz, item 118)', () => {
-    expect(getCalendarEvent(new Date(2027, 2, 20, 9))).toBe('nowruz');
+  it('returns equinox on the equinox day; the March one is Nowruz from noon (items 118, 138)', () => {
+    expect(getCalendarEvent(new Date(2027, 2, 20, 0))).toBe('equinox');
+    expect(getCalendarEvent(new Date(2027, 2, 20, 11, 59))).toBe('equinox');
+    expect(getCalendarEvent(new Date(2027, 2, 20, 12))).toBe('nowruz');
+    expect(getCalendarEvent(new Date(2027, 2, 20, 23, 59))).toBe('nowruz');
     expect(getCalendarEvent(new Date(2026, 8, 23, 20), -33.9)).toBe('equinox');
     expect(getCalendarEvent(new Date(2026, 8, 22, 20))).toBeNull();
   });
@@ -183,17 +186,18 @@ describe('getSolsticeTraceDates', () => {
     ]);
   });
 
-  it('marks the equinox as today on the September equinox and on Nowruz (the March equinox)', () => {
+  it('marks the equinox as today on the September and the March equinox; Nowruz has no fan (item 138)', () => {
     expect(fan('equinox', new Date(2027, 8, 23, 12))).toEqual([
       'june 2027-06-21T12:00:00.000Z',
       'equinox 2027-09-23T12:00:00.000Z today',
       'december 2027-12-22T12:00:00.000Z',
     ]);
-    expect(fan('nowruz', new Date(2027, 2, 20, 12))).toEqual([
-      'june 2027-06-21T12:00:00.000Z',
-      'equinox 2027-03-20T12:00:00.000Z today',
-      'december 2027-12-22T12:00:00.000Z',
+    expect(fan('equinox', new Date(2027, 2, 20, 9))).toEqual([
+      'june 2027-06-21T09:00:00.000Z',
+      'equinox 2027-03-20T09:00:00.000Z today',
+      'december 2027-12-22T09:00:00.000Z',
     ]);
+    expect(fan('nowruz', new Date(2027, 2, 20, 12))).toEqual([]);
   });
 
   it('gives none for other events', () => {
