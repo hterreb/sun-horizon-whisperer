@@ -920,12 +920,17 @@ describe('SunTracker', () => {
         createGain() {
           return { gain: { setValueAtTime: () => {}, linearRampToValueAtTime: () => {} }, connect: (node: unknown) => node };
         }
+        // The countdown's master bus (item 152).
+        createDynamicsCompressor() {
+          return { threshold: {}, knee: {}, ratio: {}, attack: {}, release: {}, connect: (node: unknown) => node };
+        }
         createOscillator() {
           return { type: '', frequency: { setValueAtTime: () => {} }, connect: (node: unknown) => node, start: (at: number) => starts.push(at), stop: () => {} };
         }
       }
       const sunset = getSunTimes(NOON, RAVENSBURG.latitude, RAVENSBURG.longitude).sunset!;
       const toggle = () => fireEvent.click(screen.getByRole('button', { name: 'Sunset countdown' }));
+      const radio = () => fireEvent.click(screen.getByRole('switch', { name: 'Play lo-fi music' }));
       // Starts 20 s before the sunset; the 1 s clock then reaches T-11 s after 9 ticks.
       const runToCountdown = (turnOn: boolean) => {
         start(new Date(sunset.getTime() - 20_000));
@@ -950,6 +955,33 @@ describe('SunTracker', () => {
         expect(screen.getByRole('button', { name: 'Sunset countdown' })).toHaveAttribute('aria-pressed', 'true');
         expect(starts).toHaveLength(1);
         expect(localStorage.getItem('sunset-countdown')).toBe('on');
+      });
+
+      it('starting the radio turns it on without a check tone, also after the user turned it off (item 152, B2)', () => {
+        const play = vi.spyOn(window.HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+        const pause = vi.spyOn(window.HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+        start(new Date(sunset.getTime() - 20_000));
+        const bell = () => screen.getByRole('button', { name: 'Sunset countdown' });
+        expect(bell()).toHaveAttribute('aria-pressed', 'false');
+        radio();
+        expect(bell()).toHaveAttribute('aria-pressed', 'true');
+        expect(localStorage.getItem('sunset-countdown')).toBe('on');
+        expect(starts).toHaveLength(0);
+
+        toggle();
+        expect(bell()).toHaveAttribute('aria-pressed', 'false');
+        radio();
+        expect(bell()).toHaveAttribute('aria-pressed', 'false');
+        radio();
+        expect(bell()).toHaveAttribute('aria-pressed', 'true');
+        expect(localStorage.getItem('sunset-countdown')).toBe('on');
+
+        // The countdown then plays over the radio.
+        starts.length = 0;
+        tickFor(9000, 1000);
+        expect(starts).toHaveLength(11);
+        play.mockRestore();
+        pause.mockRestore();
       });
 
       it('with the toggle on, schedules 11 tones at T-11 s, 1 s apart, and the pill counts down', () => {
