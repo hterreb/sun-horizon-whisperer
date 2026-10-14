@@ -739,9 +739,16 @@
   }
 
   /* Night, like the manifest background_color: the first paint before the app
-     mounts continues the splash screen (ROADMAP item 39). */
+     mounts continues the splash screen (ROADMAP item 39). Then the sky's top colour
+     (`--sky-top`, set by SunTracker): a frame the scene has not drawn yet, after a
+     rotation or the keyboard, shows sky, not near-black (item 151). */
+  html,
   body {
-    @apply bg-brand-night text-foreground;
+    background-color: var(--sky-top, hsl(var(--brand-night)));
+  }
+
+  body {
+    @apply text-foreground;
     overflow: hidden;
     overscroll-behavior: none;
   }

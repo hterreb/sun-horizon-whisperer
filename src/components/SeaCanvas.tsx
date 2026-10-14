@@ -273,6 +273,9 @@ const SeaCanvas: React.FC<SeaCanvasProps> = ({
   const underRef = useRef<HTMLCanvasElement>(null);
   const overRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<number | null>(null);
+  // The colours as RGB, resolved again only when one of them changes (item 151): a resize only
+  // reallocates the canvases. toRgb reads CSS variables, which forces a style recalc.
+  const colorsRef = useRef<{ key: string; crest: Rgb; trough: Rgb; ridge: Rgb; sky: Rgb } | null>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
@@ -290,15 +293,20 @@ const SeaCanvas: React.FC<SeaCanvasProps> = ({
     }
     const y0 = height * 0.65;
     const look = getWaveLook(windKmh);
-    const crestRgb = toRgb(ctx, crestColor);
-    const troughRgb = toRgb(ctx, troughColor);
+    const colorKey = `${crestColor}|${troughColor}|${ridgeColor}|${skyColor}`;
+    if (colorsRef.current?.key !== colorKey) {
+      colorsRef.current = {
+        key: colorKey, crest: toRgb(ctx, crestColor), trough: toRgb(ctx, troughColor), ridge: toRgb(ctx, ridgeColor), sky: toRgb(ctx, skyColor),
+      };
+    }
+    const { crest: crestRgb, trough: troughRgb, ridge: ridgeRgb, sky: skyRgb } = colorsRef.current;
     const sea: Sea = {
       ctx, w: width, h: height, dpr, y0, dir: driftDirection, gain,
       crest: rgba(crestRgb, 1), trough: rgba(troughRgb, 1), crestRgb, troughRgb,
       clip: new Path2D(seaPath),
       edge: new Path2D(seaEdgePath),
       mirror: look.mirror.strength > 0.005
-        ? buildMirror(width, height, dpr, y0, ridgePath ? new Path2D(ridgePath) : null, rgba(toRgb(ctx, ridgeColor), 1), toRgb(ctx, skyColor))
+        ? buildMirror(width, height, dpr, y0, ridgePath ? new Path2D(ridgePath) : null, rgba(ridgeRgb, 1), skyRgb)
         : null,
     };
     const over: Sea = { ...sea, ctx: overCtx };

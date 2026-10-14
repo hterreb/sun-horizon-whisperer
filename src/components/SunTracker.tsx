@@ -1213,6 +1213,15 @@ const SunTracker: React.FC = () => {
     // The water takes its colours from this same gradient (ROADMAP item 53).
     return mixGradientTowardOvercast(getBackgroundGradient(timeOfDay), getSkyOvercastMix(weatherType, cloudCover, rainMmH));
   }, [timeOfDay, weatherType, cloudCover, rainMmH]);
+  // Item 151: the page behind the scene has the sky's top colour (`--sky-top`, index.css), so a
+  // frame the scene has not drawn yet (a rotation, the keyboard) shows sky, not near-black.
+  const skyTop = /#[0-9a-f]{6}/i.exec(skyGradient)?.[0] ?? null;
+  useEffect(() => {
+    if (!skyTop) return;
+    const root = document.documentElement.style;
+    root.setProperty('--sky-top', skyTop);
+    return () => { root.removeProperty('--sky-top'); };
+  }, [skyTop]);
 
   const handleWeatherChange = (newWeather: WeatherType) => {
     setWeatherType(newWeather);
