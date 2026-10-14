@@ -220,6 +220,7 @@ export const en = {
   'scene.sun': 'Sun',
   'scene.countdown': 'Sunset in {seconds} s',
   'scene.countdownSoundOn': 'Turn on the countdown sound',
+  'scene.countdownTapToHear': 'Tap to turn on the sunset sound',
   'scene.moonInfo': 'Moon: {altitude}° | {illumination}',
   'direction.n': 'N',
   'direction.ne': 'NE',
