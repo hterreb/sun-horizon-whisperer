@@ -3,6 +3,7 @@ import React, { useEffect, useRef } from 'react';
 import { type TimeOfDay } from '../utils/sunUtils';
 import { type MoonPosition } from '../utils/moonUtils';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
+import { useViewportSize } from '../hooks/useViewportSize';
 import { type WeatherType } from './CloudLayer';
 import { getStarCloudFactor, getStarGapShow, getTwilightStars } from '../utils/weatherEffectsUtils';
 import { METEOR_SHOWER, meteorOpacity, meteorSpawnChance } from '../utils/astroEvents';
@@ -56,24 +57,16 @@ const NightStars: React.FC<NightStarsProps> = ({ timeOfDay, moonPosition, weathe
     moonBrightnessRef.current = moonPosition?.illumination || 0;
   }, [moonPosition?.illumination]);
 
-  // Create the stars once; only regenerate them when the canvas is resized.
+  // Create the stars once; only regenerate them when the canvas is resized (item 151: 150 ms
+  // after the last resize, not inside the resize event).
+  const { width, height } = useViewportSize();
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    const resizeCanvas = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      starsRef.current = createStars(canvas.width, canvas.height);
-    };
-
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-
-    return () => {
-      window.removeEventListener('resize', resizeCanvas);
-    };
-  }, []);
+    canvas.width = width;
+    canvas.height = height;
+    starsRef.current = createStars(width, height);
+  }, [width, height]);
 
   useEffect(() => {
     const canvas = canvasRef.current;

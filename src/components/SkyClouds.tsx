@@ -12,6 +12,7 @@ import {
 } from '@/utils/skyCloudUtils';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { useDoubleTap } from '@/hooks/useDoubleTap';
+import { useViewportSize } from '@/hooks/useViewportSize';
 import { isDarkSky } from '@/utils/festivalEvents';
 
 // Clouds by type (ROADMAP item 84): the real cloud layers (C1), lit by the sun (C2), in
@@ -207,13 +208,8 @@ const SkyClouds: React.FC<SkyCloudsProps> = ({
   // Item 116: a double tap opens the cloud's card; a single tap shows its ring for a moment.
   const { tap } = useDoubleTap(onInfo);
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
-  const [size, setSize] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
-  useEffect(() => {
-    const onResize = () => setSize({ width: window.innerWidth, height: window.innerHeight });
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-  const { width, height } = size;
+  // Item 151: the size 150 ms after the last resize, so the bars settling build one new layout.
+  const { width, height } = useViewportSize();
 
   // The layout changes once a day, with the weather or with the screen, not every second.
   const seed = getDaySeed(date, latitude, longitude);

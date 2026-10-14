@@ -23,6 +23,7 @@ import * as treeLib from '../src/utils/treeSilhouettes';
 import { getSunTimes, formatTime, getWaterColors } from '../src/utils/sunUtils';
 import { getSunArcLabels, getMoonArcLabels } from '../src/utils/arcLabels';
 import { mulberry32 } from '../src/utils/skyCloudUtils';
+import { VIEWPORT_DEBOUNCE_MS } from '../src/hooks/useViewportSize';
 
 describe('getAzimuthScreenFraction (C-3, static/non-compass mode)', () => {
   it('northern hemisphere: culmination (180°, South) stays centered', () => {
@@ -660,7 +661,12 @@ describe('SunVisualization (rendered): arc rise/zenith/set labels', () => {
     render(<SunVisualization {...props} />);
     expect(screen.queryByTestId('santa')).toBeNull();
     setMockedContainerSize(800, 600);
+    // Item 151: the scene measures itself 150 ms after the last resize.
+    vi.useFakeTimers();
     act(() => { window.dispatchEvent(new Event('resize')); });
+    expect(screen.queryByTestId('santa')).toBeNull();
+    act(() => { vi.advanceTimersByTime(VIEWPORT_DEBOUNCE_MS); });
+    vi.useRealTimers();
     const santa = screen.getByTestId('santa');
     expect(santa.getAttribute('data-mode')).toBe('moon');
     // His middle on the moon's centre height, not at y 0.

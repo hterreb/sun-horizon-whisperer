@@ -64,3 +64,12 @@ describe('tailwind design tokens (ROADMAP item 7)', () => {
     }
   });
 });
+
+// ROADMAP item 151: the page behind the scene has the sky's top colour (SunTracker sets
+// `--sky-top`), night before the app mounts.
+describe('page background (ROADMAP item 151)', () => {
+  it('html and body take the sky top colour, with night as the fallback', () => {
+    const rule = css.match(/html,\s*body\s*\{([^}]*)\}/)?.[1] ?? '';
+    expect(rule).toContain('background-color: var(--sky-top, hsl(var(--brand-night)))');
+  });
+});

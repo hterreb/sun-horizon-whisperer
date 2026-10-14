@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { type TimeOfDay } from '../utils/sunUtils';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
+import { useViewportSize } from '../hooks/useViewportSize';
 import {
   getRainAngleDeg, getRainIntensity, getRainLook, getRainWaterY, placeRainDrop, stepRainDrops,
   type RainDrop, type RainScene,
@@ -48,6 +49,9 @@ const RainCanvas: React.FC<RainCanvasProps> = ({ weatherType, mmH, windSpeedKmh,
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<number | null>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
+  // Item 151: the effect below starts again (and measures the canvas) 150 ms after the last
+  // resize, not inside the resize event.
+  const { width, height } = useViewportSize();
   const mode = MODE[timeOfDay];
   const angleDeg = getRainAngleDeg(windSpeedKmh, windDirectionDeg, weatherType === 'drizzle');
   const hazeAlpha = (0.08 + 0.18 * getRainIntensity(mmH)) * MODE_ALPHA[mode];
@@ -184,9 +188,7 @@ const RainCanvas: React.FC<RainCanvasProps> = ({ weatherType, mmH, windSpeedKmh,
 
     resize();
     draw(0);
-    const onResize = () => { resize(); draw(0); };
-    window.addEventListener('resize', onResize);
-    if (prefersReducedMotion) return () => window.removeEventListener('resize', onResize);
+    if (prefersReducedMotion) return;
 
     let last = performance.now();
     const loop = (now: number) => {
@@ -196,10 +198,9 @@ const RainCanvas: React.FC<RainCanvasProps> = ({ weatherType, mmH, windSpeedKmh,
     };
     frameRef.current = requestAnimationFrame(loop);
     return () => {
-      window.removeEventListener('resize', onResize);
       if (frameRef.current != null) cancelAnimationFrame(frameRef.current);
     };
-  }, [mode, angleDeg, mmH, prefersReducedMotion]);
+  }, [mode, angleDeg, mmH, prefersReducedMotion, width, height]);
 
   return (
     <canvas
