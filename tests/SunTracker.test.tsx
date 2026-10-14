@@ -6,6 +6,7 @@ import { TAP_READY_MS } from '../src/hooks/useIdleHide';
 import { DOUBLE_TAP_MS } from '../src/hooks/useDoubleTap';
 import { loadManualLocation, saveManualLocation } from '../src/utils/manualLocation';
 import { getSunPosition, getSunTimes } from '../src/utils/sunUtils';
+import { isPlaneWeather } from '../src/utils/planes';
 import type SunVisualizationType from '../src/components/SunVisualization';
 
 // Records the props SunTracker hands to SunVisualization (time travel, ROADMAP item 44),
@@ -151,7 +152,7 @@ describe('SunTracker', () => {
     expect(visProps.current!.cloudLayers).toBeNull();
   });
 
-  it('a fog code in clear air under cirrus still shows the stars and the satellites', async () => {
+  it('a fog code in clear air under cirrus still shows the stars, the satellites and the planes', async () => {
     // Ravensburg, 2026-10-14 22:30: code 45, 16.8 km visibility, a full cirrus deck only.
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 13, longitude: 14 } }) } });
     const hour = new Date(Math.floor(Date.now() / 3_600_000) * 3_600_000).toISOString().slice(0, 16);
@@ -163,6 +164,7 @@ describe('SunTracker', () => {
     render(<SunTracker />);
     await waitFor(() => expect(visProps.current?.weatherType).toBe('overcast'));
     expect(visProps.current!.cloudCoverPercent).toBe(50);
+    expect(isPlaneWeather('overcast', visProps.current!.cloudLayers ?? null)).toBe(true);
   });
 
   it('passes the visibility of the hour for the sky optics; manual weather has none (item 148)', async () => {

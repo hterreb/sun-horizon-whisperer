@@ -4,7 +4,8 @@
 
 import { type WeatherType } from '@/components/CloudLayer';
 import { type TimeOfDay } from './sunUtils';
-import { getCloudColors, getCloudLight, rgba } from './skyCloudUtils';
+import { getCloudColors, getCloudLight, rgba, type CloudLayers } from './skyCloudUtils';
+import { getStarCover } from './weatherEffectsUtils';
 
 // The trail takes the light of the high clouds (item 84): white by day, gold and pink at
 // sunset, dim at night. `sunAltitude` in degrees, rounded by the caller so it changes rarely.
@@ -39,9 +40,11 @@ export const CONTRAIL_LOOK: Record<Exclude<ContrailKind, 'none'>, { lifeSec: [nu
 };
 
 // The planes cannot be seen through fog, a cloud deck, rain or a storm. Drizzle, snow and hail
-// fall from a deck too, so no planes then either.
-export const isPlaneWeather = (weather: WeatherType): boolean =>
-  weather === 'clear' || weather === 'partly' || weather === 'cloudy';
+// fall from a deck too, so no planes then either. An overcast sky of mostly thin cirrus (a star
+// cover under 80 %, as 'cloudy') shows them: their lights shine through.
+export const isPlaneWeather = (weather: WeatherType, layers: CloudLayers | null = null): boolean =>
+  weather === 'clear' || weather === 'partly' || weather === 'cloudy' ||
+  (weather === 'overcast' && (getStarCover(null, layers) ?? 100) < 80);
 
 // At night only the lights show: from nautical twilight on, when the sky is too dark for the
 // silhouette (the same switch as the night fish, item 65).

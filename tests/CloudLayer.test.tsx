@@ -1523,6 +1523,11 @@ describe('planes and contrails (ROADMAP item 96)', () => {
     expect(scene.planes).toHaveLength(0);
   });
 
+  it('shows planes under an overcast sky of thin cirrus (planeSky)', () => {
+    expect(firstPlaneAt({ weatherType: 'overcast', planeSky: true }, 1)).not.toBeNull();
+    expect(firstPlaneAt({ weatherType: 'clear', planeSky: false }, 1)).toBeNull();
+  });
+
   it('sends no decorative plane while a live plane shows; the ones in flight fly on (items 96 and 155)', () => {
     expect(firstPlaneAt({ livePlanes: true }, 1)).toBeNull();
     const { plane } = firstPlaneAt({}, 1)!;
