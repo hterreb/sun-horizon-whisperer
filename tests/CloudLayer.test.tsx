@@ -1910,3 +1910,63 @@ describe('CloudLayer fish under water (ROADMAP item 145)', () => {
     expect(waterOf(trout)).toBe('');
   });
 });
+
+// ROADMAP item 149 (bird lookbook, B0 + B5): the starling flock breathes, in step.
+describe('the starling flock breathes (ROADMAP item 149)', () => {
+  const evening = { timeOfDay: 'evening' as const, date: new Date('2026-10-14T17:30:00'), latitude: 47.8 };
+  const flockIn = (container: HTMLElement) =>
+    [...container.querySelectorAll<SVGSVGElement>('[data-testid="scene-bird"][data-kind="starlings"]')];
+
+  it('moves each starling at most 4 bird widths, to a shorter, taller flock with the front end up', () => {
+    const flock = createBird('starlings', 390, 1, mulberry32(149));
+    const spots = flock.group!;
+    expect(spots.length).toBeGreaterThanOrEqual(18);
+    // At most 4 bird widths, a quarter of the flock's length (16).
+    for (const spot of spots) {
+      expect(spot.breath).toHaveLength(2);
+      expect(Math.hypot(...spot.breath!)).toBeLessThanOrEqual(4 * flock.size);
+    }
+    const span = (values: number[]) => Math.max(...values) - Math.min(...values);
+    const breathed = spots.map(s => ({ left: s.left + s.breath![0], top: s.top + s.breath![1] }));
+    expect(span(breathed.map(s => s.left))).toBeLessThan(span(spots.map(s => s.left)));
+    expect(span(breathed.map(s => s.top))).toBeGreaterThan(span(spots.map(s => s.top)));
+    // The front bird (right) rises against the rear bird.
+    const front = spots.reduce((a, b) => (b.left > a.left ? b : a));
+    const rear = spots.reduce((a, b) => (b.left < a.left ? b : a));
+    expect(front.breath![1]).toBeLessThan(rear.breath![1]);
+    // Only the flock breathes.
+    expect(createBird('geese', 390, 1, mulberry32(149)).group!.every(s => s.breath === undefined)).toBe(true);
+  });
+
+  it('breathes every starling in step: 6.5 s each way, ease-in-out, alternate; not with reduced motion', () => {
+    const listeners: (() => void)[] = [];
+    const query = {
+      matches: false, media: '', onchange: null, addListener: () => {}, removeListener: () => {},
+      addEventListener: (_: string, listener: () => void) => { listeners.push(listener); }, removeEventListener: () => {},
+      dispatchEvent: () => false,
+    };
+    const mediaSpy = vi.spyOn(window, 'matchMedia').mockReturnValue(query as unknown as MediaQueryList);
+    vi.useFakeTimers();
+    // A roll of 0.92 sends starlings in October's evening mix (they are the last 8 of 92).
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.92);
+    try {
+      const { container } = render(<CloudLayer warmStart={false} weatherType="clear" {...evening} />);
+      act(() => { vi.advanceTimersByTime(13000); });
+      const birds = flockIn(container);
+      expect(birds.length).toBeGreaterThanOrEqual(18);
+      for (const bird of birds) {
+        expect(bird.style.animation).toBe('starlingBreath 6.5s ease-in-out infinite alternate');
+        expect(bird.style.getPropertyValue('--tx')).toMatch(/px$/);
+        expect(bird.style.getPropertyValue('--ty')).toMatch(/px$/);
+      }
+      query.matches = true;
+      act(() => listeners.forEach(listener => listener()));
+      expect(flockIn(container)).toHaveLength(birds.length); // the flock glides on
+      expect(flockIn(container).every(bird => bird.style.animation === '')).toBe(true);
+    } finally {
+      randomSpy.mockRestore();
+      vi.useRealTimers();
+      mediaSpy.mockRestore();
+    }
+  });
+});

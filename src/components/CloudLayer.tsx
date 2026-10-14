@@ -401,6 +401,20 @@ const birdGroup = (group: BirdGroup, random: () => number): [number, number][] =
   }
 };
 
+// Item 149 (bird lookbook, B5): the starling flock breathes. Each bird moves from its spot in the
+// long, flat flock to a rounder shape that arches, with the front end up (0.71x as long, 1.45x as
+// tall, tilted by 0.14 rad), and back, all birds in step. `x`, `y`: the spot in bird widths;
+// the move is in px.
+const STARLING_BREATH_SEC = 6.5; // each way: 13 s per breath
+const BREATH_TILT = -0.14; // rad; y points down, so the front end (right) goes up
+const breathOffset = (x: number, y: number, size: number): [number, number] => {
+  const bx = 0.71 * x;
+  const by = 1.45 * y + 0.066 * bx * bx - 0.5;
+  const cos = Math.cos(BREATH_TILT);
+  const sin = Math.sin(BREATH_TILT);
+  return [(bx * cos - by * sin - x) * size, (bx * sin + by * cos - y) * size];
+};
+
 interface BirdEntity extends MovingEntity {
   kind: FlyerKind;
   depth: number; // 0 = near, 1 = far (M3)
@@ -408,7 +422,7 @@ interface BirdEntity extends MovingEntity {
   width: number; // px, of the bird or the whole group
   height: number;
   opacity: number;
-  group?: { left: number; top: number }[]; // each bird's offset in px
+  group?: { left: number; top: number; breath?: [number, number] }[]; // each bird's offset in px; breath: its move in the flock's breath (item 149), px
   easing?: string; // M8: a CSS linear() easing that hangs still mid-crossing
   curve?: [number, number][]; // the easing's points, for the lane plan (item 92)
   path?: ScenePath; // the lane plan (item 92), set at spawn
@@ -440,7 +454,10 @@ export const createBird = (
   return {
     id: Date.now() + Math.random(),
     kind, depth, size, width, height,
-    group: spots.length > 1 ? spots.map(([x, y]) => ({ left: (x - minX) * size, top: (y - minY) * size })) : undefined,
+    group: spots.length > 1 ? spots.map(([x, y]) => ({
+      left: (x - minX) * size, top: (y - minY) * size,
+      ...(spec.group === 'flock' && { breath: breathOffset(x, y, size) }),
+    })) : undefined,
     x: startX,
     // Near birds fly high (20 % of the height), far ones lower (50 %), well above the horizon
     // (65 %). Bats too (item 99).
@@ -1629,7 +1646,16 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
                 }}
               />
             ) : bird.group ? bird.group.map((spot, i) => (
-              <SceneBird key={i} kind={bird.kind as BirdKind} width={bird.size} className="absolute" style={{ left: spot.left, top: spot.top }} />
+              <SceneBird key={i} kind={bird.kind as BirdKind} width={bird.size} className="absolute" style={{
+                left: spot.left,
+                top: spot.top,
+                // The starlings' breath (item 149): a transform only, never with reduced motion.
+                ...(spot.breath && !prefersReducedMotion && {
+                  ['--tx' as string]: `${spot.breath[0]}px`,
+                  ['--ty' as string]: `${spot.breath[1]}px`,
+                  animation: `starlingBreath ${STARLING_BREATH_SEC}s ease-in-out infinite alternate`,
+                }),
+              }} />
             )) : (
               <SceneBird kind={bird.kind} width={bird.size} />
             )}
@@ -1734,6 +1760,12 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
           }
           to {
             transform: translateY(var(--bob));
+          }
+        }
+
+        @keyframes starlingBreath {
+          to {
+            transform: translate(var(--tx), var(--ty));
           }
         }
 

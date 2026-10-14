@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 import { type BirdKind } from '../utils/weatherEffectsUtils';
 
 // Bird silhouettes from the Birds & Skies lookbook (ROADMAP item 74): side view, facing
-// right, wings raised in a glide (they never flap), on a 48 × 24 grid. Filled with
+// right (the gull from the front, item 149), wings raised in a glide (they never flap), on a 48 × 24 grid. Filled with
 // currentColor like the bats (item 64, B2). CloudLayer sets the colour and the opacity on
 // the whole bird or group, so overlapping wings don't show darker seams.
 
@@ -10,11 +10,16 @@ const ell = (cx: number, cy: number, rx: number, ry: number) =>
   `M${cx - rx} ${cy}a${rx} ${ry} 0 1 0 ${2 * rx} 0a${rx} ${ry} 0 1 0 ${-2 * rx} 0Z`;
 const circle = (cx: number, cy: number, r: number) => ell(cx, cy, r, r);
 
-// `box` overrides the 48 × 24 grid: the gull is today's shape (before item 74), kept as it was.
-const BIRD_ART: Record<BirdKind, { box?: string; fill: string[]; legs?: string }> = {
+const BIRD_ART: Record<BirdKind, { fill: string[]; legs?: string }> = {
+  // Item 149 (bird lookbook, G1): a soft "m" seen from the front. Thin, tapered arches with
+  // drooping tips, and a small body and head where the wings meet.
   gull: {
-    box: '90 2 120 60',
-    fill: ['M94.51,37.677c0.606,0.254,1.313,0.05,1.702-0.492c7.256-10.366,20.402-13.103,34.655-10.466c8.789,1.622,16.164,6.439,21.22,13.003c7.066-4.324,15.686-6.186,24.484-4.559c14.253,2.633,25.539,9.888,28.625,22.165c0.159,0.643,0.747,1.086,1.403,1.06c0.657-0.019,1.215-0.497,1.334-1.149c3.503-18.931-9.008-37.12-27.939-40.618c-8.798-1.623-17.407,0.233-24.475,4.558c-5.056-6.564-12.441-11.381-21.229-13.003c-18.941-3.499-37.125,9.012-40.629,27.948C93.544,36.776,93.892,37.424,94.51,37.677z'],
+    fill: [
+      'M24 13.4C20.4 7.6 14.6 5 9.8 6C6.2 6.8 3.2 10 0.8 14.4C4 11.4 6.8 9.6 9.9 9.3C14.2 8.9 18.6 11.6 22.4 16.2Z',
+      'M24 13.4C27.6 7.6 33.4 5 38.2 6C41.8 6.8 44.8 10 47.2 14.4C44 11.4 41.2 9.6 38.1 9.3C33.8 8.9 29.4 11.6 25.6 16.2Z',
+      ell(24, 15.6, 2.4, 3.4),
+      circle(24, 12.4, 1.9),
+    ],
   },
   heron: {
     fill: [
@@ -90,7 +95,7 @@ const SceneBird = ({ kind, width, className, style }: SceneBirdProps) => {
     <svg
       width={width}
       height={width / 2}
-      viewBox={art.box ?? '0 0 48 24'}
+      viewBox="0 0 48 24"
       fill="currentColor"
       className={className}
       style={style}

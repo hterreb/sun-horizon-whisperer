@@ -2976,7 +2976,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Open:** (a) Which phenomena (all 6, plus pillar and moon halo)? (b) Lookbook first, or build at once?
 - **Decision (Lutz, 2026-10-14):** A lookbook with all 8 (the 6 in the table, the sun pillar and the moon halo). Lutz picks after the lookbook.
 
-### 149. Starlings that look like birds, not stars — S — [SUN-CHASER-1T](https://ainabler.sentry.io/issues/SUN-CHASER-1T)
+### 149. Starlings that look like birds, not stars — S — [SUN-CHASER-1T](https://ainabler.sentry.io/issues/SUN-CHASER-1T) — **✅ Done**
 
 - **Feedback (2026-10-13 18:27 CEST, Ravensburg):** "The starlings look like literal stars, is that on purpose?".
 - **Now:**
@@ -2991,6 +2991,12 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Check:** `SceneBird` renders the new path; `CloudLayer` starlings are 6–7 px. Browser shot at 18:30 with a starling flock at 390 × 844.
 - **Open:** (a) Bird glyph (1–3), or the murmuration (M)? (b) A small lookbook first?
 - **Decision (Lutz, 2026-10-14):** A lookbook first: the starling glyphs and the murmuration, plus alternatives for the gull (the standard bird glyph).
+- **Decision (Lutz, 2026-10-14, lookbook):** B0 glyph with the B5 breathing; gulls G1.
+- **Built:**
+  - Starlings keep B0: the four-pointed sparkle, its size (7 px, 4 px far out with `FAR_SHRINK`), 18–30 birds, the colour and the opacity do not change.
+  - The flock breathes (B5): each bird moves from its spot in the long, flat flock to a rounder shape that arches, with the front end up, and back (`breathOffset` in `CloudLayer`: 0.71x as long, 1.45x as tall, an arch of 0.066 x², tilted by 0.14 rad, as the lookbook's B shape). `createBird` puts the move in px on each spot of the flock (`group[].breath`); no other group gets it. A bird moves at most about 3.5 bird widths (14 px at 4 px), the lookbook's share of the flock length. The `starlingBreath` keyframe is a CSS transform only (`translate(var(--tx), var(--ty))`), 6.5 s each way (13 s per breath), ease-in-out, infinite alternate, the same delay for all birds, so the flock breathes in step on top of the straight glide. No per-frame JS. With `prefers-reduced-motion` the birds have no breathing animation (and no flocks spawn, as before).
+  - Gulls are G1: a soft "m" seen from the front, thin tapered arches with drooping tips, a small body and head where the wings meet, on the 48 × 24 grid of the other birds (`SceneBird`). The old 120 × 60 `box` is gone (no bird uses it now). Size (34 px) and speed (2.5 %/s) do not change. The `CollectionView` badge art is `SceneBird`, so it shows the new gull with no change. The shared view (item 78) captures the live scene, so it shows it too; the drawn share card has no birds. No other file had the old gull path.
+- **Checked:** unit tests: `SceneBird` (the G1 paths on the 48 × 24 grid at 34 × 17 px; the starling keeps the B0 sparkle), `CloudLayer` (each starling has a move of at most 4 bird widths; the breathed flock is shorter and taller, the front bird rises against the rear bird; geese have no move; a spawned evening flock in October: every bird has `starlingBreath 6.5s ease-in-out infinite alternate`; after a switch to reduced motion the flock glides on with no breathing). Typecheck, lint, build and all 1888 tests (119 files) pass. Built app (`vite preview`, headless Chrome, 390 × 844, Ravensburg on 14 Oct 2026 at 18:05, 32 min before sunset, clear, network stubbed): a flock of 27 starlings with 27 breathing animations, all at the same time, 6.5 s, alternate; its birds spread over 56 × 23 px at 0 s and 39 × 34 px at 6.5 s (shots of both); a G1 gull near (33 px) and far (22 px). Not checked: a real phone; a frame-time trace (item 91) with a breathing flock (the perf scenes have no evening).
 
 ### 150. Vegetation: a lookbook of tree styles — M — [SUN-CHASER-1V](https://ainabler.sentry.io/issues/SUN-CHASER-1V)
 
