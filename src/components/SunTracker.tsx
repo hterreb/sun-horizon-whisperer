@@ -123,6 +123,18 @@ const HOUR_MS = 60 * 60 * 1000;
 const MAX_EYE_HEIGHT_M = 1000;
 // Item 136: a tap on these is not a tap on the empty sky (scene things, controls, cards, dialogs).
 const NOT_SKY = '[data-scene-hit], [data-share-hide], button, a, input, [role="dialog"]';
+// Item 147: a tap on the scene, the empty sky or a scene thing (the sun is a `button`), not on a
+// control, a card, a toast or a dialog.
+const isSceneTap = (target: EventTarget | null): target is Element =>
+  target instanceof Element && target.closest('[data-share-root]') !== null &&
+  (target.closest('[data-scene-hit]') !== null || target.closest(NOT_SKY) === null);
+// Item 147 (T2): the tap point is in the box of a control that fades (`data-idle-control`:
+// TopLeftButtons, InfoPanel, MusicPlayer). An empty box (jsdom, not drawn) has no inside.
+const isOnIdleControl = ({ clientX: x, clientY: y }: MouseEvent): boolean =>
+  Array.from(document.querySelectorAll('[data-idle-control]')).some(el => {
+    const box = el.getBoundingClientRect();
+    return x >= box.left && x < box.right && y >= box.top && y < box.bottom;
+  });
 
 const clampEyeHeight = (value: number): number =>
   Number.isFinite(value) ? Math.min(MAX_EYE_HEIGHT_M, Math.max(0, value)) : DEFAULT_EYE_HEIGHT_M;
@@ -340,11 +352,18 @@ const SunTracker: React.FC = () => {
   // In fullscreen, a mouse move shows the cursor again and restarts the idle timer
   // (useIdleHide: 3 s after entering, 10 s after a wake, ROADMAP item 89).
   // Item 136: a tap on the empty sky hides the controls, the next one shows them.
-  const lastSkyToggleRef = React.useRef(-Infinity);
+  // Item 147: a single tap on a scene thing too (T1), and a tap where a hidden control is shows them (T2).
+  const lastToggleTapRef = React.useRef(-Infinity);
   const infoCardOpenRef = React.useRef(false);
   const downClosesCardRef = React.useRef(false);
   useEffect(() => {
     if (!canHideControls) return;
+    // T1: the toggle of a tap on a scene thing waits DOUBLE_TAP_MS for a second tap.
+    let thingToggle: ReturnType<typeof setTimeout> | undefined;
+    const cancelThingToggle = () => {
+      clearTimeout(thingToggle);
+      thingToggle = undefined;
+    };
 
     // Item 133: a phone tap also fires a compatibility `mousemove`; only a real mouse wakes here.
     const onPointerMove = (event: PointerEvent) => {
@@ -355,28 +374,58 @@ const SunTracker: React.FC = () => {
     const onPointerDown = () => {
       downClosesCardRef.current = infoCardOpenRef.current;
     };
-    // A tap is a `click` (a swipe or a pinch fires none). Only the empty scene toggles, not a
-    // scene thing (a double tap opens its card, item 124), a control, a card or a dialog.
-    // A second sky tap within DOUBLE_TAP_MS does nothing: a double tap on the sky does not flicker.
+    // T2: a hidden control takes no taps (pointer-events-none), so a tap in its box lands on the
+    // scene below. The window catches it first (capture), shows the controls and stops it: the
+    // scene thing below takes no tap (no card, no start of a double tap). A toast or a card on top
+    // keeps its tap.
+    const onClickCapture = (event: MouseEvent) => {
+      if (showCursor || downClosesCardRef.current || !isSceneTap(event.target) || !isOnIdleControl(event)) return;
+      event.stopPropagation();
+      cancelThingToggle();
+      lastToggleTapRef.current = Date.now();
+      wakeCursor();
+    };
+    // A tap is a `click` (a swipe or a pinch fires none). The empty scene toggles at once. A scene
+    // thing toggles after DOUBLE_TAP_MS, unless a second tap comes: that double tap opens its card
+    // (items 116, 124) and does not toggle. A control, a card or a dialog does not toggle.
+    // A tap within DOUBLE_TAP_MS after a toggle does nothing: a double tap does not flicker.
     const onClick = (event: MouseEvent) => {
       const target = event.target;
       if (downClosesCardRef.current) return;
-      if (!(target instanceof Element) || !target.closest('[data-share-root]') || target.closest(NOT_SKY)) return;
+      if (thingToggle !== undefined) {
+        cancelThingToggle();
+        return;
+      }
+      if (!isSceneTap(target)) return;
+      const isThing = target.closest('[data-scene-hit]') !== null;
       const now = Date.now();
-      if (now - lastSkyToggleRef.current <= DOUBLE_TAP_MS) return;
-      lastSkyToggleRef.current = now;
-      toggleControls();
+      if (now - lastToggleTapRef.current <= DOUBLE_TAP_MS) return;
+      if (!isThing) {
+        lastToggleTapRef.current = now;
+        toggleControls();
+        return;
+      }
+      thingToggle = setTimeout(() => {
+        thingToggle = undefined;
+        // A keyboard click opens the card at once (no second tap): it does not toggle either.
+        if (infoCardOpenRef.current) return;
+        lastToggleTapRef.current = now;
+        toggleControls();
+      }, DOUBLE_TAP_MS);
     };
     window.addEventListener('pointerdown', onPointerDown, true);
+    window.addEventListener('click', onClickCapture, true);
     document.addEventListener('pointermove', onPointerMove);
     document.addEventListener('click', onClick);
 
     return () => {
+      cancelThingToggle();
       window.removeEventListener('pointerdown', onPointerDown, true);
+      window.removeEventListener('click', onClickCapture, true);
       document.removeEventListener('pointermove', onPointerMove);
       document.removeEventListener('click', onClick);
     };
-  }, [canHideControls, wakeCursor, toggleControls]);
+  }, [canHideControls, showCursor, wakeCursor, toggleControls]);
 
   // Update time every second for smooth clock display, every PLAY_TICK_MS during play.
   useEffect(() => {

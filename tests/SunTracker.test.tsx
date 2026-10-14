@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import SunTracker from '../src/components/SunTracker';
 import { vi } from 'vitest';
 import { TAP_READY_MS } from '../src/hooks/useIdleHide';
+import { DOUBLE_TAP_MS } from '../src/hooks/useDoubleTap';
 import { loadManualLocation, saveManualLocation } from '../src/utils/manualLocation';
 import { getSunPosition, getSunTimes } from '../src/utils/sunUtils';
 import type SunVisualizationType from '../src/components/SunVisualization';
@@ -346,7 +347,7 @@ describe('SunTracker', () => {
       expect(shown()).toBe(true);
     });
 
-    it('a tap on a scene thing, a control or outside the scene does not toggle', () => {
+    it('a double tap on a scene thing, a tap on a control or outside the scene does not toggle', () => {
       const scene = start();
       setFullscreenElement(document.documentElement);
       const hit = scene.appendChild(document.createElement('span'));
@@ -399,6 +400,110 @@ describe('SunTracker', () => {
       advance(60_000);
       expect(shown()).toBe(true);
       expect(column()).not.toHaveClass('pointer-events-none');
+    });
+
+    describe('item 147: a tap on a scene thing (T1) or on a hidden control (T2)', () => {
+      // The sun is a scene thing: a double tap (detail 1, then 2) or a keyboard click (detail 0)
+      // opens its card.
+      const sunTap = (detail: number, init: MouseEventInit = {}) => {
+        const sun = screen.getByRole('button', { name: 'Sun' });
+        fireEvent.pointerDown(sun, init);
+        fireEvent.click(sun, { detail, ...init });
+      };
+      const card = () => screen.queryByTestId('scene-info-card');
+
+      it('a single tap on a scene thing toggles after DOUBLE_TAP_MS', () => {
+        const scene = start();
+        setFullscreenElement(document.documentElement);
+        const hit = scene.appendChild(document.createElement('span'));
+        hit.setAttribute('data-scene-hit', 'true');
+        const cloud = hit.appendChild(document.createElement('span'));
+
+        tap(cloud);
+        advance(DOUBLE_TAP_MS - 1);
+        expect(shown()).toBe(true);
+        advance(1);
+        expect(shown()).toBe(false);
+        advance(60_000);
+        expect(shown()).toBe(false);
+
+        tap(cloud);
+        advance(DOUBLE_TAP_MS - 1);
+        expect(shown()).toBe(false);
+        advance(1);
+        expect(shown()).toBe(true);
+      });
+
+      it('a double tap on a scene thing opens its card and does not toggle, shown or hidden', () => {
+        const scene = start();
+        setFullscreenElement(document.documentElement);
+        sunTap(1);
+        advance(200);
+        sunTap(2);
+        expect(card()).toBeInTheDocument();
+        advance(1000);
+        expect(shown()).toBe(true);
+
+        tap(scene); // closes the card only
+        tap(scene);
+        expect(shown()).toBe(false);
+        advance(1000);
+        sunTap(1);
+        advance(200);
+        sunTap(2);
+        expect(card()).toBeInTheDocument();
+        advance(1000);
+        expect(shown()).toBe(false);
+      });
+
+      it('a keyboard click on a scene thing opens its card and does not toggle', () => {
+        start();
+        setFullscreenElement(document.documentElement);
+        sunTap(0);
+        expect(card()).toBeInTheDocument();
+        advance(1000);
+        expect(shown()).toBe(true);
+      });
+
+      it('while hidden, a tap in the box of a hidden control shows the controls at once; the scene thing below takes no tap', () => {
+        const scene = start();
+        setFullscreenElement(document.documentElement);
+        expect(document.querySelectorAll('[data-idle-control]')).toHaveLength(3);
+        tap(scene);
+        expect(shown()).toBe(false);
+        advance(1000);
+        // jsdom draws nothing: the top-left column gets its box (16 px from the corner, 56 × 160).
+        vi.spyOn(column(), 'getBoundingClientRect').mockReturnValue(
+          { left: 16, top: 16, right: 72, bottom: 176, width: 56, height: 160, x: 16, y: 16, toJSON: () => ({}) } as DOMRect,
+        );
+
+        // The sun is under the column. Its double tap would open the card: the first tap goes to
+        // the column's box, so the second tap is only a first tap for the sun.
+        sunTap(1, { clientX: 30, clientY: 30 });
+        expect(shown()).toBe(true);
+        advance(200);
+        sunTap(2, { clientX: 30, clientY: 30 });
+        expect(card()).toBeNull();
+        advance(1000);
+        expect(shown()).toBe(true);
+
+        // Shown, the box is not special: a tap there on the sun toggles after DOUBLE_TAP_MS.
+        sunTap(1, { clientX: 30, clientY: 30 });
+        advance(DOUBLE_TAP_MS);
+        expect(shown()).toBe(false);
+        expect(card()).toBeNull();
+
+        // A toast on top of the hidden box (a badge, `data-share-hide`) keeps its tap.
+        advance(1000);
+        const toast = scene.appendChild(document.createElement('button'));
+        toast.setAttribute('data-share-hide', '');
+        const onToast = vi.fn();
+        toast.addEventListener('click', onToast);
+        fireEvent.pointerDown(toast);
+        fireEvent.click(toast, { clientX: 30, clientY: 30 });
+        expect(onToast).toHaveBeenCalledTimes(1);
+        expect(shown()).toBe(false);
+      });
     });
   });
 
