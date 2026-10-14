@@ -35,6 +35,7 @@ import { getTimeTravelRange, toDateTimeLocalValue } from '@/utils/timeTravel';
 import { formatTemperature, type TemperatureUnit } from '@/utils/temperatureUnit';
 import { SUNSET_REMINDER_MIN } from '@/utils/sunsetReminder';
 import { PASS_REMINDER_MIN } from '@/utils/satelliteUtils';
+import { type LiveStatus } from '@/utils/liveRadar';
 import { LANGUAGES, LANGUAGE_NAMES, type Language } from '@/utils/language';
 import { formatNumber, translate, type MessageKey } from '@/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -151,6 +152,10 @@ interface InfoPanelProps {
   // The live radar (ROADMAP item 96, Premium): the "Live planes" switch, off by default.
   isLivePlanesOn?: boolean;
   onLivePlanesToggle?: (on: boolean) => void;
+  // Item 155: the status line under the switch while the radar runs; null: no line. `nearby` is
+  // the aircraft in the last answer, `shown` the planes drawn; `compassOff`: the compass button
+  // is there and compass mode is off.
+  liveRadarStatus?: { status: LiveStatus; nearby: number; shown: number; compassOff: boolean } | null;
   // Collection badges (ROADMAP item 112): the row button that opens the collection.
   onCollectionOpen?: () => void;
   // National days (utils/nationalDays): the place's country code from the reverse-geocode
@@ -208,6 +213,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   onIssReminderToggle,
   isLivePlanesOn = false,
   onLivePlanesToggle,
+  liveRadarStatus = null,
   onCollectionOpen,
   onCountryChange,
 }) => {
@@ -731,6 +737,15 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   onCheckedChange={on => (on ? requirePremium(() => onLivePlanesToggle(true)) : onLivePlanesToggle(false))}
                 />
               </div>
+              {/* Item 155: what the radar finds; without the compass the 360° view shows few. */}
+              {isLivePlanesOn && liveRadarStatus && (
+                <p className="text-caption mt-1" data-testid="live-planes-status">
+                  {liveRadarStatus.status === 'ok'
+                    ? t('radar.status', { nearby: liveRadarStatus.nearby, shown: liveRadarStatus.shown })
+                      + (liveRadarStatus.compassOff && liveRadarStatus.shown < liveRadarStatus.nearby ? ` · ${t('radar.compassAll')}` : '')
+                    : t(liveRadarStatus.status === 'error' ? 'radar.unavailable' : 'radar.loading')}
+                </p>
+              )}
               <p className="text-caption opacity-60 mt-1">{t('radar.hint')}</p>
             </div>
           )}

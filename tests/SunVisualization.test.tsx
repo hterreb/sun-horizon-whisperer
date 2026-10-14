@@ -22,6 +22,7 @@ import type { HorizonProfile } from '../src/utils/horizonUtils';
 import * as treeLib from '../src/utils/treeSilhouettes';
 import { getSunTimes, formatTime, getWaterColors } from '../src/utils/sunUtils';
 import { getSunArcLabels, getMoonArcLabels } from '../src/utils/arcLabels';
+import { mulberry32 } from '../src/utils/skyCloudUtils';
 
 describe('getAzimuthScreenFraction (C-3, static/non-compass mode)', () => {
   it('northern hemisphere: culmination (180°, South) stays centered', () => {
@@ -1704,5 +1705,39 @@ describe('SunVisualization (rendered): waves by wind strength (ROADMAP item 79)'
     expect(bars(12)).toBe(7);
     expect(bars(null)).toBe(7);
     expect(bars(70)).toBe(36);
+  });
+});
+
+// ROADMAP item 155: the decorative planes keep flying while the live radar is on and shows no
+// live plane; while one or more show, no new one starts.
+describe('SunVisualization (rendered): decorative planes and the live radar (item 155)', () => {
+  const radarOn = { feed: { now: 1_000, aircraft: [] }, receivedAt: 1_000 };
+  const planeCount = (livePlanesShown: number) => {
+    vi.useFakeTimers();
+    const randomSpy = vi.spyOn(Math, 'random').mockImplementation(mulberry32(155));
+    window.history.pushState({}, '', '/?plane=none'); // a decorative plane every 20 s
+    try {
+      const { container, unmount } = render(
+        <SunVisualization
+          sunPosition={{ azimuth: 180, altitude: 30 }}
+          moonPosition={{ azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false }}
+          sunPath={[]} moonPath={[]} timeOfDay="midday" weatherType="clear" latitude={47.8} longitude={9.6}
+          livePlanes={radarOn} livePlanesShown={livePlanesShown}
+        />,
+      );
+      act(() => { vi.advanceTimersByTime(21_000); });
+      const count = container.querySelectorAll('[data-testid="scene-plane"]').length;
+      unmount();
+      return count;
+    } finally {
+      window.history.pushState({}, '', '/');
+      randomSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  };
+
+  it('sends a decorative plane while the radar is on with 0 live planes shown, none while 1 shows', () => {
+    expect(planeCount(0)).toBe(1);
+    expect(planeCount(1)).toBe(0);
   });
 });

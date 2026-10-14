@@ -115,6 +115,14 @@ export const pickShownPlanes = <T extends { inView: boolean; screenSpeedPxS: num
     ? nearestVisible.filter(item => item.inView).slice(0, MAX_COMPASS_PLANES)
     : nearestVisible.filter(item => item.inView && item.screenSpeedPxS >= MIN_SCREEN_SPEED_PX_S).slice(0, MAX_NORMAL_PLANES);
 
+// The feed's state (item 155): before the first answer, after an answer, after a failed request.
+export type LiveStatus = 'loading' | 'ok' | 'error';
+
+// The Sentry tag `live-planes` (item 155): `off` (no status: the radar does not run), `loading`,
+// `error`, or `ok-<shown>/<nearby>` (the planes drawn / the aircraft in the last answer).
+export const getLivePlanesTag = (status: LiveStatus | null, shown: number, nearby: number): string =>
+  status === 'ok' ? `ok-${shown}/${nearby}` : status ?? 'off';
+
 // The contrail rule of the free part, for each aircraft above 8 km.
 export const getLiveContrail = (altM: number, forecast: ContrailKind): ContrailKind =>
   altM > CONTRAIL_MIN_ALT_M ? forecast : 'none';
