@@ -384,7 +384,7 @@ describe('MusicPlayer', () => {
     const SLIDER_NIGHT = [
       '[&>span:first-child]:bg-white/15',
       '[&>span:first-child>span]:bg-white/40',
-      '[&_[role=slider]]:bg-white/60',
+      '[&_[role=slider]]:bg-[#adadaf]',
       '[&_[role=slider]]:border-transparent',
       '[&_[role=slider]]:h-4',
       '[&_[role=slider]]:w-4',
