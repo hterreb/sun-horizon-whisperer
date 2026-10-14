@@ -1,16 +1,19 @@
+import { existsSync } from 'node:fs';
 import { renderHook } from '@testing-library/react';
 import { vi } from 'vitest';
-import { useSunsetReminder } from '../src/hooks/useSunsetReminder';
+import { showReminderNotification, useSunsetReminder } from '../src/hooks/useSunsetReminder';
 
 const SUNSET = new Date('2026-09-30T18:50:00+02:00');
 const MIN = 60_000;
 
 describe('useSunsetReminder (ROADMAP item 69)', () => {
   const shown: string[] = [];
+  let lastOptions: NotificationOptions | null = null;
   class FakeNotification {
     static permission = 'granted';
     constructor(_title: string, options: NotificationOptions) {
       shown.push(options.body ?? '');
+      lastOptions = options;
     }
     close() {}
   }
@@ -70,5 +73,12 @@ describe('useSunsetReminder (ROADMAP item 69)', () => {
     renderHook(() => useSunsetReminder(null, true));
     await vi.advanceTimersByTimeAsync(10 * MIN);
     expect(shown).toHaveLength(0);
+  });
+
+  // Without a badge, Android shows the Chrome logo in the status bar.
+  it('gives the notification a Sun Chaser badge that exists in public/', async () => {
+    await showReminderNotification('Test', 'test');
+    expect(lastOptions?.badge).toBe('/notification-badge.png');
+    expect(existsSync(`public${lastOptions?.badge}`)).toBe(true);
   });
 });

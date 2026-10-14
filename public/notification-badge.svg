@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <!--
+    Notification badge (Android status bar and notification header). Android uses only
+    the alpha channel, so this is the logo mark as a white silhouette: the setting sun
+    with its stripes, the horizon and the reflection. PNG: rsvg-convert -w 96 -h 96
+    public/notification-badge.svg -o public/notification-badge.png
+  -->
+  <defs>
+    <clipPath id="above-horizon"><rect width="120" height="80"/></clipPath>
+    <mask id="sun-stripes">
+      <rect width="120" height="120" fill="#fff"/>
+      <rect y="58" width="120" height="6" fill="#000"/>
+      <rect y="69" width="120" height="6" fill="#000"/>
+    </mask>
+  </defs>
+  <g fill="#fff">
+    <circle cx="60" cy="64" r="36" clip-path="url(#above-horizon)" mask="url(#sun-stripes)"/>
+    <rect x="6" y="86" width="108" height="7" rx="3.5"/>
+    <rect x="34" y="99" width="52" height="7" rx="3.5"/>
+    <rect x="46" y="111" width="28" height="6" rx="3"/>
+  </g>
+</svg>
