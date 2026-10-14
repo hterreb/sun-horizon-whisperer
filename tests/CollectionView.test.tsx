@@ -103,6 +103,26 @@ describe('CollectionView', () => {
     }
   });
 
+  it('puts the 8 sky optics in the rainbow\'s row, 3 columns on a phone and 4 from 640 px (item 148)', () => {
+    render(<CollectionView open onClose={vi.fn()} collection={{ ...collection, 'optic:moonbow': '2026-10-14T21:00:00.000Z' }} />);
+    const row = cellOf('rainbow').closest('ul')!;
+    expect(within(row).getAllByRole('listitem').map((cell) => cell.getAttribute('data-badge-id'))).toEqual([
+      'rainbow', 'optic:rays', 'optic:sunDogs', 'optic:halo', 'optic:doubleRainbow', 'optic:fogBow', 'optic:moonbow', 'optic:sunPillar', 'optic:moonHalo',
+    ]);
+    expect(row.className).toContain('grid-cols-3');
+    expect(row.className).toContain('sm:grid-cols-4');
+    // A found optic: its badge art, name and tier; a missing one: only the grey outline of its art.
+    const moonbow = cellOf('optic:moonbow');
+    expect(moonbow).toHaveTextContent('Moonbow');
+    expect(moonbow).toHaveTextContent('Very rare');
+    expect(moonbow.className).toContain('border-tier-very-rare/80');
+    expect(moonbow.querySelector('svg')).not.toBeNull();
+    const halo = cellOf('optic:halo');
+    expect(halo.hasAttribute('data-missing')).toBe(true);
+    expect(halo).not.toHaveTextContent('halo');
+    expect(halo.querySelector('svg')).not.toBeNull();
+  });
+
   it('shows and counts no retired base badge of an old save (item 138)', () => {
     render(<CollectionView open onClose={vi.fn()} collection={{ ...collection, sun: '2026-10-01T10:00:00.000Z', moon: '2026-10-01T22:00:00.000Z', terrain: '2026-10-01T12:00:00.000Z', satellite: '2026-10-01T20:00:00.000Z' }} />);
     expect(screen.getByRole('dialog')).toHaveTextContent(`3 / ${BADGES.length}`);

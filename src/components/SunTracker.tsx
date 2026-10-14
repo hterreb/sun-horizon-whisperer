@@ -26,7 +26,7 @@ import {
   type MoonPosition,
   type MoonTimes
 } from '../utils/moonUtils';
-import { fetchCurrentWeather, getUpperAirAt, getWeatherAt, type WeatherData } from '../utils/weatherUtils';
+import { fetchCurrentWeather, getUpperAirAt, getVisibilityAt, getWeatherAt, type WeatherData } from '../utils/weatherUtils';
 import { getContrail } from '@/utils/planes';
 import { getRainMmH } from '@/utils/rainUtils';
 import { useLivePlanes, type LivePlanesState } from '@/hooks/useLivePlanes';
@@ -1180,6 +1180,8 @@ const SunTracker: React.FC = () => {
   const rainMmH = useRealWeather ? weatherData?.precipitationMmH ?? null : null;
   // The cover per layer for the cloud types (ROADMAP item 84); manual weather uses the type's own.
   const cloudLayers = useRealWeather ? weatherData?.cloudLayers ?? null : null;
+  // The visibility at the scene's time for the sky optics (item 148); manual weather has none.
+  const visibilityM = useRealWeather ? getVisibilityAt(weatherData?.hourly ?? null, date) : null;
   // The planes' contrails (ROADMAP item 96) from the forecast's upper air at the scene's time;
   // manual weather has no upper air, so no contrails.
   const upperAir = useRealWeather ? getUpperAirAt(weatherData?.hourly ?? null, date) : null;
@@ -1338,6 +1340,7 @@ const SunTracker: React.FC = () => {
             windSpeedKmh={useRealWeather ? weatherData?.windSpeedKmh ?? null : manualWindy ? MANUAL_STRONG_WIND_KMH : 0}
             rainMmH={rainMmH}
             cloudLayers={cloudLayers}
+            visibilityM={visibilityM}
             contrail={contrail}
             livePlanes={livePlanes}
             livePlanesShown={liveShown}

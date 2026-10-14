@@ -16,6 +16,7 @@ import ScenePlane from '@/components/ScenePlane';
 import { UfoShape } from '@/components/Ufo';
 import { SantaShape } from '@/components/Santa';
 import { Bat } from '@/components/sceneIcons';
+import { OPTIC_ICONS } from '@/components/opticIcons';
 import { useLanguage } from '@/hooks/useLanguage';
 import { type MessageKey } from '@/i18n';
 import {
@@ -28,6 +29,7 @@ import { CLOUD_SHAPES, type CloudType } from '@/utils/cloudShapes';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
 import { TIER_RING_BORDER } from '@/utils/rarityTier';
 import { type BirdKind, type BoatKind, type FishKind } from '@/utils/weatherEffectsUtils';
+import { type OpticKind } from '@/utils/skyOptics';
 
 // Collection view (ROADMAP item 112): every badge in a grid, by group. A found badge
 // shows its art in colour, its name, rarity tier and first-seen date, with an outline in its
@@ -128,6 +130,11 @@ const EGG_ICONS: Record<Exclude<EggKind, 'ufo' | 'santa'>, [LucideIcon, string]>
 const SKY_ICONS: Record<'rainbow', [LucideIcon, string]> = {
   rainbow: [Rainbow, 'text-white'], // item 121
 };
+// Item 148: the sky optics' badges (opticIcons), in the colours of the optics lookbook.
+const OPTIC_COLOURS: Record<OpticKind, string> = {
+  rays: 'text-brand-gold-light', sunDogs: 'text-brand-gold-light', halo: 'text-white', doubleRainbow: 'text-white',
+  fogBow: 'text-slate-100', moonbow: 'text-scene-moon', sunPillar: 'text-brand-peach', moonHalo: 'text-scene-moon',
+};
 
 // Item 115: the state badges. The sun in the colours of its time's sky gradient.
 const SunStateArt = ({ state }: { state: SunState }) => {
@@ -207,6 +214,10 @@ export const BadgeArt = ({ badge }: { badge: Badge }) => {
           <path d={CLOUD_SHAPES[kind as CloudType][0].d} className="fill-white/85" />
         </svg>
       );
+    case 'optic': {
+      const Icon = OPTIC_ICONS[kind as OpticKind];
+      return <Icon size={32} className={OPTIC_COLOURS[kind as OpticKind]} aria-hidden="true" />;
+    }
     case 'egg': {
       if (kind === 'ufo') return <UfoShape width={52} />;
       if (kind === 'santa') return <SantaShape width={64} />;

@@ -458,6 +458,15 @@ export const getUpperAirAt = (hourly: HourlyForecast | null, at: Date): { tempC:
   return tempC == null || rhPercent == null ? null : { tempC, rhPercent };
 };
 
+// The visibility in m (item 148, the sky optics) in the forecast hour nearest `at`. Null outside
+// the forecast or without a value.
+export const getVisibilityAt = (hourly: HourlyForecast | null, at: Date): number | null => {
+  const start = hourly?.time.length ? parseHourlyTime(hourly.time[0]) : null;
+  if (!hourly || !start) return null;
+  const value = hourly.visibility[Math.round((at.getTime() - start.getTime()) / HOUR_MS)];
+  return Number.isFinite(value) ? value : null;
+};
+
 export const clearWeatherCache = (): void => {
   try {
     localStorage.removeItem(CACHE_KEY);

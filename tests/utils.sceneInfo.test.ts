@@ -321,6 +321,25 @@ describe('sceneInfo: field guide data (ROADMAP item 107)', () => {
     ]);
   });
 
+  it('gives each sky optic a weather card: its icon, the direction to look, its fixed tier, a field note (item 148)', () => {
+    const i = info({ type: 'optic', kind: 'halo' });
+    expect([en(i.kicker), i.icon, en(i.title)]).toEqual(['Weather', 'optic:halo', '22° halo']);
+    expect(i.tier).toBe('uncommon');
+    expect(i.fact?.text).toBe('opticFact.halo');
+    // The sun is at 200° and the moon at 90° in ctx.
+    expect(card({ type: 'optic', kind: 'halo' })).toEqual([
+      '22° halo',
+      'Ice crystals in a thin veil of high cloud bend light by at least 22°, so the ring is always 22° from the sun and the sky inside it is darker.',
+      'Direction: S (200°)',
+      'Rarity: Uncommon',
+    ]);
+    expect(card({ type: 'optic', kind: 'fogBow' })[2]).toBe('Direction: N (20°)');
+    expect(card({ type: 'optic', kind: 'moonbow' })[2]).toBe('Direction: W (270°)');
+    expect(card({ type: 'optic', kind: 'moonHalo' })[2]).toBe('Direction: E (90°)');
+    const tiers = (['rays', 'sunDogs', 'doubleRainbow', 'sunPillar', 'moonbow'] as const).map((kind) => card({ type: 'optic', kind }).at(-1));
+    expect(tiers).toEqual(['Rarity: Common', 'Rarity: Frequent', 'Rarity: Rare', 'Rarity: Rare', 'Rarity: Very rare']);
+  });
+
   it('gives a Latin name to the real species only', () => {
     expect(info({ type: 'fish', kind: 'pike' }).latin).toBe('Esox lucius');
     expect(info({ type: 'fish', kind: 'eel' }).latin).toBe('Anguilla anguilla');

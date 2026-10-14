@@ -151,6 +151,23 @@ describe('SunTracker', () => {
     expect(visProps.current!.cloudLayers).toBeNull();
   });
 
+  it('passes the visibility of the hour for the sky optics; manual weather has none (item 148)', async () => {
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 11, longitude: 12 } }) } });
+    const hour = new Date(Math.floor(Date.now() / 3_600_000) * 3_600_000);
+    const hourly = (offset: number) => new Date(hour.getTime() + offset * 3_600_000).toISOString().slice(0, 16);
+    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({
+      current_weather: { temperature: 20, weathercode: 45, windspeed: 0, winddirection: 0, time: '' },
+      current: { cloud_cover: 40, wind_speed_10m: 0, wind_direction_10m: 0 },
+      hourly: { time: [hourly(0), hourly(1)], cloud_cover_low: [30, 30], cloud_cover_mid: [0, 0], cloud_cover_high: [5, 5], visibility: [900, 900] },
+    }) })) as unknown as typeof fetch;
+
+    render(<SunTracker />);
+    await waitFor(() => expect(visProps.current?.visibilityM).toBe(900));
+
+    fireEvent.click(screen.getByRole('button', { name: /manual/i }));
+    expect(visProps.current!.visibilityM).toBeNull();
+  });
+
   it('toasts when the weather refresh fails (A-5)', async () => {
     // Distinct coordinates from the previous test, so the weather cache (keyed on
     // location, not test) doesn't serve a stale successful result here.
@@ -1430,6 +1447,20 @@ describe('SunTracker', () => {
       expect(unlocked()).toBeNull();
       tapSeahorse();
       expect(unlocked()).toBeNull();
+      vi.useRealTimers();
+    });
+
+    it('a double tap on a sky optic opens its card and collects its badge (item 148)', () => {
+      vi.useFakeTimers();
+      render(<SunTracker />);
+      expect(visProps.current).not.toBeNull();
+      act(() => {
+        visProps.current!.onSceneInfo!({ type: 'optic', kind: 'halo' }, { x: 200, y: 300 }, 'optic:halo');
+      });
+      expect(screen.getByRole('dialog', { name: '22° halo' })).toHaveTextContent('Uncommon');
+      expect(visProps.current!.infoRing).toBe('optic:halo');
+      expect(JSON.parse(localStorage.getItem('collection')!)).toEqual({ 'optic:halo': expect.any(String) });
+      expect(unlocked()).toHaveTextContent('Badge unlocked: 22° halo, Uncommon');
       vi.useRealTimers();
     });
 

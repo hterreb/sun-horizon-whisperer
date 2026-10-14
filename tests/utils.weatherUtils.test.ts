@@ -1,4 +1,4 @@
-import { fetchCurrentWeather, getSunsetScore, getScoreReason, getUpperAirAt, getWeatherAt, WMO_CODE_MAP, type WeatherData } from '../src/utils/weatherUtils';
+import { fetchCurrentWeather, getSunsetScore, getScoreReason, getUpperAirAt, getVisibilityAt, getWeatherAt, WMO_CODE_MAP, type WeatherData } from '../src/utils/weatherUtils';
 import { type WeatherType } from '../src/components/CloudLayer';
 describe('weatherUtils', () => {
   it('fetches weather data (mocked)', async () => {
@@ -435,5 +435,22 @@ describe('getUpperAirAt (ROADMAP item 96)', () => {
     await fetchCurrentWeather(5, 5);
     const calledUrl = String((fetchMock as ReturnType<typeof vi.fn>).mock.calls[0][0]);
     expect(calledUrl).toContain(',temperature_250hPa,relative_humidity_250hPa');
+  });
+});
+
+describe('getVisibilityAt (ROADMAP item 148)', () => {
+  const hourly = {
+    time: ['2026-10-06T00:00', '2026-10-06T01:00'],
+    cloud_cover_low: [0, 0], cloud_cover_mid: [0, 0], cloud_cover_high: [0, 0], visibility: [900, 24000],
+  };
+
+  it('returns the visibility of the forecast hour nearest the time', () => {
+    expect(getVisibilityAt(hourly, new Date('2026-10-06T00:20:00Z'))).toBe(900);
+    expect(getVisibilityAt(hourly, new Date('2026-10-06T00:40:00Z'))).toBe(24000);
+  });
+
+  it('returns null outside the forecast or without one', () => {
+    expect(getVisibilityAt(hourly, new Date('2026-10-06T03:00:00Z'))).toBeNull();
+    expect(getVisibilityAt(null, new Date('2026-10-06T00:00:00Z'))).toBeNull();
   });
 });

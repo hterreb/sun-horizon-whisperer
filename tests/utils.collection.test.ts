@@ -21,16 +21,28 @@ describe('collection (ROADMAP item 112)', () => {
     vi.restoreAllMocks();
   });
 
-  it('has 130 badges with unique ids, one for every fish, flyer, boat and cloud type', () => {
+  it('has 138 badges with unique ids, one for every fish, flyer, boat, cloud type and sky optic', () => {
     const ids = BADGES.map(b => b.id);
-    expect(ids).toHaveLength(130); // item 115: 69 + 5 sun + 5 terrain + 8 moon states; + 5 sky eggs + 9 national days + 5 playful eggs + 12 festivals; item 120: + 5 hauls + 5 sizes; item 121: + rainbow; item 138: − sun, moon, terrain, satellite; item 140: + midwinter; item 146: + 4 boats
-    expect(new Set(ids).size).toBe(130);
+    expect(ids).toHaveLength(138); // item 115: 69 + 5 sun + 5 terrain + 8 moon states; + 5 sky eggs + 9 national days + 5 playful eggs + 12 festivals; item 120: + 5 hauls + 5 sizes; item 121: + rainbow; item 138: − sun, moon, terrain, satellite; item 140: + midwinter; item 146: + 4 boats; item 148: + 8 optics
+    expect(new Set(ids).size).toBe(138);
     for (const kind of [...FISH_WEIGHTS.map(([k]) => k), ...NIGHT_ONLY]) expect(ids).toContain(`fish:${kind}`);
     for (const kind of [...BIRD_WEIGHTS.map(([k]) => k), 'bat']) expect(ids).toContain(`flyer:${kind}`);
     for (const kind of ['sailboat', 'ferry', 'fishing', 'rowboat', 'freighter', 'kayak', 'paddleSteamer', 'cruiseLiner', 'tallShip']) expect(ids).toContain(`boat:${kind}`);
     for (const type of ['Ci', 'Cs', 'Ac', 'As', 'Cu', 'Sc', 'St', 'Ns', 'Cb', 'Len', 'Mam']) expect(ids).toContain(`cloud:${type}`);
     expect(BADGES.filter(b => b.group === 'egg')).toHaveLength(51);
     expect(BADGES.find(b => b.id === 'plane')?.group).toBe('sky');
+  });
+
+  it('puts the 8 sky optics right after the rainbow in the sky group, each with its fixed tier (item 148)', () => {
+    const at = BADGES.findIndex(b => b.id === 'rainbow');
+    expect(BADGES.slice(at, at + 9).map(b => b.id)).toEqual([
+      'rainbow', 'optic:rays', 'optic:sunDogs', 'optic:halo', 'optic:doubleRainbow', 'optic:fogBow', 'optic:moonbow', 'optic:sunPillar', 'optic:moonHalo',
+    ]);
+    expect(BADGES.filter(b => b.id.startsWith('optic:')).every(b => b.group === 'sky' && b.base === undefined)).toBe(true);
+    expect(['optic:rays', 'optic:sunDogs', 'optic:halo', 'optic:doubleRainbow', 'optic:fogBow', 'optic:moonbow', 'optic:sunPillar', 'optic:moonHalo'].map(id => tier(id as BadgeId))).toEqual([
+      'rarity.common', 'rarity.frequent', 'rarity.uncommon', 'rarity.rare', 'rarity.rare', 'rarity.veryRare', 'rarity.rare', 'rarity.rare',
+    ]);
+    expect(BADGES.find(b => b.id === 'optic:halo')?.name).toBe('optic.halo');
   });
 
   it('gives the rolled kinds their rarity tier, the clouds their fixed tier, the eggs ultra rare, the rest none', () => {
@@ -92,6 +104,7 @@ describe('collection (ROADMAP item 112)', () => {
     expect(badgeForTarget({ type: 'boat', kind: 'ferry' })).toBe('boat:ferry');
     expect(badgeForTarget({ type: 'rainbow' })).toBe('rainbow'); // item 121
     expect(tier('rainbow')).toBe('rarity.uncommon');
+    expect(badgeForTarget({ type: 'optic', kind: 'moonbow' })).toBe('optic:moonbow'); // item 148
     expect(badgeForTarget({ type: 'plane', contrail: 'short' })).toBe('plane');
     expect(badgeForTarget({ type: 'livePlane', callsign: null, airline: null, aircraftType: null, altM: 10_000, speedKt: 450 })).toBe('plane');
     expect(badgeForTarget({ type: 'cloud', cloudType: 'Len', band: 'mid' })).toBe('cloud:Len');
@@ -151,6 +164,7 @@ describe('collection (ROADMAP item 112)', () => {
     expect(isCollectionPaused('?hunt=1')).toBe(true);
     expect(isCollectionPaused('?country=FR')).toBe(true);
     expect(isCollectionPaused('?boat=kayak')).toBe(true); // item 146
+    expect(isCollectionPaused('?optic=halo')).toBe(true); // item 148
     expect(isCollectionPaused('?egg=bastilleDay')).toBe(true);
     expect(isCollectionPaused('?egg=midwinter')).toBe(true); // item 140
     expect(isCollectionPaused('')).toBe(false);
