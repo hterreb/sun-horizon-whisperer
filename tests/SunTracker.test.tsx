@@ -562,13 +562,13 @@ describe('SunTracker', () => {
     it('a dark sky dims the radio switch and the volume slider', () => {
       // 00:00 in Ravensburg: night.
       expect(radioSwitch('2026-10-11T22:00:00Z')).toHaveClass('data-[state=unchecked]:bg-white/15');
-      expect(screen.getByRole('slider', { name: 'Volume' }).closest('.touch-none')).toHaveClass('[&_[role=slider]]:bg-white/60');
+      expect(screen.getByRole('slider', { name: 'Volume' }).closest('.touch-none')).toHaveClass('[&_[role=slider]]:bg-[#adadaf]');
     });
 
     it('by day they keep their look', () => {
       // 13:00 in Ravensburg: midday.
       expect(radioSwitch('2026-09-30T11:00:00Z')).not.toHaveClass('data-[state=unchecked]:bg-white/15');
-      expect(screen.getByRole('slider', { name: 'Volume' }).closest('.touch-none')).not.toHaveClass('[&_[role=slider]]:bg-white/60');
+      expect(screen.getByRole('slider', { name: 'Volume' }).closest('.touch-none')).not.toHaveClass('[&_[role=slider]]:bg-[#adadaf]');
     });
   });
 
@@ -1018,20 +1018,30 @@ describe('SunTracker', () => {
     describe('sunset countdown (ROADMAP item 43)', () => {
       // Records when each oscillator starts, in AudioContext seconds (currentTime is 0).
       const starts: number[] = [];
+      const param = () => ({ value: 1, setValueAtTime: () => {}, linearRampToValueAtTime: () => {}, exponentialRampToValueAtTime: () => {}, setTargetAtTime: () => {} });
       class FakeAudioContext {
         currentTime = 0;
         state = 'running';
         destination = {};
         resume() { return Promise.resolve(); }
         createGain() {
-          return { gain: { setValueAtTime: () => {}, linearRampToValueAtTime: () => {} }, connect: (node: unknown) => node };
+          return { gain: param(), connect: (node: unknown) => node };
+        }
+        // The countdown's master bus (item 152).
+        createDynamicsCompressor() {
+          return { threshold: {}, knee: {}, ratio: {}, attack: {}, release: {}, connect: (node: unknown) => node };
+        }
+        // The low-pass of the S3 pad (item 152).
+        createBiquadFilter() {
+          return { type: '', frequency: param(), connect: (node: unknown) => node };
         }
         createOscillator() {
-          return { type: '', frequency: { setValueAtTime: () => {} }, connect: (node: unknown) => node, start: (at: number) => starts.push(at), stop: () => {} };
+          return { type: '', frequency: param(), connect: (node: unknown) => node, start: (at: number) => starts.push(at), stop: () => {} };
         }
       }
       const sunset = getSunTimes(NOON, RAVENSBURG.latitude, RAVENSBURG.longitude).sunset!;
       const toggle = () => fireEvent.click(screen.getByRole('button', { name: 'Sunset countdown' }));
+      const radio = () => fireEvent.click(screen.getByRole('switch', { name: 'Play lo-fi music' }));
       // Starts 20 s before the sunset; the 1 s clock then reaches T-11 s after 9 ticks.
       const runToCountdown = (turnOn: boolean) => {
         start(new Date(sunset.getTime() - 20_000));
@@ -1049,25 +1059,56 @@ describe('SunTracker', () => {
         Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
       });
 
-      it('is off by default; the tap that turns it on plays one check tone and saves the choice', () => {
+      it('is off by default; the tap that turns it on plays one check pluck and saves the choice', () => {
         start(new Date(sunset.getTime() - 20_000));
         expect(screen.getByRole('button', { name: 'Sunset countdown' })).toHaveAttribute('aria-pressed', 'false');
         toggle();
         expect(screen.getByRole('button', { name: 'Sunset countdown' })).toHaveAttribute('aria-pressed', 'true');
-        expect(starts).toHaveLength(1);
+        // One S3 pluck: two voices (A5 and its third harmonic).
+        expect(starts).toHaveLength(2);
         expect(localStorage.getItem('sunset-countdown')).toBe('on');
       });
 
-      it('with the toggle on, schedules 11 tones at T-11 s, 1 s apart, and the pill counts down', () => {
+      it('starting the radio turns it on without a check tone, also after the user turned it off (item 152, B2)', () => {
+        const play = vi.spyOn(window.HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+        const pause = vi.spyOn(window.HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+        start(new Date(sunset.getTime() - 20_000));
+        const bell = () => screen.getByRole('button', { name: 'Sunset countdown' });
+        expect(bell()).toHaveAttribute('aria-pressed', 'false');
+        radio();
+        expect(bell()).toHaveAttribute('aria-pressed', 'true');
+        expect(localStorage.getItem('sunset-countdown')).toBe('on');
+        expect(starts).toHaveLength(0);
+
+        toggle();
+        expect(bell()).toHaveAttribute('aria-pressed', 'false');
+        radio();
+        expect(bell()).toHaveAttribute('aria-pressed', 'false');
+        radio();
+        expect(bell()).toHaveAttribute('aria-pressed', 'true');
+        expect(localStorage.getItem('sunset-countdown')).toBe('on');
+
+        // The countdown then plays over the radio.
+        starts.length = 0;
+        tickFor(9000, 1000);
+        expect(starts).toHaveLength(31);
+        play.mockRestore();
+        pause.mockRestore();
+      });
+
+      it('with the toggle on, schedules the S3 sound at T-11 s and the pill counts down (item 152)', () => {
         runToCountdown(true);
-        // 10 ticks T-10 s to T-1 s, then the chime at T0; the clock tick at T-10.7 s
-        // scheduled them, so T0 is 10.7 s ahead on the AudioContext clock.
-        expect(starts).toHaveLength(11);
-        starts.slice(1).forEach((at, i) => expect(at - starts[i]).toBeCloseTo(1, 6));
-        expect(starts[10]).toBeCloseTo(10.7, 6);
+        // The clock tick at T-10.7 s scheduled it, so T0 is 10.7 s ahead on the AudioContext
+        // clock: the 3 pad voices at T-10 s, 10 plucks of 2 voices 1 s apart from T-10 s to
+        // T-1 s, then the 8 voices of the bowl at T0.
+        expect(starts).toHaveLength(31);
+        starts.slice(0, 3).forEach((at) => expect(at).toBeCloseTo(0.7, 6));
+        const plucks = starts.slice(3, 23).filter((_, i) => i % 2 === 0);
+        plucks.forEach((at, i) => expect(at).toBeCloseTo(0.7 + i, 6));
+        starts.slice(23).forEach((at) => expect(at).toBeCloseTo(10.7, 6));
         tickFor(4000, 1000);
         expect(screen.getByTestId('sun-altitude')).toHaveTextContent('Sunset in 7 s');
-        expect(starts).toHaveLength(11);
+        expect(starts).toHaveLength(31);
       });
 
       it('with the toggle off, schedules no tones, but the pill counts down (item 98)', () => {
@@ -1084,8 +1125,8 @@ describe('SunTracker', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Turn on the countdown sound' }));
         expect(screen.getByRole('button', { name: 'Sunset countdown' })).toHaveAttribute('aria-pressed', 'true');
         expect(localStorage.getItem('sunset-countdown')).toBe('on');
-        // The check tone of primeCountdownAudio.
-        expect(starts).toHaveLength(1);
+        // The check pluck of primeCountdownAudio (two voices).
+        expect(starts).toHaveLength(2);
         expect(screen.queryByRole('button', { name: 'Turn on the countdown sound' })).not.toBeInTheDocument();
         expect(screen.getByTestId('sun-altitude')).toHaveTextContent('Sunset in 7 s');
       });

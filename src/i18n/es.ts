@@ -220,6 +220,7 @@ export const es: Record<keyof typeof en, string> = {
   'scene.sun': "Sol",
   'scene.countdown': "Puesta de sol en {seconds} s",
   'scene.countdownSoundOn': "Activar el sonido de la cuenta atrás",
+  'scene.countdownTapToHear': "Toca para activar el sonido de la puesta de sol",
   'scene.moonInfo': "Luna: {altitude}° | {illumination}",
   'direction.n': "N",
   'direction.ne': "NE",

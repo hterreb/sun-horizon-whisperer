@@ -980,18 +980,27 @@ const SunTracker: React.FC = () => {
       return false;
     }
   });
-  const handleCountdownToggle = useCallback(() => {
-    const next = !isCountdownOn;
-    setIsCountdownOn(next);
+  const saveCountdown = useCallback((on: boolean) => {
+    setIsCountdownOn(on);
     try {
-      localStorage.setItem(SUNSET_COUNTDOWN_STORAGE_KEY, next ? 'on' : 'off');
+      localStorage.setItem(SUNSET_COUNTDOWN_STORAGE_KEY, on ? 'on' : 'off');
     } catch (error) {
       console.error('Error saving sunset countdown:', error);
     }
+  }, []);
+  const handleCountdownToggle = useCallback(() => {
+    const next = !isCountdownOn;
+    saveCountdown(next);
     if (next) primeCountdownAudio();
-  }, [isCountdownOn]);
+  }, [isCountdownOn, saveCountdown]);
+  // Item 152 (B2): starting the radio turns the countdown sound on, also after the user
+  // turned it off. The play tap starts the audio, without the check tick.
+  const handleRadioPlay = useCallback(() => {
+    saveCountdown(true);
+    primeCountdownAudio(false);
+  }, [saveCountdown]);
   const countdownTarget = getCountdownTarget(date, sunTimes, terrainExtras.terrainSunTimes, isLineOfSightOn);
-  const { seconds: countdownSeconds, isSounding: isCountdownSounding } = useSunsetCountdown(countdownTarget?.time ?? null, date, !isTimePreview, isCountdownOn);
+  const { seconds: countdownSeconds, isSounding: isCountdownSounding } = useSunsetCountdown(countdownTarget?.time ?? null, date, !isTimePreview, isCountdownOn, language);
 
   // Sunset reminder (ROADMAP item 69): a notification SUNSET_REMINDER_MIN before the same
   // target, while the app is open. Live time only. The tap that turns it on asks for the
@@ -1284,7 +1293,7 @@ const SunTracker: React.FC = () => {
       </LazyPart>
       {reveal === 'done' && (
         <>
-          <MusicPlayer controls={controls} duck={isCountdownSounding} rainMmH={getRainMmH(weatherType, rainMmH)} night={isDarkSky} />
+          <MusicPlayer controls={controls} duck={isCountdownSounding} onPlay={handleRadioPlay} rainMmH={getRainMmH(weatherType, rainMmH)} night={isDarkSky} />
           <TopLeftButtons
             showCursor={showCursor}
             isTappable={controls.isTappable}
