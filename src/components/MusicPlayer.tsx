@@ -40,8 +40,10 @@ const SWITCH_CLASS = '*:transition-[translate,background-color,box-shadow]';
 const SWITCH_DAY = 'data-[state=checked]:bg-primary';
 const SWITCH_NIGHT = 'data-[state=unchecked]:bg-white/15 data-[state=checked]:bg-white/35 *:bg-white/60 *:shadow-none';
 // The Radix slider: the root holds the track (first span, with the range in it) and the thumb.
+// The night thumb is opaque: a see-through thumb shows the track through it. #adadaf is the
+// colour of the night switch thumb (white/60 on its white/15 track over the dark glass).
 const SLIDER_CLASS = 'w-16 sm:w-24 [&>span:first-child]:transition-colors [&>span:first-child>span]:transition-colors';
-const SLIDER_NIGHT = '[&>span:first-child]:bg-white/15 [&>span:first-child>span]:bg-white/40 [&_[role=slider]]:bg-white/60 [&_[role=slider]]:border-transparent [&_[role=slider]]:h-4 [&_[role=slider]]:w-4';
+const SLIDER_NIGHT = '[&>span:first-child]:bg-white/15 [&>span:first-child>span]:bg-white/40 [&_[role=slider]]:bg-[#adadaf] [&_[role=slider]]:border-transparent [&_[role=slider]]:h-4 [&_[role=slider]]:w-4';
 
 const STATION_INDEX_KEY = 'radio_station_index';
 

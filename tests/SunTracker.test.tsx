@@ -562,13 +562,13 @@ describe('SunTracker', () => {
     it('a dark sky dims the radio switch and the volume slider', () => {
       // 00:00 in Ravensburg: night.
       expect(radioSwitch('2026-10-11T22:00:00Z')).toHaveClass('data-[state=unchecked]:bg-white/15');
-      expect(screen.getByRole('slider', { name: 'Volume' }).closest('.touch-none')).toHaveClass('[&_[role=slider]]:bg-white/60');
+      expect(screen.getByRole('slider', { name: 'Volume' }).closest('.touch-none')).toHaveClass('[&_[role=slider]]:bg-[#adadaf]');
     });
 
     it('by day they keep their look', () => {
       // 13:00 in Ravensburg: midday.
       expect(radioSwitch('2026-09-30T11:00:00Z')).not.toHaveClass('data-[state=unchecked]:bg-white/15');
-      expect(screen.getByRole('slider', { name: 'Volume' }).closest('.touch-none')).not.toHaveClass('[&_[role=slider]]:bg-white/60');
+      expect(screen.getByRole('slider', { name: 'Volume' }).closest('.touch-none')).not.toHaveClass('[&_[role=slider]]:bg-[#adadaf]');
     });
   });
 
