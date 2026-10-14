@@ -30,6 +30,7 @@ import { fetchCurrentWeather, getUpperAirAt, getWeatherAt, type WeatherData } fr
 import { getContrail } from '@/utils/planes';
 import { getRainMmH } from '@/utils/rainUtils';
 import { useLivePlanes, type LivePlanesState } from '@/hooks/useLivePlanes';
+import { getLivePlanesTag } from '@/utils/liveRadar';
 import { useLiveRoute } from '@/hooks/useLiveRoute';
 import { getMoonLook, getSkyOvercastMix, getStarCloudFactor } from '@/utils/weatherEffectsUtils';
 import { getAstroEvent, parseEggOverride } from '@/utils/astroEvents';
@@ -122,6 +123,18 @@ const HOUR_MS = 60 * 60 * 1000;
 const MAX_EYE_HEIGHT_M = 1000;
 // Item 136: a tap on these is not a tap on the empty sky (scene things, controls, cards, dialogs).
 const NOT_SKY = '[data-scene-hit], [data-share-hide], button, a, input, [role="dialog"]';
+// Item 147: a tap on the scene, the empty sky or a scene thing (the sun is a `button`), not on a
+// control, a card, a toast or a dialog.
+const isSceneTap = (target: EventTarget | null): target is Element =>
+  target instanceof Element && target.closest('[data-share-root]') !== null &&
+  (target.closest('[data-scene-hit]') !== null || target.closest(NOT_SKY) === null);
+// Item 147 (T2): the tap point is in the box of a control that fades (`data-idle-control`:
+// TopLeftButtons, InfoPanel, MusicPlayer). An empty box (jsdom, not drawn) has no inside.
+const isOnIdleControl = ({ clientX: x, clientY: y }: MouseEvent): boolean =>
+  Array.from(document.querySelectorAll('[data-idle-control]')).some(el => {
+    const box = el.getBoundingClientRect();
+    return x >= box.left && x < box.right && y >= box.top && y < box.bottom;
+  });
 
 const clampEyeHeight = (value: number): number =>
   Number.isFinite(value) ? Math.min(MAX_EYE_HEIGHT_M, Math.max(0, value)) : DEFAULT_EYE_HEIGHT_M;
@@ -246,6 +259,8 @@ const SunTracker: React.FC = () => {
       console.error('Error saving live planes:', error);
     }
   }, []);
+  // Item 155: the number of live planes drawn, from LivePlanes.
+  const [liveShown, setLiveShown] = useState(0);
   useEffect(() => {
     document.documentElement.lang = language;
   }, [language]);
@@ -337,11 +352,18 @@ const SunTracker: React.FC = () => {
   // In fullscreen, a mouse move shows the cursor again and restarts the idle timer
   // (useIdleHide: 3 s after entering, 10 s after a wake, ROADMAP item 89).
   // Item 136: a tap on the empty sky hides the controls, the next one shows them.
-  const lastSkyToggleRef = React.useRef(-Infinity);
+  // Item 147: a single tap on a scene thing too (T1), and a tap where a hidden control is shows them (T2).
+  const lastToggleTapRef = React.useRef(-Infinity);
   const infoCardOpenRef = React.useRef(false);
   const downClosesCardRef = React.useRef(false);
   useEffect(() => {
     if (!canHideControls) return;
+    // T1: the toggle of a tap on a scene thing waits DOUBLE_TAP_MS for a second tap.
+    let thingToggle: ReturnType<typeof setTimeout> | undefined;
+    const cancelThingToggle = () => {
+      clearTimeout(thingToggle);
+      thingToggle = undefined;
+    };
 
     // Item 133: a phone tap also fires a compatibility `mousemove`; only a real mouse wakes here.
     const onPointerMove = (event: PointerEvent) => {
@@ -352,28 +374,58 @@ const SunTracker: React.FC = () => {
     const onPointerDown = () => {
       downClosesCardRef.current = infoCardOpenRef.current;
     };
-    // A tap is a `click` (a swipe or a pinch fires none). Only the empty scene toggles, not a
-    // scene thing (a double tap opens its card, item 124), a control, a card or a dialog.
-    // A second sky tap within DOUBLE_TAP_MS does nothing: a double tap on the sky does not flicker.
+    // T2: a hidden control takes no taps (pointer-events-none), so a tap in its box lands on the
+    // scene below. The window catches it first (capture), shows the controls and stops it: the
+    // scene thing below takes no tap (no card, no start of a double tap). A toast or a card on top
+    // keeps its tap.
+    const onClickCapture = (event: MouseEvent) => {
+      if (showCursor || downClosesCardRef.current || !isSceneTap(event.target) || !isOnIdleControl(event)) return;
+      event.stopPropagation();
+      cancelThingToggle();
+      lastToggleTapRef.current = Date.now();
+      wakeCursor();
+    };
+    // A tap is a `click` (a swipe or a pinch fires none). The empty scene toggles at once. A scene
+    // thing toggles after DOUBLE_TAP_MS, unless a second tap comes: that double tap opens its card
+    // (items 116, 124) and does not toggle. A control, a card or a dialog does not toggle.
+    // A tap within DOUBLE_TAP_MS after a toggle does nothing: a double tap does not flicker.
     const onClick = (event: MouseEvent) => {
       const target = event.target;
       if (downClosesCardRef.current) return;
-      if (!(target instanceof Element) || !target.closest('[data-share-root]') || target.closest(NOT_SKY)) return;
+      if (thingToggle !== undefined) {
+        cancelThingToggle();
+        return;
+      }
+      if (!isSceneTap(target)) return;
+      const isThing = target.closest('[data-scene-hit]') !== null;
       const now = Date.now();
-      if (now - lastSkyToggleRef.current <= DOUBLE_TAP_MS) return;
-      lastSkyToggleRef.current = now;
-      toggleControls();
+      if (now - lastToggleTapRef.current <= DOUBLE_TAP_MS) return;
+      if (!isThing) {
+        lastToggleTapRef.current = now;
+        toggleControls();
+        return;
+      }
+      thingToggle = setTimeout(() => {
+        thingToggle = undefined;
+        // A keyboard click opens the card at once (no second tap): it does not toggle either.
+        if (infoCardOpenRef.current) return;
+        lastToggleTapRef.current = now;
+        toggleControls();
+      }, DOUBLE_TAP_MS);
     };
     window.addEventListener('pointerdown', onPointerDown, true);
+    window.addEventListener('click', onClickCapture, true);
     document.addEventListener('pointermove', onPointerMove);
     document.addEventListener('click', onClick);
 
     return () => {
+      cancelThingToggle();
       window.removeEventListener('pointerdown', onPointerDown, true);
+      window.removeEventListener('click', onClickCapture, true);
       document.removeEventListener('pointermove', onPointerMove);
       document.removeEventListener('click', onClick);
     };
-  }, [canHideControls, wakeCursor, toggleControls]);
+  }, [canHideControls, showCursor, wakeCursor, toggleControls]);
 
   // Update time every second for smooth clock display, every PLAY_TICK_MS during play.
   useEffect(() => {
@@ -928,18 +980,27 @@ const SunTracker: React.FC = () => {
       return false;
     }
   });
-  const handleCountdownToggle = useCallback(() => {
-    const next = !isCountdownOn;
-    setIsCountdownOn(next);
+  const saveCountdown = useCallback((on: boolean) => {
+    setIsCountdownOn(on);
     try {
-      localStorage.setItem(SUNSET_COUNTDOWN_STORAGE_KEY, next ? 'on' : 'off');
+      localStorage.setItem(SUNSET_COUNTDOWN_STORAGE_KEY, on ? 'on' : 'off');
     } catch (error) {
       console.error('Error saving sunset countdown:', error);
     }
+  }, []);
+  const handleCountdownToggle = useCallback(() => {
+    const next = !isCountdownOn;
+    saveCountdown(next);
     if (next) primeCountdownAudio();
-  }, [isCountdownOn]);
+  }, [isCountdownOn, saveCountdown]);
+  // Item 152 (B2): starting the radio turns the countdown sound on, also after the user
+  // turned it off. The play tap starts the audio, without the check tick.
+  const handleRadioPlay = useCallback(() => {
+    saveCountdown(true);
+    primeCountdownAudio(false);
+  }, [saveCountdown]);
   const countdownTarget = getCountdownTarget(date, sunTimes, terrainExtras.terrainSunTimes, isLineOfSightOn);
-  const { seconds: countdownSeconds, isSounding: isCountdownSounding } = useSunsetCountdown(countdownTarget?.time ?? null, date, !isTimePreview, isCountdownOn);
+  const { seconds: countdownSeconds, isSounding: isCountdownSounding } = useSunsetCountdown(countdownTarget?.time ?? null, date, !isTimePreview, isCountdownOn, language);
 
   // Sunset reminder (ROADMAP item 69): a notification SUNSET_REMINDER_MIN before the same
   // target, while the app is open. Live time only. The tap that turns it on asks for the
@@ -1124,9 +1185,15 @@ const SunTracker: React.FC = () => {
   const upperAir = useRealWeather ? getUpperAirAt(weatherData?.hourly ?? null, date) : null;
   const contrail = getContrail(upperAir?.tempC, upperAir?.rhPercent);
   const isLiveRadarActive = isLivePlanesOn && location.loaded && !premium.isLocked && !isTimePreview;
-  const liveFeed = useLivePlanes(isLiveRadarActive, location.latitude, location.longitude);
+  const { state: liveFeed, status: liveFeedStatus } = useLivePlanes(isLiveRadarActive, location.latitude, location.longitude);
   // While the radar is on and its first answer is on the way, no plane shows.
   const livePlanes: LivePlanesState | null = isLiveRadarActive ? liveFeed ?? NO_LIVE_PLANES : null;
+  // Item 155: the status line under the switch and the Sentry tag `live-planes` (no coordinates
+  // in it), set only when the status or a count changes. Nearby: the aircraft in the last answer.
+  const liveStatus = isLiveRadarActive ? liveFeedStatus : null;
+  const liveNearby = liveFeed?.feed.aircraft.length ?? 0;
+  const livePlanesTag = getLivePlanesTag(liveStatus, liveShown, liveNearby);
+  useEffect(() => { Sentry.setTag('live-planes', livePlanesTag); }, [livePlanesTag]);
   // A live plane's card asks for its route once (item 111).
   const liveRouteCallsign = infoCard?.target.type === 'livePlane' ? infoCard.target.callsign : null;
   const liveRoute = useLiveRoute(liveRouteCallsign, location.latitude, location.longitude);
@@ -1226,7 +1293,7 @@ const SunTracker: React.FC = () => {
       </LazyPart>
       {reveal === 'done' && (
         <>
-          <MusicPlayer controls={controls} duck={isCountdownSounding} rainMmH={getRainMmH(weatherType, rainMmH)} night={isDarkSky} />
+          <MusicPlayer controls={controls} duck={isCountdownSounding} onPlay={handleRadioPlay} rainMmH={getRainMmH(weatherType, rainMmH)} night={isDarkSky} />
           <TopLeftButtons
             showCursor={showCursor}
             isTappable={controls.isTappable}
@@ -1273,6 +1340,8 @@ const SunTracker: React.FC = () => {
             cloudLayers={cloudLayers}
             contrail={contrail}
             livePlanes={livePlanes}
+            livePlanesShown={liveShown}
+            onLivePlanesShown={setLiveShown}
             cloudEgg={cloudEgg}
             sunTimes={sunTimes}
             windDirectionDeg={weatherData?.windDirectionDeg ?? null}
@@ -1351,6 +1420,9 @@ const SunTracker: React.FC = () => {
             onIssReminderToggle={notificationPermission === 'unsupported' ? undefined : handleIssReminderToggle}
             isLivePlanesOn={isLivePlanesOn}
             onLivePlanesToggle={handleLivePlanesToggle}
+            liveRadarStatus={liveStatus && {
+              status: liveStatus, nearby: liveNearby, shown: liveShown, compassOff: compassStatus === 'idle',
+            }}
             onCollectionOpen={handleCollectionOpen}
             onCountryChange={setDetectedCountry}
           />

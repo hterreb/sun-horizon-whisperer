@@ -96,7 +96,12 @@ const CloudSvg = memo(function CloudSvg({
       data-scene-hit
       className={onInfo ? 'absolute pointer-events-auto cursor-pointer touch-manipulation' : 'absolute'}
       onClick={onInfo && (event => {
-        if (tapPlaneBelow(event)) return;
+        // Item 147: the plane's click is the tap now. The cloud's click goes no further, so the
+        // controls toggle (SunTracker) sees one tap, not a double tap.
+        if (tapPlaneBelow(event)) {
+          event.stopPropagation();
+          return;
+        }
         onInfo(
           heart ? { type: 'egg', kind: 'heartCloud' } : { type: 'cloud', cloudType: cloud.type, band: cloud.band },
           { x: event.clientX, y: event.clientY },

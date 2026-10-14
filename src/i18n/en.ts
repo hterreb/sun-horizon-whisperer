@@ -220,6 +220,7 @@ export const en = {
   'scene.sun': 'Sun',
   'scene.countdown': 'Sunset in {seconds} s',
   'scene.countdownSoundOn': 'Turn on the countdown sound',
+  'scene.countdownTapToHear': 'Tap to turn on the sunset sound',
   'scene.moonInfo': 'Moon: {altitude}° | {illumination}',
   'direction.n': 'N',
   'direction.ne': 'NE',
@@ -326,6 +327,10 @@ export const en = {
   'info.route': 'Route',
   'radar.livePlanes': 'Live planes',
   'radar.hint': 'Real aircraft within 100 km. Sends your place, rounded to about 11 km, to adsb.lol.',
+  'radar.loading': 'Looking for planes…',
+  'radar.status': '{nearby} nearby · {shown} in view',
+  'radar.compassAll': 'the compass shows all',
+  'radar.unavailable': 'Live radar unavailable',
   'cloud.Ci': 'Cirrus',
   'cloud.Cs': 'Cirrostratus',
   'cloud.Ac': 'Altocumulus',
@@ -608,6 +613,18 @@ export const en = {
   'feedback.success': 'Thank you for your feedback!',
   'feedback.emptyError': 'Please write a message.',
   'feedback.error': 'Could not send the feedback. Please try again later.',
+
+  // Data sources (item 153); the provider names are not translated
+  'dataSources.title': 'Data sources',
+  'dataSources.weather': 'Weather',
+  'dataSources.places': 'Places',
+  'dataSources.search': 'Place search',
+  'dataSources.planes': 'Planes',
+  'dataSources.satellites': 'Satellites',
+  'dataSources.terrain': 'Terrain',
+  'dataSources.trees': 'Trees',
+  'dataSources.radio': 'Radio',
+  'dataSources.privacy': 'Privacy',
 
   // Toasts from SunTracker
   'toast.weatherUnavailableTitle': 'Weather unavailable',

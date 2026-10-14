@@ -168,10 +168,14 @@ interface LivePlanesProps {
   reducedMotion: boolean; // the planes move only with each answer of the feed
   onInfo?: SceneInfoHandler;
   infoRing?: string | null;
+  // Item 155: the number of planes drawn, on each change (0 when the layer goes away), for the
+  // status line, the Sentry tag and the decorative planes. Keep it stable (a state setter).
+  onShownChange?: (count: number) => void;
 }
 
 const LivePlanes: React.FC<LivePlanesProps> = ({
   state, observer, project, width, compass, profile, lights, contrail, trailColour, reducedMotion, onInfo, infoRing = null,
+  onShownChange,
 }) => {
   // Item 116: a double tap opens the card; a single tap shows the ring for a moment.
   const { tap } = useDoubleTap(onInfo);
@@ -207,6 +211,11 @@ const LivePlanes: React.FC<LivePlanesProps> = ({
     const sec = lag + (reducedMotion ? 0 : Math.min(LIVE_MAX_AGE_MS, Math.max(0, now - receivedAt)) / 1000);
     shown = getShown(feed.aircraft, sec, observer, profile, project, width, compass);
   }
+  const shownCount = shown.length;
+  useEffect(() => {
+    onShownChange?.(shownCount);
+    return () => onShownChange?.(0);
+  }, [shownCount, onShownChange]);
   // Each tilt follows from the plane's last one (getLiveTilt is pure, so a second render with the
   // same step gives the same tilt). A plane that is not shown drops out, so when it shows again
   // it starts fresh, with no transition. A plane's first frame stays first in all renders of its

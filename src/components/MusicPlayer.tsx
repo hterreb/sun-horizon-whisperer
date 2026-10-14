@@ -8,6 +8,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { ALWAYS_SHOWN, type IdleHide } from '@/hooks/useIdleHide';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
 import { getRainSoundGain } from '@/utils/rainUtils';
+import { STREAMS } from '@/utils/radioStreams';
 import { useRainSound } from '@/hooks/useRainSound';
 
 interface MusicPlayerProps {
@@ -16,6 +17,8 @@ interface MusicPlayerProps {
   // True during the sunset countdown sound (item 108): the radio plays at DUCK_FACTOR
   // of the slider volume. The slider value does not change.
   duck?: boolean;
+  // Called by the play tap (item 152, B2): starting the radio turns the countdown sound on.
+  onPlay?: () => void;
   // The rain amount in mm/h, null without rain (ROADMAP item 119): the rain sound button shows then.
   rainMmH?: number | null;
   // A dark sky (isDarkSky: night, astronomical and nautical twilight): the switch and the slider
@@ -23,7 +26,12 @@ interface MusicPlayerProps {
   night?: boolean;
 }
 
-const DUCK_FACTOR = 0.3;
+// Item 152: down to 10 % of the slider (about -20 dB) over DUCK_DOWN_MS, back over DUCK_UP_MS.
+// `audio.volume` is not Web Audio and has no ramp, so an interval steps it.
+const DUCK_FACTOR = 0.1;
+const DUCK_DOWN_MS = 300;
+const DUCK_UP_MS = 1000;
+const DUCK_STEP_MS = 50;
 
 // Item 139: the shadcn Switch and Slider are near-white in their light defaults, too bright at
 // night. They are styled from here (src/components/ui/ is not hand-edited). The transitions are
@@ -34,20 +42,6 @@ const SWITCH_NIGHT = 'data-[state=unchecked]:bg-white/15 data-[state=checked]:bg
 // The Radix slider: the root holds the track (first span, with the range in it) and the thumb.
 const SLIDER_CLASS = 'w-16 sm:w-24 [&>span:first-child]:transition-colors [&>span:first-child>span]:transition-colors';
 const SLIDER_NIGHT = '[&>span:first-child]:bg-white/15 [&>span:first-child>span]:bg-white/40 [&_[role=slider]]:bg-white/60 [&_[role=slider]]:border-transparent [&_[role=slider]]:h-4 [&_[role=slider]]:w-4';
-
-// Lo-fi hip hop radio streams
-const STREAMS: { name: string; url: string }[] = [
-  { name: 'FluxFM Chillhop', url: 'https://fluxfm.streamabc.net/flx-chillhop-mp3-320-1595440' },
-  { name: 'ILoveRadio Lo-Fi', url: 'https://streams.ilovemusic.de/iloveradio17.mp3' },
-  { name: 'Epic Lounge Jazzhop', url: 'https://stream.epic-lounge.com/jazzhop-lounge' },
-  { name: '0nlineradio Lo-Fi', url: 'https://stream.0nlineradio.com/lo-fi' },
-  { name: 'ISEKOI Chill Zone', url: 'https://public.isekoi-radio.com/listen/chill/radio.mp3' },
-  { name: 'laut.fm lofi', url: 'https://stream.laut.fm/lofi' },
-  { name: 'REYFM #lofi', url: 'https://listen.reyfm.de/lofi_128kbps.mp3' },
-  { name: 'Hunter.FM Lo-Fi', url: 'https://live.hunter.fm/lofi_normal' },
-  { name: 'CLIAMP Lofi Hip Hop', url: 'https://radio.cliamp.stream/lofi/stream' },
-  { name: 'Hotmix Lo-Fi', url: 'https://streaming.hotmixradio.com/hotmix-lofi-en-mp3' }
-];
 
 const STATION_INDEX_KEY = 'radio_station_index';
 
@@ -85,7 +79,7 @@ const loadStoredStationIndex = (): number => {
   }
 };
 
-const MusicPlayer: React.FC<MusicPlayerProps> = ({ controls = ALWAYS_SHOWN, duck = false, rainMmH = null, night = false }) => {
+const MusicPlayer: React.FC<MusicPlayerProps> = ({ controls = ALWAYS_SHOWN, duck = false, onPlay, rainMmH = null, night = false }) => {
   const [isPlaying, setIsPlayingState] = useState(false);
   // The rain sound (ROADMAP item 119): on with the radio, or alone by its button. Not saved:
   // a browser plays no sound before a tap.
@@ -168,11 +162,30 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ controls = ALWAYS_SHOWN, duck
   const effectiveVolume = volume[0] * (duck ? DUCK_FACTOR : 1);
   useRainSound(getRainSoundGain(rainMmH, rainOn, isPlaying, effectiveVolume));
 
+  // The radio's share of the slider volume: 1, or DUCK_FACTOR while `duck`. A change ramps
+  // linearly from the level it has now (item 152).
+  const [duckLevel, setDuckLevel] = useState(1);
+  const duckLevelRef = useRef(1);
+  useEffect(() => {
+    const from = duckLevelRef.current;
+    const to = duck ? DUCK_FACTOR : 1;
+    if (from === to) return;
+    const durationMs = duck ? DUCK_DOWN_MS : DUCK_UP_MS;
+    const startedAt = Date.now();
+    const interval = setInterval(() => {
+      const progress = Math.min(1, (Date.now() - startedAt) / durationMs);
+      duckLevelRef.current = from + (to - from) * progress;
+      setDuckLevel(duckLevelRef.current);
+      if (progress === 1) clearInterval(interval);
+    }, DUCK_STEP_MS);
+    return () => clearInterval(interval);
+  }, [duck]);
+
   useEffect(() => {
     if (audioRef.current) {
-      audioRef.current.volume = volume[0] * (duck ? DUCK_FACTOR : 1);
+      audioRef.current.volume = volume[0] * duckLevel;
     }
-  }, [volume, duck]);
+  }, [volume, duckLevel]);
 
   useEffect(() => {
     isPlayingRef.current = isPlaying;
@@ -214,6 +227,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ controls = ALWAYS_SHOWN, duck
 
   const handlePlayToggle = (checked: boolean) => {
     setIsPlaying(checked);
+    if (checked) onPlay?.();
   };
 
   const handleNext = useCallback(() => {
@@ -254,6 +268,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ controls = ALWAYS_SHOWN, duck
   return (
     <div 
       data-share-hide
+      data-idle-control
       className={`animate-fade-in fixed z-20 ${GLASS_SURFACE} rounded-full px-3 py-2 flex items-center gap-2 transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'} ${isTappable ? '' : 'pointer-events-none'}`}
       style={{
         bottom: `calc(${isMobile ? '4rem' : '1rem'} + env(safe-area-inset-bottom))`,

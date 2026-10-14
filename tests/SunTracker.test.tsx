@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import SunTracker from '../src/components/SunTracker';
 import { vi } from 'vitest';
 import { TAP_READY_MS } from '../src/hooks/useIdleHide';
+import { DOUBLE_TAP_MS } from '../src/hooks/useDoubleTap';
 import { loadManualLocation, saveManualLocation } from '../src/utils/manualLocation';
 import { getSunPosition, getSunTimes } from '../src/utils/sunUtils';
 import type SunVisualizationType from '../src/components/SunVisualization';
@@ -21,12 +22,13 @@ vi.mock('../src/components/SunVisualization', async (importOriginal) => {
   };
 });
 
-// The fireworks breadcrumbs (ROADMAP item 80).
+// The fireworks breadcrumbs (ROADMAP item 80) and the live-planes tag (item 155).
 vi.mock('@sentry/react', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sentry/react')>()),
   addBreadcrumb: vi.fn(),
+  setTag: vi.fn(),
 }));
-import { addBreadcrumb } from '@sentry/react';
+import { addBreadcrumb, setTag } from '@sentry/react';
 
 // Mock the toast function
 vi.mock('@/hooks/use-toast', () => ({
@@ -345,7 +347,7 @@ describe('SunTracker', () => {
       expect(shown()).toBe(true);
     });
 
-    it('a tap on a scene thing, a control or outside the scene does not toggle', () => {
+    it('a double tap on a scene thing, a tap on a control or outside the scene does not toggle', () => {
       const scene = start();
       setFullscreenElement(document.documentElement);
       const hit = scene.appendChild(document.createElement('span'));
@@ -398,6 +400,110 @@ describe('SunTracker', () => {
       advance(60_000);
       expect(shown()).toBe(true);
       expect(column()).not.toHaveClass('pointer-events-none');
+    });
+
+    describe('item 147: a tap on a scene thing (T1) or on a hidden control (T2)', () => {
+      // The sun is a scene thing: a double tap (detail 1, then 2) or a keyboard click (detail 0)
+      // opens its card.
+      const sunTap = (detail: number, init: MouseEventInit = {}) => {
+        const sun = screen.getByRole('button', { name: 'Sun' });
+        fireEvent.pointerDown(sun, init);
+        fireEvent.click(sun, { detail, ...init });
+      };
+      const card = () => screen.queryByTestId('scene-info-card');
+
+      it('a single tap on a scene thing toggles after DOUBLE_TAP_MS', () => {
+        const scene = start();
+        setFullscreenElement(document.documentElement);
+        const hit = scene.appendChild(document.createElement('span'));
+        hit.setAttribute('data-scene-hit', 'true');
+        const cloud = hit.appendChild(document.createElement('span'));
+
+        tap(cloud);
+        advance(DOUBLE_TAP_MS - 1);
+        expect(shown()).toBe(true);
+        advance(1);
+        expect(shown()).toBe(false);
+        advance(60_000);
+        expect(shown()).toBe(false);
+
+        tap(cloud);
+        advance(DOUBLE_TAP_MS - 1);
+        expect(shown()).toBe(false);
+        advance(1);
+        expect(shown()).toBe(true);
+      });
+
+      it('a double tap on a scene thing opens its card and does not toggle, shown or hidden', () => {
+        const scene = start();
+        setFullscreenElement(document.documentElement);
+        sunTap(1);
+        advance(200);
+        sunTap(2);
+        expect(card()).toBeInTheDocument();
+        advance(1000);
+        expect(shown()).toBe(true);
+
+        tap(scene); // closes the card only
+        tap(scene);
+        expect(shown()).toBe(false);
+        advance(1000);
+        sunTap(1);
+        advance(200);
+        sunTap(2);
+        expect(card()).toBeInTheDocument();
+        advance(1000);
+        expect(shown()).toBe(false);
+      });
+
+      it('a keyboard click on a scene thing opens its card and does not toggle', () => {
+        start();
+        setFullscreenElement(document.documentElement);
+        sunTap(0);
+        expect(card()).toBeInTheDocument();
+        advance(1000);
+        expect(shown()).toBe(true);
+      });
+
+      it('while hidden, a tap in the box of a hidden control shows the controls at once; the scene thing below takes no tap', () => {
+        const scene = start();
+        setFullscreenElement(document.documentElement);
+        expect(document.querySelectorAll('[data-idle-control]')).toHaveLength(3);
+        tap(scene);
+        expect(shown()).toBe(false);
+        advance(1000);
+        // jsdom draws nothing: the top-left column gets its box (16 px from the corner, 56 × 160).
+        vi.spyOn(column(), 'getBoundingClientRect').mockReturnValue(
+          { left: 16, top: 16, right: 72, bottom: 176, width: 56, height: 160, x: 16, y: 16, toJSON: () => ({}) } as DOMRect,
+        );
+
+        // The sun is under the column. Its double tap would open the card: the first tap goes to
+        // the column's box, so the second tap is only a first tap for the sun.
+        sunTap(1, { clientX: 30, clientY: 30 });
+        expect(shown()).toBe(true);
+        advance(200);
+        sunTap(2, { clientX: 30, clientY: 30 });
+        expect(card()).toBeNull();
+        advance(1000);
+        expect(shown()).toBe(true);
+
+        // Shown, the box is not special: a tap there on the sun toggles after DOUBLE_TAP_MS.
+        sunTap(1, { clientX: 30, clientY: 30 });
+        advance(DOUBLE_TAP_MS);
+        expect(shown()).toBe(false);
+        expect(card()).toBeNull();
+
+        // A toast on top of the hidden box (a badge, `data-share-hide`) keeps its tap.
+        advance(1000);
+        const toast = scene.appendChild(document.createElement('button'));
+        toast.setAttribute('data-share-hide', '');
+        const onToast = vi.fn();
+        toast.addEventListener('click', onToast);
+        fireEvent.pointerDown(toast);
+        fireEvent.click(toast, { clientX: 30, clientY: 30 });
+        expect(onToast).toHaveBeenCalledTimes(1);
+        expect(shown()).toBe(false);
+      });
     });
   });
 
@@ -920,12 +1026,17 @@ describe('SunTracker', () => {
         createGain() {
           return { gain: { setValueAtTime: () => {}, linearRampToValueAtTime: () => {} }, connect: (node: unknown) => node };
         }
+        // The countdown's master bus (item 152).
+        createDynamicsCompressor() {
+          return { threshold: {}, knee: {}, ratio: {}, attack: {}, release: {}, connect: (node: unknown) => node };
+        }
         createOscillator() {
           return { type: '', frequency: { setValueAtTime: () => {} }, connect: (node: unknown) => node, start: (at: number) => starts.push(at), stop: () => {} };
         }
       }
       const sunset = getSunTimes(NOON, RAVENSBURG.latitude, RAVENSBURG.longitude).sunset!;
       const toggle = () => fireEvent.click(screen.getByRole('button', { name: 'Sunset countdown' }));
+      const radio = () => fireEvent.click(screen.getByRole('switch', { name: 'Play lo-fi music' }));
       // Starts 20 s before the sunset; the 1 s clock then reaches T-11 s after 9 ticks.
       const runToCountdown = (turnOn: boolean) => {
         start(new Date(sunset.getTime() - 20_000));
@@ -950,6 +1061,33 @@ describe('SunTracker', () => {
         expect(screen.getByRole('button', { name: 'Sunset countdown' })).toHaveAttribute('aria-pressed', 'true');
         expect(starts).toHaveLength(1);
         expect(localStorage.getItem('sunset-countdown')).toBe('on');
+      });
+
+      it('starting the radio turns it on without a check tone, also after the user turned it off (item 152, B2)', () => {
+        const play = vi.spyOn(window.HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+        const pause = vi.spyOn(window.HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+        start(new Date(sunset.getTime() - 20_000));
+        const bell = () => screen.getByRole('button', { name: 'Sunset countdown' });
+        expect(bell()).toHaveAttribute('aria-pressed', 'false');
+        radio();
+        expect(bell()).toHaveAttribute('aria-pressed', 'true');
+        expect(localStorage.getItem('sunset-countdown')).toBe('on');
+        expect(starts).toHaveLength(0);
+
+        toggle();
+        expect(bell()).toHaveAttribute('aria-pressed', 'false');
+        radio();
+        expect(bell()).toHaveAttribute('aria-pressed', 'false');
+        radio();
+        expect(bell()).toHaveAttribute('aria-pressed', 'true');
+        expect(localStorage.getItem('sunset-countdown')).toBe('on');
+
+        // The countdown then plays over the radio.
+        starts.length = 0;
+        tickFor(9000, 1000);
+        expect(starts).toHaveLength(11);
+        play.mockRestore();
+        pause.mockRestore();
       });
 
       it('with the toggle on, schedules 11 tones at T-11 s, 1 s apart, and the pill counts down', () => {
@@ -1687,6 +1825,35 @@ describe('SunTracker', () => {
       fireEvent.click(again);
       expect(localStorage.getItem('live-planes')).toBe('off');
       expect(screen.getByRole('switch', { name: 'Live planes' })).toHaveAttribute('aria-checked', 'false');
+    });
+
+    // Item 155: the status line under the switch and the Sentry tag `live-planes`.
+    it('shows the status under the switch and sets the live-planes tag: off, ok-<shown>/<nearby>, error', async () => {
+      const ac = (hex: string) => ({ hex, callsign: null, type: null, altM: 10_000, speedKt: 400, track: 90, lat: 47.5, lon: 9.6, ageSec: 0 });
+      const tags = () => vi.mocked(setTag).mock.calls.filter(([name]) => name === 'live-planes').map(([, value]) => value);
+      const first = render(<SunTracker />);
+      const toggle = await screen.findByRole('switch', { name: 'Live planes' });
+      expect(tags()).toEqual(['off']);
+      expect(screen.queryByTestId('live-planes-status')).toBeNull();
+      global.fetch = vi.fn(async (url: RequestInfo | URL) => (String(url).startsWith('/api/planes')
+        ? new Response(JSON.stringify({ now: 1, aircraft: [ac('a1'), ac('a2')] }), { status: 200 })
+        : Promise.reject(new Error('offline')))) as unknown as typeof fetch;
+      fireEvent.click(toggle);
+      // In jsdom the scene has no size, so no live plane is drawn.
+      await waitFor(() => expect(screen.getByTestId('live-planes-status').textContent).toMatch(/^2 nearby · 0 in view/));
+      expect(tags()).toEqual(['off', 'loading', 'ok-0/2']);
+      fireEvent.click(toggle);
+      expect(screen.queryByTestId('live-planes-status')).toBeNull();
+      expect(tags().at(-1)).toBe('off');
+      first.unmount();
+
+      global.fetch = vi.fn(async (url: RequestInfo | URL) => (String(url).startsWith('/api/planes')
+        ? new Response('', { status: 502 })
+        : Promise.reject(new Error('offline')))) as unknown as typeof fetch;
+      render(<SunTracker />);
+      fireEvent.click(await screen.findByRole('switch', { name: 'Live planes' }));
+      await waitFor(() => expect(screen.getByTestId('live-planes-status')).toHaveTextContent('Live radar unavailable'));
+      expect(tags().at(-1)).toBe('error');
     });
 
     it('starts off when the storage cannot be read', async () => {

@@ -220,6 +220,7 @@ export const es: Record<keyof typeof en, string> = {
   'scene.sun': "Sol",
   'scene.countdown': "Puesta de sol en {seconds} s",
   'scene.countdownSoundOn': "Activar el sonido de la cuenta atrás",
+  'scene.countdownTapToHear': "Toca para activar el sonido de la puesta de sol",
   'scene.moonInfo': "Luna: {altitude}° | {illumination}",
   'direction.n': "N",
   'direction.ne': "NE",
@@ -326,6 +327,10 @@ export const es: Record<keyof typeof en, string> = {
   'info.route': "Ruta",
   'radar.livePlanes': "Aviones en directo",
   'radar.hint': "Aviones reales a menos de 100 km. Envía tu lugar, redondeado a unos 11 km, a adsb.lol.",
+  'radar.loading': "Buscando aviones…",
+  'radar.status': "{nearby} cerca · {shown} a la vista",
+  'radar.compassAll': "la brújula los muestra todos",
+  'radar.unavailable': "Radar en directo no disponible",
   'cloud.Ci': "Cirros",
   'cloud.Cs': "Cirrostratos",
   'cloud.Ac': "Altocúmulos",
@@ -608,6 +613,18 @@ export const es: Record<keyof typeof en, string> = {
   'feedback.success': "¡Gracias por tus comentarios!",
   'feedback.emptyError': "Escribe un mensaje.",
   'feedback.error': "No se pudieron enviar los comentarios. Inténtalo más tarde.",
+
+  // Data sources (item 153); the provider names are not translated
+  'dataSources.title': "Fuentes de datos",
+  'dataSources.weather': "Tiempo",
+  'dataSources.places': "Lugares",
+  'dataSources.search': "Búsqueda de lugares",
+  'dataSources.planes': "Aviones",
+  'dataSources.satellites': "Satélites",
+  'dataSources.terrain': "Terreno",
+  'dataSources.trees': "Árboles",
+  'dataSources.radio': "Radio",
+  'dataSources.privacy': "Privacidad",
 
   // Toasts from SunTracker
   'toast.weatherUnavailableTitle': "Tiempo no disponible",

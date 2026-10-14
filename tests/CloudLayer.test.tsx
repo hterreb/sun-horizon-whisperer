@@ -1523,11 +1523,11 @@ describe('planes and contrails (ROADMAP item 96)', () => {
     expect(scene.planes).toHaveLength(0);
   });
 
-  it('sends no decorative plane while the live radar is on, and takes the ones on screen away (item 96)', () => {
+  it('sends no decorative plane while a live plane shows; the ones in flight fly on (items 96 and 155)', () => {
     expect(firstPlaneAt({ livePlanes: true }, 1)).toBeNull();
     const { plane } = firstPlaneAt({}, 1)!;
     const scene = spawnTick({ ...empty(), planes: [plane] }, times(), rules({ livePlanes: true }), 1000, 1, mulberry32(1));
-    expect(scene.planes).toHaveLength(0);
+    expect(scene.planes).toEqual([plane]);
   });
 
   it('shows only the lights at night: a red or a green wing light', () => {
@@ -1594,6 +1594,39 @@ describe('planes and contrails (ROADMAP item 96)', () => {
       endAnimation(pieces[count - 1], trailName);
       expect(container.querySelectorAll('[data-testid="scene-plane"]')).toHaveLength(0);
       unmount();
+    }
+  });
+
+  // Item 155: `livePlanes` is true only while a live plane shows. With the radar on and none
+  // shown, SunVisualization passes false: the decorative planes fly as before.
+  it('starts no decorative plane while a live plane shows, and keeps the one in flight when one comes', () => {
+    vi.useFakeTimers();
+    const randomSpy = vi.spyOn(Math, 'random').mockImplementation(mulberry32(96));
+    window.history.pushState({}, '', '/?plane=none'); // a plane every 20 s
+    const scene = (livePlanes: boolean) => <CloudLayer warmStart={false} weatherType="clear" timeOfDay="midday" livePlanes={livePlanes} />;
+    const count = (container: HTMLElement) => container.querySelectorAll('[data-testid="scene-plane"]').length;
+    try {
+      const shown = render(scene(true));
+      act(() => { vi.advanceTimersByTime(21_000); });
+      expect(count(shown.container)).toBe(0);
+      shown.unmount();
+
+      const { container, rerender } = render(scene(false));
+      act(() => { vi.advanceTimersByTime(21_000); });
+      expect(count(container)).toBe(1);
+      const wrapper = wrapperOf(container);
+      rerender(scene(true));
+      act(() => { vi.advanceTimersByTime(21_000); });
+      // No pop-out: the same plane flies on, and no second one comes.
+      expect(count(container)).toBe(1);
+      expect(wrapperOf(container)).toBe(wrapper);
+      rerender(scene(false));
+      act(() => { vi.advanceTimersByTime(1_000); });
+      expect(count(container)).toBe(2);
+    } finally {
+      window.history.pushState({}, '', '/');
+      randomSpy.mockRestore();
+      vi.useRealTimers();
     }
   });
 

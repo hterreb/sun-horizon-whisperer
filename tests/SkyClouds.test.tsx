@@ -212,4 +212,22 @@ describe('SkyClouds over a plane (ROADMAP item 126)', () => {
     expect(planeTap).toHaveBeenCalledTimes(2);
     plane.remove();
   });
+
+  it('lets only the plane\'s click reach the document, so a tap counts once (item 147)', () => {
+    const cloud = sky({ weatherType: 'partly', onInfo: vi.fn() }).querySelector<HTMLElement>('[data-testid="sky-cloud"]')!;
+    const plane = document.body.appendChild(document.createElement('span'));
+    plane.setAttribute('data-plane-hit', '');
+    const seen: EventTarget[] = [];
+    const onClick = (event: MouseEvent) => seen.push(event.target!);
+    document.addEventListener('click', onClick);
+
+    document.elementsFromPoint = () => [cloud, plane];
+    fireEvent.click(cloud, { clientX: 40, clientY: 50 });
+    expect(seen).toEqual([plane]);
+    document.elementsFromPoint = () => [cloud];
+    fireEvent.click(cloud, { clientX: 40, clientY: 50 });
+    expect(seen).toEqual([plane, cloud]);
+    document.removeEventListener('click', onClick);
+    plane.remove();
+  });
 });

@@ -62,16 +62,56 @@ describe('MusicPlayer', () => {
     // Check for visibility state
   });
 
-  it('ducks to 30 % of the slider volume during the countdown sound, then comes back (item 108)', () => {
+  it('ducks to 10 % of the slider volume over 300 ms during the countdown sound, and back over 1 s (items 108, 152)', () => {
+    vi.useFakeTimers();
     const instances = stubAudioConstructor();
     const { rerender } = render(<MusicPlayer />);
     const audioEl = instances[0];
+    const advance = (ms: number) => act(() => vi.advanceTimersByTime(ms));
     expect(audioEl.volume).toBeCloseTo(0.5, 6);
+
     rerender(<MusicPlayer duck />);
-    expect(audioEl.volume).toBeCloseTo(0.15, 6);
-    expect(screen.getByRole('slider')).toHaveAttribute('aria-valuenow', '0.5');
-    rerender(<MusicPlayer duck={false} />);
     expect(audioEl.volume).toBeCloseTo(0.5, 6);
+    advance(150);
+    expect(audioEl.volume).toBeCloseTo(0.5 * 0.55, 6);
+    advance(150);
+    expect(audioEl.volume).toBeCloseTo(0.05, 6);
+    advance(1000);
+    expect(audioEl.volume).toBeCloseTo(0.05, 6);
+    expect(screen.getByRole('slider')).toHaveAttribute('aria-valuenow', '0.5');
+
+    rerender(<MusicPlayer duck={false} />);
+    advance(500);
+    expect(audioEl.volume).toBeCloseTo(0.5 * 0.55, 6);
+    advance(500);
+    expect(audioEl.volume).toBeCloseTo(0.5, 6);
+    vi.useRealTimers();
+  });
+
+  it('a duck that ends early ramps back up from the level it reached (item 152)', () => {
+    vi.useFakeTimers();
+    const instances = stubAudioConstructor();
+    const { rerender } = render(<MusicPlayer />);
+    const audioEl = instances[0];
+    rerender(<MusicPlayer duck />);
+    act(() => vi.advanceTimersByTime(150));
+    rerender(<MusicPlayer duck={false} />);
+    act(() => vi.advanceTimersByTime(500));
+    expect(audioEl.volume).toBeCloseTo(0.5 * (0.55 + 0.45 * 0.5), 6);
+    act(() => vi.advanceTimersByTime(500));
+    expect(audioEl.volume).toBeCloseTo(0.5, 6);
+    vi.useRealTimers();
+  });
+
+  it('the play tap calls onPlay, the pause tap does not (item 152, B2)', () => {
+    vi.spyOn(window.HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+    vi.spyOn(window.HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+    const onPlay = vi.fn();
+    render(<MusicPlayer onPlay={onPlay} />);
+    fireEvent.click(screen.getByRole('switch'));
+    expect(onPlay).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('switch'));
+    expect(onPlay).toHaveBeenCalledTimes(1);
   });
 
   it('tries fallback streams if one fails', () => {

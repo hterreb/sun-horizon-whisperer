@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Wind, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward, Bell, BellRing, AlarmClock, AlarmClockCheck, Satellite, Award } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Wind, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward, Bell, BellRing, AlarmClock, AlarmClockCheck, Satellite, Award, Database } from 'lucide-react';
 import { isFeedbackAvailable, openFeedbackForm } from '@/utils/feedback';
+import DataSourcesDialog from './DataSourcesDialog';
 import { ScrollArea } from './ui/scroll-area';
 import { Switch } from './ui/switch';
 import { Button } from './ui/button';
@@ -35,6 +36,7 @@ import { getTimeTravelRange, toDateTimeLocalValue } from '@/utils/timeTravel';
 import { formatTemperature, type TemperatureUnit } from '@/utils/temperatureUnit';
 import { SUNSET_REMINDER_MIN } from '@/utils/sunsetReminder';
 import { PASS_REMINDER_MIN } from '@/utils/satelliteUtils';
+import { type LiveStatus } from '@/utils/liveRadar';
 import { LANGUAGES, LANGUAGE_NAMES, type Language } from '@/utils/language';
 import { formatNumber, translate, type MessageKey } from '@/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -151,6 +153,10 @@ interface InfoPanelProps {
   // The live radar (ROADMAP item 96, Premium): the "Live planes" switch, off by default.
   isLivePlanesOn?: boolean;
   onLivePlanesToggle?: (on: boolean) => void;
+  // Item 155: the status line under the switch while the radar runs; null: no line. `nearby` is
+  // the aircraft in the last answer, `shown` the planes drawn; `compassOff`: the compass button
+  // is there and compass mode is off.
+  liveRadarStatus?: { status: LiveStatus; nearby: number; shown: number; compassOff: boolean } | null;
   // Collection badges (ROADMAP item 112): the row button that opens the collection.
   onCollectionOpen?: () => void;
   // National days (utils/nationalDays): the place's country code from the reverse-geocode
@@ -208,6 +214,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   onIssReminderToggle,
   isLivePlanesOn = false,
   onLivePlanesToggle,
+  liveRadarStatus = null,
   onCollectionOpen,
   onCountryChange,
 }) => {
@@ -235,6 +242,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   // Golden & Blue Hour (ROADMAP item 24): collapsed by default, and not part of the
   // time-of-day auto-collapse effect below - it stays as the user left it.
   const [isGoldenBlueCollapsed, setIsGoldenBlueCollapsed] = useState(true);
+  // Data sources dialog (ROADMAP item 153). A stable close: the panel renders each second.
+  const [isDataSourcesOpen, setIsDataSourcesOpen] = useState(false);
+  const closeDataSources = useCallback(() => setIsDataSourcesOpen(false), []);
   // Line of sight details (ROADMAP item 30): closed by default, and independent for
   // the sun rows and the moon rows.
   const [isSunTerrainOpen, setIsSunTerrainOpen] = useState(false);
@@ -503,6 +513,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   return (
     <div
       data-share-hide
+      data-idle-control
       className={`absolute top-0 max-[363px]:top-[calc(10rem+env(safe-area-inset-top))] right-0 z-30 w-full max-w-[min(300px,calc(100vw-2rem))] sm:w-[300px] bg-[hsl(var(--panel-background)/0.45)] backdrop-blur-md border border-[hsl(var(--panel-border)/0.14)] text-white rounded-bl-panel max-[363px]:rounded-tl-panel overflow-hidden transition-opacity duration-300 max-h-dvh max-[363px]:max-h-[calc(100dvh-10rem-env(safe-area-inset-top))] ${
         isVisible ? 'opacity-100' : 'opacity-0'
       } ${isTappable ? '' : 'pointer-events-none'} ${
@@ -731,6 +742,15 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   onCheckedChange={on => (on ? requirePremium(() => onLivePlanesToggle(true)) : onLivePlanesToggle(false))}
                 />
               </div>
+              {/* Item 155: what the radar finds; without the compass the 360° view shows few. */}
+              {isLivePlanesOn && liveRadarStatus && (
+                <p className="text-caption mt-1" data-testid="live-planes-status">
+                  {liveRadarStatus.status === 'ok'
+                    ? t('radar.status', { nearby: liveRadarStatus.nearby, shown: liveRadarStatus.shown })
+                      + (liveRadarStatus.compassOff && liveRadarStatus.shown < liveRadarStatus.nearby ? ` · ${t('radar.compassAll')}` : '')
+                    : t(liveRadarStatus.status === 'error' ? 'radar.unavailable' : 'radar.loading')}
+                </p>
+              )}
               <p className="text-caption opacity-60 mt-1">{t('radar.hint')}</p>
             </div>
           )}
@@ -872,19 +892,6 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                     aria-pressed={isSunsetReminderOn}
                   >
                     {isSunsetReminderOn ? <AlarmClockCheck size={14} /> : <AlarmClock size={14} />}
-                  </button>
-                )}
-                {onIssReminderToggle && (
-                  <button
-                    type="button"
-                    onClick={() => requirePremium(onIssReminderToggle)}
-                    className={`${INLINE_ICON_TOGGLE} relative ml-1 ${isIssReminderOn ? 'bg-white/20' : ''}`}
-                    aria-label={t('issReminder.label')}
-                    title={t('issReminder.toggle', { minutes: PASS_REMINDER_MIN })}
-                    aria-pressed={isIssReminderOn}
-                  >
-                    <Satellite size={14} />
-                    <PremiumBadge className="absolute -right-1 -top-1 h-2.5 w-2.5" />
                   </button>
                 )}
                 {!polarSunLabel && shownSunset && (
@@ -1302,7 +1309,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             </div>
           </div>
 
-          {/* Satellite tracking (ROADMAP item 97): Premium in the Play app. */}
+          {/* Satellite tracking (ROADMAP item 97): Premium in the Play app. The ISS passes
+              toggle sits next to the switch (item 154) and works with the tracking off. */}
           {onSatelliteTrackingToggle && (
             <div className="mt-6 pt-4 border-t border-white/20 flex items-center justify-between gap-2" title={t('satellite.trackingHint')}>
               <span className="text-caption opacity-80 inline-flex items-center gap-1">
@@ -1310,6 +1318,19 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 {t('satellite.tracking')}
                 <PremiumBadge />
               </span>
+              {onIssReminderToggle && (
+                <button
+                  type="button"
+                  onClick={() => requirePremium(onIssReminderToggle)}
+                  className={`${INLINE_ICON_TOGGLE} relative ml-auto ${isIssReminderOn ? 'bg-white/20' : ''}`}
+                  aria-label={t('issReminder.label')}
+                  title={t('issReminder.toggle', { minutes: PASS_REMINDER_MIN })}
+                  aria-pressed={isIssReminderOn}
+                >
+                  <Satellite size={14} />
+                  <PremiumBadge className="absolute -right-1 -top-1 h-2.5 w-2.5" />
+                </button>
+              )}
               <Switch
                 checked={isSatelliteTrackingOn}
                 onCheckedChange={() => requirePremium(onSatelliteTrackingToggle)}
@@ -1367,6 +1388,19 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               </button>
             </div>
           )}
+
+          {/* Data sources and the privacy page (ROADMAP item 153) */}
+          <div className="mt-6 pt-4 border-t border-white/20">
+            <button
+              onClick={() => setIsDataSourcesOpen(true)}
+              className={`flex items-center gap-2 text-caption opacity-80 hover:opacity-100 transition-opacity rounded ${FOCUS_RING}`}
+              aria-haspopup="dialog"
+            >
+              <Database size={14} />
+              {t('dataSources.title')}
+            </button>
+            {isDataSourcesOpen && <DataSourcesDialog onClose={closeDataSources} />}
+          </div>
             </div>
           </ScrollArea>
         </div>
