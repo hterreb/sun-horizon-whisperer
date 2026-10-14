@@ -708,27 +708,36 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   // Terrain silhouette (ROADMAP item 13): replaces the flat horizon line with the
   // real profile when one is loaded, using the same altitude->y mapping as the sun/
   // moon dots and the same azimuth->x mapping (static full circle or compass FOV).
-  // The trees (item 141) go into the same path, so the taps, the keyboard and the sea's
-  // mirror take them as terrain. Rebuilt only when the profile, the size, the heading or
-  // the month change; no work per frame.
+  // The trees (item 141; item 150: a thin forest band and a few lone sentinels) go into the
+  // same path, so the taps, the keyboard and the sea's mirror take them as terrain. Rebuilt
+  // only when the profile, the size, the heading or the month change; no work per frame. The
+  // trees' layout on the full circle does not depend on the heading, so turning the compass
+  // only puts it on the screen again.
   const treeMonth = date.getMonth();
+  const treePlan = useMemo(() => {
+    const { width, height } = containerDimensions;
+    if (!trees || !horizonProfile || width === 0 || height === 0) return null;
+    return trees.lib.planTrees(horizonProfile, trees.cover, (angle) => altitudeToY(angle, height), {
+      perDegree: compassActive ? 3 : 1,
+      pxPerDegree: width / (compassActive ? COMPASS_FOV_DEG : 360),
+      bare: trees.lib.isBareSeason(treeMonth, latitude),
+      latitude,
+      longitude,
+    });
+  }, [trees, horizonProfile, containerDimensions, compassActive, treeMonth, latitude, longitude]);
   const terrain = useMemo(() => {
     const { width, height } = containerDimensions;
-    if (!horizonProfile || width === 0 || height === 0) return { fill: '', trees: '' };
+    if (!horizonProfile || width === 0 || height === 0) return { fill: '', trees: '', segments: [], scene: null };
 
     const horizonY = height * 0.65;
     const segments = buildTerrainSegments(horizonProfile, width, height, latitude, compassHeading);
     const fill = buildTerrainFillPath(segments, horizonY);
-    const treePath = trees
-      ? trees.lib.buildTreePath(segments, horizonProfile, trees.cover, (angle) => altitudeToY(angle, height), {
-          perDegree: compassHeading === null ? 1 : 3,
-          bare: trees.lib.isBareSeason(treeMonth, latitude),
-          latitude,
-          longitude,
-        })
-      : '';
-    return { fill: treePath ? `${fill} ${treePath}` : fill, trees: treePath };
-  }, [horizonProfile, containerDimensions, latitude, longitude, compassHeading, trees, treeMonth]);
+    const scene = trees && treePlan
+      ? trees.lib.buildTreeScene(treePlan, { width, leftAzimuth: getAzimuthAtFraction(0, latitude, compassHeading) })
+      : null;
+    const treePath = scene?.path ?? '';
+    return { fill: treePath ? `${fill} ${treePath}` : fill, trees: treePath, segments, scene };
+  }, [horizonProfile, containerDimensions, latitude, compassHeading, trees, treePlan]);
   const terrainFillPath = terrain.fill;
   // By day only, the trees get up to 8 % green or amber over the ridge colour (item 141).
   const isDaylight = timeOfDay === 'morning' || timeOfDay === 'midday' || timeOfDay === 'afternoon';
@@ -782,6 +791,26 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   // up, just off to one side" apart from "it's not up right now" (ROADMAP item 19).
   const sunVisibility = getSunVisibility(weatherType); // clouds dim the sun (ROADMAP item 50)
   const sunShines = sunVisibility.disc >= 0.5; // the faint overcast disc (item 72) gets no yellow glow and no glints
+
+  // The trees' rim light (item 150, V4): a 1 px warm edge on the sun side of the trees and the
+  // bare ridge, at golden hour (the hour after sunrise and the hour before sunset) while the
+  // sun shines. The path keeps the edges within 80° of the sun; a gradient centred on the sun's
+  // x fades them to nothing at 75° (`spreadMethod` repeat: one period is the full circle, so
+  // the fade wraps across the static seam). The path changes only with the whole-degree azimuth.
+  const rimLight = (timeOfDay === 'dawn' || timeOfDay === 'evening') && sunShines;
+  const rimSunAzimuth = Math.round(sunPosition.azimuth);
+  const treeRim = useMemo(
+    () =>
+      rimLight && trees && terrain.scene && horizonProfile
+        ? trees.lib.buildRimPath(terrain.scene, terrain.segments, horizonProfile, rimSunAzimuth)
+        : '',
+    [rimLight, trees, terrain, horizonProfile, rimSunAzimuth]
+  );
+  const rimFade = trees?.lib.RIM_FADE_DEG ?? 0;
+  const rimHalfPeriod = (180 * containerDimensions.width) / (compassActive ? COMPASS_FOV_DEG : 360);
+  const rimSunX = containerDimensions.width * resolveAzimuth(sunPosition.azimuth, latitude, compassHeading).fraction;
+  // The lookbook's two tones: golden hour (sun above 3°) and the last minutes before sunset.
+  const rimTone = sunPosition.altitude > 3 ? { color: '--scene-tree-rim-golden', opacity: 0.9 } : { color: '--scene-tree-rim-evening', opacity: 1 };
   const sunAltitudeVisible = sunPosition.altitude > -18 && sunVisibility.halo > 0;
   const moonAltitudeVisible = moonPosition.visible && (
     timeOfDay === 'night' ||
@@ -1465,6 +1494,22 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             <stop offset="0%" stopColor="hsl(var(--scene-st-patrick))" stopOpacity={0.08} />
             <stop offset="100%" stopColor="hsl(var(--scene-st-patrick))" stopOpacity={0.22} />
           </linearGradient>
+          {treeRim && (
+            <linearGradient
+              id="treeRimLight"
+              gradientUnits="userSpaceOnUse"
+              spreadMethod="repeat"
+              x1={rimSunX - rimHalfPeriod}
+              y1={0}
+              x2={rimSunX + rimHalfPeriod}
+              y2={0}
+              data-testid="tree-rim-light"
+            >
+              <stop offset={0.5 - rimFade / 360} stopColor={`hsl(var(${rimTone.color}))`} stopOpacity={0} />
+              <stop offset={0.5} stopColor={`hsl(var(${rimTone.color}))`} stopOpacity={rimTone.opacity} />
+              <stop offset={0.5 + rimFade / 360} stopColor={`hsl(var(${rimTone.color}))`} stopOpacity={0} />
+            </linearGradient>
+          )}
         </defs>
         {terrainFillPath && (
           // Line-of-sight ridge (ROADMAP item 13), colored per time-of-day like the
@@ -1497,6 +1542,19 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             fillOpacity={0.08}
             pointerEvents="none"
             data-testid="tree-tint"
+          />
+        )}
+        {treeRim && (
+          // The trees' rim light (item 150, V4), over the ridge; taps go through to the ridge.
+          <path
+            d={treeRim}
+            fill="none"
+            stroke="url(#treeRimLight)"
+            strokeWidth={1}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            pointerEvents="none"
+            data-testid="tree-rim"
           />
         )}
         <path
