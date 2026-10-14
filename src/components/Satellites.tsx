@@ -101,8 +101,10 @@ const Satellites: React.FC<SatellitesProps> = ({
   const nextId = useRef(0);
   useScenePlaybackRate(containerRef, playDirection);
 
-  // Decorative dots: one after a random gap in `gapMs`, shorter during play (item 83).
-  const showDecor = tracked === null && gapMs !== null && cloudFactor > 0 && !prefersReducedMotion && width > 0;
+  // Decorative dots: one after a random gap in `gapMs`, shorter during play (item 83). Also with
+  // the tracking on while no tracked satellite shows (none in sunlight, or all behind clouds).
+  const trackedShows = !!tracked?.some((dot) => dot.shown && getStarGapShow(cloudFactor, trackedGap(dot.id)) > 0);
+  const showDecor = !trackedShows && gapMs !== null && cloudFactor > 0 && !prefersReducedMotion && width > 0;
   const gapMin = gapMs?.[0] ?? 0;
   const gapMax = gapMs?.[1] ?? 0;
   const gapFactor = getSpawnGapFactor(playDirection);
@@ -123,9 +125,9 @@ const Satellites: React.FC<SatellitesProps> = ({
     timer = setTimeout(spawn, gap * gapFactor);
     return () => clearTimeout(timer);
   }, [showDecor, gapMin, gapMax, gapFactor]);
-  // The dots leave when the tracking takes over. When the night ends or clouds come, no new
-  // dot comes, and the ones on the way fade out with the layer and finish their crossing.
-  if ((tracked !== null || prefersReducedMotion) && decors.length > 0) setDecors([]);
+  // While a tracked satellite shows, when the night ends or clouds come, no new dot comes, and
+  // the ones on the way finish their crossing (at dawn they fade out with the layer).
+  if (prefersReducedMotion && decors.length > 0) setDecors([]);
   const removeDecor = React.useCallback((id: number) => setDecors((list) => list.filter((d) => d.id !== id)), []);
 
   if (!tracked && decors.length === 0) return null;

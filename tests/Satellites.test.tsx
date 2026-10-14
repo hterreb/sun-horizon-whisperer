@@ -100,6 +100,29 @@ describe('Satellites (ROADMAP item 97)', () => {
     expect(screen.getAllByTestId('satellite-decor')).toHaveLength(2);
   });
 
+  it('with the tracking on, sends decorative dots while no tracked satellite shows', () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0.5); // first dot at 30 s
+    const gapMs: [number, number] = [120_000, 240_000];
+    const { rerender } = render(<Satellites {...base} tracked={[iss]} gapMs={gapMs} />);
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(screen.queryByTestId('satellite-decor')).toBeNull();
+    // Only a satellite in the Earth's shadow: the decorative dots come.
+    rerender(<Satellites {...base} tracked={[fading]} gapMs={gapMs} />);
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(screen.getAllByTestId('satellite-decor')).toHaveLength(1);
+    // A tracked satellite shows again: no new dot, the one on its way stays.
+    rerender(<Satellites {...base} tracked={[iss]} gapMs={gapMs} />);
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+    expect(screen.getAllByTestId('satellite-decor')).toHaveLength(1);
+  });
+
   it('fades the decorative dots out over 1 min at the sun\'s -6°, without a cut-off', () => {
     vi.useFakeTimers();
     const { rerender } = render(<Satellites {...base} tracked={null} gapMs={[120_000, 240_000]} twilight={1} />);
@@ -119,7 +142,7 @@ describe('Satellites (ROADMAP item 97)', () => {
     expect(screen.getAllByTestId('satellite-decor')).toHaveLength(1);
   });
 
-  it('sends no decorative dots by day, behind full clouds or while tracking', () => {
+  it('sends no decorative dots by day, behind full clouds or while a tracked satellite shows', () => {
     vi.useFakeTimers();
     const { rerender } = render(<Satellites {...base} tracked={null} gapMs={null} />);
     const wait = () => act(() => {
@@ -128,7 +151,7 @@ describe('Satellites (ROADMAP item 97)', () => {
     wait();
     rerender(<Satellites {...base} tracked={null} cloudFactor={0} gapMs={[120_000, 240_000]} />);
     wait();
-    rerender(<Satellites {...base} tracked={[]} gapMs={[120_000, 240_000]} />);
+    rerender(<Satellites {...base} tracked={[iss]} gapMs={[120_000, 240_000]} />);
     wait();
     expect(screen.queryByTestId('satellite-decor')).toBeNull();
   });
