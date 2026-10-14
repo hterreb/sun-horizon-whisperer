@@ -86,6 +86,10 @@ interface SunVisualizationProps {
   contrail?: ContrailKind;
   // The live radar's feed while it is on (ROADMAP item 96, Premium); null: the decorative planes.
   livePlanes?: LivePlanesState | null;
+  // Item 155: the number of live planes drawn (SunTracker keeps it), and its report. While one
+  // or more show, no new decorative plane starts; with none, the decorative planes fly.
+  livePlanesShown?: number;
+  onLivePlanesShown?: (count: number) => void;
   // A rare lenticular or mammatus day (ROADMAP item 84, X1).
   cloudEgg?: boolean;
   // The day's sun times: the scene's busy and quiet phases follow them (ROADMAP item 93, S3).
@@ -606,6 +610,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   cloudLayers = null,
   contrail = 'none',
   livePlanes = null,
+  livePlanesShown = 0,
+  onLivePlanesShown,
   cloudEgg = false,
   sunTimes = null,
   compassHeading = null,
@@ -1159,10 +1165,11 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           reducedMotion={prefersReducedMotion}
           onInfo={onSceneInfo}
           infoRing={infoRing}
+          onShownChange={onLivePlanesShown}
         />
       )}
       <CloudLayer
-        livePlanes={!!livePlanes}
+        livePlanes={!!livePlanes && livePlanesShown > 0}
         timeOfDay={timeOfDay}
         weatherType={weatherType}
         date={date}

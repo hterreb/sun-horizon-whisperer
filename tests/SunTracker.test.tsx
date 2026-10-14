@@ -22,12 +22,13 @@ vi.mock('../src/components/SunVisualization', async (importOriginal) => {
   };
 });
 
-// The fireworks breadcrumbs (ROADMAP item 80).
+// The fireworks breadcrumbs (ROADMAP item 80) and the live-planes tag (item 155).
 vi.mock('@sentry/react', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sentry/react')>()),
   addBreadcrumb: vi.fn(),
+  setTag: vi.fn(),
 }));
-import { addBreadcrumb } from '@sentry/react';
+import { addBreadcrumb, setTag } from '@sentry/react';
 
 // Mock the toast function
 vi.mock('@/hooks/use-toast', () => ({
@@ -1792,6 +1793,35 @@ describe('SunTracker', () => {
       fireEvent.click(again);
       expect(localStorage.getItem('live-planes')).toBe('off');
       expect(screen.getByRole('switch', { name: 'Live planes' })).toHaveAttribute('aria-checked', 'false');
+    });
+
+    // Item 155: the status line under the switch and the Sentry tag `live-planes`.
+    it('shows the status under the switch and sets the live-planes tag: off, ok-<shown>/<nearby>, error', async () => {
+      const ac = (hex: string) => ({ hex, callsign: null, type: null, altM: 10_000, speedKt: 400, track: 90, lat: 47.5, lon: 9.6, ageSec: 0 });
+      const tags = () => vi.mocked(setTag).mock.calls.filter(([name]) => name === 'live-planes').map(([, value]) => value);
+      const first = render(<SunTracker />);
+      const toggle = await screen.findByRole('switch', { name: 'Live planes' });
+      expect(tags()).toEqual(['off']);
+      expect(screen.queryByTestId('live-planes-status')).toBeNull();
+      global.fetch = vi.fn(async (url: RequestInfo | URL) => (String(url).startsWith('/api/planes')
+        ? new Response(JSON.stringify({ now: 1, aircraft: [ac('a1'), ac('a2')] }), { status: 200 })
+        : Promise.reject(new Error('offline')))) as unknown as typeof fetch;
+      fireEvent.click(toggle);
+      // In jsdom the scene has no size, so no live plane is drawn.
+      await waitFor(() => expect(screen.getByTestId('live-planes-status').textContent).toMatch(/^2 nearby · 0 in view/));
+      expect(tags()).toEqual(['off', 'loading', 'ok-0/2']);
+      fireEvent.click(toggle);
+      expect(screen.queryByTestId('live-planes-status')).toBeNull();
+      expect(tags().at(-1)).toBe('off');
+      first.unmount();
+
+      global.fetch = vi.fn(async (url: RequestInfo | URL) => (String(url).startsWith('/api/planes')
+        ? new Response('', { status: 502 })
+        : Promise.reject(new Error('offline')))) as unknown as typeof fetch;
+      render(<SunTracker />);
+      fireEvent.click(await screen.findByRole('switch', { name: 'Live planes' }));
+      await waitFor(() => expect(screen.getByTestId('live-planes-status')).toHaveTextContent('Live radar unavailable'));
+      expect(tags().at(-1)).toBe('error');
     });
 
     it('starts off when the storage cannot be read', async () => {

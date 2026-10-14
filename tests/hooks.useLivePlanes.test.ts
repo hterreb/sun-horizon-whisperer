@@ -26,7 +26,7 @@ describe('useLivePlanes', () => {
     await flush();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toBe('/api/planes?lat=47.8&lon=9.6');
-    expect(result.current?.feed).toEqual({ now: 5, aircraft: [] });
+    expect(result.current.state?.feed).toEqual({ now: 5, aircraft: [] });
     act(() => { vi.advanceTimersByTime(15_000); });
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
@@ -35,7 +35,7 @@ describe('useLivePlanes', () => {
     const { result, rerender } = renderHook(({ on }) => useLivePlanes(on, 47.8, 9.6), { initialProps: { on: false } });
     act(() => { vi.advanceTimersByTime(60_000); });
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(result.current).toBeNull();
+    expect(result.current.state).toBeNull();
     visibility = 'hidden';
     rerender({ on: true });
     act(() => { vi.advanceTimersByTime(45_000); });
@@ -49,15 +49,58 @@ describe('useLivePlanes', () => {
   it('keeps the last answer when a request fails, and drops it after a minute', async () => {
     const { result } = renderHook(() => useLivePlanes(true, 47.8, 9.6));
     await flush();
-    expect(result.current).not.toBeNull();
+    expect(result.current.state).not.toBeNull();
     fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
     for (let i = 0; i < 3; i++) {
       act(() => { vi.advanceTimersByTime(15_000); });
       await flush();
     }
-    expect(result.current).not.toBeNull(); // 45 s old
+    expect(result.current.state).not.toBeNull(); // 45 s old
     act(() => { vi.advanceTimersByTime(30_000); });
     await flush();
-    expect(result.current).toBeNull();
+    expect(result.current.state).toBeNull();
+  });
+
+  // Item 155: the status for the line under the switch and the Sentry tag.
+  it('is loading until the first answer, then ok', async () => {
+    let answer: (response: Response) => void = () => {};
+    fetchMock.mockImplementation(() => new Promise<Response>(resolve => { answer = resolve; }));
+    const { result } = renderHook(() => useLivePlanes(true, 47.8, 9.6));
+    await flush();
+    expect(result.current.status).toBe('loading');
+    answer(new Response(JSON.stringify({ now: 5, aircraft: [] }), { status: 200 }));
+    await flush();
+    expect(result.current.status).toBe('ok');
+  });
+
+  it('is error after a failed request (an HTTP error, no network, a broken answer), and ok again after an answer', async () => {
+    const failures = [
+      async () => new Response('', { status: 502 }),
+      async () => { throw new TypeError('Failed to fetch'); },
+      async () => new Response(JSON.stringify({ error: 'x' }), { status: 200 }),
+    ];
+    for (const failure of failures) {
+      fetchMock.mockImplementation(failure);
+      const { result, unmount } = renderHook(() => useLivePlanes(true, 47.8, 9.6));
+      await flush();
+      expect(result.current.status).toBe('error');
+      expect(result.current.state).toBeNull();
+      fetchMock.mockImplementation(async () => new Response(JSON.stringify({ now: 5, aircraft: [] }), { status: 200 }));
+      act(() => { vi.advanceTimersByTime(15_000); });
+      await flush();
+      expect(result.current.status).toBe('ok');
+      unmount();
+    }
+  });
+
+  it('starts loading again when the switch goes off and on', async () => {
+    const { result, rerender } = renderHook(({ on }) => useLivePlanes(on, 47.8, 9.6), { initialProps: { on: true } });
+    await flush();
+    expect(result.current.status).toBe('ok');
+    fetchMock.mockImplementation(() => new Promise<Response>(() => {}));
+    rerender({ on: false });
+    rerender({ on: true });
+    await flush();
+    expect(result.current.status).toBe('loading');
   });
 });

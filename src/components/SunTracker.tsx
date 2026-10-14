@@ -30,6 +30,7 @@ import { fetchCurrentWeather, getUpperAirAt, getWeatherAt, type WeatherData } fr
 import { getContrail } from '@/utils/planes';
 import { getRainMmH } from '@/utils/rainUtils';
 import { useLivePlanes, type LivePlanesState } from '@/hooks/useLivePlanes';
+import { getLivePlanesTag } from '@/utils/liveRadar';
 import { useLiveRoute } from '@/hooks/useLiveRoute';
 import { getMoonLook, getSkyOvercastMix, getStarCloudFactor } from '@/utils/weatherEffectsUtils';
 import { getAstroEvent, parseEggOverride } from '@/utils/astroEvents';
@@ -258,6 +259,8 @@ const SunTracker: React.FC = () => {
       console.error('Error saving live planes:', error);
     }
   }, []);
+  // Item 155: the number of live planes drawn, from LivePlanes.
+  const [liveShown, setLiveShown] = useState(0);
   useEffect(() => {
     document.documentElement.lang = language;
   }, [language]);
@@ -1173,9 +1176,15 @@ const SunTracker: React.FC = () => {
   const upperAir = useRealWeather ? getUpperAirAt(weatherData?.hourly ?? null, date) : null;
   const contrail = getContrail(upperAir?.tempC, upperAir?.rhPercent);
   const isLiveRadarActive = isLivePlanesOn && location.loaded && !premium.isLocked && !isTimePreview;
-  const liveFeed = useLivePlanes(isLiveRadarActive, location.latitude, location.longitude);
+  const { state: liveFeed, status: liveFeedStatus } = useLivePlanes(isLiveRadarActive, location.latitude, location.longitude);
   // While the radar is on and its first answer is on the way, no plane shows.
   const livePlanes: LivePlanesState | null = isLiveRadarActive ? liveFeed ?? NO_LIVE_PLANES : null;
+  // Item 155: the status line under the switch and the Sentry tag `live-planes` (no coordinates
+  // in it), set only when the status or a count changes. Nearby: the aircraft in the last answer.
+  const liveStatus = isLiveRadarActive ? liveFeedStatus : null;
+  const liveNearby = liveFeed?.feed.aircraft.length ?? 0;
+  const livePlanesTag = getLivePlanesTag(liveStatus, liveShown, liveNearby);
+  useEffect(() => { Sentry.setTag('live-planes', livePlanesTag); }, [livePlanesTag]);
   // A live plane's card asks for its route once (item 111).
   const liveRouteCallsign = infoCard?.target.type === 'livePlane' ? infoCard.target.callsign : null;
   const liveRoute = useLiveRoute(liveRouteCallsign, location.latitude, location.longitude);
@@ -1322,6 +1331,8 @@ const SunTracker: React.FC = () => {
             cloudLayers={cloudLayers}
             contrail={contrail}
             livePlanes={livePlanes}
+            livePlanesShown={liveShown}
+            onLivePlanesShown={setLiveShown}
             cloudEgg={cloudEgg}
             sunTimes={sunTimes}
             windDirectionDeg={weatherData?.windDirectionDeg ?? null}
@@ -1400,6 +1411,9 @@ const SunTracker: React.FC = () => {
             onIssReminderToggle={notificationPermission === 'unsupported' ? undefined : handleIssReminderToggle}
             isLivePlanesOn={isLivePlanesOn}
             onLivePlanesToggle={handleLivePlanesToggle}
+            liveRadarStatus={liveStatus && {
+              status: liveStatus, nearby: liveNearby, shown: liveShown, compassOff: compassStatus === 'idle',
+            }}
             onCollectionOpen={handleCollectionOpen}
             onCountryChange={setDetectedCountry}
           />

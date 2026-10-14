@@ -75,7 +75,8 @@ interface CloudLayerProps {
   cloudLayers?: CloudLayers | null;
   // The planes' contrails from the forecast's upper air (ROADMAP item 96).
   contrail?: ContrailKind;
-  // The live radar is on (item 96, Premium): its planes replace the decorative ones.
+  // One or more live planes show (items 96 and 155): no new decorative plane starts; the ones in
+  // flight fly on. With none shown, the decorative planes fly, also while the radar is on.
   livePlanes?: boolean;
   windSpeedKmh?: number | null;
   windDirectionDeg?: number | null;
@@ -537,7 +538,7 @@ export interface SpawnRules {
   huntOverride?: HuntVariant | null; // `?hunt=` (item 94)
   contrail?: ContrailKind; // the planes' contrail from the forecast (item 96); none without
   planeOverride?: ContrailKind | null; // `?plane=` (item 96): a plane every 20 s with this contrail
-  livePlanes?: boolean; // item 96: the live radar's planes replace the decorative ones
+  livePlanes?: boolean; // items 96 and 155: a live plane shows, so no new decorative plane starts
 }
 type View = SpawnRules['view'];
 
@@ -985,9 +986,10 @@ export const spawnTick = (
   // the other planes. None when the sky is hidden (fog, a deck, rain, a storm). The gap is
   // rolled once per plane; with no free lane, the next check tries again. A plane with a
   // trail stays in the list until its trail fades, but counts only while it crosses.
-  if (isPlaneWeather(weatherType) && !rules.livePlanes) {
+  // While a live plane shows (item 155), none starts; the ones in flight fly on.
+  if (isPlaneWeather(weatherType)) {
     last.planeGap ??= rules.planeOverride ? PLANE_OVERRIDE_GAP_MS : PLANE_GAP_MIN_MS + random() * PLANE_GAP_RANGE_MS;
-    if (now - last.planes > last.planeGap * gapFactor) {
+    if (!rules.livePlanes && now - last.planes > last.planeGap * gapFactor) {
       const crossing = planes.filter(p => p.path && p.path.start <= sceneTime && sceneTime <= p.path.start + p.path.duration);
       let placed: PlaneEntity | null = null;
       if (crossing.length < MAX_PLANES) {
