@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   AIRLINE_COUNT, MAX_COMPASS_PLANES, MAX_NORMAL_PLANES, MIN_ELEVATION_DEG, MIN_SCREEN_SPEED_PX_S, deadReckon, distanceAndBearing, getAircraftView, getAirlineName, getLiveContrail, getLivePlaneWidth, pickNearestVisible, pickShownPlanes, slantDistanceM,
-  isAircraftVisible, planeFeedUrl,
+  isAircraftVisible, planeFeedUrl, getLivePlanesTag,
 } from '@/utils/liveRadar';
 import { type LiveAircraft } from '@/utils/planeFeed';
 import { type HorizonProfile } from '@/utils/horizonUtils';
@@ -166,5 +166,16 @@ describe('the card and the look', () => {
   it('sends only the place rounded to 0.1° to the proxy', () => {
     expect(planeFeedUrl(47.78123, 9.61234)).toBe('/api/planes?lat=47.8&lon=9.6');
     expect(planeFeedUrl(-33.86, -0.04)).toBe('/api/planes?lat=-33.9&lon=0.0');
+  });
+});
+
+// Item 155: the Sentry tag `live-planes`, so a feedback event tells if the radar ran and found planes.
+describe('getLivePlanesTag', () => {
+  it('is off without a status, the status while loading or after a failure, else ok-<shown>/<nearby>', () => {
+    expect(getLivePlanesTag(null, 0, 0)).toBe('off');
+    expect(getLivePlanesTag('loading', 0, 0)).toBe('loading');
+    expect(getLivePlanesTag('error', 1, 27)).toBe('error');
+    expect(getLivePlanesTag('ok', 0, 27)).toBe('ok-0/27');
+    expect(getLivePlanesTag('ok', 2, 27)).toBe('ok-2/27');
   });
 });

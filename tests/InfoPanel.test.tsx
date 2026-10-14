@@ -1138,6 +1138,30 @@ describe('InfoPanel: line of sight as an icon at the sun and moon rows (ROADMAP 
       fireEvent.click(screen.getByRole('switch', { name: /live planes/i }));
       expect(onLivePlanesToggle).toHaveBeenCalledWith(false);
     });
+
+    it('shows the radar status under the switch while it is on (item 155)', () => {
+      const line = () => screen.queryByTestId('live-planes-status')?.textContent ?? null;
+      const ok = { status: 'ok' as const, nearby: 27, shown: 0, compassOff: true };
+      const panel = (props: Partial<React.ComponentProps<typeof InfoPanel>>) => (
+        <InfoPanel {...defaultProps} weatherData={weatherData} isLivePlanesOn onLivePlanesToggle={vi.fn()} {...props} />
+      );
+      const { rerender } = render(panel({ liveRadarStatus: { ...ok, status: 'loading' } }));
+      expect(line()).toBe('Looking for planes…');
+      rerender(panel({ liveRadarStatus: ok }));
+      expect(line()).toBe('27 nearby · 0 in view · the compass shows all');
+      // All shown, or compass mode on (or no compass): no hint.
+      rerender(panel({ liveRadarStatus: { ...ok, nearby: 2, shown: 2 } }));
+      expect(line()).toBe('2 nearby · 2 in view');
+      rerender(panel({ liveRadarStatus: { ...ok, shown: 5, compassOff: false } }));
+      expect(line()).toBe('27 nearby · 5 in view');
+      rerender(panel({ liveRadarStatus: { ...ok, status: 'error' } }));
+      expect(line()).toBe('Live radar unavailable');
+      // No line while the switch is off, or while the radar does not run (no status).
+      rerender(panel({ liveRadarStatus: ok, isLivePlanesOn: false }));
+      expect(line()).toBeNull();
+      rerender(panel({ liveRadarStatus: null }));
+      expect(line()).toBeNull();
+    });
   });
   describe('collection button (ROADMAP item 112)', () => {
     it('calls onCollectionOpen from the Collection row', () => {
