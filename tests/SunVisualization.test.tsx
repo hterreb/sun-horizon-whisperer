@@ -1096,6 +1096,8 @@ describe('SunVisualization (rendered): tree silhouettes on the ridge (ROADMAP it
   };
   const trees = { cover: '1'.repeat(360), lib: treeLib };
   const june = new Date(2026, 5, 15, 12);
+  // The scene's altitude -> y mapping at 844 px (altitudeToY).
+  const yAt = (angle: number) => 844 * 0.65 - Math.sin((angle * Math.PI) / 180) * (844 * 0.65 - 30);
 
   const props = {
     sunPosition: { azimuth: 180, altitude: 30 },
@@ -1119,9 +1121,15 @@ describe('SunVisualization (rendered): tree silhouettes on the ridge (ROADMAP it
     expect(screen.getAllByTestId('terrain-silhouette')).toHaveLength(1);
     const withTrees = screen.getByTestId('terrain-silhouette').getAttribute('d')!;
     expect(withTrees.startsWith(bare)).toBe(true);
-    // One tree per degree in static mode.
-    expect(withTrees.slice(bare.length).trim().split('M').filter(Boolean)).toHaveLength(360);
-    expect(screen.getByTestId('tree-tint').getAttribute('d')).toBe(withTrees.slice(bare.length + 1));
+    // The band and the sentinels of item 150 (V6); the tint covers exactly them.
+    const treePart = withTrees.slice(bare.length + 1);
+    expect(treePart).toBe(
+      treeLib.buildTreeScene(
+        treeLib.planTrees(treeProfile, trees.cover, yAt, { perDegree: 1, pxPerDegree: 390 / 360, bare: false, latitude: 47.78, longitude: 9.61 }),
+        { width: 390, leftAzimuth: 0 }
+      ).path
+    );
+    expect(screen.getByTestId('tree-tint').getAttribute('d')).toBe(treePart);
   });
 
   it('draws no trees where the land cover is not tree cover', () => {
@@ -1152,13 +1160,90 @@ describe('SunVisualization (rendered): tree silhouettes on the ridge (ROADMAP it
     expect(screen.getByTestId('tree-tint').getAttribute('fill-opacity')).toBe('0.08');
   });
 
-  it('draws three trees per degree in compass mode', () => {
+  it('lays the trees out at 3 positions per degree on the compass view', () => {
     const { unmount } = render(<SunVisualization {...props} compassHeading={180.5} />);
     const bare = screen.getByTestId('terrain-silhouette').getAttribute('d')!;
     unmount();
     render(<SunVisualization {...props} compassHeading={180.5} trees={trees} />);
     const withTrees = screen.getByTestId('terrain-silhouette').getAttribute('d')!;
-    expect(withTrees.slice(bare.length).trim().split('M').filter(Boolean)).toHaveLength(270);
+    expect(withTrees.slice(bare.length + 1)).toBe(
+      treeLib.buildTreeScene(
+        treeLib.planTrees(treeProfile, trees.cover, yAt, { perDegree: 3, pxPerDegree: 390 / 90, bare: false, latitude: 47.78, longitude: 9.61 }),
+        { width: 390, leftAzimuth: 135.5 }
+      ).path
+    );
+  });
+
+  describe('the rim light (ROADMAP item 150, V4)', () => {
+    // Golden hour in Ravensburg (13 Oct 2026, 17:55): the sun at 251°, 6° high.
+    const golden = { ...props, timeOfDay: 'evening' as const, sunPosition: { azimuth: 251, altitude: 6 }, date: new Date(2026, 9, 13, 17, 55) };
+    const rim = (extra: Partial<typeof golden> & { compassHeading?: number }) => {
+      const view = render(<SunVisualization {...golden} {...extra} trees={trees} />);
+      const path = screen.queryByTestId('tree-rim');
+      const light = screen.queryByTestId('tree-rim-light');
+      const result = {
+        d: path?.getAttribute('d') ?? null,
+        stroke: path?.getAttribute('stroke') ?? null,
+        pointerEvents: path?.getAttribute('pointer-events') ?? null,
+        width: path?.getAttribute('stroke-width') ?? null,
+        x1: Number(light?.getAttribute('x1')),
+        x2: Number(light?.getAttribute('x2')),
+        spread: light?.getAttribute('spreadMethod') ?? null,
+        stops: [...(light?.querySelectorAll('stop') ?? [])].map((stop) => ({
+          offset: Number(stop.getAttribute('offset')),
+          opacity: Number(stop.getAttribute('stop-opacity')),
+          color: stop.getAttribute('stop-color'),
+        })),
+      };
+      view.unmount();
+      return result;
+    };
+
+    it('draws a 1 px rim in the hour before sunset and after sunrise, not by day, in twilight or at night', () => {
+      const evening = rim({});
+      expect(evening.d).toBeTruthy();
+      expect(evening.stroke).toBe('url(#treeRimLight)');
+      expect(evening.width).toBe('1');
+      expect(evening.pointerEvents).toBe('none');
+      expect(rim({ timeOfDay: 'dawn', sunPosition: { azimuth: 105, altitude: 4 } }).d).toBeTruthy();
+      for (const timeOfDay of ['midday', 'afternoon', 'civil-twilight', 'night'] as const) {
+        expect(rim({ timeOfDay }).d).toBeNull();
+      }
+    });
+
+    it('draws no rim while clouds hide the sun', () => {
+      expect(rim({ weatherType: 'cloudy' }).d).toBeTruthy();
+      expect(rim({ weatherType: 'overcast' }).d).toBeNull();
+      expect(rim({ weatherType: 'rain' }).d).toBeNull();
+    });
+
+    it('fades the rim from the sun’s azimuth to nothing at 75° on each side', () => {
+      const { x1, x2, spread, stops } = rim({});
+      // Static mode: 390 px for 360°; the gradient's period is the full circle, centred on the sun.
+      const sunX = (390 * 251) / 360;
+      expect((x1 + x2) / 2).toBeCloseTo(sunX, 5);
+      expect(x2 - x1).toBeCloseTo(390, 5);
+      expect(spread).toBe('repeat');
+      expect(stops.map((s) => [s.offset, s.opacity])).toEqual([[0.5 - 75 / 360, 0], [0.5, 0.9], [0.5 + 75 / 360, 0]]);
+      expect(stops[1].color).toBe('hsl(var(--scene-tree-rim-golden))');
+      // The last minutes before sunset: the warmer tone at full strength.
+      const sunset = rim({ sunPosition: { azimuth: 258, altitude: 0.1 } });
+      expect(sunset.stops[1]).toEqual({ offset: 0.5, opacity: 1, color: 'hsl(var(--scene-tree-rim-evening))' });
+    });
+
+    it('keeps the edges more than 80° from the sun out of the path', () => {
+      const xs = [...rim({}).d!.matchAll(/(-?\d+(?:\.\d+)?),/g)].map((m) => Number(m[1]));
+      // 251° - 80° is x 185 of 390; an edge reaches up to half a sentinel (12 px) beyond its
+      // azimuth. Without the filter, the forest all round would put edges from x 0.
+      for (const x of xs) expect(x).toBeGreaterThan(185 - 12);
+      expect(Math.max(...xs)).toBeLessThan(390);
+    });
+
+    it('scales the fade to the compass field of view', () => {
+      const { x1, x2 } = rim({ compassHeading: 251 });
+      expect((x1 + x2) / 2).toBeCloseTo(195, 5);
+      expect(x2 - x1).toBeCloseTo((360 * 390) / 90, 5);
+    });
   });
 });
 
