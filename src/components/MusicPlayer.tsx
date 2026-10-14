@@ -254,6 +254,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ controls = ALWAYS_SHOWN, duck
   return (
     <div 
       data-share-hide
+      data-idle-control
       className={`animate-fade-in fixed z-20 ${GLASS_SURFACE} rounded-full px-3 py-2 flex items-center gap-2 transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'} ${isTappable ? '' : 'pointer-events-none'}`}
       style={{
         bottom: `calc(${isMobile ? '4rem' : '1rem'} + env(safe-area-inset-bottom))`,
