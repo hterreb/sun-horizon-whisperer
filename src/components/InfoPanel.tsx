@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Wind, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward, Bell, BellRing, AlarmClock, AlarmClockCheck, Satellite, Award } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Wind, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward, Bell, BellRing, AlarmClock, AlarmClockCheck, Satellite, Award, Database } from 'lucide-react';
 import { isFeedbackAvailable, openFeedbackForm } from '@/utils/feedback';
+import DataSourcesDialog from './DataSourcesDialog';
 import { ScrollArea } from './ui/scroll-area';
 import { Switch } from './ui/switch';
 import { Button } from './ui/button';
@@ -241,6 +242,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   // Golden & Blue Hour (ROADMAP item 24): collapsed by default, and not part of the
   // time-of-day auto-collapse effect below - it stays as the user left it.
   const [isGoldenBlueCollapsed, setIsGoldenBlueCollapsed] = useState(true);
+  // Data sources dialog (ROADMAP item 153). A stable close: the panel renders each second.
+  const [isDataSourcesOpen, setIsDataSourcesOpen] = useState(false);
+  const closeDataSources = useCallback(() => setIsDataSourcesOpen(false), []);
   // Line of sight details (ROADMAP item 30): closed by default, and independent for
   // the sun rows and the moon rows.
   const [isSunTerrainOpen, setIsSunTerrainOpen] = useState(false);
@@ -890,19 +894,6 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                     {isSunsetReminderOn ? <AlarmClockCheck size={14} /> : <AlarmClock size={14} />}
                   </button>
                 )}
-                {onIssReminderToggle && (
-                  <button
-                    type="button"
-                    onClick={() => requirePremium(onIssReminderToggle)}
-                    className={`${INLINE_ICON_TOGGLE} relative ml-1 ${isIssReminderOn ? 'bg-white/20' : ''}`}
-                    aria-label={t('issReminder.label')}
-                    title={t('issReminder.toggle', { minutes: PASS_REMINDER_MIN })}
-                    aria-pressed={isIssReminderOn}
-                  >
-                    <Satellite size={14} />
-                    <PremiumBadge className="absolute -right-1 -top-1 h-2.5 w-2.5" />
-                  </button>
-                )}
                 {!polarSunLabel && shownSunset && (
                   <ShareCardButton
                     className={INLINE_ICON_TOGGLE}
@@ -1318,7 +1309,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             </div>
           </div>
 
-          {/* Satellite tracking (ROADMAP item 97): Premium in the Play app. */}
+          {/* Satellite tracking (ROADMAP item 97): Premium in the Play app. The ISS passes
+              toggle sits next to the switch (item 154) and works with the tracking off. */}
           {onSatelliteTrackingToggle && (
             <div className="mt-6 pt-4 border-t border-white/20 flex items-center justify-between gap-2" title={t('satellite.trackingHint')}>
               <span className="text-caption opacity-80 inline-flex items-center gap-1">
@@ -1326,6 +1318,19 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 {t('satellite.tracking')}
                 <PremiumBadge />
               </span>
+              {onIssReminderToggle && (
+                <button
+                  type="button"
+                  onClick={() => requirePremium(onIssReminderToggle)}
+                  className={`${INLINE_ICON_TOGGLE} relative ml-auto ${isIssReminderOn ? 'bg-white/20' : ''}`}
+                  aria-label={t('issReminder.label')}
+                  title={t('issReminder.toggle', { minutes: PASS_REMINDER_MIN })}
+                  aria-pressed={isIssReminderOn}
+                >
+                  <Satellite size={14} />
+                  <PremiumBadge className="absolute -right-1 -top-1 h-2.5 w-2.5" />
+                </button>
+              )}
               <Switch
                 checked={isSatelliteTrackingOn}
                 onCheckedChange={() => requirePremium(onSatelliteTrackingToggle)}
@@ -1383,6 +1388,19 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               </button>
             </div>
           )}
+
+          {/* Data sources and the privacy page (ROADMAP item 153) */}
+          <div className="mt-6 pt-4 border-t border-white/20">
+            <button
+              onClick={() => setIsDataSourcesOpen(true)}
+              className={`flex items-center gap-2 text-caption opacity-80 hover:opacity-100 transition-opacity rounded ${FOCUS_RING}`}
+              aria-haspopup="dialog"
+            >
+              <Database size={14} />
+              {t('dataSources.title')}
+            </button>
+            {isDataSourcesOpen && <DataSourcesDialog onClose={closeDataSources} />}
+          </div>
             </div>
           </ScrollArea>
         </div>
