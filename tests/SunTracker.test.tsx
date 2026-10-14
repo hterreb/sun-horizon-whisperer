@@ -108,6 +108,19 @@ describe('SunTracker', () => {
     // Optionally check for background style or class change
   });
 
+  it('gives the page the top colour of the scene sky, and removes it on unmount (ROADMAP item 151)', async () => {
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 1, longitude: 2 } }) } });
+    const skyTop = () => document.documentElement.style.getPropertyValue('--sky-top');
+    visProps.current = null;
+    const { unmount } = render(<SunTracker />);
+    await waitFor(() => expect(visProps.current).not.toBeNull());
+    // The first stop of the gradient the scene draws (after the weather's grey mix).
+    const sceneTop = visProps.current!.skyGradient!.match(/#[0-9a-f]{6}/i)![0];
+    expect(skyTop()).toBe(sceneTop);
+    unmount();
+    expect(skyTop()).toBe('');
+  });
+
   it('handles manual weather change and toggling between real/manual weather', async () => {
     render(<SunTracker />);
     // Simulate user interaction for weather change/toggle

@@ -45,6 +45,7 @@ import LivePlanes from './LivePlanes';
 import { type RarityTier } from '@/utils/rarityTier';
 import { type LivePlanesState } from '@/hooks/useLivePlanes';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
+import { useViewportSize } from '@/hooks/useViewportSize';
 import { useDoubleTap } from '@/hooks/useDoubleTap';
 
 // A fixed fallback seed date for callers that don't pass one (e.g. existing tests) -
@@ -657,21 +658,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   // to aim the phone.
   const cardinalLabelsVisible = compassActive || showCursor;
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerDimensions, setContainerDimensions] = useState({ width: 0, height: 0 });
-  useEffect(() => {
-    const updateDimensions = () => {
-      if (containerRef.current) {
-        setContainerDimensions({
-          width: containerRef.current.clientWidth,
-          height: containerRef.current.clientHeight
-        });
-      }
-    };
-
-    updateDimensions();
-    window.addEventListener('resize', updateDimensions);
-    return () => window.removeEventListener('resize', updateDimensions);
-  }, []);
+  // Item 151: measured at mount and 150 ms after the last resize, not inside the resize event.
+  const containerDimensions = useViewportSize(containerRef);
 
   // The horizon path is fully derived from `containerDimensions` (deterministic, no
   // randomness), so it's computed during render instead of synced into state. The top
