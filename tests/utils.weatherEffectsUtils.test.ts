@@ -398,6 +398,13 @@ describe('getStarCover', () => {
     expect(getStarCover(100, { low: 100, mid: 0, high: 100 })).toBe(100);
   });
 
+  it('takes the live total as the base: the layers give only its cirrus share', () => {
+    expect(getStarCover(0, { low: 100, mid: 0, high: 0 })).toBe(0); // the hour's deck has gone
+    expect(getStarCover(60, { low: 0, mid: 0, high: 80 })).toBe(30);
+    expect(getStarCover(100, { low: 0, mid: 0, high: 0 })).toBe(100); // a cover the layers do not show
+    expect(getStarCover(null, { low: 0, mid: 0, high: 100 })).toBe(50);
+  });
+
   it('is the total cover without the layers', () => {
     expect(getStarCover(80, null)).toBe(80);
     expect(getStarCover(null, null)).toBeNull();

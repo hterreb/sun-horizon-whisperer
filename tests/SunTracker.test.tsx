@@ -154,8 +154,8 @@ describe('SunTracker', () => {
     }) })) as unknown as typeof fetch;
 
     render(<SunTracker />);
-    // The star cover: the high layer at half weight (getStarCover).
-    await waitFor(() => expect(visProps.current?.cloudCoverPercent).toBeCloseTo(95.75));
+    // The star cover: the total, with its high-layer share at half weight (getStarCover).
+    await waitFor(() => expect(visProps.current?.cloudCoverPercent).toBeCloseTo(100 * 95.75 / 96.5));
     expect(visProps.current!.cloudLayers).toEqual({ low: 90, mid: 50, high: 30 });
 
     fireEvent.click(screen.getByRole('button', { name: /manual/i }));
@@ -951,8 +951,8 @@ describe('SunTracker', () => {
         weatherType: 'rain', temperatureC: 14, windSpeedKmh: 30, rainMmH: 4,
         cloudLayers: { low: 80, mid: 60, high: 20 },
       });
-      // The star cover of the hour's layers (getStarCover), not its total of 95 %.
-      expect(visProps.current!.cloudCoverPercent).toBeCloseTo(92.8);
+      // The star cover (getStarCover): the hour's total of 95 %, its high-layer share at half weight.
+      expect(visProps.current!.cloudCoverPercent).toBeCloseTo(95 * 92.8 / 93.6);
       expect(screen.getByText('Forecast')).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: 'Back to now' }));
