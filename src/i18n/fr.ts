@@ -327,6 +327,10 @@ export const fr: Record<keyof typeof en, string> = {
   'info.route': "Trajet",
   'radar.livePlanes': "Avions en direct",
   'radar.hint': "Avions réels dans un rayon de 100 km. Envoie votre lieu, arrondi à environ 11 km, à adsb.lol.",
+  'radar.loading': "Recherche d’avions…",
+  'radar.status': "{nearby} à proximité · {shown} en vue",
+  'radar.compassAll': "la boussole les montre tous",
+  'radar.unavailable': "Radar en direct indisponible",
   'cloud.Ci': "Cirrus",
   'cloud.Cs': "Cirrostratus",
   'cloud.Ac': "Altocumulus",
@@ -609,6 +613,18 @@ export const fr: Record<keyof typeof en, string> = {
   'feedback.success': "Merci pour votre avis !",
   'feedback.emptyError': "Veuillez écrire un message.",
   'feedback.error': "Impossible d’envoyer l’avis. Veuillez réessayer plus tard.",
+
+  // Data sources (item 153); the provider names are not translated
+  'dataSources.title': "Sources des données",
+  'dataSources.weather': "Météo",
+  'dataSources.places': "Lieux",
+  'dataSources.search': "Recherche de lieux",
+  'dataSources.planes': "Avions",
+  'dataSources.satellites': "Satellites",
+  'dataSources.terrain': "Relief",
+  'dataSources.trees': "Arbres",
+  'dataSources.radio': "Radio",
+  'dataSources.privacy': "Confidentialité",
 
   // Toasts from SunTracker
   'toast.weatherUnavailableTitle': "Météo indisponible",

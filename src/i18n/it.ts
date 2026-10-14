@@ -327,6 +327,10 @@ export const it: Record<keyof typeof en, string> = {
   'info.route': "Rotta",
   'radar.livePlanes': "Aerei in tempo reale",
   'radar.hint': "Aerei reali entro 100 km. Invia il tuo luogo, arrotondato a circa 11 km, ad adsb.lol.",
+  'radar.loading': "Cerco aerei…",
+  'radar.status': "{nearby} vicini · {shown} in vista",
+  'radar.compassAll': "la bussola li mostra tutti",
+  'radar.unavailable': "Radar in tempo reale non disponibile",
   'cloud.Ci': "Cirri",
   'cloud.Cs': "Cirrostrati",
   'cloud.Ac': "Altocumuli",
@@ -609,6 +613,18 @@ export const it: Record<keyof typeof en, string> = {
   'feedback.success': "Grazie per il tuo feedback!",
   'feedback.emptyError': "Scrivi un messaggio.",
   'feedback.error': "Impossibile inviare il feedback. Riprova più tardi.",
+
+  // Data sources (item 153); the provider names are not translated
+  'dataSources.title': "Fonti dei dati",
+  'dataSources.weather': "Meteo",
+  'dataSources.places': "Luoghi",
+  'dataSources.search': "Ricerca luoghi",
+  'dataSources.planes': "Aerei",
+  'dataSources.satellites': "Satelliti",
+  'dataSources.terrain': "Terreno",
+  'dataSources.trees': "Alberi",
+  'dataSources.radio': "Radio",
+  'dataSources.privacy': "Privacy",
 
   // Toasts from SunTracker
   'toast.weatherUnavailableTitle': "Meteo non disponibile",

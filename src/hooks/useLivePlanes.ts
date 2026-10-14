@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { LIVE_MAX_AGE_MS, LIVE_POLL_MS, planeFeedUrl } from '@/utils/liveRadar';
+import { LIVE_MAX_AGE_MS, LIVE_POLL_MS, planeFeedUrl, type LiveStatus } from '@/utils/liveRadar';
 import { roundPlace, type LiveFeed } from '@/utils/planeFeed';
 
 // The live radar's feed (ROADMAP item 96): one request to our proxy every 15 s, only while
@@ -11,9 +11,16 @@ export interface LivePlanesState {
   feed: LiveFeed;
   receivedAt: number;
 }
+// Item 155: the answer and the feed's status (`loading` until the first answer after the switch
+// goes on, then `ok` or `error` by the last request), for the status line and the Sentry tag.
+export interface LiveRadarFeed {
+  state: LivePlanesState | null;
+  status: LiveStatus;
+}
 
-export const useLivePlanes = (enabled: boolean, latitude: number, longitude: number): LivePlanesState | null => {
+export const useLivePlanes = (enabled: boolean, latitude: number, longitude: number): LiveRadarFeed => {
   const [state, setState] = useState<LivePlanesState | null>(null);
+  const [status, setStatus] = useState<LiveStatus>('loading');
   // One poll loop per 0.1° cell, not per small move of the place.
   const { lat, lon } = roundPlace(latitude, longitude);
 
@@ -28,10 +35,14 @@ export const useLivePlanes = (enabled: boolean, latitude: number, longitude: num
       fetch(planeFeedUrl(lat, lon), { signal: own.signal })
         .then(response => (response.ok ? response.json() as Promise<LiveFeed> : Promise.reject(new Error(String(response.status)))))
         .then(feed => {
-          if (!own.signal.aborted && Array.isArray(feed?.aircraft)) setState({ feed, receivedAt: Date.now() });
+          if (own.signal.aborted) return;
+          if (!Array.isArray(feed?.aircraft)) throw new Error('no aircraft list');
+          setState({ feed, receivedAt: Date.now() });
+          setStatus('ok');
         })
         .catch(() => {
           if (own.signal.aborted) return;
+          setStatus('error');
           setState(prev => (prev && Date.now() - prev.receivedAt > LIVE_MAX_AGE_MS ? null : prev));
         });
     };
@@ -44,8 +55,9 @@ export const useLivePlanes = (enabled: boolean, latitude: number, longitude: num
       clearInterval(id);
       document.removeEventListener('visibilitychange', onVisible);
       controller?.abort();
+      setStatus('loading'); // the next start waits for its own first answer
     };
   }, [enabled, lat, lon]);
 
-  return enabled ? state : null;
+  return { state: enabled ? state : null, status };
 };

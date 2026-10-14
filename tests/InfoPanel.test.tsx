@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, act, waitFor, within } from '@testing-library/react';
 import { vi } from 'vitest';
 import InfoPanel, { formatTerrainDelta } from '../src/components/InfoPanel';
 import { type TimeOfDay, type SunTimes, type NextGoldenBlueHours } from '../src/utils/sunUtils';
@@ -1070,25 +1070,30 @@ describe('InfoPanel: line of sight as an icon at the sun and moon rows (ROADMAP 
       expect(screen.getByRole('switch', { name: 'Satellite tracking' })).toHaveAttribute('aria-checked', 'true');
     });
 
-    it('has an "ISS passes" toggle next to the sunset reminder, with the gold plus, gated while locked', () => {
+    it('has an "ISS passes" toggle next to the satellite tracking switch (item 154), with the gold plus, gated while locked', () => {
       const value = premiumValue({});
       const onToggle = vi.fn();
+      const onTrackingToggle = vi.fn();
       const { rerender } = render(
         <PremiumContext.Provider value={value}>
-          <InfoPanel {...defaultProps} onSunsetReminderToggle={vi.fn()} onIssReminderToggle={onToggle} />
+          <InfoPanel {...defaultProps} onSunsetReminderToggle={vi.fn()} onSatelliteTrackingToggle={onTrackingToggle} onIssReminderToggle={onToggle} />
         </PremiumContext.Provider>
       );
       const button = screen.getByRole('button', { name: 'ISS passes' });
       expect(button).toHaveAttribute('aria-pressed', 'false');
       expect(button).toHaveAttribute('title', 'ISS passes: remind me 10 minutes before a visible pass (while the app is open)');
       expect(button.querySelector('[data-testid="premium-badge"]')).toBeInTheDocument();
-      // Next to the sunset reminder, in the same row.
-      expect(button.previousElementSibling).toHaveAttribute('aria-label', 'Remind me 15 minutes before sunset (while the app is open)');
+      // Next to the tracking switch, in its row; no longer after the sunset reminder.
+      expect(button.nextElementSibling).toBe(screen.getByRole('switch', { name: 'Satellite tracking' }));
+      expect(button.parentElement).toHaveTextContent('Satellite tracking');
+      const sunsetReminder = screen.getByRole('button', { name: 'Remind me 15 minutes before sunset (while the app is open)' });
+      expect(sunsetReminder.parentElement).not.toContainElement(button);
       fireEvent.click(button);
       expect(value.requirePremium).toHaveBeenCalledWith(onToggle);
+      expect(onTrackingToggle).not.toHaveBeenCalled();
       rerender(
         <PremiumContext.Provider value={premiumValue({ isPremium: true, isLocked: false, requirePremium: (action) => action?.() })}>
-          <InfoPanel {...defaultProps} onIssReminderToggle={onToggle} isIssReminderOn />
+          <InfoPanel {...defaultProps} onSatelliteTrackingToggle={onTrackingToggle} onIssReminderToggle={onToggle} isIssReminderOn />
         </PremiumContext.Provider>
       );
       fireEvent.click(screen.getByRole('button', { name: 'ISS passes' }));
@@ -1133,6 +1138,30 @@ describe('InfoPanel: line of sight as an icon at the sun and moon rows (ROADMAP 
       fireEvent.click(screen.getByRole('switch', { name: /live planes/i }));
       expect(onLivePlanesToggle).toHaveBeenCalledWith(false);
     });
+
+    it('shows the radar status under the switch while it is on (item 155)', () => {
+      const line = () => screen.queryByTestId('live-planes-status')?.textContent ?? null;
+      const ok = { status: 'ok' as const, nearby: 27, shown: 0, compassOff: true };
+      const panel = (props: Partial<React.ComponentProps<typeof InfoPanel>>) => (
+        <InfoPanel {...defaultProps} weatherData={weatherData} isLivePlanesOn onLivePlanesToggle={vi.fn()} {...props} />
+      );
+      const { rerender } = render(panel({ liveRadarStatus: { ...ok, status: 'loading' } }));
+      expect(line()).toBe('Looking for planes…');
+      rerender(panel({ liveRadarStatus: ok }));
+      expect(line()).toBe('27 nearby · 0 in view · the compass shows all');
+      // All shown, or compass mode on (or no compass): no hint.
+      rerender(panel({ liveRadarStatus: { ...ok, nearby: 2, shown: 2 } }));
+      expect(line()).toBe('2 nearby · 2 in view');
+      rerender(panel({ liveRadarStatus: { ...ok, shown: 5, compassOff: false } }));
+      expect(line()).toBe('27 nearby · 5 in view');
+      rerender(panel({ liveRadarStatus: { ...ok, status: 'error' } }));
+      expect(line()).toBe('Live radar unavailable');
+      // No line while the switch is off, or while the radar does not run (no status).
+      rerender(panel({ liveRadarStatus: ok, isLivePlanesOn: false }));
+      expect(line()).toBeNull();
+      rerender(panel({ liveRadarStatus: null }));
+      expect(line()).toBeNull();
+    });
   });
   describe('collection button (ROADMAP item 112)', () => {
     it('calls onCollectionOpen from the Collection row', () => {
@@ -1145,6 +1174,33 @@ describe('InfoPanel: line of sight as an icon at the sun and moon rows (ROADMAP 
     it('shows no Collection row without onCollectionOpen', () => {
       render(<InfoPanel {...defaultProps} />);
       expect(screen.queryByRole('button', { name: 'Collection' })).toBeNull();
+    });
+  });
+
+  describe('data sources (ROADMAP item 153)', () => {
+    it('opens a dialog with every data source, its licence and the privacy page, from a link after Feedback', () => {
+      render(<InfoPanel {...defaultProps} />);
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Data sources' }));
+      const dialog = screen.getByRole('dialog', { name: 'Data sources' });
+      const href = (name: string | RegExp) => within(dialog).getByRole('link', { name }).getAttribute('href');
+      // Open-Meteo twice: the weather and the place search.
+      expect(within(dialog).getAllByRole('link', { name: 'Open-Meteo' })[0]).toHaveAttribute('href', 'https://open-meteo.com/');
+      expect(href('© OpenStreetMap contributors')).toBe('https://www.openstreetmap.org/copyright');
+      expect(href('BigDataCloud')).toBe('https://www.bigdatacloud.com/');
+      expect(href('Photon')).toBe('https://photon.komoot.io/');
+      expect(href('adsb.lol')).toBe('https://adsb.lol/');
+      expect(href('CelesTrak')).toBe('https://celestrak.org/');
+      expect(href('Mapzen / AWS Terrain Tiles')).toBe('https://github.com/tilezen/joerd/blob/master/docs/attribution.md');
+      expect(href(/^© ESA WorldCover project 2021/)).toBe('https://esa-worldcover.org/');
+      expect(within(dialog).getAllByRole('link', { name: 'CC BY 4.0' })).toHaveLength(3);
+      expect(within(dialog).getAllByRole('link', { name: 'ODbL' })).toHaveLength(2);
+      expect(href('Privacy')).toBe('/privacy/');
+      expect(dialog).toHaveTextContent('Radio:FluxFM Chillhop');
+      // The panel's backdrop blur would hold a fixed overlay: the dialog is a child of <body>.
+      expect(dialog.closest('[data-share-hide]')).toBeNull();
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
   });
 });

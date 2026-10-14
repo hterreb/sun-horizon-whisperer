@@ -397,6 +397,42 @@ describe('LivePlanes (ROADMAP item 96)', () => {
     expect(screen.getAllByTestId('live-plane')).toHaveLength(20);
   });
 
+  it('reports the number of planes drawn when it changes, not on each tick; 0 when the radar goes off or the sky closes (item 155)', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    try {
+      const onLivePlanesShown = vi.fn();
+      const north = { ...south, hex: 'c00000', lat: PLACE.lat + 30 / KM_PER_DEG };
+      const three = feed([south, { ...south, hex: 'b00000', lat: PLACE.lat - 40 / KM_PER_DEG }, north]);
+      const scene = (props: Partial<React.ComponentProps<typeof SunVisualization>>) => (
+        <SunVisualization
+          sunPosition={{ azimuth: 200, altitude: 30 }}
+          moonPosition={{ azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false }}
+          sunPath={[]} moonPath={[]} timeOfDay="midday" weatherType="clear" latitude={PLACE.lat} longitude={PLACE.lon}
+          livePlanes={three} compassHeading={180} onLivePlanesShown={onLivePlanesShown} {...props}
+        />
+      );
+      const { rerender } = renderScene({ onLivePlanesShown, livePlanes: three });
+      // Compass facing south: the two south planes; the north one is behind.
+      expect(onLivePlanesShown).toHaveBeenLastCalledWith(2);
+      const calls = onLivePlanesShown.mock.calls.length;
+      act(() => { vi.advanceTimersByTime(2_000); });
+      expect(onLivePlanesShown).toHaveBeenCalledTimes(calls);
+      // The 360° view: still planes hang in the air, so none is drawn (item 110).
+      rerender(scene({ compassHeading: null }));
+      expect(onLivePlanesShown).toHaveBeenLastCalledWith(0);
+      rerender(scene({}));
+      expect(onLivePlanesShown).toHaveBeenLastCalledWith(2);
+      rerender(scene({ livePlanes: null }));
+      expect(onLivePlanesShown).toHaveBeenLastCalledWith(0);
+      rerender(scene({}));
+      rerender(scene({ weatherType: 'fog' })); // the layer goes away
+      expect(onLivePlanesShown).toHaveBeenLastCalledWith(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   describe('points the way it flies on the screen (item 143, option H)', () => {
     const body = () => screen.getByTestId('live-plane-body');
     const angle = () => Number(body().style.transform.match(/rotate\(([-\d.e]+)rad\)/)![1]);

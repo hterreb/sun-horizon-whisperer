@@ -8,6 +8,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { ALWAYS_SHOWN, type IdleHide } from '@/hooks/useIdleHide';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
 import { getRainSoundGain } from '@/utils/rainUtils';
+import { STREAMS } from '@/utils/radioStreams';
 import { useRainSound } from '@/hooks/useRainSound';
 
 interface MusicPlayerProps {
@@ -41,20 +42,6 @@ const SWITCH_NIGHT = 'data-[state=unchecked]:bg-white/15 data-[state=checked]:bg
 // The Radix slider: the root holds the track (first span, with the range in it) and the thumb.
 const SLIDER_CLASS = 'w-16 sm:w-24 [&>span:first-child]:transition-colors [&>span:first-child>span]:transition-colors';
 const SLIDER_NIGHT = '[&>span:first-child]:bg-white/15 [&>span:first-child>span]:bg-white/40 [&_[role=slider]]:bg-white/60 [&_[role=slider]]:border-transparent [&_[role=slider]]:h-4 [&_[role=slider]]:w-4';
-
-// Lo-fi hip hop radio streams
-const STREAMS: { name: string; url: string }[] = [
-  { name: 'FluxFM Chillhop', url: 'https://fluxfm.streamabc.net/flx-chillhop-mp3-320-1595440' },
-  { name: 'ILoveRadio Lo-Fi', url: 'https://streams.ilovemusic.de/iloveradio17.mp3' },
-  { name: 'Epic Lounge Jazzhop', url: 'https://stream.epic-lounge.com/jazzhop-lounge' },
-  { name: '0nlineradio Lo-Fi', url: 'https://stream.0nlineradio.com/lo-fi' },
-  { name: 'ISEKOI Chill Zone', url: 'https://public.isekoi-radio.com/listen/chill/radio.mp3' },
-  { name: 'laut.fm lofi', url: 'https://stream.laut.fm/lofi' },
-  { name: 'REYFM #lofi', url: 'https://listen.reyfm.de/lofi_128kbps.mp3' },
-  { name: 'Hunter.FM Lo-Fi', url: 'https://live.hunter.fm/lofi_normal' },
-  { name: 'CLIAMP Lofi Hip Hop', url: 'https://radio.cliamp.stream/lofi/stream' },
-  { name: 'Hotmix Lo-Fi', url: 'https://streaming.hotmixradio.com/hotmix-lofi-en-mp3' }
-];
 
 const STATION_INDEX_KEY = 'radio_station_index';
 
@@ -281,6 +268,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ controls = ALWAYS_SHOWN, duck
   return (
     <div 
       data-share-hide
+      data-idle-control
       className={`animate-fade-in fixed z-20 ${GLASS_SURFACE} rounded-full px-3 py-2 flex items-center gap-2 transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'} ${isTappable ? '' : 'pointer-events-none'}`}
       style={{
         bottom: `calc(${isMobile ? '4rem' : '1rem'} + env(safe-area-inset-bottom))`,
