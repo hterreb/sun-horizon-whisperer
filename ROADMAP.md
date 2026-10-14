@@ -2929,6 +2929,183 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   - Test link `?boat=<kind>`, or a list (`?boat=kayak,sailboat`, one kind by chance for each boat): `getBoatOverride`. It skips the weather, wind, time and season rules, and it pauses the collection, as `?fish=`.
 - **Checked:** unit tests: `utils.weatherEffectsUtils` (all 9 kinds in fair, calm July weather; 40 of 100 picks are sailboats; rain, fog, snow and storm send only the ferry, the freighter and the cruise liner; no kayak at night or in wind > 20 km/h; no tall ship in wind > 40 km/h; paddle steamer months 5–10 in the north and 11–4 in the south, also at night and in any wind; the shares and tiers of all 9; `getBoatOverride`; `hasBoatWake`), `utils.collection` (130 badges, the 4 tiers, `?boat=` pauses), `utils.sceneInfo` (the 4 cards; the freighter is now 5.7 % and the fishing boat 17 %), `SceneBoat` (each new kind on the grid; lights at night: kayak 0, paddle steamer 10, cruise liner 45, tall ship 3; the tall ship's wake is light: opacity 0.5, 60 % of the paddle steamer's length), `BoatBunting` (pennants and Christmas lights on all 9), `CloudLayer` (the spawn rules reach `pickBoat`: no kayak at night or in 25 km/h wind, no paddle steamer in December; `?boat=` in the spawn tick and from the address). Typecheck, lint, build and all 1802 tests (116 files, after the merge of main with items 136–141) pass. Built app (`vite preview`, headless Chrome, 390 × 844, Ravensburg on 16 Sep 2026, network stubbed): each new boat next to a sailboat at 14:00 and at 19:50 (17 min after sunset, lights on), and alone at 22:30; the card of each new boat (double tap: name, tier, share, fact, tier ring); the collection boat row (130 in all, the tier outlines, the silhouettes of the missing badges); after the merge, the tall ship's light wake by day and at dusk; a lineup of all 9 boats at the same depth (day near and far, night), drawn by `SceneBoat`. Not checked: a real phone; the dressed new boats in the app on a real national day or at Christmas (checked only in the component render).
 
+### 147. Controls: a tap shows or hides them where the user expects — S — [SUN-CHASER-1Q](https://ainabler.sentry.io/issues/SUN-CHASER-1Q)
+
+- **Feedback (2026-10-13 18:20 CEST, Ravensburg):** "The controls hide and unhide still didn't work as expected".
+- **Now (item 136):**
+  - The fade is active only in browser fullscreen and in the installed app (`isFullscreen || isInstalledApp()`, `SunTracker`). In a Chrome tab nothing hides.
+  - A document `click` toggles only when its target is in the scene root and not in `NOT_SKY` (`[data-scene-hit]`, `[data-share-hide]`, `button`, `a`, `input`, `[role="dialog"]`). A tap on a scene object does nothing.
+  - Much of the sky is not "sky". Each cloud is a rectangular hit box (`SkyClouds`), and stratus and altostratus rows cover the full width. Birds, planes, fish, boats and satellites have 44 px moving hit boxes. The terrain ridge is a scene object. During a fireworks show the top 65 % of the sky is one hit area (`EventSkyTaps`). On a cloudy evening most taps do nothing.
+  - A hidden control is `pointer-events-none`. A tap where the panel was lands on the cloud, sun or satellite below it, so the controls do not show.
+  - After a show, the 10 s timer (`WAKE_HIDE_MS`) runs. Only a new focus restarts it; a scroll in the panel or a tap on a control that has focus does not. The panel can fade while the user uses it.
+  - From 350 to 400 ms after a show, a tap on a control goes through to the sky and hides everything again (`TAP_READY_MS` 400 ms, `DOUBLE_TAP_MS` 350 ms).
+- **Spec (options):**
+  - **T1 Any single tap toggles:** a single tap on a scene object also toggles. The toggle waits `DOUBLE_TAP_MS` on a scene object only; a double tap opens the card and does not toggle. A tap on the empty sky still toggles at once.
+  - **T2 The hidden panel area wakes:** while the controls are hidden, a tap inside the rectangle of a hidden control (`InfoPanel`, `MusicPlayer`, `TopLeftButtons`) shows them, whatever is below it.
+  - **T3 Use keeps them:** a `pointerdown`, `wheel`, `scroll` or `keydown` inside a shown control restarts the 10 s timer.
+  - **T4 No auto-hide after a show:** the controls stay until the next tap (the 3 s hide on entering fullscreen stays).
+  - **T5 No pass-through:** `TAP_READY_MS` = `DOUBLE_TAP_MS`, so no window exists where a control tap hides the controls.
+- **Check:** `hooks.useIdleHide` and `SunTracker` tests for each chosen rule (a tap on a cloud toggles after 350 ms; a double tap on a cloud opens its card and does not toggle; a tap on the hidden panel area over a cloud shows the controls; a scroll in the panel at 9 s keeps them 10 s more). Browser at 390 × 844 with touch, in fullscreen and as installed app.
+- **Open:** (a) Which mode (Chrome tab, fullscreen button, Play app)? (b) What was tapped (empty sky, a cloud, the place of the hidden panel)? (c) "Didn't work" = nothing happened, or the controls hid during use? (d) Which of T1–T5?
+- **Decision (Lutz, 2026-10-14):** A tap on the sky did nothing, and a tap on the place of the hidden panel did nothing. Build T1 and T2. T3, T4 and T5 not now.
+
+### 148. More weather to tap: halos, sun dogs and more, each with its rarity — M — [SUN-CHASER-1R](https://ainabler.sentry.io/issues/SUN-CHASER-1R)
+
+- **Feedback (2026-10-13 18:20 CEST, Ravensburg):** "Are there other tappable weather phenomena besides the rainbow with different rarities? At the moment it's badge sits a little forlorn in it's row".
+- **Now:**
+  - The rainbow (item 121) is the only weather badge. Its tier is fixed at uncommon (`sceneInfo`). `groupRows` (`CollectionView`) puts every sky badge that is not in a state row into the first sky row, so the rainbow is alone there.
+  - Clouds (11 types) have their own group. Rain, drizzle, snow, hail, fog, storm lightning and heat shimmer are not tappable (`RainCanvas`, `WeatherEffects` are `pointer-events-none`). Green flash, aurora, noctilucent clouds and the meteor shower are egg badges (ultra rare).
+  - Data the app has: current cloud cover, wind, precipitation and `weatherType`; hourly low, mid and high cloud cover, visibility and 2 m temperature (`weatherUtils`); the sun and moon position and the moon phase.
+- **Spec:**
+  1. New sky optics, drawn as static SVG that fades in and out over 5 s (no new motion, calm rule). Each one is tappable as the rainbow: a double tap opens its card and collects the badge. Each badge goes into the rainbow's row ("Light in the sky"). Fixed tiers, as the rainbow.
+
+     | Phenomenon | Tier | Trigger (all from current data) |
+     |---|---|---|
+     | Crepuscular rays | common | sun −3° to 8°, low + mid cloud 20–70 % (gaps), visibility < 20 km; faint fixed light wedges from the sun |
+     | Sun dogs | frequent | high cloud ≥ 20 %, low + mid < 50 %, sun 0–30°; two soft glows 22° left and right of the sun |
+     | 22° halo | uncommon | high cloud ≥ 50 %, low < 30 %, sun > 0°; a faint ring of 22° around the sun |
+     | Double rainbow | rare | the rainbow shows and precipitation ≥ 1 mm/h; a second bow at 51°, colours reversed, fainter |
+     | Fog bow | rare | fog or visibility 300–2000 m, low cloud < 50 %, sun 0–40°; a broad white bow |
+     | Moonbow | very rare | rain or drizzle at night, moon 0–42°, illumination > 80 %; a pale white bow opposite the moon |
+
+  2. Optional: a sun pillar (rare: sun −2° to 6°, high cloud ≥ 30 %, 2 m temperature < 0 °C) and a moon halo (rare).
+  3. Each one gets a card with a fact (keys in 5 languages) and a badge drawing in `CollectionView`. Reuse `getRainbowGeometry` for the bows.
+  4. A test link `?optic=<kind>` shows one, as `?fish=` and `?boat=`, and pauses the collection.
+- **Lookbook first:** a private claude.ai page with each optic over the real sky gradients (golden hour, evening, overcast day, night), phone and wide view, 2 strengths each.
+- **Check:** `utils` tests for each trigger (inside and outside each limit), the tiers and the badge count. Browser shots with `?optic=` for each kind at 390 × 844. Frame budget (item 91) with all optics shown.
+- **Open:** (a) Which phenomena (all 6, plus pillar and moon halo)? (b) Lookbook first, or build at once?
+- **Decision (Lutz, 2026-10-14):** A lookbook with all 8 (the 6 in the table, the sun pillar and the moon halo). Lutz picks after the lookbook.
+
+### 149. Starlings that look like birds, not stars — S — [SUN-CHASER-1T](https://ainabler.sentry.io/issues/SUN-CHASER-1T)
+
+- **Feedback (2026-10-13 18:27 CEST, Ravensburg):** "The starlings look like literal stars, is that on purpose?".
+- **Now:**
+  - Each starling is a four-pointed sparkle (`SceneBird` `starlings` path), the standard "star" icon.
+  - The size is 7 px (`CloudLayer` `BIRDS`), but `far` sets the depth to 0.8–1, and `FAR_SHRINK` (0.45) makes each bird 4 px, so the sparkle is about 2 × 1.3 px.
+  - 18–30 birds are scattered at random in an ellipse 8 × 3.2 bird widths. The colour is the silhouette token (black) at an opacity of about 0.42–0.46, so they look grey. They come only in the hour before sunset, when the first stars come out.
+- **Spec:**
+  1. A bird glyph: a small swept-wing shape (body plus two wings angled back), no flapping (calm rule).
+  2. Starlings are drawn at 6–7 px: no `FAR_SHRINK` for the `far` flock (the flock stays far by its height and speed).
+  3. Opacity 0.7 for starlings, so they read as dark silhouettes against the glow.
+  4. Option M: a murmuration: 40–80 round dots of 1.5–2 px, densest in the middle, so the flock reads as one dark cloud. A slow "breathing" of the flock shape (10–15 s) is new motion; only with a lookbook.
+- **Check:** `SceneBird` renders the new path; `CloudLayer` starlings are 6–7 px. Browser shot at 18:30 with a starling flock at 390 × 844.
+- **Open:** (a) Bird glyph (1–3), or the murmuration (M)? (b) A small lookbook first?
+- **Decision (Lutz, 2026-10-14):** A lookbook first: the starling glyphs and the murmuration, plus alternatives for the gull (the standard bird glyph).
+
+### 150. Vegetation: a lookbook of tree styles — M — [SUN-CHASER-1V](https://ainabler.sentry.io/issues/SUN-CHASER-1V)
+
+- **Feedback (2026-10-13 18:33 CEST, Ravensburg):** "I don't like the vegetation can you do a lookbook with different styles, be creative".
+- **Now (item 141):** trees stand where ESA WorldCover has tree cover or mangroves, within 8 km on the ridge (`treeSilhouettes`). A conifer is a triangle, a broadleaf is a trunk with an oval crown (half as wide in winter). One tree per degree (3 in compass mode), 1.5–14 px high. The trees join the terrain path and take the ridge colour; only by day an 8 % green or amber tint is on top. At 18:33 ("evening") there is no tint, so the trees are ridge-coloured bumps in a regular row (item 141 noted this).
+- **Spec:** a lookbook (private claude.ai page, as earlier lookbooks) on the real Ravensburg ridge and tree cover, at day, golden hour, evening and night, phone and wide view. Styles:
+
+  | # | Style | How | Cost |
+  |---|---|---|---|
+  | V1 | Paper-cut layers | a second, lighter tree band 1–2 px higher with another seed, behind the main band | +1 path |
+  | V2 | Canopy skin | one soft bumpy line along each forest stretch (±20 % height), not single bumps | smaller path |
+  | V3 | Ink-wash conifers | tall spruces with 3 stepped tiers and height jitter; a far ridge softened by 0.5 px blur | low–medium |
+  | V4 | Sunset rim light | a 1 px warm edge on the side to the sun, fading with the distance to the sun's azimuth (golden hour and evening) | +1 stroke |
+  | V5 | Autumn mosaic | broadleaf crowns in 3–4 tints (amber, rust, ochre, green) at 20–30 %; conifers dark; gold larches above 1200 m in October | 4 paths |
+  | V6 | Lone sentinels | a thin forest band plus a few larger single trees (lime, oak) on peaks and forest edges | low |
+
+  Combinations to show: V2 + V3, V2 + V4, V1 + V5. Then Lutz picks one; the pick is built in `treeSilhouettes` and `SunVisualization`.
+- **Check (build):** `utils.treeSilhouettes` tests for the new shapes; browser shots at the four times; frame budget (item 91).
+- **Open:** (a) More or other directions for the lookbook? (b) The tree tint by night and evening too?
+- **Decision (Lutz, 2026-10-14):** The lookbook as specced (V1–V6 and the combinations).
+
+### 151. Rotating the phone: no black screen — S — [SUN-CHASER-1W](https://ainabler.sentry.io/issues/SUN-CHASER-1W)
+
+- **Feedback (2026-10-13 18:35 CEST, Ravensburg):** "While changing from portrait to landscape the app has a black screen for several seconds".
+- **Now:**
+  - The body background is near-black `#0F1016` (`bg-brand-night`, `index.css`; also the manifest and `index.html`). Until the scene draws its first frame at the new size, this colour fills the screen.
+  - A rotation fires `resize` (no debounce; Android often fires several as the system bars settle). Each one:
+    - `SkyClouds`: the layout key has `${width}x${height}`, so a rotation builds a new cloud layout (each cloud with a CSS `blur()`), and the old layout stays and cross-fades for 3 s (`LAYOUT_FADE_MS`): two blurred layouts at once.
+    - `SunVisualization`: new container size, so the sea path, the terrain and the trees are built again.
+    - `SeaCanvas` reallocates two canvases (up to 2× pixel density) and its mirror canvas. `NightStars` and `RainCanvas` reallocate theirs. `Fireworks` resizes its canvas with no cap on the pixel density.
+  - `use-mobile` changes at 768 px, which moves the radio.
+  - At 18:35 the sunset fireworks may have run (Ravensburg sunset ≈ 18:35).
+- **Spec:**
+  1. Measure first: `scripts/perf-trace.mjs` with a rotation from 390 × 844 to 844 × 390 at 4× CPU throttle (time to the first frame, long tasks), before and after.
+  2. The body background follows the sky: `SunTracker` sets a CSS variable with the top colour of the current sky gradient, and `body` uses it. A missing frame then shows sky colour, not black.
+  3. A size change swaps the cloud layout at once, without the 3 s cross-fade (the cross-fade stays for weather and day changes).
+  4. One shared `useViewportSize` hook with a 150 ms trailing debounce for `SunVisualization`, `SkyClouds`, `SeaCanvas`, `NightStars` and `RainCanvas`, so the bars settling cause one rebuild.
+  5. `Fireworks` caps the pixel density at 2, as `SeaCanvas`.
+- **Done when:** the trace shows the first frame at the new size within 500 ms (4× throttle), and no black frame (a dark sky frame is OK).
+- **Open:** (a) Pure black, or very dark blue? Also when rotating back? Chrome tab or Play app? (b) Spec 1–5 together, or spec 1 first and then decide?
+- **Decision (Lutz, 2026-10-14):** Measure first (spec 1). Decide the fixes from the numbers.
+
+### 152. The sunset countdown: louder, warmer, heard over the radio — M — [SUN-CHASER-1X](https://ainabler.sentry.io/issues/SUN-CHASER-1X), [SUN-CHASER-20](https://ainabler.sentry.io/issues/SUN-CHASER-20)
+
+- **Feedback (2026-10-13 18:49 CEST, Ravensburg):** "I still didn't hear the countdown although there was radio playing, so the app had the general permission to send audio. Please check if the audio can be played over the sound of the radio".
+- **Feedback (2026-10-14 18:33 CEST, Ravensburg):** "Without the radio I could hear the sunset sound but it was very faint and not really vibing. Can you please analyse and come up with some alternatives".
+- **Now (items 43, 98, 108):**
+  - The bell toggle is off by default, and the radio does not turn it on. With the bell off, the pill shows a `BellOff` button only in the last 10 s. A tap then is too late: the tones are scheduled 10–11.5 s before the target, so the user gets one check tick and no countdown. This is the most likely cause of 1X; 20 (next day, sound heard) fits a bell saved as on.
+  - Sound (`useSunsetCountdown`): ten ticks, each a pure 660 Hz sine of 80 ms, and a "chime" that is one sine stepping 660 → 990 Hz over 1.2 s. Peak gain 0.2 (−14 dBFS), linear fades, straight to `ctx.destination`, no compressor. An 80 ms pure sine is shorter than the ear's loudness window and has no harmonics where phone speakers are loud, so it sounds faint and thin.
+  - Radio: a separate `<audio>` element. During the countdown its volume drops to 0.3 × the slider (about −10 dB) in one step. iOS ignores `audio.volume`, so there is no duck on an iPhone.
+  - The CD3 toast "Tap to turn on the sunset sound" (item 98) was not built. The unlock listener re-arms only when the bell changes, so after Android suspends the audio context (screen off, a call, Bluetooth) the ticks are silent and nothing tells the user.
+- **Spec:**
+  1. **A soundbook first:** a private claude.ai page with play buttons, the same Web Audio code as the app, a "radio" loop to test against. Options:
+     - **S1 Glass bell:** each tick a bell (partials 1, 2.0, 2.76, 5.4), notes rising on a pentatonic scale (E5 → D6), 0.6–0.9 s decay; at T0 an E5 + B5 + E6 chord, 3 s.
+     - **S2 Kalimba or marimba:** each tick a pluck (fundamental, a partial at × 3.9 or × 5.9, a 2 ms click at 3 kHz), 300 ms; at T0 an A-major-9 chord strummed 60 ms apart.
+     - **S3 Swell and singing bowl:** a pad rises over the 10 s (3 detuned voices, a low-pass opening from 600 Hz to 3 kHz) with soft plucks for the count; at T0 a singing bowl (beating partials, 6–8 s).
+     - **S4 A bundled sound:** a CC0 bowl or kalimba file (about 150 kB, −14 LUFS) from the app's own origin.
+  2. **Louder, the same for every option:** all cues through one master bus (gain 0.7 → `DynamicsCompressor` −18 dB, 4:1) to a peak of 0.6–0.8; each tone ≥ 250 ms; fundamentals 400–1000 Hz.
+  3. **Duck deeper and softer:** from T−11 s the radio goes to 0.1 × the slider over 300 ms, and back up over 1 s after the last note.
+  4. **The bell when the radio plays:** (B1) the bell is on by default; or (B2) starting the radio turns the countdown sound on (the radio tap unlocks the audio); or (B3) at T−60 s with the bell off, a toast "Hear the sunset countdown?" with the bell.
+  5. **Fail visibly (CD3):** with the bell on, if the audio context is not running at T−60 s, a toast "Tap to turn on the sunset sound"; any tap resumes it.
+  6. Optional: `navigator.vibrate(30)` on each tick (Android).
+- **Check:** `hooks.useSunsetCountdown` tests (the master bus and the peak; the tones of the chosen option scheduled at the right times; the duck ramp from T−11 s and back; the toast at T−60 s when the context is suspended). Phone check: audible over the radio at slider 0.5 and 1.0, and without the radio (ROADMAP Verification item 43).
+- **Open:** (a) Soundbook first? Which options in it? (b) B1, B2 or B3? (c) Vibration?
+- **Decision (Lutz, 2026-10-14):** A soundbook first with S1–S4. B2: starting the radio turns the countdown sound on. Spec 2 (master bus), 3 (deeper duck) and 5 (CD3 toast) are built in any case. Vibration (spec 6) not now.
+
+### 153. Data sources in the app, not only on the privacy page — S — [SUN-CHASER-1Y](https://ainabler.sentry.io/issues/SUN-CHASER-1Y)
+
+- **Feedback (2026-10-13 22:07 CEST, Ravensburg):** "Open street map contribution only in the privacy page".
+- **Now:**
+  - "© OpenStreetMap contributors" shows in `InfoPanel` only when the place name came from Photon (item 137).
+  - Open-Meteo and adsb.lol (ODbL) are named only on the privacy page; the live plane card's "Data: adsb.lol" line was removed (item 111, "the privacy page only"). Mapzen / AWS Terrain Tiles and ESA WorldCover show only in the line-of-sight details. CelesTrak is named nowhere.
+  - The app has no link to the privacy page.
+  - Licences: ODbL (OSM, adsb.lol) asks for a credit where the data is shown, linked to the licence; Open-Meteo and ESA WorldCover are CC BY 4.0 (credit required). A privacy page that the app does not link is probably not enough.
+- **Spec:**
+  1. A "Data" row at the end of the expanded panel (after Feedback): "Weather: Open-Meteo · Places: © OpenStreetMap contributors · Planes: adsb.lol (ODbL) · Satellites: CelesTrak · Terrain: Mapzen/AWS · Trees: ESA WorldCover", each a link, plus a "Privacy" link to `/privacy`. Small, muted text.
+  2. Under the "Live planes" switch, while it is on: "Data: adsb.lol (ODbL)".
+  3. The Photon line (item 137) stays.
+  4. The privacy page lists CelesTrak.
+  5. Keys in 5 languages (the names stay as they are).
+- **Check:** `InfoPanel` test: the row and its links; the adsb.lol line only with the radar on. `i18n.test`.
+- **Open:** (a) A row in the panel (spec 1), or a "Data sources" dialog behind one link? (b) Spec 2 too?
+- **Decision (Lutz, 2026-10-14):** A "Data sources" link in the panel opens a dialog with all credits and the privacy link (instead of the row of spec 1). Spec 2 not now. Spec 3–5 stay.
+
+### 154. ISS passes: the switch moves to satellite tracking — S — [SUN-CHASER-1Z](https://ainabler.sentry.io/issues/SUN-CHASER-1Z)
+
+- **Feedback (2026-10-13 22:09 CEST, Ravensburg):** "ISS. Notification icon move to satellite tracking".
+- **Now:** the ISS pass reminder is an icon button in the Sunset row, after the sunset reminder's alarm clock (`InfoPanel`, item 97 decision 2026-10-06). The "Satellite tracking" switch is lower in the expanded panel.
+- **Spec:**
+  1. Remove the icon button from the Sunset row.
+  2. Directly under "Satellite tracking": an "ISS passes" row with a `Switch` and the hint `issReminder.toggle`. The same behaviour: `requirePremium`, the notification permission flow, off by default, saved as `iss-pass-reminder`, hidden without the Notification API, works with the tracking off.
+  3. No new texts (the `issReminder.*` keys exist).
+  4. Tests: `InfoPanel` (the row under the tracking switch; role `switch`), `SunTracker` (`getByRole('switch', { name: 'ISS passes' })`). A note under item 97's decision.
+- **Open:** a `Switch` row (spec), or keep the icon button next to the tracking switch?
+- **Decision (Lutz, 2026-10-14):** Keep the icon button and move it next to the "Satellite tracking" switch (spec 1, 3, 4; no `Switch` row).
+
+### 155. Live planes you can see without the compass — S — [SUN-CHASER-21](https://ainabler.sentry.io/issues/SUN-CHASER-21)
+
+- **Feedback (2026-10-14 18:33 CEST, Ravensburg):** "There is nearly no cloud coverage but I still can't see any live planes. Is it working correctly?".
+- **Now:**
+  - The feed works: on 2026-10-14 at 20:20 CEST, `/api/planes` for Ravensburg answered 200 in 1.6 s with 27 aircraft within 100 km.
+  - Without the compass the screen shows all 360°, so a plane moves very slowly on a phone. Item 110 shows only the 2 nearest planes that move ≥ 1 px/s (`MIN_SCREEN_SPEED_PX_S`, `MAX_NORMAL_PLANES`). Its decision note: only 4.2 % of the planes qualify on a phone, "so on a phone the radar often shows 0 or 1 plane without the compass". This is the most likely cause.
+  - With the radar on, the decorative planes stop (`CloudLayer`), so the sky is empty.
+  - Planes below 5° elevation or behind the terrain are hidden (`MIN_ELEVATION_DEG`). Near sunset they are 11–18 px dark silhouettes against a bright sky.
+  - A failed fetch is silent (`useLivePlanes`): no toast, no count, no Sentry tag. The feedback event cannot tell if the switch was on.
+- **Spec (options):**
+  - **P1 Always 2:** without the compass, show the 2 nearest visible planes; the ones that move ≥ 1 px/s come first, but a slow one is shown when there is no other. (Partly reverses item 110's "don't hang static in the air".)
+  - **P2 Keep the decor:** when no live plane is shown, the decorative planes fly as before.
+  - **P3 A status line** under the "Live planes" switch: "27 nearby · 0 in view · the compass shows all", or "Live radar unavailable" after a failed fetch.
+  - **P4 Sentry tag** `live-planes` = `off` | `ok-<shown>/<nearby>` | `error`, as the `place` tag (item 137).
+  - **P5 Easier to see:** a soft light outline around a plane silhouette against a bright sunset sky.
+- **Check:** `utils.liveRadar` tests for the chosen rule; `InfoPanel` test for the status texts; `useLivePlanes` test for the error state and the tag. Browser with a stubbed feed at 390 × 844 at sunset.
+- **Open:** (a) Which of P1–P5? (b) P1: 2 planes, or 1?
+- **Decision (Lutz, 2026-10-14):** P2, P3 and P4. P1 and P5 not now.
+
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 
 Rules for all items:
