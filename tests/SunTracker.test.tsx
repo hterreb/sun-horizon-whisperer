@@ -6,6 +6,7 @@ import { TAP_READY_MS } from '../src/hooks/useIdleHide';
 import { DOUBLE_TAP_MS } from '../src/hooks/useDoubleTap';
 import { loadManualLocation, saveManualLocation } from '../src/utils/manualLocation';
 import { getSunPosition, getSunTimes } from '../src/utils/sunUtils';
+import { isPlaneWeather } from '../src/utils/planes';
 import type SunVisualizationType from '../src/components/SunVisualization';
 
 // Records the props SunTracker hands to SunVisualization (time travel, ROADMAP item 44),
@@ -86,7 +87,7 @@ describe('SunTracker', () => {
   });
 
   it('fetches and displays real weather (mocked)', async () => {
-    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current_weather: { temperature: 20, weathercode: 0, windspeed: 0, winddirection: 0, time: '' } }) })) as unknown as typeof fetch;
+    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current: { temperature_2m: 20, weather_code: 0 } }) })) as unknown as typeof fetch;
     render(<SunTracker />);
     await waitFor(() => expect(fetch).toHaveBeenCalled());
     // Optionally check for weather display in InfoPanel
@@ -137,7 +138,7 @@ describe('SunTracker', () => {
 
   it('does not toast on a successful weather refresh, only on failure (A-5)', async () => {
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 1, longitude: 2 } }) } });
-    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current_weather: { temperature: 20, weathercode: 0, windspeed: 0, winddirection: 0, time: '' } }) })) as unknown as typeof fetch;
+    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current: { temperature_2m: 20, weather_code: 0 } }) })) as unknown as typeof fetch;
 
     render(<SunTracker />);
     await waitFor(() => expect(fetch).toHaveBeenCalled());
@@ -148,13 +149,13 @@ describe('SunTracker', () => {
   it('a manually picked weather ignores the real cloud cover for the stars, the moon and the cloud types (items 52, 57, 84)', async () => {
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 7, longitude: 8 } }) } });
     global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({
-      current_weather: { temperature: 20, weathercode: 3, windspeed: 0, winddirection: 0, time: '' },
-      current: { cloud_cover: 100, wind_speed_10m: 0, wind_direction_10m: 0 },
+      current: { temperature_2m: 20, weather_code: 3, cloud_cover: 100, wind_speed_10m: 0, wind_direction_10m: 0 },
       hourly: { time: ['2026-06-01T18:00'], cloud_cover_low: [90], cloud_cover_mid: [50], cloud_cover_high: [30], visibility: [24140] },
     }) })) as unknown as typeof fetch;
 
     render(<SunTracker />);
-    await waitFor(() => expect(visProps.current?.cloudCoverPercent).toBe(100));
+    // The star cover: the total, with its high-layer share at half weight (getStarCover).
+    await waitFor(() => expect(visProps.current?.cloudCoverPercent).toBeCloseTo(100 * 95.75 / 96.5));
     expect(visProps.current!.cloudLayers).toEqual({ low: 90, mid: 50, high: 30 });
 
     fireEvent.click(screen.getByRole('button', { name: /manual/i }));
@@ -164,13 +165,27 @@ describe('SunTracker', () => {
     expect(visProps.current!.cloudLayers).toBeNull();
   });
 
+  it('a fog code in clear air under cirrus still shows the stars, the satellites and the planes', async () => {
+    // Ravensburg, 2026-10-14 22:30: code 45, 16.8 km visibility, a full cirrus deck only.
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 13, longitude: 14 } }) } });
+    const hour = new Date(Math.floor(Date.now() / 3_600_000) * 3_600_000).toISOString().slice(0, 16);
+    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({
+      current: { temperature_2m: 12, weather_code: 45, cloud_cover: 100, visibility: 16800, wind_speed_10m: 3, wind_direction_10m: 32 },
+      hourly: { time: [hour], cloud_cover_low: [0], cloud_cover_mid: [0], cloud_cover_high: [100], visibility: [16800] },
+    }) })) as unknown as typeof fetch;
+
+    render(<SunTracker />);
+    await waitFor(() => expect(visProps.current?.weatherType).toBe('overcast'));
+    expect(visProps.current!.cloudCoverPercent).toBe(50);
+    expect(isPlaneWeather('overcast', visProps.current!.cloudLayers ?? null)).toBe(true);
+  });
+
   it('passes the visibility of the hour for the sky optics; manual weather has none (item 148)', async () => {
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 11, longitude: 12 } }) } });
     const hour = new Date(Math.floor(Date.now() / 3_600_000) * 3_600_000);
     const hourly = (offset: number) => new Date(hour.getTime() + offset * 3_600_000).toISOString().slice(0, 16);
     global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({
-      current_weather: { temperature: 20, weathercode: 45, windspeed: 0, winddirection: 0, time: '' },
-      current: { cloud_cover: 40, wind_speed_10m: 0, wind_direction_10m: 0 },
+      current: { temperature_2m: 20, weather_code: 45, cloud_cover: 40, wind_speed_10m: 0, wind_direction_10m: 0 },
       hourly: { time: [hourly(0), hourly(1)], cloud_cover_low: [30, 30], cloud_cover_mid: [0, 0], cloud_cover_high: [5, 5], visibility: [900, 900] },
     }) })) as unknown as typeof fetch;
 
@@ -917,8 +932,7 @@ describe('SunTracker', () => {
 
     it('during a preview the weather follows the hourly forecast (ROADMAP item 86)', async () => {
       global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({
-        current_weather: { temperature: 20, weathercode: 0, windspeed: 5, winddirection: 0, time: '' },
-        current: { cloud_cover: 0, wind_speed_10m: 5, wind_direction_10m: 0 },
+        current: { temperature_2m: 20, weather_code: 0, cloud_cover: 0, wind_speed_10m: 5, wind_direction_10m: 0 },
         hourly: {
           time: ['2026-09-30T12:00', '2026-09-30T13:00', '2026-09-30T14:00'],
           cloud_cover_low: [0, 0, 80], cloud_cover_mid: [0, 0, 60], cloud_cover_high: [0, 0, 20], visibility: [24000, 24000, 8000],
@@ -934,9 +948,11 @@ describe('SunTracker', () => {
 
       jumpTo('2026-09-30T14:10'); // TZ is UTC in tests: nearest forecast hour 14:00
       expect(visProps.current).toMatchObject({
-        weatherType: 'rain', temperatureC: 14, cloudCoverPercent: 95, windSpeedKmh: 30, rainMmH: 4,
+        weatherType: 'rain', temperatureC: 14, windSpeedKmh: 30, rainMmH: 4,
         cloudLayers: { low: 80, mid: 60, high: 20 },
       });
+      // The star cover (getStarCover): the hour's total of 95 %, its high-layer share at half weight.
+      expect(visProps.current!.cloudCoverPercent).toBeCloseTo(95 * 92.8 / 93.6);
       expect(screen.getByText('Forecast')).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: 'Back to now' }));

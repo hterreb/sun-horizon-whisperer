@@ -2,7 +2,7 @@ import { fetchCurrentWeather, getSunsetScore, getScoreReason, getUpperAirAt, get
 import { type WeatherType } from '../src/components/CloudLayer';
 describe('weatherUtils', () => {
   it('fetches weather data (mocked)', async () => {
-    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current_weather: { temperature: 20, weathercode: 0, windspeed: 0, winddirection: 0, time: '' } }) })) as unknown as typeof fetch;
+    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current: { temperature_2m: 20, weather_code: 0 } }) })) as unknown as typeof fetch;
     const data = await fetchCurrentWeather(0, 0);
     expect(data).toHaveProperty('temperature');
     expect(data).toHaveProperty('weatherType');
@@ -16,7 +16,7 @@ describe('weatherUtils', () => {
   it('ignores a cache entry with a future timestamp (device clock set back)', async () => {
     const cached = { temperature: -30, weatherType: 'snow', lastUpdated: new Date().toISOString() };
     localStorage.setItem('weather_cache', JSON.stringify({ data: cached, timestamp: Date.now() + 864e5, latitude: 0, longitude: 0 }));
-    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current_weather: { temperature: 20, weathercode: 0, windspeed: 0, winddirection: 0, time: '' } }) })) as unknown as typeof fetch;
+    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current: { temperature_2m: 20, weather_code: 0 } }) })) as unknown as typeof fetch;
     const data = await fetchCurrentWeather(0, 0);
     expect(fetch).toHaveBeenCalled();
     expect(data.temperature).toBe(20);
@@ -31,7 +31,7 @@ describe('weatherUtils', () => {
     const fetchMock = vi.fn(() =>
       Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ current_weather: { temperature: 20, weathercode: 0, windspeed: 0, winddirection: 0, time: '' } }),
+        json: () => Promise.resolve({ current: { temperature_2m: 20, weather_code: 0 } }),
       })
     ) as unknown as typeof fetch;
     global.fetch = fetchMock;
@@ -45,7 +45,7 @@ describe('weatherUtils', () => {
 
   it('does not emit [Weather Debug] console.logs (P-2)', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current_weather: { temperature: 20, weathercode: 0, windspeed: 0, winddirection: 0, time: '' } }) })) as unknown as typeof fetch;
+    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current: { temperature_2m: 20, weather_code: 0 } }) })) as unknown as typeof fetch;
 
     await fetchCurrentWeather(1, 1);
 
@@ -57,7 +57,7 @@ describe('weatherUtils', () => {
     const fetchMock = vi.fn(() =>
       Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ current_weather: { temperature: 20, weathercode: 0, windspeed: 0, winddirection: 0, time: '' } }),
+        json: () => Promise.resolve({ current: { temperature_2m: 20, weather_code: 0 } }),
       })
     ) as unknown as typeof fetch;
     global.fetch = fetchMock;
@@ -74,7 +74,7 @@ describe('weatherUtils', () => {
         ok: true,
         json: () =>
           Promise.resolve({
-            current_weather: { temperature: 20, weathercode: 0, windspeed: 0, winddirection: 0, time: '' },
+            current: { temperature_2m: 20, weather_code: 0 },
             hourly: {
               time: ['2026-06-01T17:00', '2026-06-01T18:00', '2026-06-02T18:00'],
               cloud_cover_low: [80, 0, 20],
@@ -101,7 +101,7 @@ describe('weatherUtils', () => {
         ok: true,
         json: () =>
           Promise.resolve({
-            current_weather: { temperature: 20, weathercode: 0, windspeed: 0, winddirection: 0, time: '' },
+            current: { temperature_2m: 20, weather_code: 0 },
             hourly: {
               time: ['2026-06-01T18:00'],
               cloud_cover_low: [0],
@@ -122,7 +122,7 @@ describe('weatherUtils', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-06-01T17:20:00Z'));
     const response = (hourly: boolean) => ({
-      current_weather: { temperature: 20, weathercode: 2, windspeed: 0, winddirection: 0, time: '' },
+      current: { temperature_2m: 20, weather_code: 2 },
       ...(hourly && {
         hourly: {
           time: ['2026-06-01T16:00', '2026-06-01T17:00', '2026-06-01T18:00'],
@@ -201,7 +201,7 @@ describe('WMO_CODE_MAP (ROADMAP item 10)', () => {
     global.fetch = vi.fn(() =>
       Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ current_weather: { temperature: 20, weathercode: 12345, windspeed: 0, winddirection: 0, time: '' } }),
+        json: () => Promise.resolve({ current: { temperature_2m: 20, weather_code: 12345 } }),
       })
     ) as unknown as typeof fetch;
 
@@ -209,14 +209,29 @@ describe('WMO_CODE_MAP (ROADMAP item 10)', () => {
     expect(data.weatherType).toBe('clear');
     expect(data.conditionKey).toBe('condition.unknown');
   });
+
+  it('keeps a fog code only at a visibility of 1 km or less; else the cloud cover decides', async () => {
+    const respond = (current: object) => {
+      global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current }) })) as unknown as typeof fetch;
+    };
+    // Ravensburg, 2026-10-14 22:30: code 45 under a cirrus deck, 16.8 km visibility.
+    respond({ temperature_2m: 12, weather_code: 45, cloud_cover: 100, visibility: 16800 });
+    expect(await fetchCurrentWeather(2.1, 2.1)).toMatchObject({ weatherType: 'overcast', conditionKey: 'condition.overcast' });
+    respond({ temperature_2m: 12, weather_code: 48, cloud_cover: 10, visibility: 5000 });
+    expect(await fetchCurrentWeather(2.2, 2.2)).toMatchObject({ weatherType: 'clear', conditionKey: 'condition.clearSky' });
+    respond({ temperature_2m: 12, weather_code: 45, cloud_cover: 100, visibility: 1000 });
+    expect((await fetchCurrentWeather(2.3, 2.3)).weatherType).toBe('fog');
+    respond({ temperature_2m: 12, weather_code: 45, cloud_cover: 100 });
+    expect((await fetchCurrentWeather(2.4, 2.4)).weatherType).toBe('fog');
+  });
 });
 
 describe('fetchCurrentWeather cloud/wind fields (ROADMAP item 10)', () => {
-  it('requests cloud_cover, wind_speed_10m and wind_direction_10m in the current block', async () => {
+  it('requests the weather, cloud_cover, visibility and wind in the current block only', async () => {
     const fetchMock = vi.fn(() =>
       Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ current_weather: { temperature: 20, weathercode: 0, windspeed: 0, winddirection: 0, time: '' } }),
+        json: () => Promise.resolve({ current: { temperature_2m: 20, weather_code: 0 } }),
       })
     ) as unknown as typeof fetch;
     global.fetch = fetchMock;
@@ -224,7 +239,9 @@ describe('fetchCurrentWeather cloud/wind fields (ROADMAP item 10)', () => {
     await fetchCurrentWeather(3, 3);
 
     const calledUrl = String((fetchMock as ReturnType<typeof vi.fn>).mock.calls[0][0]);
-    expect(calledUrl).toContain('current=cloud_cover,wind_speed_10m,wind_direction_10m');
+    expect(calledUrl).toContain('current=temperature_2m,weather_code,cloud_cover,visibility,wind_speed_10m,wind_direction_10m');
+    // With current_weather=true in the same request, Open-Meteo leaves the current block out.
+    expect(calledUrl).not.toContain('current_weather');
   });
 
   it('exposes cloud_cover/wind fields from the current block', async () => {
@@ -232,8 +249,7 @@ describe('fetchCurrentWeather cloud/wind fields (ROADMAP item 10)', () => {
       Promise.resolve({
         ok: true,
         json: () => Promise.resolve({
-          current_weather: { temperature: 20, weathercode: 0, windspeed: 0, winddirection: 0, time: '' },
-          current: { cloud_cover: 42, wind_speed_10m: 18, wind_direction_10m: 270 }
+          current: { temperature_2m: 20, weather_code: 0, cloud_cover: 42, wind_speed_10m: 18, wind_direction_10m: 270 }
         }),
       })
     ) as unknown as typeof fetch;
@@ -244,11 +260,11 @@ describe('fetchCurrentWeather cloud/wind fields (ROADMAP item 10)', () => {
     expect(data.windDirectionDeg).toBe(270);
   });
 
-  it('is null when the current block is missing (backward compatible)', async () => {
+  it('is null when the current block has no cloud/wind fields', async () => {
     global.fetch = vi.fn(() =>
       Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ current_weather: { temperature: 20, weathercode: 0, windspeed: 0, winddirection: 0, time: '' } }),
+        json: () => Promise.resolve({ current: { temperature_2m: 20, weather_code: 0 } }),
       })
     ) as unknown as typeof fetch;
 
@@ -272,7 +288,7 @@ describe('fetchCurrentWeather cloud/wind fields (ROADMAP item 10)', () => {
     global.fetch = vi.fn(() =>
       Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ current_weather: { temperature: 21, weathercode: 3, windspeed: 0, winddirection: 0, time: '' } }),
+        json: () => Promise.resolve({ current: { temperature_2m: 21, weather_code: 3 } }),
       })
     ) as unknown as typeof fetch;
 
@@ -342,20 +358,20 @@ describe('fetchCurrentWeather rain amount (ROADMAP item 77, X1)', () => {
     global.fetch = fetchMock as unknown as typeof fetch;
     return fetchMock;
   };
-  const weather = (weathercode: number) => ({ temperature: 12, weathercode, windspeed: 0, winddirection: 0, time: '' });
-  const current = (precipitation: number) => ({ cloud_cover: 100, wind_speed_10m: 5, wind_direction_10m: 270, precipitation, interval: 900 });
+  const current = (weather_code: number, precipitation?: number) =>
+    ({ temperature_2m: 12, weather_code, cloud_cover: 100, wind_speed_10m: 5, wind_direction_10m: 270, precipitation, interval: 900 });
 
   it('requests precipitation and turns the 15-minute amount into mm/h', async () => {
-    const fetchMock = respond({ current_weather: weather(63), current: current(0.5) });
+    const fetchMock = respond({ current: current(63, 0.5) });
     const data = await fetchCurrentWeather(17, 17);
     expect(String((fetchMock.mock.calls[0] as unknown[])[0])).toContain(',precipitation');
     expect(data.precipitationMmH).toBe(2);
   });
 
   it('takes the amount from the weather code when the measured amount is 0 or missing', async () => {
-    respond({ current_weather: weather(65), current: current(0) });
+    respond({ current: current(65, 0) });
     expect((await fetchCurrentWeather(18, 18)).precipitationMmH).toBe(10);
-    respond({ current_weather: weather(0) });
+    respond({ current: current(0) });
     expect((await fetchCurrentWeather(19, 19)).precipitationMmH).toBeNull();
   });
 
@@ -392,6 +408,12 @@ describe('getWeatherAt (ROADMAP item 86)', () => {
     expect(getWeatherAt(live, new Date('2026-10-04T00:20:00Z'))).toMatchObject({ weatherType: 'cloudy', temperature: 8 });
   });
 
+  it('keeps a forecast fog code only at a visibility of 1 km or less', () => {
+    const foggy = { ...live, hourly: { ...live.hourly!, weather_code: [45, 45], visibility: [11380, 400], cloud_cover: [60, 100] } };
+    expect(getWeatherAt(foggy, new Date('2026-10-04T00:00:00Z')).weatherType).toBe('cloudy');
+    expect(getWeatherAt(foggy, new Date('2026-10-04T01:00:00Z')).weatherType).toBe('fog');
+  });
+
   it('returns the live weather outside the forecast or without one', () => {
     expect(getWeatherAt(live, new Date('2026-10-03T23:00:00Z'))).toBe(live);
     expect(getWeatherAt(live, new Date('2026-10-04T02:00:00Z'))).toBe(live);
@@ -401,7 +423,7 @@ describe('getWeatherAt (ROADMAP item 86)', () => {
   });
 
   it('requests the hourly weather for yesterday to 6 days ahead', async () => {
-    const fetchMock = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current_weather: { temperature: 20, weathercode: 0, windspeed: 0, winddirection: 0, time: '' } }) })) as unknown as typeof fetch;
+    const fetchMock = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current: { temperature_2m: 20, weather_code: 0 } }) })) as unknown as typeof fetch;
     global.fetch = fetchMock;
     await fetchCurrentWeather(4, 4);
     const calledUrl = String((fetchMock as ReturnType<typeof vi.fn>).mock.calls[0][0]);
@@ -430,7 +452,7 @@ describe('getUpperAirAt (ROADMAP item 96)', () => {
   });
 
   it('requests the upper air with the hourly forecast', async () => {
-    const fetchMock = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current_weather: { temperature: 20, weathercode: 0, windspeed: 0, winddirection: 0, time: '' } }) })) as unknown as typeof fetch;
+    const fetchMock = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current: { temperature_2m: 20, weather_code: 0 } }) })) as unknown as typeof fetch;
     global.fetch = fetchMock;
     await fetchCurrentWeather(5, 5);
     const calledUrl = String((fetchMock as ReturnType<typeof vi.fn>).mock.calls[0][0]);

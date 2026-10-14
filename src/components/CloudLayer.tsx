@@ -556,6 +556,7 @@ export interface SpawnRules {
   contrail?: ContrailKind; // the planes' contrail from the forecast (item 96); none without
   planeOverride?: ContrailKind | null; // `?plane=` (item 96): a plane every 20 s with this contrail
   livePlanes?: boolean; // items 96 and 155: a live plane shows, so no new decorative plane starts
+  planeSky?: boolean; // isPlaneWeather with the cloud layers (a cirrus deck); without, the type alone
 }
 type View = SpawnRules['view'];
 
@@ -1004,7 +1005,7 @@ export const spawnTick = (
   // rolled once per plane; with no free lane, the next check tries again. A plane with a
   // trail stays in the list until its trail fades, but counts only while it crosses.
   // While a live plane shows (item 155), none starts; the ones in flight fly on.
-  if (isPlaneWeather(weatherType)) {
+  if (rules.planeSky ?? isPlaneWeather(weatherType)) {
     last.planeGap ??= rules.planeOverride ? PLANE_OVERRIDE_GAP_MS : PLANE_GAP_MIN_MS + random() * PLANE_GAP_RANGE_MS;
     if (!rules.livePlanes && now - last.planes > last.planeGap * gapFactor) {
       const crossing = planes.filter(p => p.path && p.path.start <= sceneTime && sceneTime <= p.path.start + p.path.duration);
@@ -1164,6 +1165,8 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   );
 
   const precipSlantPx = getPrecipitationSlantPx(windSpeedKmh, windDirectionDeg);
+  // A boolean, so a new layers object (each forecast hour) does not restart the spawn timer.
+  const planeSky = isPlaneWeather(weatherType, cloudLayers);
 
   // Drizzle, rain and storm fall on the rain canvas (ROADMAP item 77); null: no rain.
   const rainAmount = getRainMmH(weatherType, rainMmH);
@@ -1224,7 +1227,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     // Reduced motion: skip spawning birds, fish, ships and leaves entirely (static sky).
     if (prefersReducedMotion) return;
     const rules: Omit<SpawnRules, 'view' | 'density' | 'poolX' | 'contrail' | 'livePlanes'> = {
-      weatherType, timeOfDay, windSpeedKmh, isFullscreen, moonUp, moonY, month, latitude, gapFactor, fishOverride, huntOverride, planeOverride, boatOverride,
+      weatherType, timeOfDay, windSpeedKmh, isFullscreen, moonUp, moonY, month, latitude, gapFactor, fishOverride, huntOverride, planeOverride, boatOverride, planeSky,
       birdSpeedFactor: effects.birdSpeedFactor,
       showLeaves: effects.showLeaves,
       rewind: playDirection < 0,
@@ -1245,7 +1248,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
     return () => {
       clearInterval(intervalId);
     };
-  }, [weatherType, windSpeedKmh, timeOfDay, prefersReducedMotion, isFullscreen, effects.showLeaves, effects.birdSpeedFactor, moonUp, month, latitude, moonY, gapFactor, playDirection, fishOverride, huntOverride, planeOverride, boatOverride, updateEntities]);
+  }, [weatherType, windSpeedKmh, timeOfDay, prefersReducedMotion, isFullscreen, effects.showLeaves, effects.birdSpeedFactor, moonUp, month, latitude, moonY, gapFactor, playDirection, fishOverride, huntOverride, planeOverride, boatOverride, planeSky, updateEntities]);
 
   // The shark hunts (item 94): a timeout per planned hunt, and per fish that dives under a boat,
   // gives the prey its hunt (CSS animations in renderFish) and puts the ripple and the bubbles

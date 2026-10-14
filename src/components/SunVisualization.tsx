@@ -1155,7 +1155,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     [sceneWidth, sceneHeight, latitude, compassHeading]
   );
   // Mounted also while the radar is off: the trails of its planes stay and fade (item 142).
-  const showLivePlanes = sceneWidth > 0 && isPlaneWeather(weatherType);
+  const showLivePlanes = sceneWidth > 0 && isPlaneWeather(weatherType, cloudLayers);
 
   // Satellites (ROADMAP item 97): azimuth -> x and elevation -> y as for the sun and moon
   // (compass field of view included); a tracked satellite behind the terrain is hidden.

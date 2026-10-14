@@ -5,6 +5,7 @@
 import { type WeatherType } from '../components/CloudLayer';
 import { type SunTimes, type TimeOfDay } from './sunUtils';
 import { getRainMmH, getRainSkyMix } from './rainUtils';
+import { type CloudLayers } from './skyCloudUtils';
 
 export interface WeatherEffectsInput {
   type: WeatherType;
@@ -328,6 +329,21 @@ export const getStarCloudFactor = (type: WeatherType, cloudCoverPercent: number 
   cloudCoverPercent == null
     ? STAR_CLOUD_FACTOR[type] ?? 0 // ponytail: drizzle counts as covered too, same as rain
     : Math.min(1, Math.max(0, 1 - cloudCoverPercent / 100));
+
+// The cover that hides the stars, the moon and the satellites: thin high cloud (cirrus) lets
+// about half the light through. The total cover (live: every 15 min) is the base. The layers
+// (live: the nearest forecast hour) give the share of it that is cirrus, which counts at half
+// weight (random overlap of the three layers). Without a total, the layers alone; without
+// layers (manual weather, an older cache entry), the total.
+export const getStarCover = (cloudCoverPercent: number | null, layers: CloudLayers | null): number | null => {
+  if (!layers) return cloudCoverPercent;
+  const cover = (highWeight: number) =>
+    100 * (1 - (1 - layers.low / 100) * (1 - layers.mid / 100) * (1 - highWeight * layers.high / 100));
+  const thin = cover(0.5);
+  if (cloudCoverPercent == null) return thin;
+  const full = cover(1);
+  return full > 0 ? cloudCoverPercent * thin / full : cloudCoverPercent;
+};
 
 // Item 134: clouds hide a share of the stars, through gaps, instead of dimming them all.
 // Each star has a random `gap` (0-1); it shows at full strength while the cloud factor is

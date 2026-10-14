@@ -47,6 +47,13 @@ describe('the planes', () => {
     expect(['fog', 'overcast', 'storm', 'rain', 'drizzle', 'snow', 'hail'].some(w => isPlaneWeather(w as never))).toBe(false);
   });
 
+  it('shows planes under an overcast sky of thin cirrus, not under a low deck', () => {
+    expect(isPlaneWeather('overcast', { low: 0, mid: 0, high: 100 })).toBe(true);
+    expect(isPlaneWeather('overcast', { low: 60, mid: 0, high: 100 })).toBe(false);
+    expect(isPlaneWeather('overcast', { low: 100, mid: 0, high: 0 })).toBe(false);
+    expect(isPlaneWeather('fog', { low: 0, mid: 0, high: 100 })).toBe(false);
+  });
+
   it('shows only the lights from nautical twilight on', () => {
     expect(showsPlaneLights('night')).toBe(true);
     expect(showsPlaneLights('nautical-twilight')).toBe(true);
