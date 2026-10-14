@@ -42,14 +42,14 @@ export const getSeasonInstant = (year: number, month: 2 | 5 | 8 | 11): Date => {
 // and December solstice days (the same three in the south), each at today's clock time, so
 // getSunPathAround picks the same pass (current or next) as today's arc. The day that is
 // today keeps `date` itself and is marked `today`. The equinox is today's on an equinox
-// (March on Nowruz), else September's. Empty for any other event.
+// (March or September), else September's. Empty for any other event (item 138: Nowruz has none).
 const ONE_DAY_MS = 86_400_000;
 export type SeasonPath = 'june' | 'equinox' | 'december';
 export const getSolsticeTraceDates = (
   event: CalendarEvent | null,
   date: Date
 ): { season: SeasonPath; date: Date; today: boolean }[] => {
-  if (event !== 'solstice-longest' && event !== 'solstice-shortest' && event !== 'equinox' && event !== 'nowruz') return [];
+  if (event !== 'solstice-longest' && event !== 'solstice-shortest' && event !== 'equinox') return [];
   const month = date.getMonth();
   const seasons = [['june', 5], ['equinox', month === 2 ? 2 : 8], ['december', 11]] as const;
   return seasons.map(([season, m]) => {
@@ -69,8 +69,9 @@ const getSeasonEvent = (date: Date, latitude: number): CalendarEvent | null => {
   const month = date.getMonth();
   if (month !== 2 && month !== 5 && month !== 8 && month !== 11) return null;
   if (!sameLocalDay(getSeasonInstant(date.getFullYear(), month), date)) return null;
-  // Item 118: the March equinox is also Nowruz; it keeps the equinox pill and badge.
-  if (month === 2) return 'nowruz';
+  // Item 118: the March equinox is also Nowruz. Item 138: one egg at a time, the equinox until
+  // noon, then Nowruz (getEventDaysPerYear asks at noon: Nowruz keeps its day).
+  if (month === 2) return date.getHours() < 12 ? 'equinox' : 'nowruz';
   if (month === 8) return 'equinox';
   // June is the longest day in the north and the shortest in the south.
   return (month === 5) === (latitude >= 0) ? 'solstice-longest' : 'solstice-shortest';

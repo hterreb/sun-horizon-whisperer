@@ -46,7 +46,7 @@ const SEASON_TEXT: Partial<Record<CalendarEvent, MessageKey>> = {
   'solstice-longest': 'egg.seasonLongest',
   'solstice-shortest': 'egg.seasonShortest',
   equinox: 'egg.seasonEquinox',
-  nowruz: 'egg.seasonEquinox', // item 118: the March equinox; FestivalEggs adds the blossoms
+  nowruz: 'egg.nowruz', // item 138: the March equinox afternoon; FestivalEggs adds the blossoms
 };
 
 // Fixed layouts (share of the width/height, s), so a render never re-rolls them.
@@ -80,7 +80,7 @@ const CalendarEggs: React.FC<CalendarEggsProps> = ({ event, timeOfDay, moon, hor
   const seasonText = seasonKey ? t(seasonKey) : blueMoon && t('egg.blueMoonLabel');
   // Item 140: the winter solstice pill opens the midwinter card, the summer one the solstice card.
   const seasonCard: EggCardKind | null = !seasonKey ? null
-    : event === 'solstice-shortest' ? 'midwinter' : event === 'solstice-longest' ? 'solstice' : 'equinox';
+    : event === 'solstice-shortest' ? 'midwinter' : event === 'solstice-longest' ? 'solstice' : event === 'nowruz' ? 'nowruz' : 'equinox';
   // Item 113: the wrapper of a tappable egg (pointer only, hidden from screen readers) and its
   // hit area with the ring, a child of the moving wrapper.
   // Item 116: a double tap opens the card; a single tap shows the ring for a moment.

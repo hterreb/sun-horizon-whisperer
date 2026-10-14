@@ -75,7 +75,7 @@ const CollectionView = lazy(() => import('./CollectionView'));
 // Lazy too: it imports BadgeArt from CollectionView (ROADMAP item 125).
 const BadgeUnlocked = lazy(() => import('./BadgeUnlocked'));
 import {
-  BADGES, NOWRUZ_ALSO, addToCollection, badgeForAstroEvent, badgeForCalendarEvent, badgeForPlayfulEgg, badgeForSanta, badgeForTarget, countCollected, eggBadgesForTarget, isCollectionPaused, loadCollection,
+  BADGES, addToCollection, badgeForAstroEvent, badgeForCalendarEvent, badgeForPlayfulEgg, badgeForSanta, badgeForTarget, countCollected, eggBadgesForTarget, isCollectionPaused, loadCollection,
   badgeForRoute, saveCollection, stateBadgeForTarget, type BadgeId, type Collection, type StateBadgeContext,
 } from '@/utils/collection';
 import { watchSunEvent, NO_SUN_EVENT_WATCH, getCountdownTarget } from '../utils/sunEvents';
@@ -861,12 +861,13 @@ const SunTracker: React.FC = () => {
   useEffect(() => {
     stateBadgeContextRef.current = { timeOfDay, moonPhase: moonPosition.phase, horizonProfile, isTimePreview };
   }, [timeOfDay, moonPosition.phase, horizonProfile, isTimePreview]);
-  const handleSceneInfo = useCallback((target: SceneInfoTarget, point: { x: number; y: number }, ring: string) => {
+  const handleSceneInfo = useCallback((target: SceneInfoTarget, point: { x: number; y: number }, ring: string, egg: BadgeId | null) => {
     infoCardCount.current += 1;
     setInfoCard({ target, ...point, ring, id: infoCardCount.current });
-    // Item 138: one badge per tap. The kind's badge, or the state badge (satellite, sun, moon,
-    // terrain); no state (the sun in the twilights, a time preview) collects nothing.
-    const badge = badgeForTarget(target) ?? stateBadgeForTarget(target, stateBadgeContextRef.current);
+    // Item 138: one badge per tap. A new egg badge (handleSceneTap) wins, then the kind's badge,
+    // or the state badge (satellite, sun, moon, terrain); no state (the sun in the twilights, a
+    // time preview) collects nothing.
+    const badge = egg ?? badgeForTarget(target) ?? stateBadgeForTarget(target, stateBadgeContextRef.current);
     if (badge) collect(badge);
   }, [collect]);
   const handleInfoClose = useCallback(() => setInfoCard(null), []);
@@ -1068,8 +1069,6 @@ const SunTracker: React.FC = () => {
     isTimePreview,
     timeOfDay,
   });
-  // Item 118: Nowruz is the March equinox, so it also collects the equinox badge.
-  const nowruzEquinoxBadge = calendarBadge === 'egg:nowruz' ? NOWRUZ_ALSO : null;
   const santaBadge = santaForced ? null : badgeForSanta(isSanta, { reducedMotion: prefersReducedMotion, isTimePreview });
   // Reduced motion draws no shooting stars, so the meteor shower does not count then.
   const astroKind = astroEggOverride || isTimePreview ? null : astroEvent?.kind ?? null;
@@ -1093,18 +1092,20 @@ const SunTracker: React.FC = () => {
   const ufoBadge: BadgeId | null = ufoOn && !prefersReducedMotion ? 'egg:ufo' : null;
   // One string (a template, so the React Compiler sees a new primitive, not the national day it
   // came from), so the callback below changes only when the shown eggs do. A null shows as "null".
-  const shownEggs = `${calendarBadge} ${nowruzEquinoxBadge} ${santaBadge} ${astroBadge} ${nationalBadge} ${buntingBadge} ${ufoBadge}`;
+  const shownEggs = `${calendarBadge} ${santaBadge} ${astroBadge} ${nationalBadge} ${buntingBadge} ${ufoBadge}`;
   const handleSceneTap = useCallback((target: SceneInfoTarget, point: { x: number; y: number }, ring: string) => {
-    handleSceneInfo(target, point, ring);
     const shown = shownEggs.split(' ');
     const { newYearAt, playful } = eggShowRef.current;
-    for (const id of eggBadgesForTarget(target)) {
+    // Item 138: one card per tap. The first new egg badge of a shown egg wins the tap; the kind or
+    // state badge (and a second egg, such as a supermoon in an eclipse) comes on a later tap.
+    const egg = eggBadgesForTarget(target).find((id) => {
       const kind = id.slice('egg:'.length) as PlayfulEgg;
-      if (shown.includes(id)
+      return !collectionRef.current[id] && (shown.includes(id)
         || (id === 'egg:newYear' && Date.now() - newYearAt < NEW_YEAR_TAP_MS)
-        || (playful.has(kind) && PLAYFUL_EVENT[kind] === calendarEvent)) collect(id);
-    }
-  }, [handleSceneInfo, collect, shownEggs, calendarEvent]);
+        || (playful.has(kind) && PLAYFUL_EVENT[kind] === calendarEvent));
+    });
+    handleSceneInfo(target, point, ring, egg ?? null);
+  }, [handleSceneInfo, shownEggs, calendarEvent]);
   const bunting = useMemo<Bunting | null>(
     () => (nationalDay?.style === 'bunting' ? { colors: nationalDay.colors.map((c) => `hsl(var(--national-${c}))`), day: nationalDay.kind }
       // Día de los Muertos (item 118): papel picado; its badge counts with the marigolds.

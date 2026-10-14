@@ -207,14 +207,13 @@ export const badgeForTarget = (target: SceneInfoTarget): BadgeId | null => {
   }
 };
 
-// Item 123: the egg badge of each egg card. The ghost has none; Nowruz is the March equinox,
-// so it also gives the equinox badge (NOWRUZ_ALSO); the fireworks card gives the New Year badge
-// (the sunrise and sunset shows have none). A national day's card gives its badge.
+// Item 123: the egg badge of each egg card. The ghost has none; the fireworks card gives the New
+// Year badge (the sunrise and sunset shows have none). A national day's card gives its badge.
 const EGG_CARD_BADGES: Partial<Record<EggCardKind, BadgeId[]>> = {
   ufo: ['egg:ufo'], dragon: ['egg:lunarNewYear'], santa: ['egg:santa'], blackCat: ['egg:friday13'],
   halloweenBat: ['egg:halloweenBats'], pumpkinMoon: ['egg:halloweenPumpkin'],
   emptyTomb: ['egg:easter'], potOfGold: ['egg:stPatrick'], heartCloud: ['egg:valentine'],
-  nowruz: ['egg:nowruz', 'egg:equinox'], fireworks: ['egg:newYear'],
+  fireworks: ['egg:newYear'],
 };
 // The decorated boats: the national bunting days and the Christmas lights (Día de los Muertos'
 // papel picado counts with the marigolds).
@@ -291,7 +290,6 @@ export interface CalendarBadgeOptions {
 // is null: SunTracker collects it where the fireworks start. Never in the time preview.
 export const badgeForCalendarEvent = (event: CalendarEvent | null, o: CalendarBadgeOptions): BadgeId | null => {
   if (!event || o.isTimePreview) return null;
-  // Item 118: Nowruz gives its own badge; SunTracker adds the equinox badge (NOWRUZ_ALSO).
   if (isFestivalEvent(event)) {
     return o.timeOfDay && isFestivalShown(event, { timeOfDay: o.timeOfDay, weatherType: o.weatherType, reducedMotion: o.reducedMotion })
       ? `egg:${FESTIVALS[event]}` : null;
@@ -316,9 +314,6 @@ export const badgeForCalendarEvent = (event: CalendarEvent | null, o: CalendarBa
     case 'st-patrick': return null;
   }
 };
-
-// Item 118: Nowruz is the March equinox, so it also collects the equinox badge.
-export const NOWRUZ_ALSO: BadgeId = 'egg:equinox';
 
 // Christmas Eve: Santa's badge when he flies (`santaTime` from calendarEvents.isSantaTime). He
 // flies also when it snows; reduced motion hides him. Never in the time preview.
