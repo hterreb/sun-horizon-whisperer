@@ -56,19 +56,15 @@ export interface HourlyForecast {
 }
 
 interface OpenMeteoResponse {
-  current_weather: {
-    temperature: number;
-    weathercode: number;
-    windspeed: number;
-    winddirection: number;
-    time: string;
-  };
-  // Open-Meteo's newer `current` block (ROADMAP item 10) - requested alongside the
-  // legacy `current_weather` block above, which has no cloud_cover field.
-  current?: {
-    cloud_cover: number;
-    wind_speed_10m: number;
-    wind_direction_10m: number;
+  // Open-Meteo's `current` block. Only this block is requested: with the legacy
+  // `current_weather=true` in the same request, Open-Meteo leaves `current` out.
+  current: {
+    temperature_2m: number;
+    weather_code: number;
+    cloud_cover?: number;
+    visibility?: number; // m
+    wind_speed_10m?: number;
+    wind_direction_10m?: number;
     precipitation?: number; // mm over `interval` seconds
     interval?: number;
   };
@@ -123,6 +119,16 @@ export const WMO_CODE_MAP: Record<number, { type: WeatherType; conditionKey: Mes
 
 const mapWeatherCode = (code: number): { type: WeatherType; conditionKey: MessageKey } =>
   WMO_CODE_MAP[code] ?? { type: 'clear', conditionKey: 'condition.unknown' };
+
+// Fog is a visibility of 1 km or less (WMO). The model can give a fog code in clear air
+// (Ravensburg, 2026-10-14: code 45 with 16.8 km visibility), and the fog then hid the stars,
+// the planes and the satellites. With a longer visibility, the cloud cover gives code 0-3.
+// Without the visibility or the cover, the fog code stays.
+const mapWeather = (code: number, visibilityM: number | null | undefined, cloudCoverPercent: number | null | undefined) => {
+  const mapped = mapWeatherCode(code);
+  if (mapped.type !== 'fog' || visibilityM == null || cloudCoverPercent == null || visibilityM <= VISIBILITY_FULL_PENALTY_M) return mapped;
+  return mapWeatherCode(cloudCoverPercent < 20 ? 0 : cloudCoverPercent < 50 ? 1 : cloudCoverPercent < 80 ? 2 : 3);
+};
 
 export interface SunsetScoreInput {
   low: number; // cloud cover %, 0-100
@@ -361,8 +367,7 @@ export const fetchCurrentWeather = async (
     const roundedLongitude = Math.round(longitude * 100) / 100;
     const url =
       `https://api.open-meteo.com/v1/forecast?latitude=${roundedLatitude}&longitude=${roundedLongitude}` +
-      `&current_weather=true` +
-      `&current=cloud_cover,wind_speed_10m,wind_direction_10m,precipitation` +
+      `&current=temperature_2m,weather_code,cloud_cover,visibility,wind_speed_10m,wind_direction_10m,precipitation` +
       `&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility` +
       `,temperature_2m,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,precipitation` +
       `,temperature_250hPa,relative_humidity_250hPa` +
@@ -375,20 +380,21 @@ export const fetchCurrentWeather = async (
 
     const data: OpenMeteoResponse = await response.json();
 
-    const weatherMapping = mapWeatherCode(data.current_weather.weathercode);
+    const { current } = data;
+    const weatherMapping = mapWeather(current.weather_code, current.visibility, current.cloud_cover);
 
     const weatherData: WeatherData = {
-      temperature: Math.round(data.current_weather.temperature),
+      temperature: Math.round(current.temperature_2m),
       weatherType: weatherMapping.type,
       conditionKey: weatherMapping.conditionKey,
       lastUpdated: new Date(),
       isRealWeather: true,
       sunsetScoreToday: scoreSunsetAt(data.hourly, sunsetToday),
       sunsetScoreTomorrow: scoreSunsetAt(data.hourly, sunsetTomorrow),
-      cloudCoverPercent: data.current?.cloud_cover ?? null,
-      windSpeedKmh: data.current?.wind_speed_10m ?? null,
-      windDirectionDeg: data.current?.wind_direction_10m ?? null,
-      precipitationMmH: getPrecipitationMmH(data.current?.precipitation, data.current?.interval, data.current_weather.weathercode),
+      cloudCoverPercent: current.cloud_cover ?? null,
+      windSpeedKmh: current.wind_speed_10m ?? null,
+      windDirectionDeg: current.wind_direction_10m ?? null,
+      precipitationMmH: getPrecipitationMmH(current.precipitation, current.interval, current.weather_code),
       cloudLayers: cloudLayersAt(data.hourly, new Date()),
       hourly: data.hourly ?? null
     };
@@ -431,7 +437,7 @@ export const getWeatherAt = (data: WeatherData, at: Date): WeatherData => {
   const code = hourly.weather_code?.[i];
   const temperature = hourly.temperature_2m?.[i];
   if (code == null || temperature == null) return data;
-  const { type, conditionKey } = mapWeatherCode(code);
+  const { type, conditionKey } = mapWeather(code, hourly.visibility?.[i], hourly.cloud_cover?.[i]);
   return {
     ...data,
     isForecast: true,

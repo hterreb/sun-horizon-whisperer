@@ -32,7 +32,7 @@ import { getRainMmH } from '@/utils/rainUtils';
 import { useLivePlanes, type LivePlanesState } from '@/hooks/useLivePlanes';
 import { getLivePlanesTag } from '@/utils/liveRadar';
 import { useLiveRoute } from '@/hooks/useLiveRoute';
-import { getMoonLook, getSkyOvercastMix, getStarCloudFactor } from '@/utils/weatherEffectsUtils';
+import { getMoonLook, getSkyOvercastMix, getStarCloudFactor, getStarCover } from '@/utils/weatherEffectsUtils';
 import { getAstroEvent, parseEggOverride } from '@/utils/astroEvents';
 import SunVisualization from './SunVisualization';
 // The info card and the collection view load on their first open (ROADMAP item 125).
@@ -1117,6 +1117,11 @@ const SunTracker: React.FC = () => {
   // A manually picked weather ignores the real cloud cover: the sky, the stars and
   // the moon then follow the weather type alone (ROADMAP items 50, 52, 57).
   const cloudCover = useRealWeather ? weatherData?.cloudCoverPercent ?? null : null;
+  // The cover per layer for the cloud types (ROADMAP item 84); manual weather uses the type's own.
+  const cloudLayers = useRealWeather ? weatherData?.cloudLayers ?? null : null;
+  // The stars, the moon, the satellites and the aurora show through thin cirrus; the sky's
+  // grey (getSkyOvercastMix) keeps the total cover.
+  const starCover = getStarCover(cloudCover, cloudLayers);
 
   // Collection badges (ROADMAP item 112) of the calendar and astronomy eggs that the scene
   // really shows (item 123: a double tap on the egg collects one; CalendarEggs' rules: dark sky = night or astronomical/nautical twilight).
@@ -1124,7 +1129,7 @@ const SunTracker: React.FC = () => {
   const isDarkSky = timeOfDay === 'night' || timeOfDay === 'astronomical-twilight' || timeOfDay === 'nautical-twilight';
   const calendarBadge = dragonForced || santaForced || festivalForced || midwinterForced ? null : badgeForCalendarEvent(calendarEvent, {
     isNight: isDarkSky,
-    moonUp: isDarkSky && moonPosition.visible && getMoonLook(weatherType, cloudCover).disc > 0,
+    moonUp: isDarkSky && moonPosition.visible && getMoonLook(weatherType, starCover).disc > 0,
     weatherType,
     reducedMotion: prefersReducedMotion,
     isTimePreview,
@@ -1178,8 +1183,6 @@ const SunTracker: React.FC = () => {
   );
   // The forecast rain amount (ROADMAP item 77); manual weather uses the type's middle value.
   const rainMmH = useRealWeather ? weatherData?.precipitationMmH ?? null : null;
-  // The cover per layer for the cloud types (ROADMAP item 84); manual weather uses the type's own.
-  const cloudLayers = useRealWeather ? weatherData?.cloudLayers ?? null : null;
   // The visibility at the scene's time for the sky optics (item 148); manual weather has none.
   const visibilityM = useRealWeather ? getVisibilityAt(weatherData?.hourly ?? null, date) : null;
   // The planes' contrails (ROADMAP item 96) from the forecast's upper air at the scene's time;
@@ -1272,7 +1275,7 @@ const SunTracker: React.FC = () => {
       {/* Item 123 (decision 2026-10-10): first, with no z-index, so all scene things take their own taps. */}
       <EventSkyTaps
         onInfo={handleSceneTap}
-        aurora={astroEvent?.kind === 'aurora' && getStarCloudFactor(weatherType, cloudCover) > 0}
+        aurora={astroEvent?.kind === 'aurora' && getStarCloudFactor(weatherType, starCover) > 0}
         meteorShower={astroEvent?.kind === 'meteorShower' && timeOfDay === 'night' && !prefersReducedMotion}
         fireworks={nationalFireworksRunning && nationalDay?.style === 'fireworks' ? nationalDay.kind : ownFireworksRunning ? 'fireworks' : null}
       />
@@ -1280,10 +1283,10 @@ const SunTracker: React.FC = () => {
         timeOfDay={timeOfDay}
         moonPosition={moonPosition}
         weatherType={weatherType}
-        cloudCoverPercent={cloudCover}
+        cloudCoverPercent={starCover}
         meteorShower={astroEvent?.kind === 'meteorShower'}
       />
-      {astroEvent?.kind === 'aurora' && <Aurora opacity={getStarCloudFactor(weatherType, cloudCover)} />}
+      {astroEvent?.kind === 'aurora' && <Aurora opacity={getStarCloudFactor(weatherType, starCover)} />}
       <LazyPart>
       {discoOn && <DiscoSky />}
       {ufoOn && (
@@ -1335,7 +1338,7 @@ const SunTracker: React.FC = () => {
             longitude={location.longitude}
             date={date}
             temperatureC={weatherData?.temperature ?? null}
-            cloudCoverPercent={cloudCover}
+            cloudCoverPercent={starCover}
             // Manual mode sets the wind itself (ROADMAP item 73): calm, or strong with the switch.
             windSpeedKmh={useRealWeather ? weatherData?.windSpeedKmh ?? null : manualWindy ? MANUAL_STRONG_WIND_KMH : 0}
             rainMmH={rainMmH}

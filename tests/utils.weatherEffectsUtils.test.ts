@@ -1,4 +1,4 @@
-import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, hasBoatWake, getBoatTone, pickFish, FISH_WEIGHTS, canSpawnFish, getRestStopMotion, pickNightFish, pickMoonlitDayFish, NIGHT_FISH_WEIGHTS, MAX_FISH, MAX_NIGHT_FISH, MAX_BIRDS, getFishOverride, getWaterSpeedFactor, getWaterLimit, getSceneLimit, getStarCloudFactor, getStarGapShow, getTwilightStars, getSkyOvercastMix, getSunVisibility, getMoonCloudFactor, getMoonLook, BIRD_WEIGHTS, pickBird, isBirdInSeason, getBatShare, getFlyerShare, getBoatShare, getBoatOverride, type BoatKind, type BoatTime } from '../src/utils/weatherEffectsUtils';
+import { getWeatherEffects, canFlashLightning, LIGHTNING_MIN_GAP_MS, pickBoat, hasBoatWake, getBoatTone, pickFish, FISH_WEIGHTS, canSpawnFish, getRestStopMotion, pickNightFish, pickMoonlitDayFish, NIGHT_FISH_WEIGHTS, MAX_FISH, MAX_NIGHT_FISH, MAX_BIRDS, getFishOverride, getWaterSpeedFactor, getWaterLimit, getSceneLimit, getStarCloudFactor, getStarCover, getStarGapShow, getTwilightStars, getSkyOvercastMix, getSunVisibility, getMoonCloudFactor, getMoonLook, BIRD_WEIGHTS, pickBird, isBirdInSeason, getBatShare, getFlyerShare, getBoatShare, getBoatOverride, type BoatKind, type BoatTime } from '../src/utils/weatherEffectsUtils';
 import { getSunTimes } from '../src/utils/sunUtils';
 import { rarityTier } from '../src/utils/sceneInfo';
 
@@ -388,6 +388,19 @@ describe('getRestStopMotion (ROADMAP item 62, P8)', () => {
     const still = points.filter(([, p]) => Math.abs(p - 50 / 110) < 1e-4);
     expect(still.length).toBe(2);
     expect(still[1][0] - still[0][0]).toBeCloseTo(6, 1);
+  });
+});
+
+describe('getStarCover', () => {
+  it('counts the high layer at half weight, with random overlap of the layers', () => {
+    expect(getStarCover(100, { low: 0, mid: 0, high: 100 })).toBe(50);
+    expect(getStarCover(75, { low: 50, mid: 50, high: 0 })).toBe(75);
+    expect(getStarCover(100, { low: 100, mid: 0, high: 100 })).toBe(100);
+  });
+
+  it('is the total cover without the layers', () => {
+    expect(getStarCover(80, null)).toBe(80);
+    expect(getStarCover(null, null)).toBeNull();
   });
 });
 
