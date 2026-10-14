@@ -503,6 +503,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   return (
     <div
       data-share-hide
+      data-idle-control
       className={`absolute top-0 max-[363px]:top-[calc(10rem+env(safe-area-inset-top))] right-0 z-30 w-full max-w-[min(300px,calc(100vw-2rem))] sm:w-[300px] bg-[hsl(var(--panel-background)/0.45)] backdrop-blur-md border border-[hsl(var(--panel-border)/0.14)] text-white rounded-bl-panel max-[363px]:rounded-tl-panel overflow-hidden transition-opacity duration-300 max-h-dvh max-[363px]:max-h-[calc(100dvh-10rem-env(safe-area-inset-top))] ${
         isVisible ? 'opacity-100' : 'opacity-0'
       } ${isTappable ? '' : 'pointer-events-none'} ${

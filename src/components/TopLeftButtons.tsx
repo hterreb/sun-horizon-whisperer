@@ -41,6 +41,7 @@ const TopLeftButtons: React.FC<TopLeftButtonsProps> = ({
   return (
     <div
       data-share-hide
+      data-idle-control
       className={`animate-fade-in fixed z-40 flex flex-col items-center gap-2 transition-opacity duration-300 has-focus-visible:opacity-100 ${
         showCursor ? 'opacity-100' : 'opacity-0'
       } ${isTappable ? '' : 'pointer-events-none'}`}
