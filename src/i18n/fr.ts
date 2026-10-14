@@ -570,6 +570,7 @@ export const fr: Record<keyof typeof en, string> = {
   'info.fieldNote': "Note de terrain",
   'info.cloudFact': "Le saviez-vous ?",
   'info.rainbowFact': "Toujours à l'opposé du soleil : l'arc se trouve à 42° du point opposé au soleil, il n'apparaît donc que lorsque le soleil est à moins de 42°. Le rouge est à l'extérieur, le violet à l'intérieur.",
+  'info.satelliteDotFact': "Ce point représente les satellites encore au soleil là-haut pendant qu'il fait nuit au sol. Le suivi des satellites montre les vrais, avec leur nom, quand ils passent.",
   'opticFact.rays': "La lumière du soleil passe par des trouées dans les nuages et la brume la rend visible. Les rayons sont parallèles : ils semblent seulement partir du soleil, comme les rails semblent se rejoindre au loin.",
   'opticFact.sunDogs': "Des cristaux de glace plats dans des nuages hauts et fins dévient la lumière du soleil de 22°, d'où une tache brillante de chaque côté du soleil. Le côté rouge fait face au soleil.",
   'opticFact.halo': "Les cristaux de glace d'un fin voile de nuages hauts dévient la lumière d'au moins 22°, donc l'anneau est toujours à 22° du soleil et le ciel à l'intérieur est plus sombre.",

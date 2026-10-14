@@ -570,6 +570,7 @@ export const it: Record<keyof typeof en, string> = {
   'info.fieldNote': "Nota sul campo",
   'info.cloudFact': "Curiosità sulla nuvola",
   'info.rainbowFact': "Sempre opposto al sole: l'arco sta a 42° dal punto opposto al sole, quindi si vede solo quando il sole è più basso di 42°. Il rosso è all'esterno, il viola all'interno.",
+  'info.satelliteDotFact': "Questo punto rappresenta i satelliti che lassù sono ancora al sole mentre a terra è buio. Il tracciamento satelliti mostra quelli veri, con i loro nomi, quando passano.",
   'opticFact.rays': "Luce del sole che passa tra i buchi delle nuvole, resa visibile dalla foschia. I raggi sono paralleli: sembrano solo aprirsi dal sole, come i binari sembrano unirsi in lontananza.",
   'opticFact.sunDogs': "Cristalli di ghiaccio piatti in nubi alte e sottili deviano la luce del sole di 22°, così compare una macchia luminosa a ogni lato del sole. Il lato rosso guarda verso il sole.",
   'opticFact.halo': "I cristalli di ghiaccio di un velo sottile di nubi alte deviano la luce di almeno 22°, perciò l'anello è sempre a 22° dal sole e il cielo al suo interno è più scuro.",

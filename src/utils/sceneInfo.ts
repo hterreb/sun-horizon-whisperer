@@ -52,6 +52,7 @@ export type SceneInfoTarget =
   | { type: 'moon' }
   | { type: 'terrain'; azimuth: number }
   | { type: 'satellite'; id: number; name: string }
+  | { type: 'satelliteDot' } // a decorative dot: no name, no badge
   | { type: 'egg'; kind: EggCardKind }
   | { type: 'rainbow' } // item 121
   | { type: 'optic'; kind: OpticKind }; // item 148
@@ -607,6 +608,8 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
       const tier = SATELLITE_TIERS[getSatelliteSize(target.id, target.name)];
       return { kicker: 'infoKind.orbit', icon: 'satellite', title: 'scene.satellite', lines: [...satelliteLines(target.name, ctx), tierLine(tier)], tier };
     }
+    case 'satelliteDot':
+      return { kicker: 'infoKind.orbit', icon: 'satellite', title: 'scene.satellite', lines: [], tier: null, fact: fieldNote('info.satelliteDotFact') };
     case 'rainbow':
       return {
         kicker: 'infoKind.weather',

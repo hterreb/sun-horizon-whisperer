@@ -570,6 +570,7 @@ export const en = {
   'info.fieldNote': 'Field note',
   'info.cloudFact': 'Cloud fact',
   'info.rainbowFact': 'Always opposite the sun: the bow is 42° around the point opposite the sun, so it shows only when the sun is lower than 42°. Red is outside, violet inside.',
+  'info.satelliteDotFact': 'This dot stands for the satellites up there in sunlight while the ground is dark. Satellite tracking shows the real ones, with their names, when they pass.',
   'opticFact.rays': 'Sunlight through gaps in the clouds, made visible by haze. The rays are parallel: they only seem to spread out from the sun, as railway tracks seem to meet.',
   'opticFact.sunDogs': 'Flat ice crystals in thin high cloud bend sunlight by 22°, so a bright spot shows on each side of the sun. The red side faces the sun.',
   'opticFact.halo': 'Ice crystals in a thin veil of high cloud bend light by at least 22°, so the ring is always 22° from the sun and the sky inside it is darker.',

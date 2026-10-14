@@ -110,6 +110,7 @@ describe('collection (ROADMAP item 112)', () => {
     expect(badgeForTarget({ type: 'cloud', cloudType: 'Len', band: 'mid' })).toBe('cloud:Len');
     // Item 138: no base badge; the tap collects the state badge only (stateBadgeForTarget).
     expect(badgeForTarget({ type: 'satellite', id: 25544, name: 'ISS' })).toBeNull();
+    expect(badgeForTarget({ type: 'satelliteDot' })).toBeNull(); // a decorative dot: no badge
     expect(badgeForTarget({ type: 'terrain', azimuth: 90 })).toBeNull();
     expect(badgeForTarget({ type: 'sun' })).toBeNull();
     expect(badgeForTarget({ type: 'moon' })).toBeNull();
@@ -217,6 +218,7 @@ describe('state badges (ROADMAP item 115)', () => {
   it('gives a satellite its size badge from its name (item 120)', () => {
     const sat = (id: number, name: string) => stateBadgeForTarget({ type: 'satellite', id, name }, ctx);
     expect(sat(25544, 'ISS (ZARYA)')).toBe('satellite:iss');
+    expect(stateBadgeForTarget({ type: 'satelliteDot' }, ctx)).toBeNull(); // a decorative dot: no badge
     expect(sat(48274, 'CSS (TIANHE)')).toBe('satellite:giant');
     expect(sat(20580, 'HST')).toBe('satellite:giant');
     expect(sat(1, 'SL-16 R/B')).toBe('satellite:large');
