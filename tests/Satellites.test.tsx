@@ -59,6 +59,32 @@ describe('Satellites (ROADMAP item 97)', () => {
     expect(screen.getByTestId('scene-info-ring')).toBeInTheDocument();
   });
 
+  it('opens a nameless card on a double tap on a decorative dot, not behind a cloud', () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0.5); // first dot at 30 s, its cloud gap 0.5
+    const onInfo = vi.fn();
+    const gapMs: [number, number] = [120_000, 240_000];
+    const { rerender } = render(<Satellites {...base} tracked={null} gapMs={gapMs} onInfo={onInfo} />);
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    const hit = screen.getByTestId('satellite-decor-hit');
+    expect(hit.className).toContain('pointer-events-auto');
+    fireEvent.click(hit, { detail: 1 });
+    expect(onInfo).not.toHaveBeenCalled();
+    fireEvent.click(hit, { detail: 2 });
+    expect(onInfo).toHaveBeenCalledWith({ type: 'satelliteDot' }, expect.any(Object), expect.stringMatching(/^satellite-dot-/));
+    const ring = onInfo.mock.calls[0][2] as string;
+    rerender(<Satellites {...base} tracked={null} gapMs={gapMs} onInfo={onInfo} infoRing={ring} />);
+    expect(screen.getByTestId('scene-info-ring')).toBeInTheDocument();
+    // Clouds come over the dot (factor 0.3 is below its gap): it takes no tap.
+    onInfo.mockClear();
+    rerender(<Satellites {...base} cloudFactor={0.3} tracked={null} gapMs={gapMs} onInfo={onInfo} />);
+    expect(screen.getByTestId('satellite-decor-hit').className).not.toContain('pointer-events-auto');
+    fireEvent.click(screen.getByTestId('satellite-decor-hit'), { detail: 0 });
+    expect(onInfo).not.toHaveBeenCalled();
+  });
+
   it('a keyboard click (Enter, Space: detail 0) opens the card at once (item 116)', () => {
     const onInfo = vi.fn();
     render(<Satellites {...base} tracked={[iss]} gapMs={null} onInfo={onInfo} />);

@@ -570,6 +570,7 @@ export const de: Record<keyof typeof en, string> = {
   'info.fieldNote': "Feldnotiz",
   'info.cloudFact': "Wolkenwissen",
   'info.rainbowFact': "Immer gegenüber der Sonne: Der Bogen liegt 42° um den Gegenpunkt der Sonne, darum zeigt er sich nur, wenn die Sonne tiefer als 42° steht. Rot ist außen, Violett innen.",
+  'info.satelliteDotFact': "Dieser Punkt steht für die Satelliten, die dort oben noch in der Sonne sind, während es am Boden dunkel ist. Das Satelliten-Tracking zeigt die echten mit ihren Namen, wenn sie vorbeiziehen.",
   'opticFact.rays': "Sonnenlicht durch Lücken in den Wolken, sichtbar durch Dunst. Die Strahlen laufen parallel: Sie scheinen nur von der Sonne auszugehen, so wie Bahngleise in der Ferne zusammenzulaufen scheinen.",
   'opticFact.sunDogs': "Flache Eiskristalle in dünnen hohen Wolken lenken das Sonnenlicht um 22° ab, darum zeigt sich links und rechts der Sonne je ein heller Fleck. Die rote Seite zeigt zur Sonne.",
   'opticFact.halo': "Eiskristalle in einem dünnen Schleier hoher Wolken lenken das Licht um mindestens 22° ab, darum liegt der Ring immer 22° um die Sonne, und der Himmel darin ist dunkler.",

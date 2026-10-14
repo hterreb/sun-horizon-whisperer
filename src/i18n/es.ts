@@ -570,6 +570,7 @@ export const es: Record<keyof typeof en, string> = {
   'info.fieldNote': "Nota de campo",
   'info.cloudFact': "Dato de la nube",
   'info.rainbowFact': "Siempre frente al sol: el arco está a 42° del punto opuesto al sol, por eso solo aparece cuando el sol está a menos de 42°. El rojo va por fuera, el violeta por dentro.",
+  'info.satelliteDotFact': "Este punto representa los satélites que allá arriba siguen al sol mientras en el suelo ya es de noche. El seguimiento de satélites muestra los reales, con sus nombres, cuando pasan.",
   'opticFact.rays': "Luz del sol que pasa por huecos entre las nubes y que la bruma hace visible. Los rayos son paralelos: solo parecen abrirse desde el sol, como las vías del tren parecen juntarse.",
   'opticFact.sunDogs': "Cristales de hielo planos en nubes altas y finas desvían la luz del sol 22°, por eso aparece un punto brillante a cada lado del sol. El lado rojo mira hacia el sol.",
   'opticFact.halo': "Los cristales de hielo de un velo fino de nubes altas desvían la luz al menos 22°, por eso el anillo está siempre a 22° del sol y el cielo dentro de él es más oscuro.",

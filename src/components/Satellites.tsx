@@ -60,14 +60,28 @@ interface Decor {
 // A tracked satellite's gap from its id, so the same satellite stays behind its cloud or in its gap.
 const trackedGap = (id: number): number => (id * 0.6180339887) % 1;
 
-const DecorDot: React.FC<{ decor: Decor; width: number; height: number; onDone: (id: number) => void }> = ({ decor, width, height, onDone }) => {
-  const ref = useRef<HTMLSpanElement>(null);
+// A decorative dot takes a double tap as a tracked one: its hit area moves with it. It opens a
+// card without a name and gives no badge (Lutz, 2026-10-15). A dot behind a cloud, in the
+// twilight fade (`tappable` false) or faded into the Earth's shadow takes no tap.
+interface DecorDotProps {
+  decor: Decor;
+  width: number;
+  height: number;
+  onDone: (id: number) => void;
+  tappable: boolean;
+  onTap: (point: { x: number; y: number }, keyboard: boolean) => void;
+  ringOn: boolean;
+}
+
+const DecorDot: React.FC<DecorDotProps> = ({ decor, width, height, onDone, tappable, onTap, ringOn }) => {
+  const ref = useRef<HTMLButtonElement>(null);
+  const animationRef = useRef<Animation | null>(null);
+  const { x0, y0, x1, y1, durationMs, fadeAt } = decor.path;
+  const fadeEnd = Math.min(1, fadeAt + SHADOW_FADE_MS / durationMs);
   useEffect(() => {
     const el = ref.current;
     if (!el || typeof el.animate !== 'function') return;
-    const { x0, y0, x1, y1, durationMs, fadeAt } = decor.path;
-    const at = (x: number, y: number) => `translate(${(x / 100) * width}px, ${(y / 100) * height}px)`;
-    const fadeEnd = Math.min(1, fadeAt + SHADOW_FADE_MS / durationMs);
+    const at = (x: number, y: number) => `translate(${(x / 100) * width - HIT_PX / 2}px, ${(y / 100) * height - HIT_PX / 2}px)`;
     const keyframes: Keyframe[] = fadeAt < 1
       ? [
           { offset: 0, transform: at(x0, y0), opacity: 0.8 },
@@ -77,12 +91,32 @@ const DecorDot: React.FC<{ decor: Decor; width: number; height: number; onDone: 
         ]
       : [{ transform: at(x0, y0), opacity: 0.8 }, { transform: at(x1, y1), opacity: 0.8 }];
     const animation = el.animate(keyframes, { duration: durationMs, easing: 'linear', fill: 'both' });
+    animationRef.current = animation;
     animation.onfinish = () => onDone(decor.id);
     return () => animation.cancel();
     // The size at spawn: a resize does not restart a crossing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [decor]);
-  return <span ref={ref} className="absolute left-0 top-0 size-0.75 rounded-full bg-white" data-testid="satellite-decor" />;
+  const inShadow = () => fadeAt < 1 && Number(animationRef.current?.currentTime ?? 0) >= fadeEnd * durationMs;
+  return (
+    <button
+      ref={ref}
+      type="button"
+      tabIndex={-1}
+      onClick={(event) => {
+        if (!tappable || inShadow()) return;
+        const box = event.currentTarget.getBoundingClientRect();
+        onTap({ x: box.left + box.width / 2, y: box.top + box.height / 2 }, event.detail === 0);
+      }}
+      data-scene-hit
+      className={`absolute left-0 top-0 flex items-center justify-center rounded-full touch-manipulation ${tappable ? 'pointer-events-auto' : ''}`}
+      style={{ width: HIT_PX, height: HIT_PX }}
+      data-testid="satellite-decor-hit"
+    >
+      <span className="size-0.75 rounded-full bg-white" data-testid="satellite-decor" />
+      {ringOn && <span className="absolute inset-2 rounded-full border border-white/70" data-testid="scene-info-ring" />}
+    </button>
+  );
 };
 
 const Satellites: React.FC<SatellitesProps> = ({
@@ -148,7 +182,15 @@ const Satellites: React.FC<SatellitesProps> = ({
         <div className="absolute inset-0" style={{ opacity: twilight, transition: `opacity ${TWILIGHT_TRANSITION_MS}ms linear` }} data-testid="satellite-decor-layer">
           {decors.map((decor) => (
             <div key={decor.id} className="absolute inset-0 transition-opacity duration-2000" style={{ opacity: getStarGapShow(cloudFactor, decor.gap) }}>
-              <DecorDot decor={decor} width={width} height={height} onDone={removeDecor} />
+              <DecorDot
+                decor={decor}
+                width={width}
+                height={height}
+                onDone={removeDecor}
+                tappable={twilight > 0 && getStarGapShow(cloudFactor, decor.gap) > 0}
+                onTap={(point, keyboard) => tap({ type: 'satelliteDot' }, point, `satellite-dot-${decor.id}`, keyboard)}
+                ringOn={infoRing === `satellite-dot-${decor.id}`}
+              />
             </div>
           ))}
         </div>

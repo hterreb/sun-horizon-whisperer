@@ -307,6 +307,14 @@ describe('sceneInfo: field guide data (ROADMAP item 107)', () => {
     expect(kicker({ type: 'satellite', id: 1, name: 'X' })).toEqual(['Orbit', 'satellite']);
   });
 
+  it('gives a decorative satellite dot an orbit card with a field note and no rarity', () => {
+    const i = info({ type: 'satelliteDot' });
+    expect([en(i.kicker), i.icon, en(i.title)]).toEqual(['Orbit', 'satellite', 'Satellite']);
+    expect(i.tier).toBeNull();
+    expect(i.lines).toEqual([]);
+    expect(i.fact?.text).toBe('info.satelliteDotFact');
+  });
+
   it('gives the rainbow a weather card: opposite the sun, uncommon, a field note (item 121)', () => {
     const i = info({ type: 'rainbow' });
     expect([en(i.kicker), i.icon, en(i.title)]).toEqual(['Weather', 'rainbow', 'Rainbow']);

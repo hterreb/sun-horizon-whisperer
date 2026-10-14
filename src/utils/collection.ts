@@ -207,6 +207,7 @@ export const badgeForTarget = (target: SceneInfoTarget): BadgeId | null => {
     case 'moon':
     case 'terrain':
     case 'satellite':
+    case 'satelliteDot': // a decorative dot, not a real satellite
     case 'egg': return null;
   }
 };

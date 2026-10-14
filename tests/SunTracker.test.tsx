@@ -1519,6 +1519,18 @@ describe('SunTracker', () => {
       expect(unlocked()).toBeNull();
     });
 
+    it('a tap on a decorative satellite dot opens its card and collects no badge', () => {
+      vi.useFakeTimers();
+      render(<SunTracker />);
+      expect(visProps.current).toBeTruthy();
+      act(() => {
+        visProps.current!.onSceneInfo!({ type: 'satelliteDot' }, { x: 200, y: 200 }, 'satellite-dot-1');
+      });
+      expect(screen.getByText(/This dot stands for the satellites/)).toBeInTheDocument();
+      expect(localStorage.getItem('collection')).toBeNull();
+      expect(screen.queryAllByTestId('badge-unlocked')).toHaveLength(0);
+    });
+
     it('a sun tap at midday collects only "sun:midday", with one card (items 115, 138)', () => {
       vi.useFakeTimers();
       try {
