@@ -39,7 +39,7 @@ describe('useTreeCover (ROADMAP item 141)', () => {
     await waitFor(() => expect(result.current).not.toBeNull());
     expect(loadTreeCover).toHaveBeenCalledWith(47.78, 9.61, profile, expect.any(AbortSignal));
     expect(result.current?.cover).toBe(COVER);
-    expect(typeof result.current?.lib.buildTreePath).toBe('function');
+    expect(typeof result.current?.lib.buildTreeScene).toBe('function');
   });
 
   it('shows no trees of the last profile on a new one', async () => {

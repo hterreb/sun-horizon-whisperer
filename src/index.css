@@ -503,6 +503,10 @@
        colour by day: green in spring and summer, amber in autumn. */
     --scene-tree-green: 120 45% 28%;
     --scene-tree-amber: 35 85% 50%;
+    /* The trees' rim light (ROADMAP item 150, V4): a warm 1 px edge on the sun side at golden
+       hour (sun above 3°) and in the last minutes before sunset. */
+    --scene-tree-rim-golden: 44 100% 72%;
+    --scene-tree-rim-evening: 40 100% 70%;
 
     /* Soft white glow, shared by the day/fair-weather clouds and the midnight
        ghost easter egg (the style book's D ghost: "soft white glow"). */
