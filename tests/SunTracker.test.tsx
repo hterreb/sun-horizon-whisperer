@@ -113,7 +113,7 @@ describe('SunTracker', () => {
     const skyTop = () => document.documentElement.style.getPropertyValue('--sky-top');
     visProps.current = null;
     const { unmount } = render(<SunTracker />);
-    await waitFor(() => expect(visProps.current).not.toBeNull());
+    await waitFor(() => expect(visProps.current).toBeTruthy());
     // The first stop of the gradient the scene draws (after the weather's grey mix).
     const sceneTop = visProps.current!.skyGradient!.match(/#[0-9a-f]{6}/i)![0];
     expect(skyTop()).toBe(sceneTop);
@@ -1466,7 +1466,7 @@ describe('SunTracker', () => {
     it('a tap on a fish collects its badge with one "Badge unlocked" card, no toast; a second tap adds nothing', () => {
       vi.useFakeTimers();
       render(<SunTracker />);
-      expect(visProps.current).not.toBeNull();
+      expect(visProps.current).toBeTruthy();
       tapSeahorse();
       expect(JSON.parse(localStorage.getItem('collection')!)).toEqual({ 'fish:seahorse': expect.any(String) });
       expect(unlocked()).toHaveTextContent('Badge unlocked: Seahorse, Rare');
@@ -1482,7 +1482,7 @@ describe('SunTracker', () => {
     it('a double tap on a sky optic opens its card and collects its badge (item 148)', () => {
       vi.useFakeTimers();
       render(<SunTracker />);
-      expect(visProps.current).not.toBeNull();
+      expect(visProps.current).toBeTruthy();
       act(() => {
         visProps.current!.onSceneInfo!({ type: 'optic', kind: 'halo' }, { x: 200, y: 300 }, 'optic:halo');
       });
@@ -1496,7 +1496,7 @@ describe('SunTracker', () => {
     it('two new badges show one after the other, not stacked', () => {
       vi.useFakeTimers();
       render(<SunTracker />);
-      expect(visProps.current).not.toBeNull();
+      expect(visProps.current).toBeTruthy();
       tapSeahorse();
       tapCumulus();
       expect(screen.getAllByTestId('badge-unlocked')).toHaveLength(1);
@@ -1512,7 +1512,7 @@ describe('SunTracker', () => {
 
     it('a tap on the card opens the collection view', () => {
       render(<SunTracker />);
-      expect(visProps.current).not.toBeNull();
+      expect(visProps.current).toBeTruthy();
       tapSeahorse();
       fireEvent.click(screen.getByRole('button', { name: 'Show in the collection' }));
       expect(screen.getByRole('dialog', { name: 'Collection' })).toHaveTextContent('Seahorse');
@@ -1524,7 +1524,7 @@ describe('SunTracker', () => {
       try {
         vi.setSystemTime(new Date('2026-09-30T11:00:00Z')); // 13:00 in Ravensburg: midday
         render(<SunTracker />);
-        expect(visProps.current).not.toBeNull();
+        expect(visProps.current).toBeTruthy();
         act(() => {
           visProps.current!.onSceneInfo!({ type: 'sun' }, { x: 200, y: 200 }, 'sun');
         });
@@ -1544,7 +1544,7 @@ describe('SunTracker', () => {
       try {
         vi.setSystemTime(new Date('2026-09-30T11:00:00Z'));
         render(<SunTracker />);
-        expect(visProps.current).not.toBeNull();
+        expect(visProps.current).toBeTruthy();
         act(() => {
           visProps.current!.onSceneInfo!({ type: 'moon' }, { x: 200, y: 200 }, 'moon');
         });
@@ -1575,7 +1575,7 @@ describe('SunTracker', () => {
       try {
         vi.setSystemTime(new Date('2026-09-30T17:35:00Z')); // 19:35 in Ravensburg: after sunset, in the twilight
         render(<SunTracker />);
-        expect(visProps.current).not.toBeNull();
+        expect(visProps.current).toBeTruthy();
         act(() => {
           visProps.current!.onSceneInfo!({ type: 'sun' }, { x: 200, y: 200 }, 'sun');
         });
@@ -1589,7 +1589,7 @@ describe('SunTracker', () => {
     it('collects nothing with a test link (?egg=ufo)', () => {
       window.history.pushState({}, '', '/?egg=ufo');
       render(<SunTracker />);
-      expect(visProps.current).not.toBeNull();
+      expect(visProps.current).toBeTruthy();
       tapSeahorse();
       // Seven sun taps: the sunglasses, which would count without the link.
       act(() => {
@@ -1686,7 +1686,7 @@ describe('SunTracker', () => {
       let now = 1_000_000;
       vi.spyOn(Date, 'now').mockImplementation(() => now);
       render(<SunTracker />);
-      expect(visProps.current).not.toBeNull();
+      expect(visProps.current).toBeTruthy();
       const tapMoon = (gapMs: number) => act(() => {
         now += gapMs;
         visProps.current!.onMoonTap!();
@@ -1741,7 +1741,7 @@ describe('SunTracker', () => {
 
     it('the InfoPanel button opens the collection; the close button closes it', () => {
       render(<SunTracker />);
-      expect(visProps.current).not.toBeNull();
+      expect(visProps.current).toBeTruthy();
       tapSeahorse();
       fireEvent.click(screen.getByRole('button', { name: 'Collection' }));
       const view = screen.getByRole('dialog', { name: 'Collection' });
