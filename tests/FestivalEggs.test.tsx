@@ -125,7 +125,7 @@ describe('FestivalEggs', () => {
     expect(Number(animation(candle.querySelector('g')!).match(/festival-glow (\d+)s/)?.[1])).toBeGreaterThanOrEqual(4);
   });
 
-  it('frames the equinox pill with an arc of big spring blossoms for Nowruz, day and night', () => {
+  it('frames the Nowruz pill with a close arc of big spring blossoms, day and night', () => {
     const { rerender } = render(<FestivalEggs {...day} event="nowruz" />);
     // The arc hangs from the pill's top (CalendarEggs: horizon + 90 px).
     expect(screen.getByTestId('festival-nowruz').style.top).toBe('590px');
