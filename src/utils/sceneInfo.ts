@@ -23,6 +23,7 @@ import { UFO_CHANCE } from './hiddenEggs';
 import { SANTA_DAYS_PER_YEAR, getEventDaysPerYear, type CalendarEvent } from './calendarEvents';
 import { NATIONAL_DAY_DAYS_PER_YEAR, type NationalDayKind } from './nationalDays';
 import { type FestivalEgg } from './festivalEvents';
+import { getOptic, type OpticKind } from './skyOptics';
 
 // Item 113: the easter eggs and special events that are one thing in the scene and take taps.
 // Not the collection's EggKind (item 112), which has one badge per egg or event.
@@ -52,7 +53,8 @@ export type SceneInfoTarget =
   | { type: 'terrain'; azimuth: number }
   | { type: 'satellite'; id: number; name: string }
   | { type: 'egg'; kind: EggCardKind }
-  | { type: 'rainbow' }; // item 121
+  | { type: 'rainbow' } // item 121
+  | { type: 'optic'; kind: OpticKind }; // item 148
 
 // A text from the dictionary; a var can be another dictionary text.
 export interface InfoText {
@@ -69,7 +71,8 @@ export interface InfoLine {
 // The kicker's icon; SceneInfoCard has the drawing and the colour for each.
 export type SceneIconId =
   | 'water' | 'visitor' | 'bird' | 'bat' | 'boat' | 'plane' | 'cloud' | 'sun' | 'moon' | 'terrain' | 'satellite'
-  | 'egg' | 'event' | 'rainbow';
+  | 'egg' | 'event' | 'rainbow'
+  | `optic:${OpticKind}`; // item 148: each optic has its badge icon
 export interface SceneInfo {
   kicker: MessageKey; // the type name over the title
   icon: SceneIconId;
@@ -616,6 +619,24 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
         ],
         fact: fieldNote('info.rainbowFact'),
       };
+    case 'optic': {
+      // Item 148: as the rainbow, a fixed tier and the direction to look: the sun or the moon, or
+      // the point opposite (the bows).
+      const optic = getOptic(target.kind);
+      const azimuth = {
+        rays: ctx.sunPosition.azimuth, sunDogs: ctx.sunPosition.azimuth, halo: ctx.sunPosition.azimuth, sunPillar: ctx.sunPosition.azimuth,
+        doubleRainbow: ctx.sunPosition.azimuth + 180, fogBow: ctx.sunPosition.azimuth + 180,
+        moonbow: ctx.moonPosition.azimuth + 180, moonHalo: ctx.moonPosition.azimuth,
+      }[target.kind];
+      return {
+        kicker: 'infoKind.weather',
+        icon: `optic:${target.kind}`,
+        title: optic.name,
+        tier: optic.tier,
+        lines: [{ label: 'info.direction', value: directionText(azimuth) }, tierLine(optic.tier)],
+        fact: fieldNote(optic.fact),
+      };
+    }
     case 'egg': {
       const egg = EGGS[target.kind];
       if (target.kind === 'santa') return santaCard(egg, ctx);
