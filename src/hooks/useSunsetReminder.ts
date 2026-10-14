@@ -20,7 +20,9 @@ export const requestReminderPermission = async (): Promise<boolean> => {
 // pass reminder (item 97).
 export const showReminderNotification = async (body: string, tag: string) => {
   const title = 'Sun Chaser';
-  const options: NotificationOptions = { body, icon: '/icon-192.png', tag };
+  // `badge` is the small monochrome icon in the Android status bar and notification
+  // header. Without it, Chrome shows its own logo there.
+  const options: NotificationOptions = { body, icon: '/icon-192.png', badge: '/notification-badge.png', tag };
   try {
     const registration = await navigator.serviceWorker?.getRegistration();
     if (registration) {
