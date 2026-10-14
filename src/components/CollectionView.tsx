@@ -261,7 +261,9 @@ const CollectionView: React.FC<CollectionViewProps> = ({ open, onClose, collecti
 
   const renderBadge = (badge: Badge) => {
     const firstSeen = collection[badge.id];
-    const cell = 'flex h-32 flex-col items-center justify-start gap-0.5 rounded-lg border p-1.5 text-center';
+    // min-h, not h: a two-line name, the tier and a two-line date need more than 128 px; the
+    // grid row stretches its other cells to match.
+    const cell = 'flex min-h-32 flex-col items-center justify-start gap-0.5 rounded-lg border p-1.5 text-center';
     const artBox = 'flex h-12 w-full items-center justify-center overflow-hidden';
     if (firstSeen === undefined) {
       return (
