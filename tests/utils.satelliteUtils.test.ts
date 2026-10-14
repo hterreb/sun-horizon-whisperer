@@ -132,7 +132,7 @@ describe('brightness from the distance', () => {
   });
 
   it('keeps a faint satellite at the least opacity', () => {
-    expect(getSatelliteOpacity(8)).toBe(0.25);
+    expect(getSatelliteOpacity(8)).toBe(0.35);
   });
 });
 
@@ -309,11 +309,12 @@ describe('decorative dots (free part)', () => {
     expect(getDotGapMs(new Date(times.dusk.getTime() + MIN), -6.1, times)).toEqual(SPAWN_GAP_MS);
   });
 
-  it('come every 2-4 min in the 2 h after dusk and before dawn, fewer at midnight', () => {
+  it('come every 2-4 min in the 2 h after dusk and before dawn, every 3-6 min at midnight', () => {
     expect(getDotGapMs(new Date(times.dusk.getTime() + 110 * MIN), -15, times)).toEqual(SPAWN_GAP_MS);
     expect(getDotGapMs(new Date(times.dawn.getTime() - 60 * MIN), -15, times)).toEqual(SPAWN_GAP_MS);
     const midnight = new Date('2026-10-07T01:00:00+02:00');
     expect(getDotGapMs(midnight, -40, times)).toEqual([SPAWN_GAP_MS[0] * NIGHT_GAP_FACTOR, SPAWN_GAP_MS[1] * NIGHT_GAP_FACTOR]);
+    expect(getDotGapMs(midnight, -40, times)).toEqual([3 * MIN, 6 * MIN]);
   });
 
   it('show in a dry sky, not in rain or fog (item 135)', () => {

@@ -32,9 +32,10 @@ export const ISS_NORAD_ID = 25544;
 
 // The 2 h after dusk and before dawn, when most satellites are still in sunlight.
 const SATELLITE_HOURS_MS = 2 * HOUR_MS;
-// About one dot every 2-4 min in those hours, and a third of that in the middle of the night.
+// About one dot every 2-4 min in those hours, and one every 3-6 min in the middle of the night
+// (every 6-12 min was too rare to see one).
 export const SPAWN_GAP_MS: [number, number] = [2 * MINUTE_MS, 4 * MINUTE_MS];
-export const NIGHT_GAP_FACTOR = 3;
+export const NIGHT_GAP_FACTOR = 1.5;
 // Speed in % of the screen width per second: 6x the first 0.1-0.3, so the eye finds the
 // moving dot (item 131). Slower than the birds (2.5); the fastest pass the sailboat (1.2).
 export const DOT_SPEED: [number, number] = [0.6, 1.8];
@@ -152,7 +153,7 @@ export const isSatelliteVisible = ({ elevation, sunAltitude, sunlit }: { elevati
 // ponytail: one magnitude per size class; a table of per-satellite standard magnitudes
 // (McCants' list) if a known one looks wrong.
 const STANDARD_MAGNITUDE: Record<SatelliteSize, number> = { iss: -1.8, giant: 1, large: 2.5, medium: 4, small: 6 };
-const MIN_OPACITY = 0.25;
+const MIN_OPACITY = 0.35; // 0.25 was too faint to see on a phone
 export const getSatelliteMagnitude = (id: number, name: string, rangeKm: number): number =>
   STANDARD_MAGNITUDE[getSatelliteSize(id, name)] + 5 * Math.log10(Math.max(rangeKm, 100) / 1000);
 export const getSatelliteOpacity = (magnitude: number): number =>
