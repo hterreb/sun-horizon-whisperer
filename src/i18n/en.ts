@@ -609,6 +609,18 @@ export const en = {
   'feedback.emptyError': 'Please write a message.',
   'feedback.error': 'Could not send the feedback. Please try again later.',
 
+  // Data sources (item 153); the provider names are not translated
+  'dataSources.title': 'Data sources',
+  'dataSources.weather': 'Weather',
+  'dataSources.places': 'Places',
+  'dataSources.search': 'Place search',
+  'dataSources.planes': 'Planes',
+  'dataSources.satellites': 'Satellites',
+  'dataSources.terrain': 'Terrain',
+  'dataSources.trees': 'Trees',
+  'dataSources.radio': 'Radio',
+  'dataSources.privacy': 'Privacy',
+
   // Toasts from SunTracker
   'toast.weatherUnavailableTitle': 'Weather unavailable',
   'toast.weatherUnavailableDescription': 'Using default weather. Check your connection.',

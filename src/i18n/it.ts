@@ -609,6 +609,18 @@ export const it: Record<keyof typeof en, string> = {
   'feedback.emptyError': "Scrivi un messaggio.",
   'feedback.error': "Impossibile inviare il feedback. Riprova più tardi.",
 
+  // Data sources (item 153); the provider names are not translated
+  'dataSources.title': "Fonti dei dati",
+  'dataSources.weather': "Meteo",
+  'dataSources.places': "Luoghi",
+  'dataSources.search': "Ricerca luoghi",
+  'dataSources.planes': "Aerei",
+  'dataSources.satellites': "Satelliti",
+  'dataSources.terrain': "Terreno",
+  'dataSources.trees': "Alberi",
+  'dataSources.radio': "Radio",
+  'dataSources.privacy': "Privacy",
+
   // Toasts from SunTracker
   'toast.weatherUnavailableTitle': "Meteo non disponibile",
   'toast.weatherUnavailableDescription': "Uso il meteo predefinito. Controlla la connessione.",
