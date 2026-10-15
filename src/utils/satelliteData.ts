@@ -3,7 +3,7 @@
 // CelesTrak updates the data every 2 h and blocks clients that fetch the same data more
 // often, or that repeat a request after an error (an HTTP 403 or 404 does not change on a
 // repeat). So a failed fetch waits RETRY_MS before the next try. The data is global: the
-// request sends no place.
+// request sends no place. Item 160 adds the night catalogue from our own server.
 
 // The OMM fields that satellite.js (json2satrec) and the card need. CelesTrak sends more.
 export interface GpRecord {
@@ -44,12 +44,18 @@ interface SatelliteCache {
   records: GpRecord[];
 }
 
-const isRecord = (value: unknown): value is GpRecord =>
+// The night catalogue (ROADMAP item 160): the satellites of CelesTrak's `active` group (16,000,
+// 7 MB) in a 700-2000 km orbit, which stay in sunlight deep into the night. Our server
+// (api/satellites.ts, satelliteFeed) filters the group once a day.
+export const NIGHT_CATALOGUE_URL = '/api/satellites';
+
+// Exported for satelliteFeed (the Edge function).
+export const isRecord = (value: unknown): value is GpRecord =>
   typeof value === 'object' && value !== null &&
   typeof (value as GpRecord).OBJECT_NAME === 'string' && typeof (value as GpRecord).EPOCH === 'string' &&
   Number.isFinite(Number((value as GpRecord).NORAD_CAT_ID)) && Number.isFinite(Number((value as GpRecord).MEAN_MOTION));
 
-const trim = (record: GpRecord): GpRecord =>
+export const trim = (record: GpRecord): GpRecord =>
   Object.fromEntries(FIELDS.map((field) => [field, record[field]])) as unknown as GpRecord;
 
 // One record per satellite. The modules docked to a station (POISK, NAUKA at the ISS) have
@@ -86,9 +92,23 @@ const writeCache = (cache: SatelliteCache): void => {
   }
 };
 
-// The cached records when they are fresh or a try is not due yet; else one fetch per group.
-// A failed group keeps the cached records and waits RETRY_MS. A future time in the cache
-// (device clock set back) does not keep it fresh. Null when there are no records at all.
+// The night catalogue, or none when our server or CelesTrak fails.
+// ponytail: a failed night catalogue stays out until the next daily fetch; give it its own
+// retry if a day without it matters.
+const fetchNightCatalogue = async (fetchImpl: typeof fetch): Promise<GpRecord[]> => {
+  try {
+    const response = await fetchImpl(NIGHT_CATALOGUE_URL);
+    const data: unknown = response.status === 200 ? await response.json() : null;
+    return Array.isArray(data) ? data.filter(isRecord).map(trim) : [];
+  } catch {
+    return [];
+  }
+};
+
+// The cached records when they are fresh or a try is not due yet; else one fetch per group,
+// then the night catalogue. A failed group keeps the cached records and waits RETRY_MS. A
+// future time in the cache (device clock set back) does not keep it fresh. Null when there
+// are no records at all.
 export const loadSatelliteData = async (
   now: number = Date.now(),
   fetchImpl: typeof fetch = fetch,
@@ -124,6 +144,8 @@ export const loadSatelliteData = async (
     writeCache({ fetchedAt: cache?.fetchedAt ?? 0, triedAt: now, records: kept });
     return kept.length > 0 ? kept : null;
   }
+  // After the groups, so the ISS stays the first record (useSatelliteTracking's epoch check).
+  records.push(...(await fetchNightCatalogue(fetchImpl)));
   const deduped = dedupeRecords(records);
   writeCache({ fetchedAt: now, triedAt: now, records: deduped });
   return deduped.length > 0 ? deduped : null;

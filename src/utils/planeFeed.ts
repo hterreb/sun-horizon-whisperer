@@ -95,7 +95,8 @@ export const mapFeed = (body: unknown, fallbackNow: number): LiveFeed => {
   };
 };
 
-const json = (status: number, body: unknown, cacheControl: string): Response =>
+// Also the night catalogue's answer (satelliteFeed, item 160).
+export const json = (status: number, body: unknown, cacheControl: string): Response =>
   new Response(body === null ? null : JSON.stringify(body), {
     status,
     headers: { 'Content-Type': 'application/json', 'Cache-Control': cacheControl },
