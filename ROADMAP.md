@@ -3185,6 +3185,71 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Checked:** unit tests: `hooks.useLivePlanes` (loading until the first answer, then ok; error after a 502, no network or a broken answer, and ok again after an answer; loading again after off and on), `utils.liveRadar` (the tag values), `LivePlanes` (the count goes up when it changes, not on each tick; 0 in the 360° view for still planes, with the radar off and in fog), `CloudLayer` (no decorative plane starts while a live plane shows; the one in flight stays; the next one comes when none shows), `SunVisualization` (radar on with 0 shown: a decorative plane after 20 s; with 1 shown: none), `InfoPanel` (the texts, the hint rule, no line while the switch is off or the radar does not run), `SunTracker` (tag `off` → `loading` → `ok-0/2` and back to `off`; `error` and "Live radar unavailable" after a 502). Typecheck, lint, build and all 1893 tests (118 files) pass. Built app (`vite preview`, headless Chromium, 390 × 844, Ravensburg on 16 Sep 2026 at 14:00, BigDataCloud and `/api/planes` stubbed, each answer 1.5 s late, `?plane=none`): with 27 aircraft at 40–100 km, "Looking for planes…", then "27 nearby · 0 in view · the compass shows all", 0 live planes and decorative planes at 20 s and 40 s; with one more plane 5 km away at 3 km, "28 nearby · 1 in view · the compass shows all", 1 live plane and no decorative plane in 45 s; with a 502, "Live radar unavailable" and decorative planes at 15 s and 35 s. Not checked: a real phone, the live feed, the look at sunset (P5 is not built).
 - **Open:** in fog, overcast, rain or a storm no live plane shows, but the line still adds "· the compass shows all", and the compass does not help then.
 
+### 156. Sunset countdown and fireworks: today's sunset stays the target until it is over — S — [SUN-CHASER-25](https://ainabler.sentry.io/issues/SUN-CHASER-25)
+
+- **Feedback (2026-10-15 18:33 CEST, Ravensburg):** "Today no Sunset countdown and no firework was triggered".
+- **Now:**
+  - `SunTracker` computes the line-of-sight sun times for `sunPassDay = passTimes?.sunrise ?? date`. `passTimes` comes from `getSunArcLabels` → `findSunPass` (`sunUtils`), which ends the day's pass when the geometric altitude (suncalc, no refraction) reaches 0°. It is evaluated again each minute.
+  - In Ravensburg on 2026-10-15 the geometric altitude is 0° at 18:29:41, so the pass changes at the 18:30 tick. From then on `terrainSunTimes` holds the times of 16 October. The flat sunset was 18:35:56; a line-of-sight horizon below about 0.65° gives a sunset after 18:30.
+  - `getCountdownTarget` and `getNextSunEvent` (`sunEvents`) use the line-of-sight sunset before the flat one, so both go to 16 October. `watchSunEvent` arms tomorrow's sunrise before today's sunset is over: no fireworks, and no "fired" or "skipped" breadcrumb.
+  - The panel's Sunset row also goes to tomorrow about 6 min before the sunset.
+  - The bug is from 19c7575 (2026-09-28, audit C-17), not from the last updates. The weather gates (#210), item 151 and item 152 do not touch the targets (checked in the diffs). The `SunTracker` tests run without a horizon profile, so the switch is not tested.
+- **Spec:** the pass of today stays until today's line-of-sight sunset is over (the flat sunset when there is no profile). Only then do the pass, the panel and the targets go to the next day.
+- **Check:** a `SunTracker` test with a mocked flat horizon profile that ticks through the sunset (Ravensburg, 2026-10-15) and expects the countdown pill and the fireworks trigger; `utils.sunUtils` / `utils.sunEvents` tests for the switch time. Polar day and polar night keep their behaviour.
+- **Decision (Lutz, 2026-10-15):** switch the day after the sunset.
+
+### 157. Hidden controls: a double tap reaches the scene again — S — [SUN-CHASER-22](https://ainabler.sentry.io/issues/SUN-CHASER-22)
+
+- **Feedback (2026-10-15 17:58 CEST, Ravensburg):** "Now after the last update, items that are behind controls are not double tappable anymore - please find a solution for all of the needed cases".
+- **Now:**
+  - Item 147 T2 (PR #200): while the controls are hidden, a window capture `click` in the box of a hidden control (`TopLeftButtons`, `InfoPanel`, `MusicPlayer`; `data-idle-control`) shows the controls and stops the tap. The scene thing below gets no first tap.
+  - The second tap comes before `TAP_READY_MS` (400 ms), so it reaches the thing, but only as a first tap. A third tap lands on the control. A double tap there is not possible, and the 7-tap eggs cannot count.
+  - Before item 147, hidden controls let all taps through (items 132, 136).
+  - With the controls shown, they cover the things below them. This was always so (not part of this item).
+  - #215 added tappable satellite dots in the top sky, where the `InfoPanel` is, so this case is more frequent.
+  - Things often below a control: the sun, the moon, satellites, planes, sun dogs and halo, the UFO (`InfoPanel`); boats, fish, birds, the terrain (`MusicPlayer`).
+- **Spec:**
+  - While the controls are hidden, a tap on a scene thing (`[data-scene-hit]`) in a hidden control's box goes to the thing, as before item 147. A double tap opens its card, and an egg counts the tap.
+  - A single tap on the thing shows the controls (T1: after `DOUBLE_TAP_MS`, if no second tap comes).
+  - A tap on the empty sky in the box shows the controls at once (T2, as now).
+- **Check:** `SunTracker` tests: with the controls hidden, a double tap on the sun in the box of the top-left buttons opens its card, and the controls stay hidden; a single tap there shows them after 350 ms; a tap on the empty sky in the box shows them at once. The item 147 test that expects the swallowed tap changes.
+- **Decision (Lutz, 2026-10-15):** only while the controls are hidden, and a single tap there shows the controls. The pass-through of shown controls is not now.
+
+### 158. Sun and moon: one tap, two taps, seven taps — S — [SUN-CHASER-24](https://ainabler.sentry.io/issues/SUN-CHASER-24)
+
+- **Feedback (2026-10-15 18:05 CEST, Ravensburg):** "7 tap of sun or moon shouldn't trigger the panel on and off".
+- **Now:**
+  - The sun (sunglasses) and the moon (disco) count 7 taps with gaps of at most 1500 ms (`registerSunTap`, `SUN_TAP_GAP_MS`, `hiddenEggs`). Each tap also goes to `useDoubleTap` and to the item 147 T1 toggle.
+  - Slow taps (gaps of 350–1500 ms): each tap starts the 350 ms toggle and no second tap stops it. The 7 taps flip the controls 7 times.
+  - Fast taps (gaps under 350 ms): taps 2, 4 and 6 open the card, and taps 3, 5 and 7 close it on `pointerdown`. The tap that closes a card returns (`downClosesCardRef`) before the pending toggle is stopped, so the toggles of taps 4 and 6 still run. This is so for 4 or more fast taps on any scene thing.
+- **Spec (Lutz):**
+  - A sequence is taps on the same body with gaps of at most `SUN_TAP_GAP_MS`.
+  - 1 tap: shows or hides the controls (after `DOUBLE_TAP_MS`, as T1).
+  - 2 taps (the second within `DOUBLE_TAP_MS`): the info card.
+  - Taps 3–6: nothing. No toggle, and the card stays as it is.
+  - Tap 7: the egg.
+  - Only the first tap of a sequence can toggle the controls. With slow taps, tap 1 toggles and taps 2–6 do nothing.
+  - The tap that closes a card also stops a pending toggle (for all scene things).
+- **Check:** `SunTracker` tests in fullscreen: 7 fast taps and 7 slow taps on the sun and on the moon give the egg, and the controls change at most once (only from tap 1 of a slow sequence); 1 tap toggles; 2 fast taps open the card and do not toggle; 4 fast taps on a cloud do not toggle.
+- **Decision (Lutz, 2026-10-15):** "single tap on the sun, shows/ hides controls, double tap shows info, 3-6 tap does nothing, 7 easter egg".
+
+### 159. Live planes: fade in and out, and a size that follows the distance — M — [SUN-CHASER-23](https://ainabler.sentry.io/issues/SUN-CHASER-23)
+
+- **Feedback (2026-10-15 18:03 CEST, Ravensburg):** "Planes sometime just plop of the screen, they should slowly fade in or out and also get bigger and smaller depending on the flight direction".
+- **Now:**
+  - Without the compass, `pickShownPlanes` (`liveRadar`) picks the 2 nearest visible planes that move at least 1 px/s, again on each 250 ms tick, with no memory of the last pick. A third plane that comes nearer, or a speed near 1 px/s, swaps a plane at once. The Sentry tag was `ok-2/69`.
+  - `LivePlanes` renders the planes with `key={ac.hex}`. A plane that is not picked, is not in an answer, goes below 5° or behind the ridge, or is older than 60 s unmounts in the same render. Only its trail fades. The weather gate unmounts the whole layer. A new plane shows at full opacity on its first frame.
+  - The size: `getLivePlaneWidth` goes from 18 px (20 km or nearer) to 11 px (100 km) by the ground distance, in whole px, with no transition. At 450 kt this is about 1 px per minute, so the size change is not visible.
+  - `slantDistanceM` and the view 1 s later (`getShown`) give the closing speed. `speedKt`, `track` and `altM` are in the feed.
+  - The decorative planes enter and leave off the screen edges, so they do not plop. The weather gate takes them away at once (`CloudLayer`, `planes = []`).
+- **Spec (options for the lookbook):**
+  - **Stickier pick:** a shown plane stays while it is visible; its speed limit drops to about 0.6 px/s; a new plane replaces it only when it is about 25 % nearer.
+  - **Fade:** a new plane fades in; a leaving plane flies on (dead reckoning) and fades out, then goes. The same for the weather gate, the 60 s stale drop and the switch. Lengths to pick in the lookbook.
+  - **Size from the slant distance:** a scale that grows while the plane comes nearer and gets smaller while it flies away, smoothed per plane, as a `transform: scale()` on a wrapper. Ranges to pick in the lookbook.
+  - Reduced motion: no fade and no smoothing.
+- **Decision (Lutz, 2026-10-15):** a lookbook first.
+- **Lookbook:** (link follows)
+
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 
 Rules for all items:
