@@ -191,6 +191,9 @@
   --animate-badge-out: fade-out 0.3s ease-in both;
   --animate-badge-sweep: badge-sweep 0.8s ease-in-out 0.4s both;
   --animate-badge-glow: badge-glow 1.2s ease-in-out 0.4s both;
+  /* A new live plane fades in over 3 s on the smoothstep curve (item 159, F3; LivePlanes sets
+     the haze's blur with its 4 Hz clock: an animated blur repaints in every frame). */
+  --animate-plane-fade-in: fade-in 3s cubic-bezier(0.33, 0, 0.67, 1);
 
   @keyframes accordion-down {
     from {
