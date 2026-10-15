@@ -824,6 +824,28 @@ describe('SunVisualization (rendered): line-of-sight labels on the sun arc (ROAD
     expect(screen.getByTestId('arc-label-sun-set')).toBeInTheDocument();
   });
 
+  it('keeps today\'s set label until the line-of-sight sunset is over (ROADMAP item 156)', () => {
+    // Ravensburg on 2026-10-15 at 16:36:30 UTC: after the flat sunset (16:35:56), before the
+    // line-of-sight sunset over a horizon 0.3° below the flat one (16:37:04). No profile, so
+    // no terrain pill covers the flat set label.
+    const lat = 47.78;
+    const lon = 9.61;
+    const today = getSunTimes(new Date('2026-10-15T12:00:00Z'), lat, lon);
+    const tomorrow = getSunTimes(new Date('2026-10-16T12:00:00Z'), lat, lon);
+    expect(formatTime(today.sunset)).not.toBe(formatTime(tomorrow.sunset));
+    render(
+      <SunVisualization
+        {...baseProps}
+        sunPosition={{ azimuth: 256, altitude: -1 }}
+        latitude={lat}
+        longitude={lon}
+        date={new Date('2026-10-15T16:36:30Z')}
+        terrainSunTimes={{ sunrise: new Date('2026-10-15T05:39:00Z'), sunset: new Date('2026-10-15T16:37:04Z') }}
+      />
+    );
+    expect(screen.getByTestId('arc-label-sun-set')).toHaveTextContent(formatTime(today.sunset));
+  });
+
   it('renders no terrain label for a null time (the sun does not clear the terrain)', () => {
     render(
       <SunVisualization {...baseProps} horizonProfile={ridgeProfile} terrainSunTimes={{ sunrise: null, sunset: null }} />
@@ -1597,6 +1619,28 @@ describe('SunVisualization info cards (ROADMAP item 95)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('item 158: a sun or moon tap that only counts (the tap handler returns false) does not reach the card', () => {
+    // The handler gets the click on the button (React clears `currentTarget` after the call).
+    const targets: EventTarget[] = [];
+    const onTap = vi.fn((event: React.MouseEvent<HTMLElement>) => {
+      targets.push(event.currentTarget);
+      return false;
+    });
+    const onSceneInfo = vi.fn();
+    for (const [name, timeOfDay] of [['Sun', 'midday'], ['Moon', 'night']] as const) {
+      const { unmount } = render(<SunVisualization {...props} timeOfDay={timeOfDay} onSunTap={onTap} onMoonTap={onTap} onSceneInfo={onSceneInfo} />);
+      const body = screen.getByRole('button', { name });
+      fireEvent.click(body, { detail: 1 });
+      fireEvent.click(body, { detail: 2 });
+      fireEvent.click(body, { detail: 0 });
+      expect(targets).toEqual([body, body, body]);
+      targets.length = 0;
+      unmount();
+    }
+    expect(onTap).toHaveBeenCalledTimes(6);
+    expect(onSceneInfo).not.toHaveBeenCalled();
   });
 
   it('the moon reports each tap for the disco egg, beside its card', () => {

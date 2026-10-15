@@ -1,5 +1,6 @@
 import fixture from './fixtures/iss-omm-2026-10-05.json';
 import {
+  NIGHT_CATALOGUE_URL,
   REFRESH_MS,
   RETRY_MS,
   SATELLITE_CACHE_KEY,
@@ -30,18 +31,37 @@ describe('satelliteData (ROADMAP item 97)', () => {
     expect(dedupeRecords([iss, poisk, other, other]).map((r) => r.OBJECT_NAME)).toEqual(['ISS (ZARYA)', 'OTHER']);
   });
 
-  it('fetches the three groups once, then serves the cache for a day', async () => {
+  it('fetches the three groups and the night catalogue once, then serves the cache for a day', async () => {
     const fetchImpl = vi.fn(async () => response(200, [iss, poisk, other]));
     const first = await loadSatelliteData(NOW, fetchImpl);
-    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
     expect(first?.map((r) => r.OBJECT_NAME)).toEqual(['ISS (ZARYA)', 'OTHER']);
     // Only the fields SGP4 and the card need are cached.
     expect(first?.[0]).not.toHaveProperty('EXTRA_FIELD');
 
     await loadSatelliteData(NOW + REFRESH_MS - 1, fetchImpl);
-    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
     await loadSatelliteData(NOW + REFRESH_MS, fetchImpl);
-    expect(fetchImpl).toHaveBeenCalledTimes(6);
+    expect(fetchImpl).toHaveBeenCalledTimes(8);
+  });
+
+  it('adds the night catalogue after the groups (item 160)', async () => {
+    const night: GpRecord = { ...iss, OBJECT_NAME: 'QIANFAN-1', NORAD_CAT_ID: 60001, MEAN_ANOMALY: 20, EXTRA_FIELD: 'x' } as GpRecord;
+    const fetchImpl = vi.fn(async (url: string) => response(200, url === NIGHT_CATALOGUE_URL ? [night, iss] : [iss]));
+    const records = await loadSatelliteData(NOW, fetchImpl as unknown as typeof fetch);
+    expect(fetchImpl.mock.calls.at(-1)?.[0]).toBe('/api/satellites');
+    expect(records?.map((r) => r.OBJECT_NAME)).toEqual(['ISS (ZARYA)', 'QIANFAN-1']);
+    expect(records?.[1]).not.toHaveProperty('EXTRA_FIELD');
+  });
+
+  it('keeps the groups for a day when the night catalogue fails', async () => {
+    const fetchImpl = vi.fn(async (url: string) => {
+      if (url === NIGHT_CATALOGUE_URL) throw new TypeError('Failed to fetch');
+      return response(200, [iss]);
+    });
+    expect(await loadSatelliteData(NOW, fetchImpl as unknown as typeof fetch)).toHaveLength(1);
+    await loadSatelliteData(NOW + RETRY_MS, fetchImpl as unknown as typeof fetch);
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
   });
 
   it('stops at the first error and waits 2 h before the next try, keeping the old data', async () => {

@@ -135,9 +135,10 @@ interface SunVisualizationProps {
   onFireworksRunning?: (running: boolean) => void;
   // Hidden sunglasses egg: the sun wears sunglasses; tapping the sun reports each tap to SunTracker.
   sunglasses?: boolean;
-  onSunTap?: () => void;
-  // Hidden disco egg: tapping the moon reports each tap to SunTracker.
-  onMoonTap?: () => void;
+  // Item 158: false: the tap only counts for the egg (taps 3 to 7 of a tap sequence), no card.
+  onSunTap?: (event: React.MouseEvent<HTMLElement>) => boolean;
+  // Hidden disco egg: tapping the moon reports each tap to SunTracker (the same return).
+  onMoonTap?: (event: React.MouseEvent<HTMLElement>) => boolean;
   // Info cards (ROADMAP item 95): a tap on anything in the scene, and the ring id of the open card.
   onSceneInfo?: SceneInfoHandler;
   infoRing?: string | null;
@@ -877,10 +878,13 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   // arcLabels.ts's own comment) so the labels always match the panel's own times.
   // Keyed on the minute: `date` ticks every second, the labels only change by the minute.
   const arcLabelMinuteKey = Math.floor(date.getTime() / 60_000);
+  // Item 156: the pass stays until the line-of-sight sunset is over, as in the panel.
+  // SunTracker's terrain times are the pass day's, which is that day until then.
+  const terrainSunset = terrainSunTimes?.sunset ?? null;
   const sunArcLabels = useMemo(
-    () => getSunArcLabels(date, latitude, longitude),
+    () => getSunArcLabels(date, latitude, longitude, terrainSunset),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on arcLabelMinuteKey, not `date` itself
-    [arcLabelMinuteKey, latitude, longitude]
+    [arcLabelMinuteKey, latitude, longitude, terrainSunset]
   );
   const moonArcLabels = useMemo(
     () => getMoonArcLabels(date, latitude, longitude),
@@ -1344,9 +1348,9 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           type="button"
           aria-label={t('scene.sun')}
           // Each tap counts for the sunglasses egg; a double tap (or a keyboard click, detail 0)
-          // also opens the sun's card (items 95, 116).
+          // also opens the sun's card (items 95, 116). Taps 3 to 7 of a sequence only count (item 158).
           onClick={event => {
-            onSunTap?.();
+            if (onSunTap?.(event) === false) return;
             tap({ type: 'sun' }, tapPoint(event), 'sun', event.detail === 0);
           }}
           data-testid="sun-dot"
@@ -1415,12 +1419,13 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
 
       {moonMounted && moonLook.disc > 0 && (
         // A button for the moon's info card (ROADMAP item 95), at least 44 px wide.
-        // Each tap also counts for the disco egg (ROADMAP "Ongoing — Easter eggs").
+        // Each tap also counts for the disco egg (ROADMAP "Ongoing — Easter eggs"); taps 3 to 7
+        // of a sequence only count (item 158).
         <button
           type="button"
           aria-label={t('scene.moon')}
           onClick={event => {
-            onMoonTap?.();
+            if (onMoonTap?.(event) === false) return;
             tap({ type: 'moon' }, tapPoint(event), 'moon', event.detail === 0);
           }}
           data-scene-hit

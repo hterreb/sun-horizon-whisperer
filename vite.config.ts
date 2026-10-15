@@ -5,20 +5,26 @@ import path from "path";
 import { VitePWA } from 'vite-plugin-pwa';
 import { sentryVitePlugin } from '@sentry/vite-plugin';
 import { handlePlanesRequest } from './src/utils/planeFeed';
+import { handleSatellitesRequest } from './src/utils/satelliteFeed';
 
-// The live radar's proxy (ROADMAP item 96) in `npm run dev` and `vite preview`: the same
-// handler as the Vercel Edge function api/planes.ts.
-const planesApi = (): Plugin => {
+// The Edge functions in `npm run dev` and `vite preview`, with the same handlers as api/: the
+// live radar's proxy (ROADMAP item 96) and the night catalogue (item 160).
+const API_ROUTES: [string, (request: Request) => Promise<Response>][] = [
+  ['/api/planes', handlePlanesRequest],
+  ['/api/satellites', handleSatellitesRequest],
+];
+const edgeApi = (): Plugin => {
   const serve: Connect.NextHandleFunction = (req, res, next) => {
-    if (!req.url?.startsWith('/api/planes')) return next();
-    handlePlanesRequest(new Request(`http://localhost${req.url}`, { method: req.method })).then(async response => {
+    const handler = API_ROUTES.find(([route]) => req.url?.startsWith(route))?.[1];
+    if (!handler) return next();
+    handler(new Request(`http://localhost${req.url}`, { method: req.method })).then(async response => {
       res.statusCode = response.status;
       response.headers.forEach((value, key) => res.setHeader(key, value));
       res.end(await response.text());
     }, next);
   };
   return {
-    name: 'planes-api',
+    name: 'edge-api',
     configureServer: server => { server.middlewares.use(serve); },
     configurePreviewServer: server => { server.middlewares.use(serve); },
   };
@@ -45,7 +51,7 @@ export default defineConfig(({ mode }) => {
   },
   plugins: [
     react(),
-    planesApi(),
+    edgeApi(),
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
