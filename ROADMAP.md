@@ -3248,7 +3248,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   - **Size from the slant distance:** a scale that grows while the plane comes nearer and gets smaller while it flies away, smoothed per plane, as a `transform: scale()` on a wrapper. Ranges to pick in the lookbook.
   - Reduced motion: no fade and no smoothing.
 - **Decision (Lutz, 2026-10-15):** a lookbook first.
-- **Lookbook:** (link follows)
+- **Lookbook:** https://claude.ai/artifact/QmnhwPPAem2fvE6Vos8z8Y (F0–F3 fade, Z0–Z3 size, S0/S1 pick, a combined tile; private).
 
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 
