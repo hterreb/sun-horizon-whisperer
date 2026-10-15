@@ -5,7 +5,8 @@
       "namespace": "android_app",
       "package_name": "com.ainabler.sunchaser",
       "sha256_cert_fingerprints": [
-        "4B:9C:19:1B:E6:20:5F:8F:6B:AA:9E:CE:72:3D:70:4A:6A:CA:E9:82:10:62:47:3E:A0:AF:D2:9E:DB:45:4F:CB"
+        "4B:9C:19:1B:E6:20:5F:8F:6B:AA:9E:CE:72:3D:70:4A:6A:CA:E9:82:10:62:47:3E:A0:AF:D2:9E:DB:45:4F:CB",
+        "99:59:32:DF:EA:61:40:84:2E:34:3E:08:D7:DD:86:DA:56:9E:30:73:DB:25:74:48:9C:D2:97:00:49:9E:7C:C3"
       ]
     }
   }
