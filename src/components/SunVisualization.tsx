@@ -1158,8 +1158,9 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     (altitude: number, azimuth: number) => getArcScreenPosition(altitude, azimuth, sceneWidth, sceneHeight, latitude, compassHeading),
     [sceneWidth, sceneHeight, latitude, compassHeading]
   );
-  // Mounted also while the radar is off: the trails of its planes stay and fade (item 142).
-  const showLivePlanes = sceneWidth > 0 && isPlaneWeather(weatherType, cloudLayers);
+  // Mounted also while the radar is off: the trails of its planes stay and fade (item 142). And in
+  // all weather: when the weather closes the sky, the layer fades out, then goes (item 159).
+  const showLivePlanes = sceneWidth > 0;
 
   // Satellites (ROADMAP item 97): azimuth -> x and elevation -> y as for the sun and moon
   // (compass field of view included); a tracked satellite behind the terrain is hidden.
@@ -1226,6 +1227,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           contrail={contrail}
           trailColour={getTrailColour(weatherType, Math.round(sunPosition.altitude * 2) / 2)}
           reducedMotion={prefersReducedMotion}
+          skyOpen={isPlaneWeather(weatherType, cloudLayers)}
           onInfo={onSceneInfo}
           infoRing={infoRing}
           onShownChange={onLivePlanesShown}
