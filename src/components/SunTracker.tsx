@@ -90,7 +90,7 @@ import { NO_PATIENT_WATCH, PLAYFUL_EVENT, advancePatientWatch, getPlayfulOverrid
 import { parseFestivalOverride } from '@/utils/festivalEvents';
 import { PLAY_SPEED, PLAY_TICK_MS, clampTimeOffset } from '@/utils/timeTravel';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
-import { DISCO_MS, KONAMI_SEQUENCE, SUNGLASSES_MS, UFO_RING, advanceKonami, getEggOverride, registerSunTap, rollUfo } from '@/utils/hiddenEggs';
+import { DISCO_MS, KONAMI_SEQUENCE, SUNGLASSES_MS, SUN_TAP_GAP_MS, UFO_RING, advanceKonami, getEggOverride, registerSunTap, rollUfo, type SunTaps } from '@/utils/hiddenEggs';
 import { isCloudEggDay, isCloudEggForced } from '@/utils/skyCloudUtils';
 import { isInstalledApp } from '@/utils/installedApp';
 import { getStartReveal, isFastReturn, loadLastVisible, saveLastVisible } from '@/utils/fastReturn';
@@ -356,6 +356,11 @@ const SunTracker: React.FC = () => {
   const lastToggleTapRef = React.useRef(-Infinity);
   const infoCardOpenRef = React.useRef(false);
   const downClosesCardRef = React.useRef(false);
+  // Item 158: the last tap on the sun or the moon: its click, its button and its egg count
+  // (registerSunTap). A tap sequence is the taps on one of them with gaps of at most
+  // SUN_TAP_GAP_MS. Tap 1 toggles, taps 1 and 2 reach the card (a double tap opens it), tap 7
+  // starts the egg. Taps 3 to 7 only count: no toggle, and the card stays as it is.
+  const bodyTapRef = React.useRef<{ click: Event; body: Element; taps: SunTaps } | null>(null);
   useEffect(() => {
     if (!canHideControls) return;
     // T1: the toggle of a tap on a scene thing waits DOUBLE_TAP_MS for a second tap.
@@ -375,11 +380,12 @@ const SunTracker: React.FC = () => {
       downClosesCardRef.current = infoCardOpenRef.current;
     };
     // T2: a hidden control takes no taps (pointer-events-none), so a tap in its box lands on the
-    // scene below. The window catches it first (capture), shows the controls and stops it: the
-    // scene thing below takes no tap (no card, no start of a double tap). A toast or a card on top
-    // keeps its tap.
+    // scene below. The window catches a tap on the empty sky first (capture), shows the controls
+    // and stops it. A scene thing keeps its taps (item 157): a single tap shows the controls (T1),
+    // a double tap opens its card, and the eggs count. A toast or a card on top keeps its tap.
     const onClickCapture = (event: MouseEvent) => {
-      if (showCursor || downClosesCardRef.current || !isSceneTap(event.target) || !isOnIdleControl(event)) return;
+      if (showCursor || downClosesCardRef.current || !isSceneTap(event.target) ||
+        event.target.closest('[data-scene-hit]') !== null || !isOnIdleControl(event)) return;
       event.stopPropagation();
       cancelThingToggle();
       lastToggleTapRef.current = Date.now();
@@ -389,14 +395,17 @@ const SunTracker: React.FC = () => {
     // thing toggles after DOUBLE_TAP_MS, unless a second tap comes: that double tap opens its card
     // (items 116, 124) and does not toggle. A control, a card or a dialog does not toggle.
     // A tap within DOUBLE_TAP_MS after a toggle does nothing: a double tap does not flicker.
+    // The tap that closes a card only closes it, and stops a pending toggle too (item 158).
     const onClick = (event: MouseEvent) => {
       const target = event.target;
-      if (downClosesCardRef.current) return;
-      if (thingToggle !== undefined) {
+      if (thingToggle !== undefined || downClosesCardRef.current) {
         cancelThingToggle();
         return;
       }
       if (!isSceneTap(target)) return;
+      // Item 158: only tap 1 of a sun or moon tap sequence toggles.
+      const bodyTap = bodyTapRef.current;
+      if (bodyTap?.click === event && bodyTap.taps.count !== 1) return;
       const isThing = target.closest('[data-scene-hit]') !== null;
       const now = Date.now();
       if (now - lastToggleTapRef.current <= DOUBLE_TAP_MS) return;
@@ -426,6 +435,18 @@ const SunTracker: React.FC = () => {
       document.removeEventListener('click', onClick);
     };
   }, [canHideControls, showCursor, wakeCursor, toggleControls]);
+  // Item 158: the pointerdown of taps 3 to 7 of a sequence stops at the window (capture), before
+  // SceneInfoCard's outside close (document, capture): the card stays as it is. With a card open,
+  // the tap toggle takes it as the tap that closes the card, so it does not toggle either.
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      const bodyTap = bodyTapRef.current;
+      if (bodyTap && bodyTap.taps.count >= 2 && Date.now() - bodyTap.taps.lastMs <= SUN_TAP_GAP_MS &&
+        event.target instanceof Node && bodyTap.body.contains(event.target)) event.stopPropagation();
+    };
+    window.addEventListener('pointerdown', onPointerDown, true);
+    return () => window.removeEventListener('pointerdown', onPointerDown, true);
+  }, []);
 
   // Update time every second for smooth clock display, every PLAY_TICK_MS during play.
   useEffect(() => {
@@ -864,22 +885,27 @@ const SunTracker: React.FC = () => {
   const [discoOn, setDiscoOn] = useState(eggOverride === 'disco');
   const [ufoOn, setUfoOn] = useState(eggOverride === 'ufo');
   const sunTapsRef = React.useRef({ count: 0, lastMs: -Infinity });
-  const handleSunTap = useCallback(() => {
+  // Item 158: each tap also goes to bodyTapRef. True: the tap reaches the card (taps 1 and 2).
+  const handleSunTap = useCallback((event: React.MouseEvent<HTMLElement>) => {
     const { taps, triggered } = registerSunTap(sunTapsRef.current, Date.now());
     sunTapsRef.current = taps;
+    bodyTapRef.current = { click: event.nativeEvent, body: event.currentTarget, taps };
     if (triggered) {
       setSunglassesOn(true);
       collect('egg:sunglasses');
     }
+    return taps.count === 1 || taps.count === 2;
   }, [collect]);
   const moonTapsRef = React.useRef({ count: 0, lastMs: -Infinity });
-  const handleMoonTap = useCallback(() => {
+  const handleMoonTap = useCallback((event: React.MouseEvent<HTMLElement>) => {
     const { taps, triggered } = registerSunTap(moonTapsRef.current, Date.now());
     moonTapsRef.current = taps;
+    bodyTapRef.current = { click: event.nativeEvent, body: event.currentTarget, taps };
     if (triggered) {
       setDiscoOn(true);
       collect('egg:disco');
     }
+    return taps.count === 1 || taps.count === 2;
   }, [collect]);
   useEffect(() => {
     if (!sunglassesOn) return;

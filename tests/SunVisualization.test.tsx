@@ -1621,6 +1621,28 @@ describe('SunVisualization info cards (ROADMAP item 95)', () => {
     }
   });
 
+  it('item 158: a sun or moon tap that only counts (the tap handler returns false) does not reach the card', () => {
+    // The handler gets the click on the button (React clears `currentTarget` after the call).
+    const targets: EventTarget[] = [];
+    const onTap = vi.fn((event: React.MouseEvent<HTMLElement>) => {
+      targets.push(event.currentTarget);
+      return false;
+    });
+    const onSceneInfo = vi.fn();
+    for (const [name, timeOfDay] of [['Sun', 'midday'], ['Moon', 'night']] as const) {
+      const { unmount } = render(<SunVisualization {...props} timeOfDay={timeOfDay} onSunTap={onTap} onMoonTap={onTap} onSceneInfo={onSceneInfo} />);
+      const body = screen.getByRole('button', { name });
+      fireEvent.click(body, { detail: 1 });
+      fireEvent.click(body, { detail: 2 });
+      fireEvent.click(body, { detail: 0 });
+      expect(targets).toEqual([body, body, body]);
+      targets.length = 0;
+      unmount();
+    }
+    expect(onTap).toHaveBeenCalledTimes(6);
+    expect(onSceneInfo).not.toHaveBeenCalled();
+  });
+
   it('the moon reports each tap for the disco egg, beside its card', () => {
     const onMoonTap = vi.fn();
     const onSceneInfo = vi.fn();
