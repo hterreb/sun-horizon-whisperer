@@ -121,18 +121,19 @@ describe('brightness from the distance', () => {
     expect(order).toEqual([...order].sort((a, b) => a - b));
   });
 
-  it('draws a brighter satellite as a bigger dot, 2.5-7 px, with a glow only below 0 (item 131)', () => {
+  it('draws a brighter satellite as a bigger dot, 3-7 px, with a glow only below 0 (item 131)', () => {
     const iss = getSatelliteMagnitude(ISS_NORAD_ID, 'ISS (ZARYA)', 420);
     expect(getSatelliteDotPx(iss)).toBeGreaterThan(6);
     expect(getSatelliteGlowPx(iss)).toBeGreaterThan(0);
     const starlink = getSatelliteMagnitude(4, 'STARLINK-1007', 550);
-    expect(getSatelliteDotPx(starlink)).toBe(2.5);
+    expect(getSatelliteDotPx(starlink)).toBe(3);
     expect(getSatelliteGlowPx(starlink)).toBe(0);
     expect(getSatelliteDotPx(-10)).toBe(7);
   });
 
-  it('keeps a faint satellite at the least opacity', () => {
-    expect(getSatelliteOpacity(8)).toBe(0.35);
+  it('draws a faint satellite at least as bright as a decorative dot (3 px, 0.8)', () => {
+    expect(getSatelliteOpacity(8)).toBe(0.8);
+    expect(getSatelliteDotPx(8)).toBe(3);
   });
 });
 
