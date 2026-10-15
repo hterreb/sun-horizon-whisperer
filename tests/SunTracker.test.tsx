@@ -6,6 +6,7 @@ import { TAP_READY_MS } from '../src/hooks/useIdleHide';
 import { DOUBLE_TAP_MS } from '../src/hooks/useDoubleTap';
 import { loadManualLocation, saveManualLocation } from '../src/utils/manualLocation';
 import { getSunPosition, getSunTimes } from '../src/utils/sunUtils';
+import { getTerrainSunTimes, type HorizonProfile } from '../src/utils/horizonUtils';
 import { isPlaneWeather } from '../src/utils/planes';
 import type SunVisualizationType from '../src/components/SunVisualization';
 
@@ -1196,6 +1197,38 @@ describe('SunTracker', () => {
         tickFor(80_000, 1000);
         expect(starts).toHaveLength(0);
         expect(screen.getByTestId('sun-altitude')).not.toHaveTextContent('Sunset in');
+      });
+    });
+
+    describe('today\'s sunset stays the target until it is over (ROADMAP item 156)', () => {
+      // SUN-CHASER-25: Ravensburg on 2026-10-15. The sun is at 0° (geometric) at 16:29:42
+      // UTC; over a flat 0° horizon the line-of-sight sunset is at 16:34:49 UTC.
+      const profile: HorizonProfile = {
+        angles: new Array(360).fill(0), observerElevation: 450, eyeHeight: 1.7,
+        ridgeDistances: new Array(360).fill(null), ridgeHeights: new Array(360).fill(null),
+      };
+      const lineOfSightSunset = (day: string) =>
+        getTerrainSunTimes(new Date(`${day}T12:00:00Z`), RAVENSBURG.latitude, RAVENSBURG.longitude, profile).sunset!;
+
+      it('counts down and starts the fireworks at the line-of-sight sunset after the geometric set', async () => {
+        const sunset = lineOfSightSunset('2026-10-15');
+        // The profile comes from the terrain cache (default eye height 1.7 m), with no fetch.
+        localStorage.setItem('terrain_horizon_profile_v2_47.780_9.610_1.7', JSON.stringify({ profile, timestamp: 0 }));
+        // Open 6 min before the sunset, before the geometric set.
+        start(new Date(sunset.getTime() - 361_000));
+        await act(() => vi.advanceTimersByTimeAsync(1000)); // the profile loads after a 500 ms debounce
+        expect(visProps.current!.terrainSunTimes?.sunset).toEqual(sunset);
+        // To T-19.7 s: past the geometric set and the minute tick after it.
+        tickFor(340_000, 20_000);
+        expect(visProps.current!.terrainSunTimes?.sunset).toEqual(sunset);
+        tickFor(13_000, 1000);
+        expect(screen.getByTestId('sun-altitude')).toHaveTextContent('Sunset in 7 s');
+        expect(visProps.current!.fireworksTrigger).toBe(0);
+        tickFor(10_000, 1000);
+        expect(visProps.current!.fireworksTrigger).not.toBe(0);
+        // Only after the sunset does the next minute tick move the times to the next day.
+        tickFor(60_000, 10_000);
+        expect(visProps.current!.terrainSunTimes?.sunset).toEqual(lineOfSightSunset('2026-10-16'));
       });
     });
 

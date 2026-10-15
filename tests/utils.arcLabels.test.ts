@@ -44,6 +44,21 @@ describe('getSunArcLabels (arc rise/zenith/set labels)', () => {
     expect(morning.zenith?.time).toEqual(evening.zenith?.time);
   });
 
+  it('keeps today\'s rise and set after the geometric set, until the sunset is over (ROADMAP item 156)', () => {
+    // Ravensburg on 2026-10-15: the sun is at 0° at 16:29:42 UTC, the flat sunset is at 16:35:56 UTC.
+    const lat = 47.78;
+    const lon = 9.61;
+    const today = getSunTimes(new Date('2026-10-15T12:00:00Z'), lat, lon);
+    const tomorrow = getSunTimes(new Date('2026-10-16T12:00:00Z'), lat, lon);
+    expect(getSunArcLabels(new Date('2026-10-15T16:31:00Z'), lat, lon).set?.time).toEqual(today.sunset);
+    expect(getSunArcLabels(new Date('2026-10-15T16:36:00Z'), lat, lon).set?.time).toEqual(tomorrow.sunset);
+    // A line-of-sight sunset after the flat one keeps the pass until it is over.
+    const lineOfSight = new Date('2026-10-15T16:37:04Z');
+    expect(getSunArcLabels(new Date('2026-10-15T16:36:30Z'), lat, lon, lineOfSight).rise?.time).toEqual(today.sunrise);
+    expect(getSunArcLabels(new Date('2026-10-15T16:36:30Z'), lat, lon, lineOfSight).set?.time).toEqual(today.sunset);
+    expect(getSunArcLabels(new Date('2026-10-15T16:37:30Z'), lat, lon, lineOfSight).set?.time).toEqual(tomorrow.sunset);
+  });
+
   it('polar day: rise/set are null (the pass has no horizon crossing)', () => {
     // Polar day at lat 78 in June (see utils.sunUtils.test.ts).
     const date = new Date(2026, 5, 21, 12, 0, 0, 0);

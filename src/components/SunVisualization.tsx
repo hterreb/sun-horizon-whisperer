@@ -877,10 +877,13 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   // arcLabels.ts's own comment) so the labels always match the panel's own times.
   // Keyed on the minute: `date` ticks every second, the labels only change by the minute.
   const arcLabelMinuteKey = Math.floor(date.getTime() / 60_000);
+  // Item 156: the pass stays until the line-of-sight sunset is over, as in the panel.
+  // SunTracker's terrain times are the pass day's, which is that day until then.
+  const terrainSunset = terrainSunTimes?.sunset ?? null;
   const sunArcLabels = useMemo(
-    () => getSunArcLabels(date, latitude, longitude),
+    () => getSunArcLabels(date, latitude, longitude, terrainSunset),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on arcLabelMinuteKey, not `date` itself
-    [arcLabelMinuteKey, latitude, longitude]
+    [arcLabelMinuteKey, latitude, longitude, terrainSunset]
   );
   const moonArcLabels = useMemo(
     () => getMoonArcLabels(date, latitude, longitude),
