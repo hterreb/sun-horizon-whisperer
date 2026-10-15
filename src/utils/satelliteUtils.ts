@@ -230,10 +230,16 @@ export const getTwilightFade = (sunAltitude: number): number =>
 // fade it out: into the Earth's shadow, or below 10°.
 export const FADE_MS = 6000;
 
+// The scene shows a satellite only up to this magnitude (item 160): the naked eye from a
+// balcony with some town light. With the night catalogue, 6 gave 28 dots at once after dusk.
+// ponytail: one limit for every sky; a darker limit for dark places if a remote one looks empty.
+export const NAKED_EYE_MAGNITUDE = 5.5;
+
 // The visibility rule for the scene: in the twilight band the sun part of the rule becomes
 // the fade (the opacity), so a satellite does not vanish at the sun's -6°.
-const isShownInScene = (look: SatelliteLook, sunAltitude: number): boolean =>
-  isSatelliteVisible({ elevation: look.elevation, sunAltitude: getTwilightFade(sunAltitude) > 0 ? SUN_MAX_ALTITUDE - 1 : sunAltitude, sunlit: look.sunlit });
+const isShownInScene = (sat: TrackedSatellite, look: SatelliteLook, sunAltitude: number): boolean =>
+  isSatelliteVisible({ elevation: look.elevation, sunAltitude: getTwilightFade(sunAltitude) > 0 ? SUN_MAX_ALTITUDE - 1 : sunAltitude, sunlit: look.sunlit }) &&
+  getSatelliteMagnitude(sat.id, sat.name, look.rangeKm) <= NAKED_EYE_MAGNITUDE;
 
 // The satellites the scene shows at `date`: the visible ones, and the ones fading out (with
 // `visible` false). The opacity includes the twilight fade. Empty while the sun is above the
@@ -247,14 +253,14 @@ export const getSkySatellites = (lib: SatelliteLib, satellites: TrackedSatellite
   const wasVisible = (sat: TrackedSatellite): boolean => {
     snapBefore ??= snapshot(before, observer);
     const look = lookAtSatellite(lib, sat.satrec, before, observer, snapBefore.sunDirection);
-    return !!look && isShownInScene(look, snapBefore.sunAltitude);
+    return !!look && isShownInScene(sat, look, snapBefore.sunAltitude);
   };
   const result: SkySatellite[] = [];
   for (const sat of satellites) {
     if (!isNearEpoch(sat, date)) continue;
     const look = lookAtSatellite(lib, sat.satrec, date, observer, snap.sunDirection);
     if (!look || look.elevation <= 0) continue;
-    const visible = isShownInScene(look, snap.sunAltitude);
+    const visible = isShownInScene(sat, look, snap.sunAltitude);
     if (!visible && !wasVisible(sat)) continue;
     const magnitude = getSatelliteMagnitude(sat.id, sat.name, look.rangeKm);
     result.push({

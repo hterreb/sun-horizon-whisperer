@@ -6,6 +6,7 @@ import {
   FADE_MS,
   ISS_NORAD_ID,
   MAX_EPOCH_AGE_MS,
+  NAKED_EYE_MAGNITUDE,
   NIGHT_GAP_FACTOR,
   SPAWN_GAP_MS,
   directionKey,
@@ -197,6 +198,16 @@ describe('getSkySatellites', () => {
     const [fading] = getSkySatellites(satellite, [iss], new Date(end + 3000), sydney);
     expect(fading.visible).toBe(false);
     expect(getSkySatellites(satellite, [iss], new Date(end + FADE_MS + 2000), sydney)).toEqual([]);
+  });
+
+  it('shows a satellite only while it is brighter than the naked-eye limit (item 160)', () => {
+    // The ISS orbit as a small Starlink-class satellite: bright when near, too faint when far.
+    const twin = { ...iss, id: 44713, name: 'STARLINK-1007' };
+    const high = getSkySatellites(satellite, [iss, twin], new Date(Date.parse(refFromShadow.start) + 30_000), sydney);
+    expect(high.map((s) => s.visible)).toEqual([true, true]);
+    expect(high[1].magnitude).toBeLessThanOrEqual(NAKED_EYE_MAGNITUDE);
+    const low = getSkySatellites(satellite, [iss, twin], new Date(Date.parse(refFromShadow.end) - 20_000), sydney);
+    expect(low.map((s) => s.name)).toEqual(['ISS (ZARYA)']);
   });
 
   it('computes nothing while the sun is above -6°', () => {
