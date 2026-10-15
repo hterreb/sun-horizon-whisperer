@@ -1818,6 +1818,25 @@ describe('SunTracker', () => {
       }
     });
 
+    it('a double tap on the midnight ghost counts its badge at 00:00 only', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-11-12T00:00:30Z')); // TZ is UTC in the tests
+      try {
+        const { unmount } = render(<SunTracker />);
+        const tapGhost = () => act(() => visProps.current!.onSceneInfo!({ type: 'egg', kind: 'ghost' }, { x: 100, y: 100 }, 'egg-ghost'));
+        tapGhost();
+        expect(Object.keys(JSON.parse(localStorage.getItem('collection')!))).toEqual(['egg:ghost']);
+        unmount();
+        localStorage.removeItem('collection');
+        vi.setSystemTime(new Date('2026-11-12T00:01:00Z'));
+        render(<SunTracker />);
+        tapGhost();
+        expect(JSON.parse(localStorage.getItem('collection') ?? '{}')).not.toHaveProperty('egg:ghost');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('the March equinox day is the equinox until noon, then Nowruz, each with its own badge (item 138)', () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date('2027-03-20T10:00:00Z')); // 11:00 in Ravensburg
