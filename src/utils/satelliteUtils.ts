@@ -153,14 +153,16 @@ export const isSatelliteVisible = ({ elevation, sunAltitude, sunlit }: { elevati
 // ponytail: one magnitude per size class; a table of per-satellite standard magnitudes
 // (McCants' list) if a known one looks wrong.
 const STANDARD_MAGNITUDE: Record<SatelliteSize, number> = { iss: -1.8, giant: 1, large: 2.5, medium: 4, small: 6 };
-const MIN_OPACITY = 0.35; // 0.25 was too faint to see on a phone
+// The decorative dot's opacity: at 0.35 a real satellite was fainter than a decorative one and
+// nobody saw it (Lutz, 2026-10-15).
+const MIN_OPACITY = 0.8;
 export const getSatelliteMagnitude = (id: number, name: string, rangeKm: number): number =>
   STANDARD_MAGNITUDE[getSatelliteSize(id, name)] + 5 * Math.log10(Math.max(rangeKm, 100) / 1000);
 export const getSatelliteOpacity = (magnitude: number): number =>
   Math.min(1, Math.max(MIN_OPACITY, 1 - (magnitude + 2) / 8));
-// The dot's size from the magnitude (item 131): 2.5 px for faint ones up to 7 px (the ISS
-// overhead, about -3.7), on the stars' scale. A glow below magnitude 0.
-export const getSatelliteDotPx = (magnitude: number): number => Math.min(7, Math.max(2.5, 4.5 - 0.65 * magnitude));
+// The dot's size from the magnitude (item 131): 3 px (the decorative dot) for faint ones up to
+// 7 px (the ISS overhead, about -3.7), on the stars' scale. A glow below magnitude 0.
+export const getSatelliteDotPx = (magnitude: number): number => Math.min(7, Math.max(3, 4.5 - 0.65 * magnitude));
 export const getSatelliteGlowPx = (magnitude: number): number => Math.min(8, Math.max(0, -2 * magnitude));
 
 export interface Observer { latitude: number; longitude: number }
