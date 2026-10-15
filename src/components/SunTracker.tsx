@@ -715,13 +715,22 @@ const SunTracker: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on moonHourKey (the hour), not `date` itself
   }, [moonHourKey, location.loaded, location.latitude, location.longitude]);
 
+  // Item 156: the sun's pass stays until the line-of-sight sunset of the solar day is over
+  // (findSunPass), so it is computed for that day here, not for the pass day below.
+  const solarNoonMs = sunTimes?.solarNoon.getTime() ?? null;
+  const lineOfSightSunset = useMemo(
+    () => (horizonProfile && solarNoonMs !== null
+      ? getTerrainSunTimes(new Date(solarNoonMs), location.latitude, location.longitude, horizonProfile).sunset
+      : null),
+    [solarNoonMs, horizonProfile, location.latitude, location.longitude]
+  );
   // The panel's rise/set times follow the pass the arcs draw (AUDIT C-17): after sunset
   // the next sunrise/sunset, after moonset the next moonrise/moonset. Same arcLabels calls
   // as SunVisualization, so panel and arc labels cannot disagree. Keyed on the minute.
   const passMinuteKey = Math.floor(date.getTime() / 60_000);
   const passTimes = useMemo(() => {
     if (!location.loaded) return null;
-    const sun = getSunArcLabels(date, location.latitude, location.longitude);
+    const sun = getSunArcLabels(date, location.latitude, location.longitude, lineOfSightSunset);
     const moon = getMoonArcLabels(date, location.latitude, location.longitude);
     return {
       sunrise: sun.rise?.time ?? null,
@@ -730,7 +739,7 @@ const SunTracker: React.FC = () => {
       moonset: moon.set?.time ?? null,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on passMinuteKey, not `date` itself
-  }, [passMinuteKey, location.loaded, location.latitude, location.longitude]);
+  }, [passMinuteKey, location.loaded, location.latitude, location.longitude, lineOfSightSunset]);
   // No moon pass (up or down all day): keep getMoonTimes' alwaysUp/alwaysDown flags.
   const panelMoonTimes: MoonTimes = passTimes && (passTimes.moonrise || passTimes.moonset)
     ? { rise: passTimes.moonrise, set: passTimes.moonset, alwaysUp: false, alwaysDown: false }
