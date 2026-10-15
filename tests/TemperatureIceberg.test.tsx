@@ -1,6 +1,6 @@
 import React from 'react';
-import { render } from '@testing-library/react';
-import TemperatureIceberg from '../src/components/TemperatureIceberg';
+import { fireEvent, render, screen } from '@testing-library/react';
+import TemperatureIceberg, { ICEBERG_RING } from '../src/components/TemperatureIceberg';
 
 const mockReducedMotion = (matches: boolean) =>
   vi.spyOn(window, 'matchMedia').mockReturnValue({
@@ -52,5 +52,25 @@ describe('TemperatureIceberg', () => {
     setIntervalSpy.mockRestore();
     mediaSpy.mockRestore();
     vi.useRealTimers();
+  });
+
+  it('a double tap opens its info card; the ring shows while the card is open (item 161)', () => {
+    const onInfo = vi.fn();
+    const { rerender } = render(<TemperatureIceberg temperature={-5} isVisible onInfo={onInfo} />);
+    const iceberg = screen.getByTestId('temperature-iceberg');
+    expect(iceberg.className).toContain('pointer-events-auto');
+    expect(iceberg.getAttribute('aria-hidden')).toBe('true');
+    const hit = iceberg.querySelector('[data-testid="scene-hit"]')!;
+    fireEvent.click(hit, { clientX: 120, clientY: 600, detail: 1 });
+    expect(onInfo).not.toHaveBeenCalled();
+    fireEvent.click(hit, { clientX: 120, clientY: 600, detail: 2 });
+    expect(onInfo).toHaveBeenCalledWith({ type: 'egg', kind: 'iceberg' }, { x: 120, y: 600 }, ICEBERG_RING);
+    rerender(<TemperatureIceberg temperature={-5} isVisible onInfo={onInfo} ringOn ringTier="ultraRare" />);
+    expect(iceberg.querySelector('[data-testid="scene-info-ring"]')!.className).toContain('border-tier-ultra-rare/80');
+  });
+
+  it('takes no taps without onInfo', () => {
+    render(<TemperatureIceberg temperature={-5} isVisible />);
+    expect(screen.getByTestId('temperature-iceberg').className).toContain('pointer-events-none');
   });
 });

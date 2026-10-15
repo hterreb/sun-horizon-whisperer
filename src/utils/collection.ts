@@ -22,7 +22,7 @@ import { ridgeAt, type HorizonProfile } from './horizonUtils';
 import { OPTICS, type OpticKind } from './skyOptics';
 
 export type EggKind =
-  | 'sunglasses' | 'ufo' | 'ghost' | 'disco'
+  | 'sunglasses' | 'ufo' | 'ghost' | 'iceberg' | 'disco'
   | 'newYear' | 'friday13' | 'lunarNewYear' | 'solstice' | 'midwinter' | 'equinox' | 'halloweenPumpkin' | 'halloweenBats' | 'christmas' | 'santa'
   | 'solarEclipse' | 'lunarEclipse' | 'greenFlash' | 'supermoon' | 'blueMoon' | 'meteorShower' | 'aurora'
   | 'matariki' | 'conjunction' | 'noctilucent' | 'midnightSun' | 'polarNight'
@@ -106,7 +106,7 @@ export const SATELLITE_SIZES: [SatelliteSize, MessageKey][] = [
 ];
 
 const EGGS: [EggKind, MessageKey][] = [
-  ['sunglasses', 'egg.sunglasses'], ['ufo', 'egg.ufo'], ['ghost', 'egg.ghost'], ['disco', 'egg.disco'],
+  ['sunglasses', 'egg.sunglasses'], ['ufo', 'egg.ufo'], ['ghost', 'egg.ghost'], ['iceberg', 'egg.iceberg'], ['disco', 'egg.disco'],
   ['newYear', 'egg.newYear'], ['friday13', 'egg.friday13'], ['lunarNewYear', 'egg.lunarNewYear'],
   // Item 140: the summer solstice and midwinter (the winter solstice) have a badge each.
   ['solstice', 'egg.solstice'], ['midwinter', 'egg.midwinter'], ['equinox', 'egg.equinox'], ['halloweenPumpkin', 'egg.halloweenPumpkin'],

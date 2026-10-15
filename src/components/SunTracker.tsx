@@ -46,7 +46,7 @@ import MusicPlayer from './MusicPlayer';
 import TopLeftButtons from './TopLeftButtons';
 import PWAInstallPrompt from './PWAInstallPrompt';
 import MidnightGhost, { GHOST_RING } from './MidnightGhost';
-import TemperatureIceberg from './TemperatureIceberg';
+import TemperatureIceberg, { ICEBERG_RING } from './TemperatureIceberg';
 import LoadingScreen, { FAST_START_MS } from './LoadingScreen';
 import { type WeatherType } from './CloudLayer';
 import { toast } from '@/hooks/use-toast';
@@ -1194,9 +1194,12 @@ const SunTracker: React.FC = () => {
   // The midnight ghost counts at 00:00 (MidnightGhost's rule), not on New Year (the fireworks replace it).
   const ghostBadge: BadgeId | null = !isTimePreview && calendarEvent !== 'new-year' && date.getHours() === 0 && date.getMinutes() === 0
     ? 'egg:ghost' : null;
+  // Item 161: the iceberg counts while it floats (TemperatureIceberg's rule: below 0 °C), not in a time preview.
+  const icebergShown = location.loaded && weatherData !== null && weatherData.temperature < 0;
+  const icebergBadge: BadgeId | null = icebergShown && !isTimePreview ? 'egg:iceberg' : null;
   // One string (a template, so the React Compiler sees a new primitive, not the national day it
   // came from), so the callback below changes only when the shown eggs do. A null shows as "null".
-  const shownEggs = `${calendarBadge} ${santaBadge} ${astroBadge} ${nationalBadge} ${buntingBadge} ${ufoBadge} ${ghostBadge}`;
+  const shownEggs = `${calendarBadge} ${santaBadge} ${astroBadge} ${nationalBadge} ${buntingBadge} ${ufoBadge} ${ghostBadge} ${icebergBadge}`;
   const handleSceneTap = useCallback((target: SceneInfoTarget, point: { x: number; y: number }, ring: string) => {
     const shown = shownEggs.split(' ');
     const { newYearAt, playful } = eggShowRef.current;
@@ -1369,6 +1372,9 @@ const SunTracker: React.FC = () => {
       <TemperatureIceberg 
         temperature={weatherData?.temperature || 20} 
         isVisible={location.loaded && weatherData !== null} 
+        onInfo={handleSceneTap}
+        ringOn={infoCard?.ring === ICEBERG_RING}
+        ringTier={infoCardInfo?.tier ?? null}
       />
       
       {location.loaded && (

@@ -27,7 +27,7 @@ import { getOptic, type OpticKind } from './skyOptics';
 
 // Item 113: the easter eggs and special events that are one thing in the scene and take taps.
 // Not the collection's EggKind (item 112), which has one badge per egg or event.
-export type EggCardKind = 'ufo' | 'ghost' | 'dragon' | 'santa' | 'blackCat' | 'halloweenBat' | 'pumpkinMoon'
+export type EggCardKind = 'ufo' | 'ghost' | 'iceberg' | 'dragon' | 'santa' | 'blackCat' | 'halloweenBat' | 'pumpkinMoon'
   | 'matariki' | 'conjunction' | 'noctilucent' | 'midnightSun' | 'polarNight'
   | NationalDayKind
   | 'emptyTomb' | 'potOfGold' | 'heartCloud' // item 117
@@ -260,6 +260,8 @@ type EggChance = { perNight: number } | { event: CalendarEvent } | { daysPerYear
 const EGGS: Record<EggCardKind, { name: MessageKey; fact: MessageKey; hidden: boolean; chance: EggChance; latin?: string }> = {
   ufo: { name: 'egg.ufo', fact: 'eggFact.ufo', hidden: true, chance: { perNight: UFO_CHANCE } },
   ghost: { name: 'egg.ghost', fact: 'eggFact.ghost', hidden: true, chance: null },
+  // Item 161: it floats by while the temperature is below 0 °C, so no chance either.
+  iceberg: { name: 'egg.iceberg', fact: 'eggFact.iceberg', hidden: true, chance: null },
   dragon: { name: 'egg.dragon', fact: 'eggFact.dragon', hidden: false, chance: { event: 'lunar-new-year' } },
   santa: { name: 'egg.santa', fact: 'eggFact.santa', hidden: false, chance: { daysPerYear: SANTA_DAYS_PER_YEAR } },
   blackCat: { name: 'egg.blackCat', fact: 'eggFact.blackCat', hidden: false, chance: { event: 'friday-13' }, latin: 'Felis catus' },

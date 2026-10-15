@@ -15,6 +15,7 @@ import SceneBoat from '@/components/SceneBoat';
 import ScenePlane from '@/components/ScenePlane';
 import { UfoShape } from '@/components/Ufo';
 import { SantaShape } from '@/components/Santa';
+import { IcebergShape } from '@/components/TemperatureIceberg';
 import { Bat } from '@/components/sceneIcons';
 import { OPTIC_ICONS } from '@/components/opticIcons';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -71,7 +72,7 @@ const groupRows = (group: BadgeGroup): Badge[][] => {
 
 const OUTLINE_FILTER_ID = 'badge-outline';
 
-const EGG_ICONS: Record<Exclude<EggKind, 'ufo' | 'santa'>, [LucideIcon, string]> = {
+const EGG_ICONS: Record<Exclude<EggKind, 'ufo' | 'santa' | 'iceberg'>, [LucideIcon, string]> = {
   sunglasses: [Glasses, 'text-white'],
   ghost: [Ghost, 'text-white'],
   disco: [Sparkles, 'text-brand-cyan'],
@@ -222,7 +223,8 @@ export const BadgeArt = ({ badge }: { badge: Badge }) => {
     case 'egg': {
       if (kind === 'ufo') return <UfoShape width={52} />;
       if (kind === 'santa') return <SantaShape width={64} />;
-      const [Icon, colour] = EGG_ICONS[kind as Exclude<EggKind, 'ufo' | 'santa'>];
+      if (kind === 'iceberg') return <IcebergShape width={44} />;
+      const [Icon, colour] = EGG_ICONS[kind as Exclude<EggKind, 'ufo' | 'santa' | 'iceberg'>];
       return <Icon size={32} className={colour} aria-hidden="true" />;
     }
     default: {
