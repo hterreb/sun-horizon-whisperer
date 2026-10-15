@@ -4,8 +4,10 @@ import SunTracker from '../src/components/SunTracker';
 import { vi } from 'vitest';
 import { TAP_READY_MS } from '../src/hooks/useIdleHide';
 import { DOUBLE_TAP_MS } from '../src/hooks/useDoubleTap';
+import { SUN_TAP_GAP_MS } from '../src/utils/hiddenEggs';
 import { loadManualLocation, saveManualLocation } from '../src/utils/manualLocation';
 import { getSunPosition, getSunTimes } from '../src/utils/sunUtils';
+import { getTerrainSunTimes, type HorizonProfile } from '../src/utils/horizonUtils';
 import { isPlaneWeather } from '../src/utils/planes';
 import type SunVisualizationType from '../src/components/SunVisualization';
 
@@ -22,6 +24,9 @@ vi.mock('../src/components/SunVisualization', async (importOriginal) => {
     },
   };
 });
+
+// A click on a body for a direct call of onSunTap or onMoonTap (item 158: they take the click).
+const bodyClick = () => ({ nativeEvent: new MouseEvent('click'), currentTarget: document.body }) as unknown as React.MouseEvent<HTMLElement>;
 
 // The fireworks breadcrumbs (ROADMAP item 80) and the live-planes tag (item 155).
 vi.mock('@sentry/react', async (importOriginal) => ({
@@ -322,10 +327,10 @@ describe('SunTracker', () => {
     };
     const column = () => screen.getByRole('button', { name: /fullscreen/i }).parentElement!;
     const shown = () => column().classList.contains('opacity-100');
-    const start = (displayMode: string | null = null) => {
+    const start = (displayMode: string | null = null, time = '2026-09-30T11:00:00Z') => {
       vi.useFakeTimers();
       // Midday: the sun shows (a tap on it opens a card).
-      vi.setSystemTime(new Date('2026-09-30T11:00:00Z'));
+      vi.setSystemTime(new Date(time));
       vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 1, longitude: 2 } }) } });
       vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
         matches: query === displayMode,
@@ -510,44 +515,174 @@ describe('SunTracker', () => {
         expect(shown()).toBe(true);
       });
 
-      it('while hidden, a tap in the box of a hidden control shows the controls at once; the scene thing below takes no tap', () => {
-        const scene = start();
-        setFullscreenElement(document.documentElement);
-        expect(document.querySelectorAll('[data-idle-control]')).toHaveLength(3);
+      // A tap point in the box of the top-left column.
+      const IN_BOX = { clientX: 30, clientY: 30 };
+      // Hides the controls with a sky tap. jsdom draws nothing: the top-left column gets its box
+      // (16 px from the corner, 56 × 160).
+      const hideWithBox = (scene: Element) => {
         tap(scene);
         expect(shown()).toBe(false);
         advance(1000);
-        // jsdom draws nothing: the top-left column gets its box (16 px from the corner, 56 × 160).
         vi.spyOn(column(), 'getBoundingClientRect').mockReturnValue(
           { left: 16, top: 16, right: 72, bottom: 176, width: 56, height: 160, x: 16, y: 16, toJSON: () => ({}) } as DOMRect,
         );
+      };
 
-        // The sun is under the column. Its double tap would open the card: the first tap goes to
-        // the column's box, so the second tap is only a first tap for the sun.
-        sunTap(1, { clientX: 30, clientY: 30 });
+      it('while hidden, a tap on the empty sky in the box of a hidden control shows the controls at once; a toast on top keeps its tap', () => {
+        const scene = start();
+        setFullscreenElement(document.documentElement);
+        expect(document.querySelectorAll('[data-idle-control]')).toHaveLength(3);
+        hideWithBox(scene);
+        fireEvent.pointerDown(scene, IN_BOX);
+        fireEvent.click(scene, IN_BOX);
         expect(shown()).toBe(true);
-        advance(200);
-        sunTap(2, { clientX: 30, clientY: 30 });
-        expect(card()).toBeNull();
-        advance(1000);
-        expect(shown()).toBe(true);
-
-        // Shown, the box is not special: a tap there on the sun toggles after DOUBLE_TAP_MS.
-        sunTap(1, { clientX: 30, clientY: 30 });
-        advance(DOUBLE_TAP_MS);
-        expect(shown()).toBe(false);
-        expect(card()).toBeNull();
 
         // A toast on top of the hidden box (a badge, `data-share-hide`) keeps its tap.
+        advance(1000);
+        tap(scene);
+        expect(shown()).toBe(false);
         advance(1000);
         const toast = scene.appendChild(document.createElement('button'));
         toast.setAttribute('data-share-hide', '');
         const onToast = vi.fn();
         toast.addEventListener('click', onToast);
         fireEvent.pointerDown(toast);
-        fireEvent.click(toast, { clientX: 30, clientY: 30 });
+        fireEvent.click(toast, IN_BOX);
         expect(onToast).toHaveBeenCalledTimes(1);
         expect(shown()).toBe(false);
+      });
+
+      // Item 157: the sun is under the column. While hidden, its taps reach it (as before item 147).
+      it('item 157: while hidden, a double tap on the sun in the box of a hidden control opens its card; the controls stay hidden', () => {
+        const scene = start();
+        setFullscreenElement(document.documentElement);
+        hideWithBox(scene);
+        sunTap(1, IN_BOX);
+        expect(shown()).toBe(false);
+        advance(200);
+        sunTap(2, IN_BOX);
+        expect(card()).toBeInTheDocument();
+        advance(1000);
+        expect(shown()).toBe(false);
+      });
+
+      it('item 157: while hidden, a single tap on the sun in the box shows the controls after DOUBLE_TAP_MS; shown, the same tap hides them', () => {
+        const scene = start();
+        setFullscreenElement(document.documentElement);
+        hideWithBox(scene);
+        sunTap(1, IN_BOX);
+        advance(DOUBLE_TAP_MS - 1);
+        expect(shown()).toBe(false);
+        advance(1);
+        expect(shown()).toBe(true);
+        expect(card()).toBeNull();
+
+        // Shown, the box is not special: after a pause (a new tap sequence, item 158) a tap there
+        // on the sun toggles after DOUBLE_TAP_MS.
+        advance(SUN_TAP_GAP_MS + 1);
+        sunTap(1, IN_BOX);
+        advance(DOUBLE_TAP_MS);
+        expect(shown()).toBe(false);
+        expect(card()).toBeNull();
+      });
+    });
+
+    describe('item 158: one tap on the sun or the moon toggles, two open the card, seven start the egg', () => {
+      // The installed app: the controls show until a tap (no 3 s hide after the start).
+      const APP = '(display-mode: fullscreen)';
+      const BODIES = [
+        { name: 'Sun', time: '2026-09-30T11:00:00Z', egg: 'sun-sunglasses' },
+        { name: 'Moon', time: '2026-09-30T03:00:00Z', egg: 'disco-sky' }, // the moon at 66°, the sun at −41°
+      ];
+      // A pointer tap: the pointerdown (SceneInfoCard closes on it), then the click (detail 1).
+      const press = (el: Element) => {
+        fireEvent.pointerDown(el);
+        fireEvent.click(el, { detail: 1 });
+      };
+      const card = () => screen.queryByTestId('scene-info-card');
+      // Taps `el` `count` times, `gapMs` apart, then waits 1 s. Returns how often the controls
+      // changed (checked every 50 ms) and the card after each tap.
+      const tapRun = (el: () => Element, count: number, gapMs: number) => {
+        let changes = 0;
+        let last = shown();
+        const note = () => {
+          if (shown() !== last) changes += 1;
+          last = shown();
+        };
+        const cards: (HTMLElement | null)[] = [];
+        for (let i = 0; i < count; i++) {
+          for (let t = 0; i > 0 && t < gapMs; t += 50) {
+            advance(50);
+            note();
+          }
+          press(el());
+          note();
+          cards.push(card());
+        }
+        for (let t = 0; t < 1000; t += 50) {
+          advance(50);
+          note();
+        }
+        return { changes, cards };
+      };
+
+      afterEach(() => {
+        window.history.pushState({}, '', '/');
+      });
+
+      it.each(BODIES)('7 fast taps on the $name: the card of tap 2 stays as it is, tap 7 starts the egg, the controls do not change', ({ name, time, egg }) => {
+        start(APP, time);
+        const body = () => screen.getByRole('button', { name });
+        expect(shown()).toBe(true);
+        const { changes, cards } = tapRun(body, 7, 200);
+        expect(cards[0]).toBeNull();
+        expect(cards[1]).not.toBeNull();
+        // Taps 3 to 7: the same card, not closed and opened again.
+        for (const later of cards.slice(2)) expect(later).toBe(cards[1]);
+        expect(screen.getByTestId(egg)).toBeInTheDocument();
+        expect(changes).toBe(0);
+        expect(shown()).toBe(true);
+      });
+
+      it.each(BODIES)('7 slow taps on the $name: tap 1 toggles, taps 2 to 6 do nothing, tap 7 starts the egg', ({ name, time, egg }) => {
+        start(APP, time);
+        const body = () => screen.getByRole('button', { name });
+        const { changes, cards } = tapRun(body, 7, 600);
+        expect(cards.every(c => c === null)).toBe(true);
+        expect(screen.getByTestId(egg)).toBeInTheDocument();
+        expect(changes).toBe(1);
+        expect(shown()).toBe(false);
+      });
+
+      it.each(BODIES)('1 tap on the $name toggles after DOUBLE_TAP_MS; 2 fast taps open the card and do not toggle', ({ name, time }) => {
+        start(APP, time);
+        const body = () => screen.getByRole('button', { name });
+        press(body());
+        advance(DOUBLE_TAP_MS - 1);
+        expect(shown()).toBe(true);
+        advance(1);
+        expect(shown()).toBe(false);
+        expect(card()).toBeNull();
+
+        advance(SUN_TAP_GAP_MS + 1);
+        const { changes, cards } = tapRun(body, 2, 200);
+        expect(cards[1]).toBeInTheDocument();
+        expect(changes).toBe(0);
+      });
+
+      it('5 fast taps on a scene thing with a card (a fish) do not toggle: the tap that closes the card stops the toggle of the tap before', () => {
+        // Every fish a perch; Math.random at 0.1 passes every spawn chance (as in the info card tests).
+        window.history.pushState({}, '', '/?fish=perch');
+        start(APP);
+        vi.spyOn(Math, 'random').mockReturnValue(0.1);
+        advance(10_000);
+        const fish = () => [...screen.getAllByTestId('scene-hit')]
+          .find(hit => hit.closest('[aria-hidden="true"]')?.querySelector('[data-testid="scene-fish"]'))!;
+        const { changes, cards } = tapRun(fish, 5, 200);
+        // Tap 2 opens the card, tap 3 closes it, tap 4 opens it again, tap 5 closes it.
+        expect(cards.map(c => c !== null)).toEqual([false, true, false, true, false]);
+        expect(changes).toBe(0);
+        expect(shown()).toBe(true);
       });
     });
   });
@@ -1199,6 +1334,38 @@ describe('SunTracker', () => {
       });
     });
 
+    describe('today\'s sunset stays the target until it is over (ROADMAP item 156)', () => {
+      // SUN-CHASER-25: Ravensburg on 2026-10-15. The sun is at 0° (geometric) at 16:29:42
+      // UTC; over a flat 0° horizon the line-of-sight sunset is at 16:34:49 UTC.
+      const profile: HorizonProfile = {
+        angles: new Array(360).fill(0), observerElevation: 450, eyeHeight: 1.7,
+        ridgeDistances: new Array(360).fill(null), ridgeHeights: new Array(360).fill(null),
+      };
+      const lineOfSightSunset = (day: string) =>
+        getTerrainSunTimes(new Date(`${day}T12:00:00Z`), RAVENSBURG.latitude, RAVENSBURG.longitude, profile).sunset!;
+
+      it('counts down and starts the fireworks at the line-of-sight sunset after the geometric set', async () => {
+        const sunset = lineOfSightSunset('2026-10-15');
+        // The profile comes from the terrain cache (default eye height 1.7 m), with no fetch.
+        localStorage.setItem('terrain_horizon_profile_v2_47.780_9.610_1.7', JSON.stringify({ profile, timestamp: 0 }));
+        // Open 6 min before the sunset, before the geometric set.
+        start(new Date(sunset.getTime() - 361_000));
+        await act(() => vi.advanceTimersByTimeAsync(1000)); // the profile loads after a 500 ms debounce
+        expect(visProps.current!.terrainSunTimes?.sunset).toEqual(sunset);
+        // To T-19.7 s: past the geometric set and the minute tick after it.
+        tickFor(340_000, 20_000);
+        expect(visProps.current!.terrainSunTimes?.sunset).toEqual(sunset);
+        tickFor(13_000, 1000);
+        expect(screen.getByTestId('sun-altitude')).toHaveTextContent('Sunset in 7 s');
+        expect(visProps.current!.fireworksTrigger).toBe(0);
+        tickFor(10_000, 1000);
+        expect(visProps.current!.fireworksTrigger).not.toBe(0);
+        // Only after the sunset does the next minute tick move the times to the next day.
+        tickFor(60_000, 10_000);
+        expect(visProps.current!.terrainSunTimes?.sunset).toEqual(lineOfSightSunset('2026-10-16'));
+      });
+    });
+
     describe('sunset reminder (ROADMAP item 69)', () => {
       // Records the body of each notification; jsdom has no service worker, so the hook
       // uses a page notification.
@@ -1361,17 +1528,18 @@ describe('SunTracker', () => {
       start();
       const sun = screen.getByRole('button', { name: 'Sun' });
       doubleTap(sun);
-      expect(screen.getByRole('dialog', { name: 'Sun' })).toHaveTextContent(/Sunset in \d+ h \d+ min/);
+      const sunCard = screen.getByRole('dialog', { name: 'Sun' });
+      expect(sunCard).toHaveTextContent(/Sunset in \d+ h \d+ min/);
       expect(screen.queryByTestId('sun-sunglasses')).toBeNull();
-      // A real tap: the pointerdown closes the card, the click counts. Single taps 500 ms apart
-      // open no card.
+      // Item 158: taps 3 to 7 of the sequence (real taps with the pointerdown, 500 ms apart) only
+      // count: the card stays as it is.
       for (let i = 0; i < 5; i++) {
         fireEvent.pointerDown(sun);
         tap(sun);
         advance(500);
       }
       expect(screen.getByTestId('sun-sunglasses')).toBeInTheDocument();
-      expect(card()).toBeNull();
+      expect(card()).toBe(sunCard);
     });
 
     it('one tap opens no card and collects no badge and shows no ring; a double tap opens and collects (item 116)', () => {
@@ -1385,7 +1553,8 @@ describe('SunTracker', () => {
       expect(card()).toBeNull();
       expect(localStorage.getItem('collection')).toBeNull();
       expect(sun.querySelector('[data-testid="scene-info-ring"]')).toBeNull();
-      advance(600);
+      // After a pause: a new tap sequence (item 158; within SUN_TAP_GAP_MS these are taps 2 and 3).
+      advance(SUN_TAP_GAP_MS + 100);
       doubleTap(sun);
       expect(screen.getByRole('dialog', { name: 'Sun' })).toBeInTheDocument();
       expect(Object.keys(JSON.parse(localStorage.getItem('collection')!))).toEqual(['sun:midday']); // item 138: no base badge
@@ -1605,7 +1774,7 @@ describe('SunTracker', () => {
       tapSeahorse();
       // Seven sun taps: the sunglasses, which would count without the link.
       act(() => {
-        for (let i = 0; i < 7; i++) visProps.current!.onSunTap!();
+        for (let i = 0; i < 7; i++) visProps.current!.onSunTap!(bodyClick());
       });
       expect(visProps.current!.sunglasses).toBe(true);
       expect(localStorage.getItem('collection')).toBeNull();
@@ -1701,7 +1870,7 @@ describe('SunTracker', () => {
       expect(visProps.current).toBeTruthy();
       const tapMoon = (gapMs: number) => act(() => {
         now += gapMs;
-        visProps.current!.onMoonTap!();
+        visProps.current!.onMoonTap!(bodyClick());
       });
       // Six quick taps, then a pause longer than 1.5 s: the count starts again.
       for (let i = 0; i < 6; i++) tapMoon(1000);
