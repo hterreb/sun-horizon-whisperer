@@ -4,7 +4,7 @@ import {
   Sparkles, Star, Sun, SunMoon, Sunrise, Sunset, TreePine, X, type LucideIcon,
   CloudMoon, Orbit, Sparkle, SunDim,
   Cherry, Drama, FlameKindling, Flower, Lamp, Palette, Rabbit, Sprout,
-  Snowflake,
+  Snowflake, Ghost,
 } from 'lucide-react';
 import { Crown, Flag, Plane } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
@@ -73,6 +73,7 @@ const OUTLINE_FILTER_ID = 'badge-outline';
 
 const EGG_ICONS: Record<Exclude<EggKind, 'ufo' | 'santa'>, [LucideIcon, string]> = {
   sunglasses: [Glasses, 'text-white'],
+  ghost: [Ghost, 'text-white'],
   disco: [Sparkles, 'text-brand-cyan'],
   newYear: [PartyPopper, 'text-brand-gold-light'],
   friday13: [Cat, 'text-white'],

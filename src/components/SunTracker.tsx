@@ -1191,9 +1191,12 @@ const SunTracker: React.FC = () => {
   // while it flies (reduced motion shows none); the New Year show for its run; a playful egg on its
   // day, once the scene reported it.
   const ufoBadge: BadgeId | null = ufoOn && !prefersReducedMotion ? 'egg:ufo' : null;
+  // The midnight ghost counts at 00:00 (MidnightGhost's rule), not on New Year (the fireworks replace it).
+  const ghostBadge: BadgeId | null = !isTimePreview && calendarEvent !== 'new-year' && date.getHours() === 0 && date.getMinutes() === 0
+    ? 'egg:ghost' : null;
   // One string (a template, so the React Compiler sees a new primitive, not the national day it
   // came from), so the callback below changes only when the shown eggs do. A null shows as "null".
-  const shownEggs = `${calendarBadge} ${santaBadge} ${astroBadge} ${nationalBadge} ${buntingBadge} ${ufoBadge}`;
+  const shownEggs = `${calendarBadge} ${santaBadge} ${astroBadge} ${nationalBadge} ${buntingBadge} ${ufoBadge} ${ghostBadge}`;
   const handleSceneTap = useCallback((target: SceneInfoTarget, point: { x: number; y: number }, ring: string) => {
     const shown = shownEggs.split(' ');
     const { newYearAt, playful } = eggShowRef.current;

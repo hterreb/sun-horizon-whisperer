@@ -22,7 +22,7 @@ import { ridgeAt, type HorizonProfile } from './horizonUtils';
 import { OPTICS, type OpticKind } from './skyOptics';
 
 export type EggKind =
-  | 'sunglasses' | 'ufo' | 'disco'
+  | 'sunglasses' | 'ufo' | 'ghost' | 'disco'
   | 'newYear' | 'friday13' | 'lunarNewYear' | 'solstice' | 'midwinter' | 'equinox' | 'halloweenPumpkin' | 'halloweenBats' | 'christmas' | 'santa'
   | 'solarEclipse' | 'lunarEclipse' | 'greenFlash' | 'supermoon' | 'blueMoon' | 'meteorShower' | 'aurora'
   | 'matariki' | 'conjunction' | 'noctilucent' | 'midnightSun' | 'polarNight'
@@ -106,7 +106,7 @@ export const SATELLITE_SIZES: [SatelliteSize, MessageKey][] = [
 ];
 
 const EGGS: [EggKind, MessageKey][] = [
-  ['sunglasses', 'egg.sunglasses'], ['ufo', 'egg.ufo'], ['disco', 'egg.disco'],
+  ['sunglasses', 'egg.sunglasses'], ['ufo', 'egg.ufo'], ['ghost', 'egg.ghost'], ['disco', 'egg.disco'],
   ['newYear', 'egg.newYear'], ['friday13', 'egg.friday13'], ['lunarNewYear', 'egg.lunarNewYear'],
   // Item 140: the summer solstice and midwinter (the winter solstice) have a badge each.
   ['solstice', 'egg.solstice'], ['midwinter', 'egg.midwinter'], ['equinox', 'egg.equinox'], ['halloweenPumpkin', 'egg.halloweenPumpkin'],
@@ -212,7 +212,7 @@ export const badgeForTarget = (target: SceneInfoTarget): BadgeId | null => {
   }
 };
 
-// Item 123: the egg badge of each egg card. The ghost has none; the fireworks card gives the New
+// Item 123: the egg badge of each egg card. The fireworks card gives the New
 // Year badge (the sunrise and sunset shows have none). A national day's card gives its badge.
 const EGG_CARD_BADGES: Partial<Record<EggCardKind, BadgeId[]>> = {
   ufo: ['egg:ufo'], dragon: ['egg:lunarNewYear'], santa: ['egg:santa'], blackCat: ['egg:friday13'],
@@ -233,7 +233,7 @@ const DRESSED_BADGES: BadgeId[] = [
 export const eggBadgesForTarget = (target: SceneInfoTarget): BadgeId[] => {
   switch (target.type) {
     // The other cards have the badge of their own name (sky, national and festival eggs, item 123's cards).
-    case 'egg': return EGG_CARD_BADGES[target.kind] ?? (target.kind === 'ghost' ? [] : [`egg:${target.kind as EggKind}`]);
+    case 'egg': return EGG_CARD_BADGES[target.kind] ?? [`egg:${target.kind as EggKind}`];
     case 'sun': return ['egg:solarEclipse', 'egg:greenFlash', 'egg:aprilFools'];
     case 'moon': return ['egg:lunarEclipse', 'egg:supermoon', 'egg:blueMoon'];
     case 'boat': return target.dressed ? DRESSED_BADGES : [];
