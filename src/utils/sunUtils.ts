@@ -106,7 +106,11 @@ interface SkyPass {
 // day/night (no crossing at all within that range) safely comes back null instead of
 // searching forever. Exported for arcLabels.ts, which needs the same pass boundaries
 // to match rise/set/zenith labels to the arc actually drawn.
-export const findSunPass = (date: Date, latitude: number, longitude: number): SkyPass | null => {
+// ROADMAP item 156: the pass ends at 0° (no refraction), some minutes before the sunset
+// people see. The pass that set last stays until `sunset` is over: the line-of-sight
+// sunset of the solar day around `date`, else the flat one (SunCalc). Only then do the
+// panel, the line-of-sight times and the sunset targets go to the next pass.
+export const findSunPass = (date: Date, latitude: number, longitude: number, sunset?: Date | null): SkyPass | null => {
   const altitudeAt = (ms: number) => getSunPosition(new Date(ms), latitude, longitude).altitude;
   const dateMs = date.getTime();
 
@@ -114,6 +118,17 @@ export const findSunPass = (date: Date, latitude: number, longitude: number): Sk
     const startMs = findHorizonCrossingMs(altitudeAt, dateMs, -1, ONE_DAY_MS);
     const endMs = findHorizonCrossingMs(altitudeAt, dateMs, 1, ONE_DAY_MS);
     return startMs !== null && endMs !== null ? { start: new Date(startMs), end: new Date(endMs) } : null;
+  }
+
+  const flat = getSunTimes(date, latitude, longitude);
+  const sunsetMs = (sunset ?? (flat.polar ? null : flat.sunset))?.getTime() ?? null;
+  if (sunsetMs !== null && sunsetMs > dateMs) {
+    const setMs = findHorizonCrossingMs(altitudeAt, dateMs, -1, ONE_DAY_MS);
+    // A sunset half a day after the last set is the one of the coming pass (the morning).
+    if (setMs !== null && sunsetMs - setMs < ONE_DAY_MS / 2) {
+      const riseMs = findHorizonCrossingMs(altitudeAt, setMs - HORIZON_BISECT_TOLERANCE_MS, -1, ONE_DAY_MS);
+      if (riseMs !== null) return { start: new Date(riseMs), end: new Date(setMs) };
+    }
   }
 
   const startMs = findHorizonCrossingMs(altitudeAt, dateMs, 1, ONE_DAY_MS);

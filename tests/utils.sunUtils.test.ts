@@ -477,6 +477,54 @@ describe('sunUtils', () => {
       }
     });
   });
+
+  describe('findSunPass: the pass stays until the sunset is over (ROADMAP item 156)', () => {
+    // SUN-CHASER-25: Ravensburg on 2026-10-15. The sun is at 0° (geometric, no refraction)
+    // at 16:29:42 UTC; the flat sunset (SunCalc) is at 16:35:56 UTC.
+    const LAT = 47.78;
+    const LON = 9.61;
+    const at = (time: string) => new Date(`2026-10-15T${time}Z`);
+    const today = findSunPass(at('12:00:00'), LAT, LON)!;
+    const flatSunset = getSunTimes(at('12:00:00'), LAT, LON).sunset;
+    // The first 5 s step from 16:29 UTC at which the pass is the next one (its rise is ahead).
+    const switchTime = (sunset?: Date) => {
+      for (let ms = at('16:29:00').getTime(); ms < at('16:45:00').getTime(); ms += 5000) {
+        if (findSunPass(new Date(ms), LAT, LON, sunset)!.start.getTime() > ms) return ms;
+      }
+      return null;
+    };
+
+    it('keeps today\'s pass after the geometric set, until the flat sunset', () => {
+      expect(today.end.getTime()).toBeLessThan(at('16:30:00').getTime());
+      const pass = findSunPass(at('16:31:00'), LAT, LON)!;
+      expect(Math.abs(pass.start.getTime() - today.start.getTime())).toBeLessThan(10_000);
+      expect(Math.abs(pass.end.getTime() - today.end.getTime())).toBeLessThan(10_000);
+    });
+
+    it('switches to the next pass at the flat sunset when no sunset is given', () => {
+      const switched = switchTime()!;
+      expect(switched).toBeGreaterThan(flatSunset.getTime());
+      expect(switched - flatSunset.getTime()).toBeLessThanOrEqual(5000);
+    });
+
+    it('switches at a given line-of-sight sunset after the flat one', () => {
+      const lineOfSight = at('16:37:04'); // a horizon about 0.3° below the flat one
+      const switched = switchTime(lineOfSight)!;
+      expect(switched).toBeGreaterThan(lineOfSight.getTime());
+      expect(switched - lineOfSight.getTime()).toBeLessThanOrEqual(5000);
+    });
+
+    it('in the morning before the rise, gives the coming pass, not the last one', () => {
+      const morning = new Date('2026-10-16T04:00:00Z');
+      const pass = findSunPass(morning, LAT, LON, new Date('2026-10-16T16:35:00Z'))!;
+      expect(pass.start.getTime()).toBeGreaterThan(morning.getTime());
+    });
+
+    it('keeps no pass at polar day and polar night (lat 78)', () => {
+      expect(findSunPass(new Date(2026, 5, 21, 12), 78, 15, new Date(2026, 5, 21, 13))).toBeNull();
+      expect(findSunPass(new Date(2026, 11, 21, 12), 78, 15, new Date(2026, 11, 21, 13))).toBeNull();
+    });
+  });
 });
 
 describe('getDayLengthMinutes', () => {

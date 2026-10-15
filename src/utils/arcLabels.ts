@@ -72,8 +72,9 @@ const closestTo = (target: Date, candidates: (Date | null)[]): Date | null => {
 // falls back to the +-24h search bound instead of a horizon crossing). Zenith is the
 // solar noon that falls inside the pass (or its fallback window), still shown at polar
 // day/night since the sun still has a highest point even when it doesn't set.
-export const getSunArcLabels = (date: Date, latitude: number, longitude: number): ArcLabels => {
-  const pass = findSunPass(date, latitude, longitude);
+// `sunset`: the line-of-sight sunset that keeps the pass until it is over (item 156).
+export const getSunArcLabels = (date: Date, latitude: number, longitude: number, sunset?: Date | null): ArcLabels => {
+  const pass = findSunPass(date, latitude, longitude, sunset);
   const start = pass ? pass.start : new Date(date.getTime() - HALF_DAY_MS);
   const end = pass ? pass.end : new Date(date.getTime() + HALF_DAY_MS);
 
