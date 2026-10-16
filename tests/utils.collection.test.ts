@@ -21,15 +21,15 @@ describe('collection (ROADMAP item 112)', () => {
     vi.restoreAllMocks();
   });
 
-  it('has 139 badges with unique ids, one for every fish, flyer, boat, cloud type and sky optic', () => {
+  it('has 140 badges with unique ids, one for every fish, flyer, boat, cloud type and sky optic', () => {
     const ids = BADGES.map(b => b.id);
-    expect(ids).toHaveLength(139); // item 115: 69 + 5 sun + 5 terrain + 8 moon states; + 5 sky eggs + 9 national days + 5 playful eggs + 12 festivals; item 120: + 5 hauls + 5 sizes; item 121: + rainbow; item 138: − sun, moon, terrain, satellite; item 140: + midwinter; item 146: + 4 boats; item 148: + 8 optics; + the midnight ghost
-    expect(new Set(ids).size).toBe(139);
+    expect(ids).toHaveLength(140); // item 115: 69 + 5 sun + 5 terrain + 8 moon states; + 5 sky eggs + 9 national days + 5 playful eggs + 12 festivals; item 120: + 5 hauls + 5 sizes; item 121: + rainbow; item 138: − sun, moon, terrain, satellite; item 140: + midwinter; item 146: + 4 boats; item 148: + 8 optics; + the midnight ghost; item 161: + the iceberg
+    expect(new Set(ids).size).toBe(140);
     for (const kind of [...FISH_WEIGHTS.map(([k]) => k), ...NIGHT_ONLY]) expect(ids).toContain(`fish:${kind}`);
     for (const kind of [...BIRD_WEIGHTS.map(([k]) => k), 'bat']) expect(ids).toContain(`flyer:${kind}`);
     for (const kind of ['sailboat', 'ferry', 'fishing', 'rowboat', 'freighter', 'kayak', 'paddleSteamer', 'cruiseLiner', 'tallShip']) expect(ids).toContain(`boat:${kind}`);
     for (const type of ['Ci', 'Cs', 'Ac', 'As', 'Cu', 'Sc', 'St', 'Ns', 'Cb', 'Len', 'Mam']) expect(ids).toContain(`cloud:${type}`);
-    expect(BADGES.filter(b => b.group === 'egg')).toHaveLength(52);
+    expect(BADGES.filter(b => b.group === 'egg')).toHaveLength(53);
     expect(BADGES.find(b => b.id === 'plane')?.group).toBe('sky');
   });
 
@@ -359,7 +359,7 @@ describe('national-day badges', () => {
 // Item 123: the egg badges a double tap can collect.
 describe('eggBadgesForTarget (ROADMAP item 123)', () => {
   const ids = new Set<string>(BADGES.map(b => b.id));
-  const cards: EggCardKind[] = ['ufo', 'ghost', 'dragon', 'santa', 'blackCat', 'halloweenBat', 'pumpkinMoon',
+  const cards: EggCardKind[] = ['ufo', 'ghost', 'iceberg', 'dragon', 'santa', 'blackCat', 'halloweenBat', 'pumpkinMoon',
     'matariki', 'conjunction', 'noctilucent', 'midnightSun', 'polarNight', ...NATIONAL_DAYS.map(d => d.kind),
     'emptyTomb', 'potOfGold', 'heartCloud',
     'loyKrathong', 'diwali', 'eidAlFitr', 'midAutumn', 'hanami', 'tanabata', 'diaDeMuertos', 'hanukkah', 'nowruz', 'midsummer', 'carnival',

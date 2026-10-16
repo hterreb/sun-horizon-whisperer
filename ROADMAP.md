@@ -3300,6 +3300,15 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Limits:** the magnitude is per size class from the name (item 131), not per satellite. A cubesat in a 700–2000 km orbit is shown as bright as a large satellite. The per-second sky with ~1,480 satellites: 1.4 ms every 30 s and 0.3 ms per second on a Mac.
 - **Checked:** unit tests `utils.satelliteFeed` (orbit heights, the filter, the answer and its cache, the error answer, 405), `api.satellites`, `utils.satelliteData` (the night catalogue after the groups; a failure keeps the groups), `utils.satelliteUtils` (the limit: the same orbit as a Starlink-class satellite shows near and not far). Not checked: the Vercel Edge function against CelesTrak (its egress IPs may be blocked), a real phone.
 
+### 161. Iceberg: an easter egg card and a collection badge — S — **✅ Done**
+
+- **Feedback (Lutz, 2026-10-16):** "add one for the iceberg". The iceberg (below 0 °C) had no tap, no card and no badge.
+- **Built:**
+  - `TemperatureIceberg` takes a double tap like the midnight ghost (`useDoubleTap`, `HitArea` 96 × 96 px, `data-scene-hit`, `touch-manipulation`, `aria-hidden`) and shows the ring while its card is open (`ICEBERG_RING`). Without `onInfo` it stays `pointer-events-none`.
+  - Card: `EggCardKind` `iceberg`, kicker "Easter egg", the ultra rare tier alone (no chance: it follows the temperature). Keys `egg.iceberg`, `eggFact.iceberg` in 5 languages.
+  - Badge: `egg:iceberg` (ultra rare). The collection shows the scene drawing (`IcebergShape`, exported from `TemperatureIceberg`). It counts on a double tap while the iceberg floats (real weather below 0 °C), not in a time preview.
+- **Checked:** `TemperatureIceberg` (one tap: nothing; two: the card; the ring; no taps without `onInfo`), `utils.sceneInfo` (the card text, the kicker), `utils.collection` (140 badges, 53 eggs, every egg card gives a badge), `SunTracker` (−5 °C: a double tap opens the card and counts `egg:iceberg`; 20 °C: no iceberg, nothing counts).
+
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 
 Rules for all items:

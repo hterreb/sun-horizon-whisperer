@@ -1837,6 +1837,31 @@ describe('SunTracker', () => {
       }
     });
 
+    it('a double tap on the iceberg counts its badge below 0 °C; a warm day shows none (item 161)', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-12-10T11:00:00Z'));
+      global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current: { temperature_2m: -5, weather_code: 0 } }) })) as unknown as typeof fetch;
+      try {
+        const { unmount } = render(<SunTracker />);
+        await act(() => vi.advanceTimersByTimeAsync(300));
+        const hit = screen.getByTestId('temperature-iceberg').querySelector('[data-testid="scene-hit"]')!;
+        fireEvent.click(hit, { detail: 1 });
+        fireEvent.click(hit, { detail: 2 });
+        expect(screen.getByRole('dialog', { name: 'Iceberg' })).toHaveTextContent('Easter egg');
+        expect(Object.keys(JSON.parse(localStorage.getItem('collection')!))).toEqual(['egg:iceberg']);
+        unmount();
+        localStorage.clear();
+        global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current: { temperature_2m: 20, weather_code: 0 } }) })) as unknown as typeof fetch;
+        render(<SunTracker />);
+        await act(() => vi.advanceTimersByTimeAsync(300));
+        expect(screen.queryByTestId('temperature-iceberg')).toBeNull();
+        act(() => visProps.current!.onSceneInfo!({ type: 'egg', kind: 'iceberg' }, { x: 100, y: 100 }, 'egg-iceberg'));
+        expect(JSON.parse(localStorage.getItem('collection') ?? '{}')).not.toHaveProperty('egg:iceberg');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('the March equinox day is the equinox until noon, then Nowruz, each with its own badge (item 138)', () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date('2027-03-20T10:00:00Z')); // 11:00 in Ravensburg

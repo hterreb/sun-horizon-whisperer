@@ -421,7 +421,7 @@ describe('sceneInfo: easter egg cards (ROADMAP item 113)', () => {
   const festivals: EggCardKind[] = [
     'loyKrathong', 'diwali', 'eidAlFitr', 'midAutumn', 'hanami', 'tanabata', 'diaDeMuertos', 'hanukkah', 'nowruz', 'midsummer', 'carnival',
   ];
-  const kinds: EggCardKind[] = ['ufo', 'ghost', 'dragon', 'santa', 'blackCat', 'halloweenBat', 'pumpkinMoon',
+  const kinds: EggCardKind[] = ['ufo', 'ghost', 'iceberg', 'dragon', 'santa', 'blackCat', 'halloweenBat', 'pumpkinMoon',
     'matariki', 'conjunction', 'noctilucent', 'midnightSun', 'polarNight', 'emptyTomb', 'potOfGold', 'heartCloud', ...festivals,
     'fireworks', 'aurora', 'meteorShower', 'solstice', 'equinox', 'midwinter']; // item 123; item 140
 
@@ -446,6 +446,7 @@ describe('sceneInfo: easter egg cards (ROADMAP item 113)', () => {
   it('names a hidden egg an "Easter egg" and a calendar egg a "Special event"', () => {
     expect(info('ufo')).toMatchObject({ kicker: 'infoKind.easterEgg', icon: 'egg' });
     expect(info('ghost')).toMatchObject({ kicker: 'infoKind.easterEgg', icon: 'egg' });
+    expect(info('iceberg')).toMatchObject({ kicker: 'infoKind.easterEgg', icon: 'egg' }); // item 161
     for (const kind of ['dragon', 'santa', 'blackCat', 'halloweenBat', 'pumpkinMoon', 'matariki', 'conjunction', 'noctilucent', 'midnightSun', 'polarNight', 'emptyTomb', 'potOfGold', 'heartCloud'] as const) {
       expect(info(kind), kind).toMatchObject({ kicker: 'infoKind.specialEvent', icon: 'event' });
     }
@@ -532,6 +533,12 @@ describe('sceneInfo: easter egg cards (ROADMAP item 113)', () => {
   it('shows the tier alone for the midnight ghost (no chance in the code)', () => {
     expect(eggCard('ghost')).toEqual([
       'Midnight ghost', 'Old folklore calls midnight the witching hour, when ghosts are said to walk.', 'Rarity: Ultra rare',
+    ]);
+  });
+
+  it('shows the tier alone for the iceberg, as it follows the temperature (item 161)', () => {
+    expect(eggCard('iceberg')).toEqual([
+      'Iceberg', 'Only about a tenth of an iceberg shows above the water; the rest is hidden below.', 'Rarity: Ultra rare',
     ]);
   });
 });
