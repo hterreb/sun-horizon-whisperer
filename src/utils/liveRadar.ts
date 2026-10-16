@@ -106,14 +106,36 @@ export const pickNearestVisible = <T extends { ac: Pick<LiveAircraft, 'altM'>; v
     .slice(0, max)
     .map(({ item }) => item);
 
+// Item 159 (S1 of the plane lookbook): the normal view's pick is sticky. A shown plane stays
+// while it is visible, in view and moves at least this fast (a new one needs
+// MIN_SCREEN_SPEED_PX_S), so a speed near 1 px/s does not swap it in and out.
+export const STICKY_SCREEN_SPEED_PX_S = 0.6;
+// A new plane takes the place of the farthest shown one only at this share of its slant
+// distance or nearer (25 % nearer).
+export const SWAP_NEARER_RATIO = 0.75;
+
 // From the visible aircraft, nearest first (pickNearestVisible) and with their place on the
 // screen: the ones to show. A plane that fails a rule leaves its place to the next nearest.
-export const pickShownPlanes = <T extends { inView: boolean; screenSpeedPxS: number }>(
-  nearestVisible: T[], compass: boolean,
-): T[] =>
-  compass
-    ? nearestVisible.filter(item => item.inView).slice(0, MAX_COMPASS_PLANES)
-    : nearestVisible.filter(item => item.inView && item.screenSpeedPxS >= MIN_SCREEN_SPEED_PX_S).slice(0, MAX_NORMAL_PLANES);
+// `shownBefore`: the hex codes the last update showed (the normal view keeps them, item 159).
+export const pickShownPlanes = <T extends { ac: Pick<LiveAircraft, 'hex'>; slantM: number; inView: boolean; screenSpeedPxS: number }>(
+  nearestVisible: T[], compass: boolean, shownBefore: ReadonlySet<string> = new Set(),
+): T[] => {
+  if (compass) return nearestVisible.filter(item => item.inView).slice(0, MAX_COMPASS_PLANES);
+  // At most MAX_NORMAL_PLANES also after the compass view, which shows more.
+  let keep = nearestVisible
+    .filter(item => shownBefore.has(item.ac.hex) && item.inView && item.screenSpeedPxS >= STICKY_SCREEN_SPEED_PX_S)
+    .slice(0, MAX_NORMAL_PLANES);
+  for (const item of nearestVisible) {
+    if (keep.includes(item) || !item.inView || item.screenSpeedPxS < MIN_SCREEN_SPEED_PX_S) continue;
+    if (keep.length < MAX_NORMAL_PLANES) {
+      keep.push(item);
+      continue;
+    }
+    const farthest = keep.reduce((a, b) => (b.slantM > a.slantM ? b : a));
+    if (item.slantM <= SWAP_NEARER_RATIO * farthest.slantM) keep = [...keep.filter(k => k !== farthest), item];
+  }
+  return nearestVisible.filter(item => keep.includes(item));
+};
 
 // The feed's state (item 155): before the first answer, after an answer, after a failed request.
 export type LiveStatus = 'loading' | 'ok' | 'error';
@@ -127,9 +149,22 @@ export const getLivePlanesTag = (status: LiveStatus | null, shown: number, nearb
 export const getLiveContrail = (altM: number, forecast: ContrailKind): ContrailKind =>
   altM > CONTRAIL_MIN_ALT_M ? forecast : 'none';
 
-// The silhouette's width (px) by distance: 18 px within 20 km, 11 px at 100 km.
-export const getLivePlaneWidth = (distanceM: number): number =>
-  Math.round(18 - 7 * Math.min(1, Math.max(0, (distanceM - 20_000) / 80_000)));
+// Item 159 (Z3 of the plane lookbook): the silhouette's scale (× PLANE_WIDTH_PX, 18 px) by the
+// slant distance, near true perspective: (25 km / slant)^0.8, from 0.4 (7 px, 79 km or farther)
+// to 1.8 (32 px, 12 km or nearer). A plane grows while it comes nearer and gets smaller while it
+// flies away (a pass at 17 km: about 8 px → 24 px → 8 px).
+export const PLANE_SCALE_REF_M = 25_000;
+export const PLANE_SCALE_EXP = 0.8;
+export const PLANE_SCALE_MIN = 0.4;
+export const PLANE_SCALE_MAX = 1.8;
+export const getLivePlaneScale = (slantM: number): number =>
+  Math.min(PLANE_SCALE_MAX, Math.max(PLANE_SCALE_MIN, (PLANE_SCALE_REF_M / slantM) ** PLANE_SCALE_EXP));
+
+// The drawn scale follows getLivePlaneScale with this time constant (s), so a new answer that
+// moves the plane does not change its size in one step.
+export const PLANE_SCALE_SMOOTH_SEC = 1;
+export const smoothPlaneScale = (scale: number, target: number, dtSec: number): number =>
+  scale + (target - scale) * (1 - Math.exp(-Math.max(0, dtSec) / PLANE_SCALE_SMOOTH_SEC));
 
 // The airlines common over Europe, by the ICAO code that starts the callsign. A small table on
 // purpose: an unknown code shows no airline.

@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
-  AIRLINE_COUNT, MAX_COMPASS_PLANES, MAX_NORMAL_PLANES, MIN_ELEVATION_DEG, MIN_SCREEN_SPEED_PX_S, deadReckon, distanceAndBearing, getAircraftView, getAirlineName, getLiveContrail, getLivePlaneWidth, pickNearestVisible, pickShownPlanes, slantDistanceM,
-  isAircraftVisible, planeFeedUrl, getLivePlanesTag,
+  AIRLINE_COUNT, MAX_COMPASS_PLANES, MAX_NORMAL_PLANES, MIN_ELEVATION_DEG, MIN_SCREEN_SPEED_PX_S, deadReckon, distanceAndBearing, getAircraftView, getAirlineName, getLiveContrail, getLivePlaneScale, pickNearestVisible, pickShownPlanes, slantDistanceM,
+  isAircraftVisible, planeFeedUrl, getLivePlanesTag, smoothPlaneScale, STICKY_SCREEN_SPEED_PX_S, SWAP_NEARER_RATIO,
 } from '@/utils/liveRadar';
+import { PLANE_WIDTH_PX } from '@/utils/planes';
 import { type LiveAircraft } from '@/utils/planeFeed';
 import { type HorizonProfile } from '@/utils/horizonUtils';
 
@@ -117,7 +118,7 @@ describe('pickNearestVisible', () => {
 
 describe('pickShownPlanes (item 110, SUN-CHASER-13)', () => {
   // Nearest first, as pickNearestVisible gives them.
-  const plane = (id: string, screenSpeedPxS: number, inView = true) => ({ id, screenSpeedPxS, inView });
+  const plane = (id: string, screenSpeedPxS: number, inView = true, slantM = 10_000) => ({ ac: { hex: id }, id, screenSpeedPxS, inView, slantM });
 
   it('in the normal view shows the 2 nearest that visibly move: a plane that hangs in the air leaves its place to the next', () => {
     expect(MAX_NORMAL_PLANES).toBe(2);
@@ -141,6 +142,42 @@ describe('pickShownPlanes (item 110, SUN-CHASER-13)', () => {
   });
 });
 
+// Item 159, S1 of the plane lookbook: a sticky pick in the normal view.
+describe('pickShownPlanes: the sticky pick (item 159, S1)', () => {
+  const plane = (id: string, km: number, screenSpeedPxS = 2, inView = true) => ({ ac: { hex: id }, id, screenSpeedPxS, inView, slantM: km * 1000 });
+  const ids = (shown: { id: string }[]) => shown.map(p => p.id);
+
+  it('keeps a shown plane while it is visible and in view, also when a new one is a little nearer', () => {
+    const nearest = [plane('a', 10), plane('c', 11), plane('b', 12)];
+    expect(ids(pickShownPlanes(nearest, false))).toEqual(['a', 'c']);
+    expect(ids(pickShownPlanes(nearest, false, new Set(['a', 'b'])))).toEqual(['a', 'b']);
+    // b is out of view now, or no longer visible (not in the list): c takes its place.
+    expect(ids(pickShownPlanes([plane('a', 10), plane('c', 11), plane('b', 12, 2, false)], false, new Set(['a', 'b'])))).toEqual(['a', 'c']);
+    expect(ids(pickShownPlanes([plane('a', 10), plane('c', 11)], false, new Set(['a', 'b'])))).toEqual(['a', 'c']);
+  });
+
+  it('lets a new plane take the place of the farthest shown one only when it is 25 % nearer', () => {
+    expect(SWAP_NEARER_RATIO).toBe(0.75);
+    const shownBefore = new Set(['a', 'b']);
+    expect(ids(pickShownPlanes([plane('c', 15.001), plane('b', 16), plane('a', 20)], false, shownBefore))).toEqual(['b', 'a']);
+    expect(ids(pickShownPlanes([plane('c', 15), plane('b', 16), plane('a', 20)], false, shownBefore))).toEqual(['c', 'b']);
+    // Two new ones, both much nearer: both come in.
+    expect(ids(pickShownPlanes([plane('c', 5), plane('d', 6), plane('b', 16), plane('a', 20)], false, shownBefore))).toEqual(['c', 'd']);
+  });
+
+  it('keeps a shown plane down to 0.6 px/s; a new one still needs 1 px/s', () => {
+    expect(STICKY_SCREEN_SPEED_PX_S).toBe(0.6);
+    expect(ids(pickShownPlanes([plane('a', 10, 0.6), plane('b', 12, 0.7)], false, new Set(['a'])))).toEqual(['a']);
+    expect(ids(pickShownPlanes([plane('a', 10, 0.59), plane('b', 12, 1)], false, new Set(['a'])))).toEqual(['b']);
+  });
+
+  it('keeps at most 2 after the compass view, the nearest; the compass view itself shows all in view', () => {
+    const nearest = [plane('a', 10, 0.8), plane('b', 11, 0.8), plane('c', 12, 0.8), plane('d', 13, 0.1)];
+    expect(ids(pickShownPlanes(nearest, false, new Set(['a', 'b', 'c', 'd'])))).toEqual(['a', 'b']);
+    expect(ids(pickShownPlanes(nearest, true, new Set(['d'])))).toEqual(['a', 'b', 'c', 'd']);
+  });
+});
+
 describe('the card and the look', () => {
   it('applies the contrail rule above 8 km only', () => {
     expect(getLiveContrail(10_500, 'persistent')).toBe('persistent');
@@ -158,9 +195,24 @@ describe('the card and the look', () => {
     expect(AIRLINE_COUNT).toBeLessThanOrEqual(70);
   });
 
-  it('draws nearer planes bigger', () => {
-    expect(getLivePlaneWidth(10_000)).toBe(18);
-    expect(getLivePlaneWidth(100_000)).toBe(11);
+  // Item 159, Z3 of the plane lookbook: (25 km / slant)^0.8, 0.4-1.8 × the 18 px silhouette.
+  it('draws a plane bigger by its slant distance, near true perspective', () => {
+    expect(getLivePlaneScale(25_000)).toBe(1);
+    expect(getLivePlaneScale(50_000)).toBeCloseTo(0.5 ** 0.8, 6);
+    expect(getLivePlaneScale(10_000)).toBe(1.8);
+    expect(getLivePlaneScale(150_000)).toBe(0.4);
+    // The lookbook's pass: 7.8 px at 71 km, 24.1 px at the closest point, 17.4 km.
+    expect(PLANE_WIDTH_PX * getLivePlaneScale(71_200)).toBeCloseTo(7.8, 1);
+    expect(PLANE_WIDTH_PX * getLivePlaneScale(17_400)).toBeCloseTo(24.1, 1);
+    expect(getLivePlaneScale(20_000)).toBeGreaterThan(getLivePlaneScale(21_000));
+  });
+
+  it('smooths the scale with a 1 s time constant, with no overshoot', () => {
+    expect(smoothPlaneScale(1, 1.8, 0)).toBe(1);
+    expect(smoothPlaneScale(1, 1.8, 0.25)).toBeCloseTo(1 + 0.8 * (1 - Math.exp(-0.25)), 6);
+    expect(smoothPlaneScale(1, 1.8, 1)).toBeCloseTo(1 + 0.8 * (1 - Math.exp(-1)), 6);
+    expect(smoothPlaneScale(1.8, 1, 60)).toBeCloseTo(1, 6);
+    expect(smoothPlaneScale(1, 1.8, -5)).toBe(1); // a clock that goes back: no change
   });
 
   it('sends only the place rounded to 0.1° to the proxy', () => {

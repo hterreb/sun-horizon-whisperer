@@ -6,6 +6,7 @@ import LivePlanes from '../src/components/LivePlanes';
 import { type LivePlanesState } from '../src/hooks/useLivePlanes';
 import { type LiveAircraft } from '../src/utils/planeFeed';
 import type { HorizonProfile } from '../src/utils/horizonUtils';
+import { getLivePlaneScale } from '../src/utils/liveRadar';
 
 // ROADMAP item 96 (Premium): the live radar with a stubbed feed, in the real scene mapping.
 // An 800 x 600 scene: the horizon at 65 % (390 px), the sun arc's scale up to 30 px.
@@ -22,6 +23,11 @@ const south: LiveAircraft = {
 const feed = (aircraft: LiveAircraft[]): LivePlanesState => ({ feed: { now: 1_000, aircraft }, receivedAt: 1_000 });
 const elevation = Math.atan((10_000 - 1.7 - (50_000 ** 2 / (2 * 6_371_000)) * 0.87) / 50_000);
 const expectedY = 390 - Math.sin(elevation) * 360;
+// Item 159 (Z3): the drawn width of the plane 50 km south at 10 km, by its slant distance.
+const SOUTH_WIDTH = 18 * getLivePlaneScale(Math.hypot(50_000, 10_000 - 1.7));
+// The scale of a plane's wrapper.
+const scaleOf = (plane: HTMLElement) =>
+  Number(plane.querySelector<HTMLElement>('[data-testid="live-plane-scale"]')!.style.transform.match(/scale\(([-\d.]+)\)/)![1]);
 
 const originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
 const originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
@@ -167,8 +173,9 @@ describe('LivePlanes (ROADMAP item 96)', () => {
         {...props}
       />
     );
-    // The engine of a 15 px plane (50 km) that faces left: right of and below its middle.
-    const ENGINE = { x: 0.04 * 15, y: 0.22 * 15 * 0.3 };
+    // The engine of the plane 50 km away (about 10 px wide, item 159) that faces left: right of
+    // and below its middle.
+    const ENGINE = { x: 0.04 * SOUTH_WIDTH, y: 0.22 * SOUTH_WIDTH * 0.3 };
 
     it('draws no trail on the first frame; it grows from the plane\'s first place, and its points never move', () => {
       vi.useFakeTimers();
@@ -226,30 +233,32 @@ describe('LivePlanes (ROADMAP item 96)', () => {
         const trail = points();
         const ridge: HorizonProfile = { angles: Array(360).fill(12), observerElevation: 0, eyeHeight: 1.7 };
         rerender(scene({ horizonProfile: ridge }));
-        run(1_000);
+        // Item 159: it flies on behind the ridge and fades out over 4 s, with its trail.
+        run(4_250);
         expect(screen.queryByTestId('live-plane')).toBeNull();
-        expect(points()).toEqual(trail);
+        expect(points().slice(0, trail.length - 1)).toEqual(trail.slice(0, -1));
         // Medium: 5 min. The older end fades first, then the trail goes.
-        run(300_000 - 21_000 + 250);
-        expect(points().length).toBeLessThan(trail.length);
-        expect(points()[points().length - 1]).toEqual(trail[trail.length - 1]);
-        run(20_000);
+        run(300_000 - 24_250 + 250);
+        expect(points()[0]).toEqual(trail[1]); // the oldest point went
+        run(25_000);
         expect(screen.queryAllByTestId('live-plane-trail')).toHaveLength(0);
       } finally {
         vi.useRealTimers();
       }
     });
 
-    it('when the radar is switched off, the planes go at once and their trails fade on their own clock', () => {
+    it('when the radar is switched off, the planes fade out over 4 s and their trails fade on their own clock', () => {
       vi.useFakeTimers();
       vi.setSystemTime(1_000);
       try {
         const { rerender } = renderScene({ contrail: 'medium', livePlanes: feed([east]) });
         run(20_000);
-        const trail = points();
         rerender(scene({ livePlanes: null }));
+        // Item 159: the plane flies on while it fades out, then goes.
+        expect(screen.getByTestId('live-plane').style.opacity).toBe('0');
+        run(4_250);
         expect(screen.queryByTestId('live-plane')).toBeNull();
-        expect(points()).toEqual(trail);
+        const trail = points();
         run(200_000);
         expect(points()).toEqual(trail); // the points stay where they are
         run(101_000);
@@ -293,7 +302,8 @@ describe('LivePlanes (ROADMAP item 96)', () => {
         const angle = Number(transformOf('live-plane-body').match(/rotate\(([-\d.e]+)rad\)/)![1]);
         const under = transformOf('live-plane-under') === 'scaleY(1)';
         const side = Number((screen.getByTestId('live-plane-side').firstElementChild as HTMLElement).style.transform.match(/scaleY\(([-\d.]+)\)/)![1]);
-        const w = Number(screen.getByTestId(under ? 'scene-plane-under' : 'scene-plane').getAttribute('width'));
+        // Item 159: the body is 18 px wide, scaled by the slant distance.
+        const w = Number(screen.getByTestId(under ? 'scene-plane-under' : 'scene-plane').getAttribute('width')) * scaleOf(screen.getByTestId('live-plane'));
         // The tail in the body's own frame, from its middle: the engine of the side view (mirrored
         // by the side), or the end of the fuselage from below; then turned by the body's angle.
         const [lx, ly] = under ? [(2 / 40 - 0.5) * w, 0] : [(0.46 - 0.5) * w, side * (0.72 - 0.5) * 0.3 * w];
@@ -555,4 +565,240 @@ describe('LivePlanes (ROADMAP item 96)', () => {
       vi.useRealTimers();
     }
   });
+});
+
+// ROADMAP item 159 (SUN-CHASER-23), the plane lookbook's F3, Z3 and S1: planes fade in and out,
+// their size follows the slant distance, and the normal view's pick is sticky.
+describe('LivePlanes: fade, size and a sticky pick (item 159)', () => {
+  const east = { ...south, speedKt: 450, track: 90 };
+  const scene = (props: Partial<React.ComponentProps<typeof SunVisualization>> = {}) => (
+    <SunVisualization
+      sunPosition={{ azimuth: 200, altitude: 30 }}
+      moonPosition={{ azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false }}
+      sunPath={[]} moonPath={[]} timeOfDay="midday" weatherType="clear" latitude={PLACE.lat} longitude={PLACE.lon}
+      livePlanes={feed([east])} compassHeading={180}
+      {...props}
+    />
+  );
+  // An answer of the feed that came at `ms`.
+  const answer = (aircraft: LiveAircraft[], ms: number): LivePlanesState => ({ feed: { now: ms, aircraft }, receivedAt: ms });
+  // The clock in ticks: one render per tick, as in the browser.
+  const run = (ms: number) => {
+    for (let i = 0; i < ms; i += 250) act(() => { vi.advanceTimersByTime(Math.min(250, ms - i)); });
+  };
+  const withTimers = (test: () => void) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    try { test(); } finally { vi.useRealTimers(); }
+  };
+  const reduceMotion = () => vi.spyOn(window, 'matchMedia').mockImplementation(query => ({
+    matches: query.includes('reduce'), media: query, onchange: null,
+    addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+  }));
+  const EASE = 'cubic-bezier(0.33, 0, 0.67, 1)'; // smoothstep, as the lookbook
+  const scaleBox = () => screen.getByTestId('live-plane-scale');
+  const hitOf = (plane: HTMLElement) => plane.querySelector<HTMLElement>('[data-plane-hit]');
+
+  it('brings a new plane out of a soft haze, at its size by the slant distance', () => {
+    renderScene({ onSceneInfo: vi.fn() });
+    expect(scaleBox().className).toContain('animate-plane-fade-in');
+    expect(scaleOf(screen.getByTestId('live-plane'))).toBeCloseTo(SOUTH_WIDTH / 18, 2);
+    // The body keeps its 18 px and the wrapper scales it. The tap area does not scale.
+    expect(screen.getByTestId('scene-plane').getAttribute('width')).toBe('18');
+    const hit = hitOf(screen.getByTestId('live-plane'));
+    expect(hit).not.toBeNull();
+    expect(scaleBox().contains(hit)).toBe(false);
+  });
+
+  it('takes the haze (1.4 px of blur) away with the 4 Hz clock over the 3 s fade-in, on the smoothstep curve', () => withTimers(() => {
+    renderScene({ livePlanes: feed([east]) });
+    expect(scaleBox().style.filter).toBe('blur(1.40px)');
+    run(750); // a quarter: smoothstep 0.156
+    expect(scaleBox().style.filter).toBe(`blur(${(1.4 * (1 - 0.15625)).toFixed(2)}px)`);
+    run(750);
+    expect(scaleBox().style.filter).toBe('blur(0.70px)');
+    run(1_500);
+    expect(scaleBox().style.filter).toBe('');
+    expect(scaleBox().className).toContain('animate-plane-fade-in'); // the opacity: a CSS animation
+  }));
+
+  it('a plane missing from the next answer flies on and fades out over 4 s, with no tap and not counted, then goes', () => withTimers(() => {
+    const onLivePlanesShown = vi.fn();
+    const { rerender } = renderScene({ livePlanes: feed([east]), onLivePlanesShown });
+    run(1_000);
+    expect(onLivePlanesShown).toHaveBeenLastCalledWith(1);
+    rerender(scene({ livePlanes: answer([], 2_000), onLivePlanesShown }));
+    const plane = screen.getByTestId('live-plane');
+    expect(plane.style.opacity).toBe('0');
+    expect(plane.style.transition).toBe(`opacity 4s ${EASE}`);
+    expect(hitOf(plane)).toBeNull();
+    expect(onLivePlanesShown).toHaveBeenLastCalledWith(0);
+    const x0 = start(plane).x;
+    run(2_000);
+    expect(start(screen.getByTestId('live-plane')).x).toBeLessThan(x0 - 3); // it flies on (east is left)
+    run(1_750);
+    expect(screen.getByTestId('live-plane')).toBe(plane);
+    run(250);
+    expect(screen.queryByTestId('live-plane')).toBeNull();
+  }));
+
+  it('a plane that comes back while it fades out fades in again, with no new haze', () => withTimers(() => {
+    const onSceneInfo = vi.fn();
+    const { rerender } = renderScene({ livePlanes: feed([east]), onSceneInfo });
+    run(1_000);
+    rerender(scene({ livePlanes: answer([], 2_000), onSceneInfo }));
+    run(1_000);
+    const plane = screen.getByTestId('live-plane');
+    rerender(scene({ livePlanes: answer([east], 3_000), onSceneInfo }));
+    expect(screen.getByTestId('live-plane')).toBe(plane);
+    expect(plane.style.opacity).toBe('1');
+    expect(plane.style.transition).toBe(`opacity 3s ${EASE}`);
+    expect(hitOf(plane)).not.toBeNull();
+  }));
+
+  it('the weather fades the whole layer out over 4 s, then it goes; a clear sky brings the planes back in a haze', () => withTimers(() => {
+    const onLivePlanesShown = vi.fn();
+    const { rerender } = renderScene({ livePlanes: feed([east]), onLivePlanesShown });
+    run(1_000);
+    rerender(scene({ weatherType: 'fog', onLivePlanesShown }));
+    const layer = screen.getByTestId('live-planes');
+    expect(layer.style.opacity).toBe('0');
+    expect(layer.style.transition).toBe(`opacity 4s ${EASE}`);
+    expect(screen.getAllByTestId('live-plane')).toHaveLength(1);
+    expect(hitOf(screen.getByTestId('live-plane'))).toBeNull();
+    expect(onLivePlanesShown).toHaveBeenLastCalledWith(0);
+    run(3_750);
+    expect(screen.getByTestId('live-planes')).toBe(layer);
+    run(500);
+    expect(screen.queryByTestId('live-planes')).toBeNull();
+    rerender(scene({ onLivePlanesShown }));
+    expect(screen.getByTestId('live-planes').style.opacity).toBe('1');
+    expect(scaleBox().className).toContain('animate-plane-fade-in');
+    expect(onLivePlanesShown).toHaveBeenLastCalledWith(1);
+  }));
+
+  it('a clear sky that comes back within the 4 s fades the layer in again over 3 s', () => withTimers(() => {
+    const onSceneInfo = vi.fn();
+    const { rerender } = renderScene({ livePlanes: feed([east]), onSceneInfo });
+    rerender(scene({ weatherType: 'fog', onSceneInfo }));
+    run(1_000);
+    expect(screen.getByTestId('live-planes').style.opacity).toBe('0');
+    rerender(scene({ onSceneInfo }));
+    const layer = screen.getByTestId('live-planes');
+    expect(layer.style.opacity).toBe('1');
+    expect(layer.style.transition).toBe(`opacity 3s ${EASE}`);
+    expect(hitOf(screen.getByTestId('live-plane'))).not.toBeNull();
+  }));
+
+  it('grows while a plane comes nearer, and smoothly when a new answer moves it', () => withTimers(() => {
+    // 30 km south at 10 km, flying north towards the observer at 450 kt.
+    const towards = { ...south, lat: PLACE.lat - 30 / KM_PER_DEG, speedKt: 450, track: 0 };
+    const { rerender } = renderScene({ livePlanes: feed([towards]) });
+    const plane = () => screen.getByTestId('live-plane');
+    const k0 = scaleOf(plane());
+    run(30_000);
+    const k1 = scaleOf(plane());
+    expect(k1).toBeGreaterThan(k0 + 0.1); // 6.9 km nearer
+    // The next answer puts it 5 km nearer than the dead reckoning: no jump to the new size.
+    rerender(scene({ livePlanes: answer([{ ...towards, lat: PLACE.lat - 18 / KM_PER_DEG }], 31_000) }));
+    const target = getLivePlaneScale(Math.hypot(18_000, 10_000 - 1.7));
+    expect(target - k1).toBeGreaterThan(0.1);
+    run(250);
+    expect(scaleOf(plane())).toBeGreaterThan(k1);
+    expect(scaleOf(plane())).toBeLessThan(k1 + 0.5 * (target - k1));
+    run(5_000);
+    expect(scaleOf(plane())).toBeGreaterThan(target - 0.02);
+    expect(screen.getByTestId('scene-plane').getAttribute('width')).toBe('18');
+  }));
+
+  it('keeps a shown plane in the normal view until a new one is 25 % nearer; the dropped one fades out', () => withTimers(() => {
+    // Low and near, flying east at 450 kt: 2-4 px/s across the 800 px 360° view.
+    const near = (hex: string, km: number): LiveAircraft => ({
+      ...south, hex, altM: 3_000, speedKt: 450, track: 90, lat: PLACE.lat - km / KM_PER_DEG,
+    });
+    const onSceneInfo = vi.fn();
+    const shownHexes = () => screen.getAllByTestId('live-plane').flatMap(plane => {
+      const hit = hitOf(plane);
+      if (!hit) return [];
+      fireEvent.click(hit, { detail: 1 });
+      fireEvent.click(hit, { detail: 2 }); // item 116: a double tap
+      return [onSceneInfo.mock.lastCall![2]];
+    }).sort();
+    const a = near('d00001', 8);
+    const b = near('d00002', 10);
+    const { rerender } = renderScene({ compassHeading: null, onSceneInfo, livePlanes: answer([a, b], 1_000) });
+    expect(shownHexes()).toEqual(['live-d00001', 'live-d00002']);
+    // c at 9 km is nearer than b, but not 25 % nearer (slant 9.5 against 10.4 km): b stays.
+    run(250);
+    rerender(scene({ compassHeading: null, onSceneInfo, livePlanes: answer([a, b, near('d00003', 9)], 1_250) }));
+    expect(screen.getAllByTestId('live-plane')).toHaveLength(2);
+    expect(shownHexes()).toEqual(['live-d00001', 'live-d00002']);
+    // At 6 km it is (6.7 km): c comes in, and b fades out.
+    run(250);
+    rerender(scene({ compassHeading: null, onSceneInfo, livePlanes: answer([a, b, near('d00003', 6)], 1_500) }));
+    expect(shownHexes()).toEqual(['live-d00001', 'live-d00003']);
+    expect(screen.getAllByTestId('live-plane')).toHaveLength(3);
+    expect(screen.getAllByTestId('live-plane').filter(plane => plane.style.opacity === '0')).toHaveLength(1);
+  }));
+
+  it('keeps a plane picked while it crosses the 360° edge (north), with no fade', () => withTimers(() => {
+    // 10 km north, 3° east of north, at 10 km, flying west at 450 kt: over north in about 2 s.
+    const north = {
+      ...east, hex: 'e00000', track: 270,
+      lat: PLACE.lat + (10 * Math.cos(3 * Math.PI / 180)) / KM_PER_DEG,
+      lon: PLACE.lon + (10 * Math.sin(3 * Math.PI / 180)) / (KM_PER_DEG * Math.cos(PLACE.lat * Math.PI / 180)),
+    };
+    renderScene({ compassHeading: null, livePlanes: feed([north]) });
+    const xs: number[] = [];
+    for (let i = 0; i < 20; i++) {
+      run(250);
+      const plane = screen.getByTestId('live-plane');
+      expect(plane.style.opacity).toBe('1');
+      xs.push(start(plane).x);
+    }
+    expect(xs[0]).toBeLessThan(20);
+    expect(xs[xs.length - 1]).toBeGreaterThan(780);
+  }));
+
+  it('with reduced motion: no haze and no fade, and the size is set at once', () => withTimers(() => {
+    const reduce = reduceMotion();
+    try {
+      const onLivePlanesShown = vi.fn();
+      const { rerender } = renderScene({ livePlanes: feed([east]), onLivePlanesShown });
+      expect(scaleBox().className).not.toContain('animate-plane-fade-in');
+      expect(scaleBox().style.filter).toBe('');
+      expect(screen.getByTestId('live-planes').style.transition).toBe('');
+      // The next answer, 1 s later, puts it 20 km nearer: the new size at once.
+      rerender(scene({ livePlanes: answer([{ ...east, lat: PLACE.lat - 30 / KM_PER_DEG }], 2_000), onLivePlanesShown }));
+      expect(scaleOf(screen.getByTestId('live-plane'))).toBeCloseTo(getLivePlaneScale(Math.hypot(30_000, 10_000 - 1.7)), 2);
+      // Missing from the next answer: gone at once.
+      rerender(scene({ livePlanes: answer([], 3_000), onLivePlanesShown }));
+      expect(screen.queryByTestId('live-plane')).toBeNull();
+      expect(onLivePlanesShown).toHaveBeenLastCalledWith(0);
+      // The weather closes the sky: the layer goes at once.
+      rerender(scene({ livePlanes: answer([east], 4_000), onLivePlanesShown }));
+      expect(screen.getAllByTestId('live-plane')).toHaveLength(1);
+      rerender(scene({ livePlanes: answer([east], 4_000), weatherType: 'fog', onLivePlanesShown }));
+      expect(screen.queryByTestId('live-planes')).toBeNull();
+      expect(onLivePlanesShown).toHaveBeenLastCalledWith(0);
+    } finally {
+      reduce.mockRestore();
+    }
+  }));
+
+  it('with reduced motion the closed sky takes the trails away too', () => withTimers(() => {
+    const reduce = reduceMotion();
+    try {
+      const { rerender } = renderScene({ contrail: 'medium', livePlanes: answer([east], 1_000) });
+      rerender(scene({ contrail: 'medium', livePlanes: answer([east], 16_000) }));
+      expect(screen.getAllByTestId('live-plane-trail')).toHaveLength(1);
+      rerender(scene({ contrail: 'medium', livePlanes: answer([east], 16_000), weatherType: 'fog' }));
+      expect(screen.queryByTestId('live-planes')).toBeNull();
+      rerender(scene({ contrail: 'medium', livePlanes: answer([east], 16_000) }));
+      expect(screen.getAllByTestId('live-plane')).toHaveLength(1);
+      expect(screen.queryAllByTestId('live-plane-trail')).toHaveLength(0);
+    } finally {
+      reduce.mockRestore();
+    }
+  }));
 });
