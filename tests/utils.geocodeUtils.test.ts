@@ -91,6 +91,20 @@ describe('geocodeUtils', () => {
       expect(nowhere.timeZone).toBeUndefined();
     });
 
+    it('keeps one of two results with the same label (item 176)', async () => {
+      vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ results: [
+          { name: 'Londres', admin1: 'Inglaterra', country: 'Reino Unido', latitude: 51.51, longitude: -0.13 },
+          { name: 'Londres', admin1: 'Inglaterra', country: 'Reino Unido', latitude: 51.5, longitude: -0.12 },
+          { name: 'Londres', admin1: 'Ontario', country: 'Canadá', latitude: 42.98, longitude: -81.23 },
+        ] }),
+      })));
+      const results = await searchPlaces('Londres');
+      expect(results.map((r) => r.admin1)).toEqual(['Inglaterra', 'Ontario']);
+      expect(results[0].latitude).toBe(51.51);
+    });
+
     it('drops results missing a usable name or coordinates', async () => {
       const fetchMock = vi.fn(() =>
         Promise.resolve({

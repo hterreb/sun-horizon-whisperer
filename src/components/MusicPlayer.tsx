@@ -112,6 +112,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ controls = ALWAYS_SHOWN, duck
       const playPromise = audioRef.current.play();
       if (playPromise !== undefined) {
         playPromise.catch(error => {
+          if (error instanceof DOMException && error.name === 'AbortError') return; // item 176: a newer switch
           console.error('Audio playback failed after stream switch:', error);
         });
       }
@@ -209,6 +210,9 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ controls = ALWAYS_SHOWN, duck
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
           playPromise.catch(error => {
+            // Item 176: a pause or a new source during the start (a double tap, fast station
+            // taps) rejects play() with AbortError. That is no failure: no toast.
+            if (error instanceof DOMException && error.name === 'AbortError') return;
             console.error('Audio playback failed:', error);
             setIsPlaying(false);
             toast({

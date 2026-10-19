@@ -54,6 +54,16 @@ import { isEmptySkyTap } from '@/utils/sceneTap';
 // glassChrome.ts for the one style helper shared more broadly, and its test.
 export const ROW = 'flex justify-between items-center gap-2 border-t border-[hsl(var(--panel-border)/0.12)] pt-1';
 const SECTION_HEADING = 'text-title font-bold flex items-center';
+// Item 176: a tap focused the twilight label (open), the touch's mouse events opened it again,
+// and the click then closed it: a tap showed nothing. Only a mouse hovers, and only a keyboard
+// focus (`:focus-visible`) opens it; the click toggles.
+const isKeyboardFocus = (element: Element): boolean => {
+  try {
+    return element.matches(':focus-visible');
+  } catch {
+    return false;
+  }
+};
 // Lookbook round 2 (Lutz, 2026-10-19, option A2): a closed card is one row of a compact list (a
 // faint line, a 16 px title, 44 px high); an open card keeps its gap and big title. The first
 // card keeps a gap above it, so the list does not touch the block before.
@@ -531,6 +541,12 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
       : null;
   const shownSunrise = passSunTimes?.sunrise ?? sunTimes.sunrise;
   const shownSunset = passSunTimes?.sunset ?? sunTimes.sunset;
+  // Item 176: the time over the hills (the sky's line-of-sight pill) under the flat-horizon
+  // time, when the hills shift it by 2 min or more; first users saw two times and no reason.
+  const overHills = (terrain: Date | null | undefined, flat: Date | null) =>
+    !polarSunLabel && terrain && flat && Math.abs(terrain.getTime() - flat.getTime()) >= 2 * 60_000 ? (
+      <span className="text-caption opacity-70 tabular-nums">{t('sun.overHills', { time: formatLocalTime(terrain) })}</span>
+    ) : null;
 
   // Frost (ROADMAP items 10 & 49): getWeatherEffects owns the one threshold.
   const isFrost = getWeatherEffects({
@@ -739,13 +755,14 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               className="px-4 pb-4"
               style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
             >
-          {/* Current Weather Display */}
-          {weatherData && (
+          {/* Current Weather Display. Item 176: shown with "–" before the first answer, so the
+              panel does not jump when the weather comes. */}
+          {(
             <div className="mb-4 pt-2 border-t border-white/20">
               <div className="flex items-center justify-between mb-2">
                 <h3 className={SECTION_HEADING}>
                   <Thermometer size={16} className="mr-2" />
-                  {t(weatherData.isForecast ? 'weather.forecast' : 'weather.current')}
+                  {t(weatherData?.isForecast ? 'weather.forecast' : 'weather.current')}
                 </h3>
                 <button
                   onClick={onWeatherRefresh}
@@ -763,7 +780,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   <span className="opacity-80 text-body">{t('weather.temperature')}</span>
                   <div className="flex items-center gap-2">
                     {/* Item 165: the fallback weather's 20 °C read as a real temperature. */}
-                    <span className="font-semibold text-body tabular-nums">{weatherData.isRealWeather ? formatTemperature(weatherData.temperature, temperatureUnit) : '–'}</span>
+                    <span className="font-semibold text-body tabular-nums">{weatherData?.isRealWeather ? formatTemperature(weatherData.temperature, temperatureUnit) : '–'}</span>
                     <div className="flex bg-white/10 rounded-full p-1" role="group" aria-label={t('weather.temperatureUnit')}>
                       {(['C', 'F'] as const).map((unit) => (
                         <button
@@ -784,9 +801,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 </div>
                 <div className={ROW}>
                   <span className="opacity-80 text-body">{t('weather.condition')}</span>
-                  <span className="font-semibold text-body text-right">{t(weatherData.conditionKey)}</span>
+                  <span className="font-semibold text-body text-right">{weatherData ? t(weatherData.conditionKey) : '–'}</span>
                 </div>
-                {!weatherData.isRealWeather && (
+                {weatherData && !weatherData.isRealWeather && (
                   <div className="text-caption opacity-60 text-brand-peach mt-1">
                     {t('weather.realUnavailable')}
                   </div>
@@ -971,7 +988,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   </button>
                 )}
               </div>
-              <span className="font-semibold text-body tabular-nums">{polarSunLabel ?? formatLocalTime(shownSunrise)}</span>
+              <div className="flex flex-col items-end">
+                <span className="font-semibold text-body tabular-nums">{polarSunLabel ?? formatLocalTime(shownSunrise)}</span>
+                {overHills(terrainSunTimes?.sunrise, shownSunrise)}
+              </div>
             </div>
 
             <div className={`${ROW} min-h-11`}>
@@ -1018,7 +1038,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   />
                 )}
               </div>
-              <span className="font-semibold text-body tabular-nums">{polarSunLabel ?? formatLocalTime(shownSunset)}</span>
+              <div className="flex flex-col items-end">
+                <span className="font-semibold text-body tabular-nums">{polarSunLabel ?? formatLocalTime(shownSunset)}</span>
+                {overHills(terrainSunTimes?.sunset, shownSunset)}
+              </div>
             </div>
 
             {terrainStatus !== 'idle' && isSunTerrainOpen && (
@@ -1036,12 +1059,13 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
             {/* Sunset score (ROADMAP item 11) */}
             {/* Locked (item 14): only the label with the plus, which opens the purchase. */}
-            {weatherData?.sunsetScoreToday && isLocked && (
+            {/* Item 176: none on a polar day or night: there is no sunset to score. */}
+            {weatherData?.sunsetScoreToday && !polarSunLabel && isLocked && (
               <button type="button" onClick={() => requirePremium()} className={`text-caption opacity-80 mt-1 inline-flex items-center gap-1 rounded ${FOCUS_RING}`}>
                 {t('score.label')}<PremiumBadge />
               </button>
             )}
-            {weatherData?.sunsetScoreToday && !isLocked && (
+            {weatherData?.sunsetScoreToday && !polarSunLabel && !isLocked && (
               <div className="text-caption opacity-80 mt-1 space-y-0.5">
                 <div className="flex items-center gap-2">
                   <span className="inline-flex shrink-0 items-center gap-1">{t('score.label')}<PremiumBadge /></span>
@@ -1250,9 +1274,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                       <button
                         type="button"
                         className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left text-caption rounded ${TAP_TARGET} ${FOCUS_RING}`}
-                        onMouseEnter={() => setHoveredTwilight('civil')}
-                        onMouseLeave={() => setHoveredTwilight(null)}
-                        onFocus={() => setHoveredTwilight('civil')}
+                        onPointerEnter={(e) => e.pointerType === 'mouse' && setHoveredTwilight('civil')}
+                        onPointerLeave={(e) => e.pointerType === 'mouse' && setHoveredTwilight(null)}
+                        onFocus={(e) => isKeyboardFocus(e.currentTarget) && setHoveredTwilight('civil')}
                         onBlur={() => setHoveredTwilight(null)}
                         onClick={() => setHoveredTwilight(hoveredTwilight === 'civil' ? null : 'civil')}
                         aria-expanded={hoveredTwilight === 'civil'}
@@ -1272,9 +1296,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                       <button
                         type="button"
                         className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left text-caption rounded ${TAP_TARGET} ${FOCUS_RING}`}
-                        onMouseEnter={() => setHoveredTwilight('nautical')}
-                        onMouseLeave={() => setHoveredTwilight(null)}
-                        onFocus={() => setHoveredTwilight('nautical')}
+                        onPointerEnter={(e) => e.pointerType === 'mouse' && setHoveredTwilight('nautical')}
+                        onPointerLeave={(e) => e.pointerType === 'mouse' && setHoveredTwilight(null)}
+                        onFocus={(e) => isKeyboardFocus(e.currentTarget) && setHoveredTwilight('nautical')}
                         onBlur={() => setHoveredTwilight(null)}
                         onClick={() => setHoveredTwilight(hoveredTwilight === 'nautical' ? null : 'nautical')}
                         aria-expanded={hoveredTwilight === 'nautical'}
@@ -1294,9 +1318,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                       <button
                         type="button"
                         className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left text-caption rounded ${TAP_TARGET} ${FOCUS_RING}`}
-                        onMouseEnter={() => setHoveredTwilight('astronomical')}
-                        onMouseLeave={() => setHoveredTwilight(null)}
-                        onFocus={() => setHoveredTwilight('astronomical')}
+                        onPointerEnter={(e) => e.pointerType === 'mouse' && setHoveredTwilight('astronomical')}
+                        onPointerLeave={(e) => e.pointerType === 'mouse' && setHoveredTwilight(null)}
+                        onFocus={(e) => isKeyboardFocus(e.currentTarget) && setHoveredTwilight('astronomical')}
                         onBlur={() => setHoveredTwilight(null)}
                         onClick={() => setHoveredTwilight(hoveredTwilight === 'astronomical' ? null : 'astronomical')}
                         aria-expanded={hoveredTwilight === 'astronomical'}
@@ -1319,9 +1343,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                       <button
                         type="button"
                         className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left text-caption rounded ${TAP_TARGET} ${FOCUS_RING}`}
-                        onMouseEnter={() => setHoveredTwilight('astronomical')}
-                        onMouseLeave={() => setHoveredTwilight(null)}
-                        onFocus={() => setHoveredTwilight('astronomical')}
+                        onPointerEnter={(e) => e.pointerType === 'mouse' && setHoveredTwilight('astronomical')}
+                        onPointerLeave={(e) => e.pointerType === 'mouse' && setHoveredTwilight(null)}
+                        onFocus={(e) => isKeyboardFocus(e.currentTarget) && setHoveredTwilight('astronomical')}
                         onBlur={() => setHoveredTwilight(null)}
                         onClick={() => setHoveredTwilight(hoveredTwilight === 'astronomical' ? null : 'astronomical')}
                         aria-expanded={hoveredTwilight === 'astronomical'}
@@ -1341,9 +1365,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                       <button
                         type="button"
                         className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left text-caption rounded ${TAP_TARGET} ${FOCUS_RING}`}
-                        onMouseEnter={() => setHoveredTwilight('nautical')}
-                        onMouseLeave={() => setHoveredTwilight(null)}
-                        onFocus={() => setHoveredTwilight('nautical')}
+                        onPointerEnter={(e) => e.pointerType === 'mouse' && setHoveredTwilight('nautical')}
+                        onPointerLeave={(e) => e.pointerType === 'mouse' && setHoveredTwilight(null)}
+                        onFocus={(e) => isKeyboardFocus(e.currentTarget) && setHoveredTwilight('nautical')}
                         onBlur={() => setHoveredTwilight(null)}
                         onClick={() => setHoveredTwilight(hoveredTwilight === 'nautical' ? null : 'nautical')}
                         aria-expanded={hoveredTwilight === 'nautical'}
@@ -1363,9 +1387,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                       <button
                         type="button"
                         className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left text-caption rounded ${TAP_TARGET} ${FOCUS_RING}`}
-                        onMouseEnter={() => setHoveredTwilight('civil')}
-                        onMouseLeave={() => setHoveredTwilight(null)}
-                        onFocus={() => setHoveredTwilight('civil')}
+                        onPointerEnter={(e) => e.pointerType === 'mouse' && setHoveredTwilight('civil')}
+                        onPointerLeave={(e) => e.pointerType === 'mouse' && setHoveredTwilight(null)}
+                        onFocus={(e) => isKeyboardFocus(e.currentTarget) && setHoveredTwilight('civil')}
                         onBlur={() => setHoveredTwilight(null)}
                         onClick={() => setHoveredTwilight(hoveredTwilight === 'civil' ? null : 'civil')}
                         aria-expanded={hoveredTwilight === 'civil'}

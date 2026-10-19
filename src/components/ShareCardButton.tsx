@@ -39,7 +39,10 @@ const ShareCardButton: React.FC<ShareCardButtonProps> = ({ card, latitude, longi
         blob = await drawShareCard(data, latitude, longitude, horizonProfile);
         fileName = data.fileName;
       }
-      await shareOrDownload(blob, fileName);
+      // Item 176: without a share sheet the picture is saved, which showed nothing: say so.
+      if (await shareOrDownload(blob, fileName) === 'downloaded') {
+        toast({ title: t('share.savedTitle'), description: fileName });
+      }
     } catch {
       toast({ title: t('share.failedTitle'), description: t('share.failedDescription') });
     } finally {

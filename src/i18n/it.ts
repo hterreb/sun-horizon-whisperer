@@ -58,6 +58,7 @@ export const it: Record<keyof typeof en, string> = {
   'search.placeholder': "es. Firenze",
   'search.searching': "Ricerca…",
   'search.error': "Impossibile cercare i luoghi.",
+  'search.offline': "Nessuna connessione. Cerca di nuovo quando sei online.",
   'search.noResults': "Nessun risultato",
   'search.results': "Risultati della ricerca",
 
@@ -128,9 +129,11 @@ export const it: Record<keyof typeof en, string> = {
   // Sun rows
   'sun.sunrise': "Alba",
   'sun.sunset': "Tramonto",
+  'sun.overHills': "oltre i rilievi {time}",
   'sun.noSet': "Il sole non tramonta",
   'sun.noRise': "Il sole non sorge",
   'sun.countdown': "Conto alla rovescia del tramonto",
+  'sun.countdownOn': "Attivo: gli ultimi 10 secondi prima del tramonto ticchettano e il cielo fa il conto alla rovescia.",
 
   // Sunset reminder (item 69)
   'reminder.toggle': "Avvisami {minutes} minuti prima del tramonto (con l’app aperta)",
@@ -161,6 +164,7 @@ export const it: Record<keyof typeof en, string> = {
   'share.score': "Voto tramonto {score}/10 · {reason}",
   'share.failedTitle': "Impossibile condividere il tramonto",
   'share.failedDescription': "Riprova.",
+  'share.savedTitle': "Immagine salvata",
 
   // Line of sight with terrain (items 13 and 30)
   'terrain.show': "Mostra linea di vista",
@@ -607,7 +611,7 @@ export const it: Record<keyof typeof en, string> = {
   'info.ridgeHeight': "Altezza della cresta",
   'info.metresAsl': "{value} m s.l.m.",
   'scene.satellite': "Satellite",
-  'satellite.tracking': "Tracciamento satelliti",
+  'satellite.tracking': "Satelliti",
   'satellite.trackingHint': "Satelliti reali dai dati CelesTrak",
   'satellite.unavailable': "Dati dei satelliti non disponibili",
   'satellite.nextTry': "prossimo tentativo alle {time}",
@@ -632,6 +636,8 @@ export const it: Record<keyof typeof en, string> = {
   'compass.disable': "Disattiva bussola",
   'compass.calibratingTitle': "Calibrazione della bussola",
   'compass.calibratingDescription': "Muovi il telefono disegnando un 8 per una direzione più precisa.",
+  'compass.unavailableTitle': "Bussola non disponibile",
+  'compass.unavailableDescription': "Questo dispositivo non fornisce la direzione. Il cielo resta nella vista normale.",
 
   // Feedback (items 21 and 23)
   'feedback.send': "Invia feedback",
@@ -660,6 +666,8 @@ export const it: Record<keyof typeof en, string> = {
   'toast.weatherUnavailableDescription': "Mostro il meteo predefinito. Riprovo tra un minuto.",
   'toast.weatherFailedTitle': "Errore nel caricare il meteo",
   'toast.weatherFailedDescription': "Impossibile ottenere i dati meteo attuali.",
+  'toast.offlineTitle': "Sei offline",
+  'toast.offlineWeather': "Il meteo si aggiorna quando torna la connessione.",
   'toast.geolocationUnsupportedTitle': "Geolocalizzazione non supportata",
   'toast.geolocationUnsupportedDefault': "Il browser non supporta la geolocalizzazione. Uso la posizione predefinita.",
   'toast.geolocationUnsupported': "Il browser non supporta la geolocalizzazione.",

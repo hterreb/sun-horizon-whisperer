@@ -251,7 +251,22 @@ describe('InfoPanel', () => {
     // Also shows on focus, not just click/hover.
     fireEvent.click(civilButton); // collapse again
     expect(civilButton).toHaveAttribute('aria-expanded', 'false');
+    // A keyboard focus (:focus-visible) opens it.
+    const matches = civilButton.matches.bind(civilButton);
+    civilButton.matches = (selector: string) => selector === ':focus-visible' || matches(selector);
     fireEvent.focus(civilButton);
+    expect(civilButton).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('a tap on a twilight label opens its degrees, though the tap also focuses it (item 176)', () => {
+    const noon = new Date();
+    noon.setHours(12, 0, 0, 0);
+    render(<InfoPanel {...defaultProps} currentTime={noon} />);
+    const civilButton = screen.getByRole('button', { name: /civil:/i });
+    // A touch: focus (not :focus-visible), the pointer events of a touch, then the click.
+    fireEvent.focus(civilButton);
+    fireEvent.pointerEnter(civilButton, { pointerType: 'touch' });
+    fireEvent.click(civilButton);
     expect(civilButton).toHaveAttribute('aria-expanded', 'true');
   });
 

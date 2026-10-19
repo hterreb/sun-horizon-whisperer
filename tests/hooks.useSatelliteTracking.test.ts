@@ -138,6 +138,21 @@ describe('useSatelliteTracking (ROADMAP item 97)', () => {
       expect(result.current.nextTryAt).toBeNull();
     });
 
+    it('drops the next try when its time comes, not at the next minute step (item 176)', async () => {
+      vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'] });
+      vi.setSystemTime(scene);
+      const at = scene.getTime() + 90 * 60_000 + 30_000; // between two minute steps
+      nextTry.mockReturnValue(at);
+      load.mockResolvedValue(null);
+      const { result } = render();
+      for (let i = 0; i < 5; i++) await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(result.current.nextTryAt).toBe(at);
+      await act(async () => { await vi.advanceTimersByTimeAsync(90 * 60_000 + 29_000); });
+      expect(result.current.nextTryAt).toBe(at);
+      await act(async () => { await vi.advanceTimersByTimeAsync(2_000); });
+      expect(result.current.nextTryAt).toBeNull();
+    });
+
     it('is error when satellite.js does not load; a refresh loads it again', async () => {
       vi.spyOn(console, 'error').mockImplementation(() => {});
       // A lost chunk: the next import of satellite.js fails.

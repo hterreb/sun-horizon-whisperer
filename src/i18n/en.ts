@@ -58,6 +58,7 @@ export const en = {
   'search.placeholder': 'e.g. Lisbon',
   'search.searching': 'Searching…',
   'search.error': 'Could not search for places.',
+  'search.offline': 'No connection. Search again when you are online.',
   'search.noResults': 'No results',
   'search.results': 'Search results',
 
@@ -128,9 +129,11 @@ export const en = {
   // Sun rows
   'sun.sunrise': 'Sunrise',
   'sun.sunset': 'Sunset',
+  'sun.overHills': 'over hills {time}',
   'sun.noSet': 'Sun does not set',
   'sun.noRise': 'Sun does not rise',
   'sun.countdown': 'Sunset countdown',
+  'sun.countdownOn': 'On: the last 10 seconds before sunset tick, and the sky counts down.',
 
   // Sunset reminder (item 69)
   'reminder.toggle': 'Remind me {minutes} minutes before sunset (while the app is open)',
@@ -161,6 +164,7 @@ export const en = {
   'share.score': 'Sunset score {score}/10 · {reason}',
   'share.failedTitle': 'Could not share the sunset',
   'share.failedDescription': 'Please try again.',
+  'share.savedTitle': 'Picture saved',
 
   // Line of sight with terrain (items 13 and 30)
   'terrain.show': 'Show line of sight',
@@ -632,6 +636,8 @@ export const en = {
   'compass.disable': 'Disable compass',
   'compass.calibratingTitle': 'Calibrating compass',
   'compass.calibratingDescription': 'Move your phone in a figure 8 for a more accurate heading.',
+  'compass.unavailableTitle': 'Compass not available',
+  'compass.unavailableDescription': 'This device gives no heading. The sky keeps the normal view.',
 
   // Feedback (items 21 and 23)
   'feedback.send': 'Send feedback',
@@ -660,6 +666,8 @@ export const en = {
   'toast.weatherUnavailableDescription': 'Showing default weather. Trying again in a minute.',
   'toast.weatherFailedTitle': 'Weather fetch failed',
   'toast.weatherFailedDescription': 'Could not get current weather data.',
+  'toast.offlineTitle': 'You are offline',
+  'toast.offlineWeather': 'The weather updates when the connection is back.',
   'toast.geolocationUnsupportedTitle': 'Geolocation not supported',
   'toast.geolocationUnsupportedDefault': "Your browser doesn't support geolocation. Using default location.",
   'toast.geolocationUnsupported': "Your browser doesn't support geolocation.",

@@ -4,8 +4,11 @@ import { BadgeArt } from '@/components/CollectionView';
 import { useLanguage } from '@/hooks/useLanguage';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { BADGES, badgeTier, type BadgeId } from '@/utils/collection';
-import { GLASS_CARD_SURFACE } from '@/utils/glassChrome';
 import { cardBorderClass, ringBorderClass, type RarityTier } from '@/utils/rarityTier';
+
+// Item 176: the banner often lies over the panel header; on the card's 58 % glass the two texts
+// mixed. 85 % keeps the glass look and the banner readable.
+const BANNER_SURFACE = 'bg-[hsl(var(--panel-background)/0.85)] backdrop-blur-md border shadow-[0_8px_30px_rgba(0,0,0,0.25)]';
 
 // "Badge unlocked" card (ROADMAP item 114): a new badge shows like a game achievement. A glass
 // card at the top centre: the badge as in the collection grid with its tier ring, the kicker,
@@ -103,7 +106,7 @@ const BadgeUnlocked: React.FC<BadgeUnlockedProps> = ({ badgeId, found, onOpen, o
           onClick={handleClick}
           onPointerDown={handlePointerDown}
           onPointerUp={handlePointerUp}
-          className={`flex w-80 max-w-full touch-none items-center gap-3 ${GLASS_CARD_SURFACE} ${cardBorderClass(tier)} rounded-panel p-3 pr-4 text-left text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70`}
+          className={`flex w-80 max-w-full touch-none items-center gap-3 ${BANNER_SURFACE} ${cardBorderClass(tier)} rounded-panel p-3 pr-4 text-left text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70`}
         >
           <span aria-hidden="true" className={`relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-2 bg-white/10 ${ringBorderClass(tier)}`}>
             {!reducedMotion && (
