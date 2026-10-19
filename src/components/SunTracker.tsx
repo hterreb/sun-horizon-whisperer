@@ -174,6 +174,9 @@ const CHRISTMAS_LIGHT_COLORS = [1, 2, 3, 4].map((n) => `hsl(var(--scene-xmas-bul
 // Item 123: a New Year show takes taps for its 12-13 s (Fireworks.planShow), plus a little slack.
 const NEW_YEAR_TAP_MS = 15_000;
 
+// Item 165: the waits before the retries of a failed weather answer.
+const WEATHER_RETRY_MS = [60_000, 120_000, 300_000];
+
 const SunTracker: React.FC = () => {
   const [date, setDate] = useState<Date>(new Date());
   // A manually chosen location (set via InfoPanel's "Change location" form) takes
@@ -505,6 +508,8 @@ const SunTracker: React.FC = () => {
   // Item 165: the number of the latest weather request. An older place's answer that
   // arrives later is dropped, or it would stay until the next 30-minute refresh.
   const weatherRequestRef = React.useRef(0);
+  // The number of retries since the last good answer, a place change or a refresh tap.
+  const weatherRetriesRef = React.useRef(0);
   const fetchWeatherData = useCallback(async (isRetry = false) => {
     if (!location.loaded) return;
 
@@ -530,6 +535,7 @@ const SunTracker: React.FC = () => {
       );
       if (!isLatest()) return;
       setWeatherData(weather);
+      if (weather.isRealWeather) weatherRetriesRef.current = 0;
 
       if (useRealWeather) {
         setWeatherType(weather.weatherType);
@@ -566,20 +572,26 @@ const SunTracker: React.FC = () => {
     if (!(location.loaded && useRealWeather)) return;
 
     const timeoutId = setTimeout(() => {
+      weatherRetriesRef.current = 0;
       fetchWeatherData();
     }, 0);
 
     return () => clearTimeout(timeoutId);
   }, [location.loaded, useRealWeather, fetchWeatherData]);
 
-  // Item 165: a failed weather answer (a 503, a dropped connection) tries again each
-  // minute, not only at the 30-minute refresh. Each failed answer is a new object, so the
-  // timer starts again after each try.
-  // ponytail: no back-off; one small request a minute until it works.
+  // Item 165: a failed weather answer (a 503, a dropped connection) is tried again after
+  // 1, 2 and 5 min (WEATHER_RETRY_MS); after that only the 30-minute refresh asks. A good
+  // answer, a place change or a refresh tap starts the series again. Each failed answer is
+  // a new object, so the effect sets the next timer after each try.
   const isWeatherFailed = useRealWeather && liveWeatherData?.isRealWeather === false;
   useEffect(() => {
     if (!isWeatherFailed) return;
-    const retryTimer = setTimeout(() => fetchWeatherData(true), 60_000);
+    const delay = WEATHER_RETRY_MS[weatherRetriesRef.current];
+    if (delay === undefined) return;
+    const retryTimer = setTimeout(() => {
+      weatherRetriesRef.current += 1;
+      fetchWeatherData(true);
+    }, delay);
     return () => clearTimeout(retryTimer);
   }, [isWeatherFailed, liveWeatherData, fetchWeatherData]);
 
@@ -1320,6 +1332,7 @@ const SunTracker: React.FC = () => {
   };
 
   const handleWeatherRefresh = () => {
+    weatherRetriesRef.current = 0;
     fetchWeatherData();
   };
 
