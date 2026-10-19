@@ -99,6 +99,31 @@ describe('usePremium (ROADMAP item 14)', () => {
     expect(result.current.isDialogOpen).toBe(false);
   });
 
+  it('the first gold-plus use while Premium is free says "free for now" once per device, and runs the action (item 171)', () => {
+    const { result, unmount } = renderHook(() => usePremium('en', false));
+    const action = vi.fn();
+    act(() => result.current.requirePremium(action));
+    act(() => result.current.requirePremium(action));
+    expect(action).toHaveBeenCalledTimes(2);
+    expect(toastMock).toHaveBeenCalledTimes(1);
+    expect(toastMock).toHaveBeenCalledWith({ title: 'Premium feature, free for now' });
+    unmount();
+    // A new start on the same device: no toast again.
+    const again = renderHook(() => usePremium('en', false));
+    act(() => again.result.current.requirePremium(action));
+    expect(toastMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('no "free for now" toast when Premium is bought (the plus is gone) or locked (the dialog opens) (item 171)', async () => {
+    const owned = await renderBilling(false, mockService([premiumPurchase]));
+    await waitFor(() => expect(owned.result.current.isPremium).toBe(true));
+    act(() => owned.result.current.requirePremium(vi.fn()));
+    owned.unmount();
+    const locked = await renderBilling(true, mockService([]));
+    act(() => locked.result.current.requirePremium(vi.fn()));
+    expect(toastMock).not.toHaveBeenCalled();
+  });
+
   it('requirePremium opens the dialog instead of the action while locked', async () => {
     const service = mockService([]);
     const { result } = await renderBilling(true, service);

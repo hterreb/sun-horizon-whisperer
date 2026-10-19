@@ -3558,13 +3558,15 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   - New keys in 5 languages; `toast.locationUnavailableDefault` removed. **Deviation:** with no geolocation API at all (no real browser; jsdom tests) New York and its toast stay.
 - **Checked:** component tests: denied keeps the loading screen with the free "Choose a place", no toast and no scene; a permission change to `granted` opens the scene at the position; a timeout says "Location not found"; "Use my location" while blocked gives the site-settings toast; typed coordinates say "Chosen point"; while Premium is locked, "Use my location" runs and "Set location" goes through `requirePremium`. Typecheck, lint and all 2107 tests pass. Browser (built app, 390 × 844, location denied): "No location: choose a place" and the button, no red toast, no scene; after the permission was granted the scene opened at Ravensburg without a reload.
 
-### 171. The "+" badge on a phone: what it means — S
+### 171. The "+" badge on a phone: what it means — S — **✅ Done**
 
 - **Finding (item 165, #6):** 3 of 5 first users did not know what the yellow "+" on about 10 controls means. "Premium feature, free for now" is only in a hover tooltip, which a phone does not show. A tap on the badge of the compass button turned the compass on.
 - **Options:** (a) the first tap on a control with a badge shows a toast "Premium feature, free for now" once; (b) one line at the end of the panel: "+ Premium feature, free for now"; (c) no badges until Premium is on sale (item 16, `PREMIUM_ENFORCED`).
 - **Open:** (a), (b) or (c)?
 - **Done when:** a first user on a phone can learn what the badge means without hover.
 - **Decision (Lutz, 2026-10-19):** (a) the first tap on a control with a badge shows "Premium feature · free for now" once (kept on the device); the control still works.
+- **Built:** `requirePremium` (`usePremium`), which every gold-plus control calls, shows the toast "Premium feature, free for now" (the existing `common.premium` text, 5 languages) on the first call while Premium is free and the plus shows, then runs the action as before. `localStorage` `premium-badge-hint` keeps it to once per device (`loadBadgeHintShown`, `saveBadgeHintShown` in `utils/premium.ts`). No toast when Premium is bought (no plus) or locked (the Premium dialog opens).
+- **Checked:** `hooks.usePremium`: the first call shows the toast once and runs the action each time, a new start on the same device shows none, none when bought or locked. Typecheck, lint and all 2131 tests pass. Browser (built app, 390 × 844): the first tap on "Manual" showed "Premium feature, free for now" and turned manual weather on; a second tap and a tap after a reload showed no toast.
 
 ### 172. A single tap on the sun or another scene thing — S — **Closed: no change**
 
