@@ -6,6 +6,7 @@ import {
   FADE_MS,
   ISS_NORAD_ID,
   MAX_EPOCH_AGE_MS,
+  MAX_SHOWN_SATELLITES,
   NAKED_EYE_MAGNITUDE,
   NIGHT_GAP_FACTOR,
   SPAWN_GAP_MS,
@@ -27,6 +28,7 @@ import {
   isSatelliteVisible,
   isSatelliteWeather,
   makeDotPath,
+  pickShownSatellites,
   sunDirectionEcf,
   toTrackedSatellites,
   type SatellitePass,
@@ -218,6 +220,53 @@ describe('getSkySatellites', () => {
   it('leaves out positions far from the data\'s epoch (time travel)', () => {
     const late = new Date(iss.epochMs + MAX_EPOCH_AGE_MS + 3_600_000);
     expect(getSkySatellites(satellite, [iss], late, sydney)).toEqual([]);
+  });
+});
+
+describe('pickShownSatellites (item 162, N2: a cap of 8)', () => {
+  const dot = (id: number, magnitude: number, shown = true) => ({ id, magnitude, shown });
+  const ids = (dots: { id: number }[]) => dots.map((d) => d.id);
+  // 12 visible dots: id 1 is the brightest (magnitude 1), id 12 the faintest (5.4).
+  const twelve = Array.from({ length: 12 }, (_, i) => dot(i + 1, 1 + i * 0.4));
+
+  it('shows at most 8 dots, the brightest first, in the order of the list', () => {
+    expect(MAX_SHOWN_SATELLITES).toBe(8);
+    const shuffled = [...twelve].reverse();
+    const picked = pickShownSatellites(shuffled, new Set());
+    expect(picked).toHaveLength(8);
+    expect(ids(picked)).toEqual([8, 7, 6, 5, 4, 3, 2, 1]);
+  });
+
+  it('keeps a shown dot while it is in the sky, also when brighter dots come', () => {
+    const faint = Array.from({ length: 8 }, (_, i) => dot(100 + i, 5));
+    const shown = new Set(ids(pickShownSatellites(faint, new Set())));
+    // Four bright dots rise: the 8 faint ones keep their places.
+    const picked = pickShownSatellites([...twelve.slice(0, 4), ...faint], shown);
+    expect(ids(picked)).toEqual(ids(faint));
+  });
+
+  it('gives a free place to the brightest new dot only', () => {
+    const shown = new Set(ids(pickShownSatellites(twelve, new Set()))); // 1-8
+    // Dot 3 goes into the Earth's shadow (it fades out) and dot 2 sets: two places are free.
+    const next = twelve.filter((d) => d.id !== 2).map((d) => (d.id === 3 ? dot(3, d.magnitude, false) : d));
+    const picked = pickShownSatellites(next, shown);
+    expect(ids(picked)).toEqual([1, 4, 5, 6, 7, 8, 9, 10]);
+  });
+
+  it('gives no place to a dot that fades out', () => {
+    const picked = pickShownSatellites([dot(1, 1, false), dot(2, 3)], new Set([1]));
+    expect(ids(picked)).toEqual([2]);
+  });
+
+  it('gives the same pick again for the same update', () => {
+    const first = pickShownSatellites(twelve, new Set([12, 11]));
+    expect(ids(first)).toEqual([1, 2, 3, 4, 5, 6, 11, 12]);
+    expect(ids(pickShownSatellites(twelve, new Set(ids(first))))).toEqual(ids(first));
+  });
+
+  it('keeps no more than the cap, the brightest, when more were shown before', () => {
+    const picked = pickShownSatellites(twelve, new Set(ids(twelve)), 3);
+    expect(ids(picked)).toEqual([1, 2, 3]);
   });
 });
 
