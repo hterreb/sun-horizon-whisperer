@@ -3574,7 +3574,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Done when:** a single tap on the sun gives a visible answer; a component test.
 - **Decision (Lutz, 2026-10-19):** no change. The double tap of item 116 stays the only way to open a scene card.
 
-### 173. Phone: Back, a tap beside the panel, and tap targets — M
+### 173. Phone: Back, a tap beside the panel, and tap targets — M — **✅ Done**
 
 - **Finding (item 165, #17):** Back leaves the app while the panel, the search, the collection or Data sources is open (P5). A tap on the sky beside the open panel (it covers about 80 % of a 375 px screen) does not close it (P3). Tap targets of 16–40 px: "Next station" 16 px, the volume knob 20 px, the panel chevron 30 px, the card chevrons 26 px (P3).
 - **Spec:**
@@ -3583,6 +3583,12 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Open:** (a) a tap beside the open panel on a phone: close the panel, or keep the item 136 rule (it hides or shows the controls)?
 - **Done when:** on a 375 px phone, Back closes each open layer and a second Back leaves; no tap target under 44 px in the panel and the radio bar.
 - **Decision (Lutz, 2026-10-19):** (a) a tap on the sky beside the open panel on a phone closes the panel. With the panel closed, the item 136 rule stays.
+- **Built:**
+  - `src/hooks/useBackToClose.ts`: on a phone (`useIsMobile`, < 768 px) each open layer adds a history entry (same URL). Back (`popstate`) closes the top layer only. A layer closed in the UI takes its entry back with `history.back()`, and that `popstate` is skipped, so after the last layer a Back leaves the app. Layers: the expanded panel, the location search, Data sources (`InfoPanel`), a scene card, the collection and the Premium dialog (`SunTracker`).
+  - `InfoPanel`, on a phone with the panel open: a tap on the empty sky (`isEmptySkyTap` in the new `src/utils/sceneTap.ts`, which also holds item 147's `isSceneTap`) closes the panel and stops there (document capture), so the item 136 toggle does not run.
+  - `TAP_TARGET` (`glassChrome.ts`): an empty 44 × 44 px `after:` box centred on a small control. On `ICON_TOGGLE`, `INLINE_ICON_TOGGLE`, `GLASS_ICON_BUTTON` (fullscreen, compass), the radio bar's switch, next-station and rain buttons, the °C/°F, Real/Manual and language buttons (also `min-w-11`), the clock, "Change location", the switches, the twilight labels, Collection and Data sources. The volume slider's tap area reaches 12 px above and below. The card toggles cover their whole header row.
+  - So that the boxes do not overlap: the rows with a control are at least 44 px high (`min-h-11`: temperature, weather mode, live planes, current time, sunrise, sunset, the twilight rows, satellite tracking, the card headers); the Sunset bell, alarm and share are 44 px apart (`ml-[26px]`); the time controls have `gap-3.5`; the ISS toggle has `mr-1.5`; the panel header has `pb-3`.
+- **Checked:** unit tests (`hooks.useBackToClose`: one entry per layer, Back closes the top one only, a UI close takes its entry back and that popstate closes nothing, off on a desktop), `InfoPanel` on a 390 px phone (a sky tap beside the open panel closes it and goes no further, a tap inside does not; Back closes the search, then the panel). Typecheck, lint and all 2129 tests pass. Browser (built app, 390 × 844, touch): Back closes the search, then the panel; Back closes Data sources and keeps the panel; a sky tap beside the panel closes it; the next Back leaves the app. Tap areas measured at 375 × 667 (the box around each control's centre where `elementFromPoint` returns the control): every control in the radio bar, the top-left buttons and the panel is 42–44 px or more, except at the panel's right edge, where the probe meets the scroll bar (the card toggles, whose tap area is their 44 px row, and "FR").
 
 ### 174. First load on slow 3G: a smaller first bundle — M
 

@@ -6,7 +6,7 @@ import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLanguage } from '@/hooks/useLanguage';
 import { ALWAYS_SHOWN, type IdleHide } from '@/hooks/useIdleHide';
-import { GLASS_SURFACE } from '@/utils/glassChrome';
+import { GLASS_SURFACE, TAP_TARGET } from '@/utils/glassChrome';
 import { getRainSoundGain } from '@/utils/rainUtils';
 import { STREAMS } from '@/utils/radioStreams';
 import { useRainSound } from '@/hooks/useRainSound';
@@ -42,7 +42,8 @@ const SWITCH_NIGHT = 'data-[state=unchecked]:bg-white/15 data-[state=checked]:bg
 // The Radix slider: the root holds the track (first span, with the range in it) and the thumb.
 // The night thumb is opaque: a see-through thumb shows the track through it. #adadaf is the
 // colour of the night switch thumb (white/60 on its white/15 track over the dark glass).
-const SLIDER_CLASS = 'w-16 sm:w-24 [&>span:first-child]:transition-colors [&>span:first-child>span]:transition-colors';
+// Item 173: the tap area reaches 12 px above and below the 20 px slider (44 px).
+const SLIDER_CLASS = 'w-16 sm:w-24 [&>span:first-child]:transition-colors [&>span:first-child>span]:transition-colors after:absolute after:inset-x-0 after:-inset-y-3';
 const SLIDER_NIGHT = '[&>span:first-child]:bg-white/15 [&>span:first-child>span]:bg-white/40 [&_[role=slider]]:bg-[#adadaf] [&_[role=slider]]:border-transparent [&_[role=slider]]:h-4 [&_[role=slider]]:w-4';
 
 const STATION_INDEX_KEY = 'radio_station_index';
@@ -281,7 +282,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ controls = ALWAYS_SHOWN, duck
       <Switch
         checked={isPlaying}
         onCheckedChange={handlePlayToggle}
-        className={`${SWITCH_CLASS} ${night ? SWITCH_NIGHT : SWITCH_DAY}`}
+        className={`${SWITCH_CLASS} ${TAP_TARGET} ${night ? SWITCH_NIGHT : SWITCH_DAY}`}
         aria-label={t('music.play')}
       />
       <Music className="h-4 w-4 text-white" />
@@ -292,7 +293,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ controls = ALWAYS_SHOWN, duck
         type="button"
         onClick={handleNext}
         aria-label={t('music.next')}
-        className="text-white/80 hover:text-white transition-colors rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70"
+        className={`text-white/80 hover:text-white transition-colors rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 ${TAP_TARGET}`}
       >
         <SkipForward className="h-4 w-4" />
       </button>
@@ -302,7 +303,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ controls = ALWAYS_SHOWN, duck
           onClick={() => setRainOn((on) => !on)}
           aria-pressed={rainOn}
           aria-label={t('music.rain')}
-          className={`${rainOn ? 'text-white' : 'text-white/50'} hover:text-white transition-colors rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70`}
+          className={`${rainOn ? 'text-white' : 'text-white/50'} hover:text-white transition-colors rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 ${TAP_TARGET}`}
         >
           <CloudRain className="h-4 w-4" />
         </button>

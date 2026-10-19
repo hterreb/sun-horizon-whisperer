@@ -19,5 +19,10 @@ export const GLASS_CARD_SURFACE =
 // glass surface, always fully rounded, with a hover state and a visible
 // keyboard focus ring. `hover:text-white` replaces the shadcn ghost variant's
 // near-black hover text: on a phone, :hover stays after a tap (ROADMAP item 81).
+// Item 173: a 44 × 44 px tap area around a small control (an empty `after:` box, centred), so
+// the icon keeps its size. The element must not be `absolute` (the class makes it `relative`).
+export const TAP_TARGET =
+  'relative after:absolute after:left-1/2 after:top-1/2 after:size-11 after:-translate-x-1/2 after:-translate-y-1/2';
+
 export const GLASS_ICON_BUTTON =
-  `${GLASS_SURFACE} rounded-full hover:bg-[hsl(var(--panel-background)/0.65)] hover:text-white focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-0`;
+  `${TAP_TARGET} ${GLASS_SURFACE} rounded-full hover:bg-[hsl(var(--panel-background)/0.65)] hover:text-white focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-0`;
