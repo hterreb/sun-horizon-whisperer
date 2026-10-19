@@ -135,6 +135,8 @@ const isOnIdleControl = ({ clientX: x, clientY: y }: MouseEvent): boolean =>
     const box = el.getBoundingClientRect();
     return x >= box.left && x < box.right && y >= box.top && y < box.bottom;
   });
+// Item 163: these events in a shown control (`data-idle-control`) are a use of it, and a wake.
+const CONTROL_USE_EVENTS = ['pointerdown', 'scroll', 'wheel', 'keydown'] as const;
 
 const clampEyeHeight = (value: number): number =>
   Number.isFinite(value) ? Math.min(MAX_EYE_HEIGHT_M, Math.max(0, value)) : DEFAULT_EYE_HEIGHT_M;
@@ -379,6 +381,14 @@ const SunTracker: React.FC = () => {
     const onPointerDown = () => {
       downClosesCardRef.current = infoCardOpenRef.current;
     };
+    // Item 163: use of a shown control is a wake: the controls stay, and the hide timer starts
+    // again. A touch scroll in the panel gives no click and no focus. A scroll does not bubble, so
+    // the window listens in the capture phase. A wake on shown controls changes no state.
+    const onControlUse = (event: Event) => {
+      if (showCursor && event.target instanceof Element && event.target.closest('[data-idle-control]') !== null) {
+        wakeCursor();
+      }
+    };
     // T2: a hidden control takes no taps (pointer-events-none), so a tap in its box lands on the
     // scene below. The window catches a tap on the empty sky first (capture), shows the controls
     // and stops it. A scene thing keeps its taps (item 157): a single tap shows the controls (T1),
@@ -426,9 +436,11 @@ const SunTracker: React.FC = () => {
     window.addEventListener('click', onClickCapture, true);
     document.addEventListener('pointermove', onPointerMove);
     document.addEventListener('click', onClick);
+    for (const type of CONTROL_USE_EVENTS) window.addEventListener(type, onControlUse, { capture: true, passive: true });
 
     return () => {
       cancelThingToggle();
+      for (const type of CONTROL_USE_EVENTS) window.removeEventListener(type, onControlUse, true);
       window.removeEventListener('pointerdown', onPointerDown, true);
       window.removeEventListener('click', onClickCapture, true);
       document.removeEventListener('pointermove', onPointerMove);

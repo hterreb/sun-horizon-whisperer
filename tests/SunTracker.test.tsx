@@ -587,6 +587,96 @@ describe('SunTracker', () => {
       });
     });
 
+    describe('item 163: use of a shown control is a wake', () => {
+      // The scroll area of the info panel (a scroll does not bubble) and the radio.
+      const panelScroll = () => document.querySelector('[data-idle-control] [data-radix-scroll-area-viewport]')!;
+      const radio = () => screen.getByRole('switch', { name: 'Play lo-fi music' });
+      // Enters fullscreen, hides the controls with a sky tap and shows them with the next one:
+      // the hide timer is now WAKE_HIDE_MS.
+      const showForTenSeconds = (scene: Element) => {
+        setFullscreenElement(document.documentElement);
+        tap(scene);
+        advance(1000);
+        tap(scene);
+        expect(shown()).toBe(true);
+        advance(TAP_READY_MS);
+      };
+
+      it('in fullscreen, a scroll in the panel each 2 s for 20 s keeps the controls; they hide 10 s after the last scroll', () => {
+        const scene = start();
+        // Before the first hide, a wake starts ENTER_HIDE_MS again (item 89).
+        setFullscreenElement(document.documentElement);
+        advance(2000);
+        fireEvent.scroll(panelScroll());
+        advance(2999);
+        expect(shown()).toBe(true);
+        advance(1);
+        expect(shown()).toBe(false);
+
+        advance(1000);
+        tap(scene);
+        advance(TAP_READY_MS);
+        for (let i = 0; i < 10; i++) {
+          advance(2000);
+          fireEvent.scroll(panelScroll());
+          expect(shown()).toBe(true);
+        }
+        expect(column()).not.toHaveClass('pointer-events-none');
+        advance(9999);
+        expect(shown()).toBe(true);
+        advance(1);
+        expect(shown()).toBe(false);
+      });
+
+      it('a pointerdown on the radio, a wheel and a key in the panel start the timer again; the controls keep their taps', () => {
+        const scene = start();
+        showForTenSeconds(scene);
+        advance(8000);
+        fireEvent.pointerDown(radio());
+        expect(column()).not.toHaveClass('pointer-events-none');
+        advance(8000);
+        fireEvent.wheel(panelScroll());
+        advance(8000);
+        fireEvent.keyDown(panelScroll(), { key: 'ArrowDown' });
+        expect(column()).not.toHaveClass('pointer-events-none');
+        advance(9999);
+        expect(shown()).toBe(true);
+        advance(1);
+        expect(shown()).toBe(false);
+      });
+
+      it('a scroll storm in the panel renders nothing again', () => {
+        const scene = start();
+        showForTenSeconds(scene);
+        const props = visProps.current;
+        for (let i = 0; i < 100; i++) fireEvent.scroll(panelScroll());
+        expect(visProps.current).toBe(props);
+      });
+
+      it('hidden controls do not come back on a scroll, a wheel, a key or a pointerdown in them; use of the scene is no wake', () => {
+        const scene = start();
+        showForTenSeconds(scene);
+        // A scroll that runs on after a sky tap hid the controls (a fling) does not show them.
+        tap(scene);
+        expect(shown()).toBe(false);
+        fireEvent.scroll(panelScroll());
+        fireEvent.wheel(panelScroll());
+        fireEvent.keyDown(panelScroll(), { key: 'ArrowDown' });
+        fireEvent.pointerDown(radio());
+        advance(60_000);
+        expect(shown()).toBe(false);
+
+        tap(scene);
+        expect(shown()).toBe(true);
+        advance(8000);
+        fireEvent.pointerDown(scene);
+        fireEvent.scroll(document);
+        fireEvent.keyDown(document.body, { key: 'ArrowDown' });
+        advance(2000);
+        expect(shown()).toBe(false);
+      });
+    });
+
     describe('item 158: one tap on the sun or the moon toggles, two open the card, seven start the egg', () => {
       // The installed app: the controls show until a tap (no 3 s hide after the start).
       const APP = '(display-mode: fullscreen)';
