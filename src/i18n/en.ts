@@ -50,7 +50,7 @@ export const en = {
 
   // Place search
   'search.label': 'Search for a place',
-  'search.placeholder': 'e.g. Friedrichshafen',
+  'search.placeholder': 'e.g. Lisbon',
   'search.searching': 'Searching…',
   'search.error': 'Could not search for places.',
   'search.noResults': 'No results',
@@ -178,6 +178,7 @@ export const en = {
   'moon.set': 'Moonset',
   'moon.upAllDay': 'Up all day',
   'moon.downAllDay': 'Down all day',
+  'moon.belowHorizon': 'below the horizon',
   'moon.nextFull': 'Next full moon:',
   'moon.nextNew': 'Next new moon:',
   'moonPhase.new': 'New Moon',
@@ -339,6 +340,7 @@ export const en = {
   'radar.status': '{nearby} nearby · {shown} in view',
   'radar.compassAll': 'the compass shows all',
   'radar.unavailable': 'Live radar unavailable',
+  'radar.refresh': 'Refresh live planes',
   'cloud.Ci': 'Cirrus',
   'cloud.Cs': 'Cirrostratus',
   'cloud.Ac': 'Altocumulus',
@@ -602,6 +604,9 @@ export const en = {
   'scene.satellite': 'Satellite',
   'satellite.tracking': 'Satellite tracking',
   'satellite.trackingHint': 'Real satellites from CelesTrak data',
+  'satellite.unavailable': 'Satellite data unavailable',
+  'satellite.nextTry': 'next try at {time}',
+  'satellite.refresh': 'Refresh satellite data',
   'satellite.passReminder': 'ISS visible at {time}, from {from} to {to}, up to {elevation}°',
   'issReminder.label': 'ISS passes',
   'issReminder.toggle': 'ISS passes: remind me {minutes} minutes before a visible pass (while the app is open)',
@@ -647,7 +652,7 @@ export const en = {
 
   // Toasts from SunTracker
   'toast.weatherUnavailableTitle': 'Weather unavailable',
-  'toast.weatherUnavailableDescription': 'Using default weather. Check your connection.',
+  'toast.weatherUnavailableDescription': 'Showing default weather. Trying again in a minute.',
   'toast.weatherFailedTitle': 'Weather fetch failed',
   'toast.weatherFailedDescription': 'Could not get current weather data.',
   'toast.geolocationUnsupportedTitle': 'Geolocation not supported',

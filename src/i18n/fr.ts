@@ -50,7 +50,7 @@ export const fr: Record<keyof typeof en, string> = {
 
   // Place search
   'search.label': "Rechercher un lieu",
-  'search.placeholder': "ex. Friedrichshafen",
+  'search.placeholder': "ex. Marseille",
   'search.searching': "Recherche…",
   'search.error': "Impossible de rechercher des lieux.",
   'search.noResults': "Aucun résultat",
@@ -178,6 +178,7 @@ export const fr: Record<keyof typeof en, string> = {
   'moon.set': "Coucher de la lune",
   'moon.upAllDay': "Visible toute la journée",
   'moon.downAllDay': "Invisible toute la journée",
+  'moon.belowHorizon': "sous l’horizon",
   'moon.nextFull': "Prochaine pleine lune :",
   'moon.nextNew': "Prochaine nouvelle lune :",
   'moonPhase.new': "Nouvelle lune",
@@ -339,6 +340,7 @@ export const fr: Record<keyof typeof en, string> = {
   'radar.status': "{nearby} à proximité · {shown} en vue",
   'radar.compassAll': "la boussole les montre tous",
   'radar.unavailable': "Radar en direct indisponible",
+  'radar.refresh': "Actualiser les avions en direct",
   'cloud.Ci': "Cirrus",
   'cloud.Cs': "Cirrostratus",
   'cloud.Ac': "Altocumulus",
@@ -602,6 +604,9 @@ export const fr: Record<keyof typeof en, string> = {
   'scene.satellite': "Satellite",
   'satellite.tracking': "Suivi des satellites",
   'satellite.trackingHint': "Des satellites réels d'après les données CelesTrak",
+  'satellite.unavailable': "Données des satellites indisponibles",
+  'satellite.nextTry': "prochain essai à {time}",
+  'satellite.refresh': "Actualiser les données des satellites",
   'satellite.passReminder': "ISS visible à {time}, de {from} à {to}, jusqu’à {elevation}°",
   'issReminder.label': "Passages de l'ISS",
   'issReminder.toggle': "Passages de l'ISS : me prévenir {minutes} minutes avant un passage visible (app ouverte)",
@@ -647,7 +652,7 @@ export const fr: Record<keyof typeof en, string> = {
 
   // Toasts from SunTracker
   'toast.weatherUnavailableTitle': "Météo indisponible",
-  'toast.weatherUnavailableDescription': "Météo par défaut utilisée. Vérifiez votre connexion.",
+  'toast.weatherUnavailableDescription': "Météo par défaut affichée. Nouvel essai dans une minute.",
   'toast.weatherFailedTitle': "Échec du chargement de la météo",
   'toast.weatherFailedDescription': "Impossible d’obtenir les données météo actuelles.",
   'toast.geolocationUnsupportedTitle': "Géolocalisation non prise en charge",

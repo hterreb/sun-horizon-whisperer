@@ -61,7 +61,7 @@ import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { useSunsetCountdown, primeCountdownAudio } from '@/hooks/useSunsetCountdown';
 import { useSunsetReminder, requestReminderPermission, getNotificationPermission } from '@/hooks/useSunsetReminder';
 import { SUNSET_REMINDER_MIN } from '@/utils/sunsetReminder';
-import { useSatelliteTracking, useSatellitePassReminder } from '@/hooks/useSatelliteTracking';
+import { getSatellitesTag, useSatelliteTracking, useSatellitePassReminder } from '@/hooks/useSatelliteTracking';
 import { PASS_REMINDER_MIN, getSatelliteCard } from '@/utils/satelliteUtils';
 import { loadManualLocation, saveManualLocation, clearManualLocation } from '../utils/manualLocation';
 import {
@@ -135,6 +135,8 @@ const isOnIdleControl = ({ clientX: x, clientY: y }: MouseEvent): boolean =>
     const box = el.getBoundingClientRect();
     return x >= box.left && x < box.right && y >= box.top && y < box.bottom;
   });
+// Item 163: these events in a shown control (`data-idle-control`) are a use of it, and a wake.
+const CONTROL_USE_EVENTS = ['pointerdown', 'scroll', 'wheel', 'keydown'] as const;
 
 const clampEyeHeight = (value: number): number =>
   Number.isFinite(value) ? Math.min(MAX_EYE_HEIGHT_M, Math.max(0, value)) : DEFAULT_EYE_HEIGHT_M;
@@ -171,6 +173,9 @@ const PICADO_COLORS = [1, 2, 3, 4, 5].map((n) => `hsl(var(--scene-festival-paste
 const CHRISTMAS_LIGHT_COLORS = [1, 2, 3, 4].map((n) => `hsl(var(--scene-xmas-bulb-${n}))`);
 // Item 123: a New Year show takes taps for its 12-13 s (Fireworks.planShow), plus a little slack.
 const NEW_YEAR_TAP_MS = 15_000;
+
+// Item 165: the waits before the retries of a failed weather answer.
+const WEATHER_RETRY_MS = [60_000, 120_000, 300_000];
 
 const SunTracker: React.FC = () => {
   const [date, setDate] = useState<Date>(new Date());
@@ -379,6 +384,14 @@ const SunTracker: React.FC = () => {
     const onPointerDown = () => {
       downClosesCardRef.current = infoCardOpenRef.current;
     };
+    // Item 163: use of a shown control is a wake: the controls stay, and the hide timer starts
+    // again. A touch scroll in the panel gives no click and no focus. A scroll does not bubble, so
+    // the window listens in the capture phase. A wake on shown controls changes no state.
+    const onControlUse = (event: Event) => {
+      if (showCursor && event.target instanceof Element && event.target.closest('[data-idle-control]') !== null) {
+        wakeCursor();
+      }
+    };
     // T2: a hidden control takes no taps (pointer-events-none), so a tap in its box lands on the
     // scene below. The window catches a tap on the empty sky first (capture), shows the controls
     // and stops it. A scene thing keeps its taps (item 157): a single tap shows the controls (T1),
@@ -426,9 +439,11 @@ const SunTracker: React.FC = () => {
     window.addEventListener('click', onClickCapture, true);
     document.addEventListener('pointermove', onPointerMove);
     document.addEventListener('click', onClick);
+    for (const type of CONTROL_USE_EVENTS) window.addEventListener(type, onControlUse, { capture: true, passive: true });
 
     return () => {
       cancelThingToggle();
+      for (const type of CONTROL_USE_EVENTS) window.removeEventListener(type, onControlUse, true);
       window.removeEventListener('pointerdown', onPointerDown, true);
       window.removeEventListener('click', onClickCapture, true);
       document.removeEventListener('pointermove', onPointerMove);
@@ -490,9 +505,16 @@ const SunTracker: React.FC = () => {
     applyTimeOffset(0);
   }, [applyTimeOffset]);
 
-  const fetchWeatherData = useCallback(async () => {
+  // Item 165: the number of the latest weather request. An older place's answer that
+  // arrives later is dropped, or it would stay until the next 30-minute refresh.
+  const weatherRequestRef = React.useRef(0);
+  // The number of retries since the last good answer, a place change or a refresh tap.
+  const weatherRetriesRef = React.useRef(0);
+  const fetchWeatherData = useCallback(async (isRetry = false) => {
     if (!location.loaded) return;
 
+    const request = ++weatherRequestRef.current;
+    const isLatest = () => request === weatherRequestRef.current;
     setIsLoadingWeather(true);
     try {
       // Sunset score (ROADMAP item 11) needs today's and tomorrow's sunset time.
@@ -511,15 +533,18 @@ const SunTracker: React.FC = () => {
         todaySunTimes.sunset,
         tomorrowSunTimes.sunset
       );
+      if (!isLatest()) return;
       setWeatherData(weather);
+      if (weather.isRealWeather) weatherRetriesRef.current = 0;
 
       if (useRealWeather) {
         setWeatherType(weather.weatherType);
       }
 
       // Only surface a toast when the refresh actually failed; a successful
-      // refresh (every 30 min, or a cache hit) should stay silent.
-      if (!weather.isRealWeather) {
+      // refresh (every 30 min, or a cache hit) should stay silent. A retry that fails
+      // again stays silent too: the first toast already said it tries again.
+      if (!weather.isRealWeather && !isRetry) {
         toast({
           title: t('toast.weatherUnavailableTitle'),
           description: t('toast.weatherUnavailableDescription'),
@@ -527,6 +552,7 @@ const SunTracker: React.FC = () => {
         });
       }
     } catch (error) {
+      if (!isLatest()) return;
       console.error('[SunTracker Debug] Error fetching weather:', error);
       toast({
         title: t('toast.weatherFailedTitle'),
@@ -534,7 +560,7 @@ const SunTracker: React.FC = () => {
         variant: "destructive"
       });
     } finally {
-      setIsLoadingWeather(false);
+      if (isLatest()) setIsLoadingWeather(false);
     }
   }, [location.loaded, location.latitude, location.longitude, useRealWeather, t]);
 
@@ -546,11 +572,28 @@ const SunTracker: React.FC = () => {
     if (!(location.loaded && useRealWeather)) return;
 
     const timeoutId = setTimeout(() => {
+      weatherRetriesRef.current = 0;
       fetchWeatherData();
     }, 0);
 
     return () => clearTimeout(timeoutId);
   }, [location.loaded, useRealWeather, fetchWeatherData]);
+
+  // Item 165: a failed weather answer (a 503, a dropped connection) is tried again after
+  // 1, 2 and 5 min (WEATHER_RETRY_MS); after that only the 30-minute refresh asks. A good
+  // answer, a place change or a refresh tap starts the series again. Each failed answer is
+  // a new object, so the effect sets the next timer after each try.
+  const isWeatherFailed = useRealWeather && liveWeatherData?.isRealWeather === false;
+  useEffect(() => {
+    if (!isWeatherFailed) return;
+    const delay = WEATHER_RETRY_MS[weatherRetriesRef.current];
+    if (delay === undefined) return;
+    const retryTimer = setTimeout(() => {
+      weatherRetriesRef.current += 1;
+      fetchWeatherData(true);
+    }, delay);
+    return () => clearTimeout(retryTimer);
+  }, [isWeatherFailed, liveWeatherData, fetchWeatherData]);
 
   // Auto-refresh weather every 30 minutes
   useEffect(() => {
@@ -1140,6 +1183,12 @@ const SunTracker: React.FC = () => {
     isPassReminderOn
   );
   useSatellitePassReminder(satelliteTracking.issPass, isPassReminderOn, language);
+  // Item 164: the status for the panel and the Sentry tag `satellites`, set only when it changes
+  // (as `live-planes`): `off` while the tracking does not run; in `ok-<n>`, n is the visible
+  // satellites in the hook's sky (the scene can draw fewer: terrain, clouds).
+  const satelliteStatus = isSatelliteTrackingOn && location.loaded ? satelliteTracking.status : null;
+  const satellitesTag = getSatellitesTag(satelliteStatus, satelliteTracking.sky?.filter((sat) => sat.visible).length ?? 0);
+  useEffect(() => { Sentry.setTag('satellites', satellitesTag); }, [satellitesTag]);
   // The open card of a tracked satellite, updated every 10 s.
   const cardSatelliteId = infoCard?.target.type === 'satellite' ? infoCard.target.id : null;
   const satelliteCardStep = Math.floor(date.getTime() / SATELLITE_CARD_STEP_MS);
@@ -1231,7 +1280,9 @@ const SunTracker: React.FC = () => {
   const upperAir = useRealWeather ? getUpperAirAt(weatherData?.hourly ?? null, date) : null;
   const contrail = getContrail(upperAir?.tempC, upperAir?.rhPercent);
   const isLiveRadarActive = isLivePlanesOn && location.loaded && !premium.isLocked && !isTimePreview;
-  const { state: liveFeed, status: liveFeedStatus } = useLivePlanes(isLiveRadarActive, location.latitude, location.longitude);
+  const {
+    state: liveFeed, status: liveFeedStatus, refresh: refreshLivePlanes, refreshing: isLiveRefreshing,
+  } = useLivePlanes(isLiveRadarActive, location.latitude, location.longitude);
   // While the radar is on and its first answer is on the way, no plane shows.
   const livePlanes: LivePlanesState | null = isLiveRadarActive ? liveFeed ?? NO_LIVE_PLANES : null;
   // Item 155: the status line under the switch and the Sentry tag `live-planes` (no coordinates
@@ -1281,6 +1332,7 @@ const SunTracker: React.FC = () => {
   };
 
   const handleWeatherRefresh = () => {
+    weatherRetriesRef.current = 0;
     fetchWeatherData();
   };
 
@@ -1480,8 +1532,13 @@ const SunTracker: React.FC = () => {
             isLivePlanesOn={isLivePlanesOn}
             onLivePlanesToggle={handleLivePlanesToggle}
             liveRadarStatus={liveStatus && {
-              status: liveStatus, nearby: liveNearby, shown: liveShown, compassOff: compassStatus === 'idle',
+              status: liveStatus, nearby: liveNearby, shown: liveShown, compassOff: compassStatus === 'idle', refreshing: isLiveRefreshing,
             }}
+            onLivePlanesRefresh={refreshLivePlanes}
+            satelliteStatus={satelliteStatus && {
+              status: satelliteStatus, refreshing: satelliteTracking.refreshing, nextTryAt: satelliteTracking.nextTryAt,
+            }}
+            onSatelliteRefresh={satelliteTracking.refresh}
             onCollectionOpen={handleCollectionOpen}
             onCountryChange={setDetectedCountry}
           />

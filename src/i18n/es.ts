@@ -50,7 +50,7 @@ export const es: Record<keyof typeof en, string> = {
 
   // Place search
   'search.label': "Buscar un lugar",
-  'search.placeholder': "p. ej., Friedrichshafen",
+  'search.placeholder': "p. ej., Sevilla",
   'search.searching': "Buscando…",
   'search.error': "No se pudieron buscar lugares.",
   'search.noResults': "Sin resultados",
@@ -178,6 +178,7 @@ export const es: Record<keyof typeof en, string> = {
   'moon.set': "Puesta de la luna",
   'moon.upAllDay': "Visible todo el día",
   'moon.downAllDay': "Oculta todo el día",
+  'moon.belowHorizon': "bajo el horizonte",
   'moon.nextFull': "Próxima luna llena:",
   'moon.nextNew': "Próxima luna nueva:",
   'moonPhase.new': "Luna nueva",
@@ -339,6 +340,7 @@ export const es: Record<keyof typeof en, string> = {
   'radar.status': "{nearby} cerca · {shown} a la vista",
   'radar.compassAll': "la brújula los muestra todos",
   'radar.unavailable': "Radar en directo no disponible",
+  'radar.refresh': "Actualizar los aviones en directo",
   'cloud.Ci': "Cirros",
   'cloud.Cs': "Cirrostratos",
   'cloud.Ac': "Altocúmulos",
@@ -602,6 +604,9 @@ export const es: Record<keyof typeof en, string> = {
   'scene.satellite': "Satélite",
   'satellite.tracking': "Seguimiento de satélites",
   'satellite.trackingHint': "Satélites reales con datos de CelesTrak",
+  'satellite.unavailable': "Datos de satélites no disponibles",
+  'satellite.nextTry': "próximo intento a las {time}",
+  'satellite.refresh': "Actualizar los datos de satélites",
   'satellite.passReminder': "ISS visible a las {time}, de {from} a {to}, hasta {elevation}°",
   'issReminder.label': "Pasos de la ISS",
   'issReminder.toggle': "Pasos de la ISS: avísame {minutes} minutos antes de un paso visible (con la app abierta)",
@@ -647,7 +652,7 @@ export const es: Record<keyof typeof en, string> = {
 
   // Toasts from SunTracker
   'toast.weatherUnavailableTitle': "Tiempo no disponible",
-  'toast.weatherUnavailableDescription': "Se usa el tiempo por defecto. Comprueba tu conexión.",
+  'toast.weatherUnavailableDescription': "Se muestra el tiempo por defecto. Se reintentará en un minuto.",
   'toast.weatherFailedTitle': "Error al obtener el tiempo",
   'toast.weatherFailedDescription': "No se pudieron obtener los datos del tiempo.",
   'toast.geolocationUnsupportedTitle': "Geolocalización no disponible",

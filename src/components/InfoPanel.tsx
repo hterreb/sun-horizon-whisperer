@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Wind, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward, Bell, BellRing, AlarmClock, AlarmClockCheck, Satellite, Award, Database } from 'lucide-react';
+import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Wind, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward, Bell, BellRing, AlarmClock, AlarmClockCheck, Satellite, Award, Database, CircleAlert } from 'lucide-react';
 import { isFeedbackAvailable, openFeedbackForm } from '@/utils/feedback';
 import DataSourcesDialog from './DataSourcesDialog';
 import { ScrollArea } from './ui/scroll-area';
@@ -37,6 +37,7 @@ import { formatTemperature, type TemperatureUnit } from '@/utils/temperatureUnit
 import { SUNSET_REMINDER_MIN } from '@/utils/sunsetReminder';
 import { PASS_REMINDER_MIN } from '@/utils/satelliteUtils';
 import { type LiveStatus } from '@/utils/liveRadar';
+import { type SatelliteStatus } from '@/hooks/useSatelliteTracking';
 import { LANGUAGES, LANGUAGE_NAMES, type Language } from '@/utils/language';
 import { formatNumber, translate, type MessageKey } from '@/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -50,6 +51,9 @@ export const ROW = 'flex justify-between items-center gap-2 border-t border-[hsl
 const SECTION_HEADING = 'text-title font-bold flex items-center';
 export const ICON_TOGGLE = 'p-1.5 rounded-full hover:bg-white/10 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70';
 export const FOCUS_RING = 'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70';
+// Item 165: a card's toggle stretches over its header row (the row is `relative`), so a tap
+// on the title opens the card too, not only the chevron.
+const SECTION_TOGGLE = `${ICON_TOGGLE} after:absolute after:inset-0`;
 
 // A compact variant of ICON_TOGGLE for the inline "line of sight" buttons (ROADMAP
 // item 30), which sit inside an already-tight row and must not push it past one
@@ -83,6 +87,25 @@ const formatMoonDate = (date: Date, language: Language): string =>
 // terrain delta above.
 const renderWindow = ({ text, isNow }: { text: string; isNow: boolean }): React.ReactNode =>
   isNow ? <span className="text-brand-peach">{text}</span> : text;
+
+// Item 164: a live feed in `error` (live planes, satellite tracking) gets a red icon next to its
+// name and a refresh button as the weather's (the icon turns while the refresh runs).
+const FeedErrorIcon = ({ label }: { label: string }) => (
+  <CircleAlert size={14} className="text-red-400 shrink-0" role="img" aria-label={label} />
+);
+const FeedRefreshButton = ({ label, onClick, refreshing, disabled = false, className = '' }: {
+  label: string; onClick: () => void; refreshing: boolean; disabled?: boolean; className?: string;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={refreshing || disabled}
+    className={`${ICON_TOGGLE} disabled:opacity-50 shrink-0 ${className}`}
+    aria-label={label}
+  >
+    <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+  </button>
+);
 
 interface InfoPanelProps {
   sunPosition: SunPosition;
@@ -156,7 +179,13 @@ interface InfoPanelProps {
   // Item 155: the status line under the switch while the radar runs; null: no line. `nearby` is
   // the aircraft in the last answer, `shown` the planes drawn; `compassOff`: the compass button
   // is there and compass mode is off.
-  liveRadarStatus?: { status: LiveStatus; nearby: number; shown: number; compassOff: boolean } | null;
+  liveRadarStatus?: { status: LiveStatus; nearby: number; shown: number; compassOff: boolean; refreshing?: boolean } | null;
+  // Item 164: in `error`, a red icon, a red line and this refresh (asks the feed at once).
+  onLivePlanesRefresh?: () => void;
+  // Item 164: the satellite tracking's status while the tracking runs (null: none). In `error`:
+  // a red icon, a red line and the refresh; `nextTryAt` (CelesTrak's wait) disables the refresh.
+  satelliteStatus?: { status: SatelliteStatus; refreshing: boolean; nextTryAt: number | null } | null;
+  onSatelliteRefresh?: () => void;
   // Collection badges (ROADMAP item 112): the row button that opens the collection.
   onCollectionOpen?: () => void;
   // National days (utils/nationalDays): the place's country code from the reverse-geocode
@@ -215,6 +244,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   isLivePlanesOn = false,
   onLivePlanesToggle,
   liveRadarStatus = null,
+  onLivePlanesRefresh,
+  satelliteStatus = null,
+  onSatelliteRefresh,
   onCollectionOpen,
   onCountryChange,
 }) => {
@@ -222,6 +254,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   // Premium gate (ROADMAP item 14): every gold-plus control goes through requirePremium.
   const { isLocked, requirePremium } = usePremiumGate();
   const formatLocalTime = (date: Date | null) => formatTime(date, language);
+  // Item 164: a live feed in `error` while its switch is on.
+  const isLiveRadarError = isLivePlanesOn && liveRadarStatus?.status === 'error';
+  const isSatelliteError = isSatelliteTrackingOn && satelliteStatus?.status === 'error';
   // '' until the first lookup ends; null when the lookup found no place name.
   const [locationName, setLocationName] = useState<string | null>('');
   // Item 137: the shown name comes from Photon (OpenStreetMap data) and needs the attribution.
@@ -234,7 +269,6 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   const [latInput, setLatInput] = useState('');
   const [lonInput, setLonInput] = useState('');
   const [locationError, setLocationError] = useState<string | null>(null);
-  const latInputRef = useRef<HTMLInputElement>(null);
   const changeLocationButtonRef = useRef<HTMLButtonElement>(null);
   const [isMoonCollapsed, setIsMoonCollapsed] = useState(true);
   const [isTwilightCollapsed, setIsTwilightCollapsed] = useState(false);
@@ -376,13 +410,6 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   useEffect(() => {
     onPlaceName?.(shownPlaceName);
   }, [shownPlaceName, onPlaceName]);
-
-  // Focus the latitude field when the manual-location form opens.
-  useEffect(() => {
-    if (isLocationFormOpen) {
-      latInputRef.current?.focus();
-    }
-  }, [isLocationFormOpen]);
 
   const openLocationForm = () => {
     setLatInput(location.latitude.toFixed(4));
@@ -589,21 +616,26 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className={`ml-2 ${ICON_TOGGLE} shrink-0`}
+          className={`ml-2 ${ICON_TOGGLE} shrink-0 relative`}
           aria-label={isCollapsed ? t('panel.expand') : t('panel.collapse')}
         >
           {isCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+          {/* Item 164 (option 6): the closed panel shows a feed in `error` too. */}
+          {isCollapsed && (isLiveRadarError || isSatelliteError) && (
+            <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-red-400" data-testid="panel-error-dot" aria-hidden="true" />
+          )}
         </button>
       </div>
 
       {!isCollapsed && isLocationFormOpen && (
         <form onSubmit={handleSubmitLocation} noValidate className="mx-4 mb-3 p-2 space-y-2 text-caption bg-white/10 rounded">
-          <PlaceSearch onSelect={handleSelectPlace} />
+          {/* Item 165: the cursor starts in the search, so a typed place and Enter search it
+              (in the latitude field, Enter set the old coordinates again). */}
+          <PlaceSearch onSelect={handleSelectPlace} autoFocus />
           <div className="flex flex-col gap-1">
             <label htmlFor="manual-location-lat" className="opacity-80">{t('location.latitude')}</label>
             <input
               id="manual-location-lat"
-              ref={latInputRef}
               type="number"
               step="any"
               min={-90}
@@ -631,7 +663,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           )}
           <div className="flex flex-wrap gap-2 pt-1">
             <Button type="submit" size="sm" variant="secondary" className="rounded-full">{t('location.set')}</Button>
-            <Button type="button" size="sm" variant="outline" className="rounded-full" onClick={handleUseMyLocationClick}>
+            {/* Item 165: the outline variant's white fill under the panel's white text hid the label. */}
+            <Button type="button" size="sm" variant="outline" className="rounded-full bg-transparent border-white/40 hover:bg-white/10 hover:text-white" onClick={handleUseMyLocationClick}>
               {t('location.useMine')}
             </Button>
           </div>
@@ -664,11 +697,13 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 </button>
               </div>
 
-              <div className="space-y-1">
+              {/* Item 165: dimmed while a new answer loads, so the old place's weather does not read as the new one's. */}
+              <div className={`space-y-1 transition-opacity ${isLoadingWeather ? 'opacity-50' : ''}`} aria-busy={isLoadingWeather}>
                 <div className={ROW}>
                   <span className="opacity-80 text-body">{t('weather.temperature')}</span>
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-body tabular-nums">{formatTemperature(weatherData.temperature, temperatureUnit)}</span>
+                    {/* Item 165: the fallback weather's 20 °C read as a real temperature. */}
+                    <span className="font-semibold text-body tabular-nums">{weatherData.isRealWeather ? formatTemperature(weatherData.temperature, temperatureUnit) : '–'}</span>
                     <div className="flex bg-white/10 rounded-full p-1" role="group" aria-label={t('weather.temperatureUnit')}>
                       {(['C', 'F'] as const).map((unit) => (
                         <button
@@ -736,6 +771,15 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 <label htmlFor="live-planes" className={`${SECTION_HEADING} inline-flex items-center gap-1`}>
                   {t('radar.livePlanes')}<PremiumBadge />
                 </label>
+                {/* Item 164: outside the label, so the switch keeps its name. */}
+                {isLiveRadarError && (
+                  <>
+                    <span className="mr-auto inline-flex"><FeedErrorIcon label={t('radar.unavailable')} /></span>
+                    {onLivePlanesRefresh && (
+                      <FeedRefreshButton label={t('radar.refresh')} onClick={onLivePlanesRefresh} refreshing={!!liveRadarStatus?.refreshing} />
+                    )}
+                  </>
+                )}
                 <Switch
                   id="live-planes"
                   checked={isLivePlanesOn}
@@ -744,7 +788,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               </div>
               {/* Item 155: what the radar finds; without the compass the 360° view shows few. */}
               {isLivePlanesOn && liveRadarStatus && (
-                <p className="text-caption mt-1" data-testid="live-planes-status">
+                <p className={`text-caption mt-1 ${isLiveRadarError ? 'text-red-400' : ''}`} data-testid="live-planes-status">
                   {liveRadarStatus.status === 'ok'
                     ? t('radar.status', { nearby: liveRadarStatus.nearby, shown: liveRadarStatus.shown })
                       + (liveRadarStatus.compassOff && liveRadarStatus.shown < liveRadarStatus.nearby ? ` · ${t('radar.compassAll')}` : '')
@@ -793,12 +837,14 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
           {/* Time information */}
           <div className="space-y-1">
-            <div className={ROW}>
+            {/* Item 165: the open date field is wider than the row on a phone in fr/es: the
+                controls wrap to a second line, on the right. */}
+            <div className={`${ROW} flex-wrap`}>
               <div className="flex items-center">
                 <Clock size={18} className="mr-2" />
                 <span className="text-body inline-flex items-center gap-1 whitespace-nowrap">{isTimePreview ? t('time.preview') : t('time.current')}<PremiumBadge /></span>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 ml-auto">
                 <button
                   type="button"
                   onClick={() => requirePremium(() => onTimePlay(-1))}
@@ -958,7 +1004,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
           {/* Moon information - collapsible, shown even when the moon is below the horizon */}
           <div className="mt-6 pt-4 border-t border-white/20">
-            <div className="flex items-center justify-between mb-2">
+            <div className="relative flex items-center justify-between mb-2">
               <h3 className={SECTION_HEADING}>
                 <Moon size={16} className="mr-2" />
                 {t('moon.title')}
@@ -968,7 +1014,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   userToggledMoonRef.current = true;
                   setIsMoonCollapsed(!isMoonCollapsed);
                 }}
-                className={ICON_TOGGLE}
+                className={SECTION_TOGGLE}
                 aria-label={isMoonCollapsed ? t('moon.expand') : t('moon.collapse')}
               >
                 {isMoonCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
@@ -989,7 +1035,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 </div>
                 <div className={ROW}>
                   <span className="text-caption">{t('common.altitude')}</span>
-                  <span className="text-caption tabular-nums">{formatNumber(language, moonPosition.altitude, 1)}°</span>
+                  {/* Item 165: a negative number alone did not tell first users where the moon is. */}
+                  <span className="text-caption tabular-nums">
+                    {formatNumber(language, moonPosition.altitude, 1)}°{moonPosition.altitude < 0 && ` · ${t('moon.belowHorizon')}`}
+                  </span>
                 </div>
                 <div className={ROW}>
                   <span className="text-caption">{t('common.azimuth')}</span>
@@ -1064,13 +1113,13 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               default (ROADMAP item 24) - not part of the time-of-day auto-collapse
               effect, so it stays as the user left it. */}
           <div className="mt-6 pt-4 border-t border-white/20">
-            <div className="flex items-center justify-between mb-2">
+            <div className="relative flex items-center justify-between mb-2">
               <h3 className={SECTION_HEADING}>
                 {t('golden.title')}
               </h3>
               <button
                 onClick={() => setIsGoldenBlueCollapsed(!isGoldenBlueCollapsed)}
-                className={ICON_TOGGLE}
+                className={SECTION_TOGGLE}
                 aria-label={isGoldenBlueCollapsed ? t('golden.expand') : t('golden.collapse')}
                 aria-expanded={!isGoldenBlueCollapsed}
               >
@@ -1114,7 +1163,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
           {/* Upcoming twilight times - collapsible */}
           <div className="mt-6 pt-4 border-t border-white/20">
-            <div className="flex items-center justify-between mb-2">
+            <div className="relative flex items-center justify-between mb-2">
               <h3 className={SECTION_HEADING}>
                 {relevantTwilightTimes.type === 'dawn' ? t('twilight.dawnTitle') : t('twilight.duskTitle')}
               </h3>
@@ -1123,7 +1172,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   userToggledTwilightRef.current = true;
                   setIsTwilightCollapsed(!isTwilightCollapsed);
                 }}
-                className={ICON_TOGGLE}
+                className={SECTION_TOGGLE}
                 aria-label={isTwilightCollapsed ? t('twilight.expand') : t('twilight.collapse')}
               >
                 {isTwilightCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
@@ -1151,7 +1200,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                       >
                         {t('common.labelColon', { label: t('twilight.civil') })}
                       </button>
-                      <span className="text-caption tabular-nums">{formatLocalTime(sunTimes.sunset)} - {formatLocalTime(relevantTwilightTimes.civil)}</span>
+                      <span className="text-caption tabular-nums">{formatLocalTime(sunTimes.sunset)} – {formatLocalTime(relevantTwilightTimes.civil)}</span>
                     </div>
                     {hoveredTwilight === 'civil' && (
                       <div id="twilight-degree-civil" className="text-caption opacity-60 ml-2">
@@ -1173,7 +1222,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                       >
                         {t('common.labelColon', { label: t('twilight.nautical') })}
                       </button>
-                      <span className="text-caption tabular-nums">{formatLocalTime(relevantTwilightTimes.civil)} - {formatLocalTime(relevantTwilightTimes.nautical)}</span>
+                      <span className="text-caption tabular-nums">{formatLocalTime(relevantTwilightTimes.civil)} – {formatLocalTime(relevantTwilightTimes.nautical)}</span>
                     </div>
                     {hoveredTwilight === 'nautical' && (
                       <div id="twilight-degree-nautical" className="text-caption opacity-60 ml-2">
@@ -1195,7 +1244,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                       >
                         {t('common.labelColon', { label: t('twilight.astronomical') })}
                       </button>
-                      <span className="text-caption tabular-nums">{formatLocalTime(relevantTwilightTimes.nautical)} - {formatLocalTime(relevantTwilightTimes.astronomical)}</span>
+                      <span className="text-caption tabular-nums">{formatLocalTime(relevantTwilightTimes.nautical)} – {formatLocalTime(relevantTwilightTimes.astronomical)}</span>
                     </div>
                     {hoveredTwilight === 'astronomical' && (
                       <div id="twilight-degree-astronomical" className="text-caption opacity-60 ml-2">
@@ -1220,7 +1269,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                       >
                         {t('common.labelColon', { label: t('twilight.astronomical') })}
                       </button>
-                      <span className="text-caption tabular-nums">{formatLocalTime(relevantTwilightTimes.astronomical)} - {formatLocalTime(relevantTwilightTimes.nautical)}</span>
+                      <span className="text-caption tabular-nums">{formatLocalTime(relevantTwilightTimes.astronomical)} – {formatLocalTime(relevantTwilightTimes.nautical)}</span>
                     </div>
                     {hoveredTwilight === 'astronomical' && (
                       <div id="twilight-degree-astronomical" className="text-caption opacity-60 ml-2">
@@ -1242,7 +1291,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                       >
                         {t('common.labelColon', { label: t('twilight.nautical') })}
                       </button>
-                      <span className="text-caption tabular-nums">{formatLocalTime(relevantTwilightTimes.nautical)} - {formatLocalTime(relevantTwilightTimes.civil)}</span>
+                      <span className="text-caption tabular-nums">{formatLocalTime(relevantTwilightTimes.nautical)} – {formatLocalTime(relevantTwilightTimes.civil)}</span>
                     </div>
                     {hoveredTwilight === 'nautical' && (
                       <div id="twilight-degree-nautical" className="text-caption opacity-60 ml-2">
@@ -1264,7 +1313,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                       >
                         {t('common.labelColon', { label: t('twilight.civil') })}
                       </button>
-                      <span className="text-caption tabular-nums">{formatLocalTime(relevantTwilightTimes.civil)} - {formatLocalTime(sunTimes.sunrise)}</span>
+                      <span className="text-caption tabular-nums">{formatLocalTime(relevantTwilightTimes.civil)} – {formatLocalTime(sunTimes.sunrise)}</span>
                     </div>
                     {hoveredTwilight === 'civil' && (
                       <div id="twilight-degree-civil" className="text-caption opacity-60 ml-2">
@@ -1279,14 +1328,14 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
           {/* Sun position - collapsible */}
           <div className="mt-6 pt-4 border-t border-white/20">
-            <div className="flex items-center justify-between mb-2">
+            <div className="relative flex items-center justify-between mb-2">
               <h3 className={SECTION_HEADING}>{t('sunPosition.title')}</h3>
               <button
                 onClick={() => {
                   userToggledSunPositionRef.current = true;
                   setIsSunPositionCollapsed(!isSunPositionCollapsed);
                 }}
-                className={ICON_TOGGLE}
+                className={SECTION_TOGGLE}
                 aria-label={isSunPositionCollapsed ? t('sunPosition.expand') : t('sunPosition.collapse')}
               >
                 {isSunPositionCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
@@ -1312,30 +1361,51 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           {/* Satellite tracking (ROADMAP item 97): Premium in the Play app. The ISS passes
               toggle sits next to the switch (item 154) and works with the tracking off. */}
           {onSatelliteTrackingToggle && (
-            <div className="mt-6 pt-4 border-t border-white/20 flex items-center justify-between gap-2" title={t('satellite.trackingHint')}>
-              <span className="text-caption opacity-80 inline-flex items-center gap-1">
-                <Satellite size={14} className="mr-1" />
-                {t('satellite.tracking')}
-                <PremiumBadge />
-              </span>
-              {onIssReminderToggle && (
-                <button
-                  type="button"
-                  onClick={() => requirePremium(onIssReminderToggle)}
-                  className={`${INLINE_ICON_TOGGLE} relative ml-auto ${isIssReminderOn ? 'bg-white/20' : ''}`}
-                  aria-label={t('issReminder.label')}
-                  title={t('issReminder.toggle', { minutes: PASS_REMINDER_MIN })}
-                  aria-pressed={isIssReminderOn}
-                >
-                  <Satellite size={14} />
-                  <PremiumBadge className="absolute -right-1 -top-1 h-2.5 w-2.5" />
-                </button>
+            <div className="mt-6 pt-4 border-t border-white/20">
+              <div className="flex items-center justify-between gap-2" title={t('satellite.trackingHint')}>
+                <span className="text-caption opacity-80 inline-flex items-center gap-1">
+                  <Satellite size={14} className="mr-1" />
+                  {t('satellite.tracking')}
+                  <PremiumBadge />
+                </span>
+                {/* Item 164: outside the span, so its opacity does not dim the red. */}
+                {isSatelliteError && <FeedErrorIcon label={t('satellite.unavailable')} />}
+                {onIssReminderToggle && (
+                  <button
+                    type="button"
+                    onClick={() => requirePremium(onIssReminderToggle)}
+                    className={`${INLINE_ICON_TOGGLE} relative ml-auto ${isIssReminderOn ? 'bg-white/20' : ''}`}
+                    aria-label={t('issReminder.label')}
+                    title={t('issReminder.toggle', { minutes: PASS_REMINDER_MIN })}
+                    aria-pressed={isIssReminderOn}
+                  >
+                    <Satellite size={14} />
+                    <PremiumBadge className="absolute -right-1 -top-1 h-2.5 w-2.5" />
+                  </button>
+                )}
+                {isSatelliteError && onSatelliteRefresh && (
+                  <FeedRefreshButton
+                    label={t('satellite.refresh')}
+                    onClick={onSatelliteRefresh}
+                    refreshing={!!satelliteStatus?.refreshing}
+                    disabled={satelliteStatus?.nextTryAt != null}
+                    className={onIssReminderToggle ? '' : 'ml-auto'}
+                  />
+                )}
+                <Switch
+                  checked={isSatelliteTrackingOn}
+                  onCheckedChange={() => requirePremium(onSatelliteTrackingToggle)}
+                  aria-label={t('satellite.tracking')}
+                />
+              </div>
+              {/* Item 164 (R-a): CelesTrak blocks a client that asks again after an error, so the
+                  refresh waits for the cache's next try. */}
+              {isSatelliteError && (
+                <p className="text-caption text-red-400 mt-1" data-testid="satellite-status">
+                  {t('satellite.unavailable')}
+                  {satelliteStatus?.nextTryAt != null && ` · ${t('satellite.nextTry', { time: formatLocalTime(new Date(satelliteStatus.nextTryAt)) })}`}
+                </p>
               )}
-              <Switch
-                checked={isSatelliteTrackingOn}
-                onCheckedChange={() => requirePremium(onSatelliteTrackingToggle)}
-                aria-label={t('satellite.tracking')}
-              />
             </div>
           )}
 

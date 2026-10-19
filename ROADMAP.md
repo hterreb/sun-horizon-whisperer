@@ -3344,7 +3344,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   - **Deviations:** (1) A dot behind a cloud (item 135) takes no place, so the cap counts the dots that the user sees. Else 8 dots behind a cloud could keep all places while a dot in a gap stays hidden, and `trackedShows` would stop the decorative dots. (2) The memory is state, not a ref as in `LivePlanes` (item 159): no ref is read or written in the render, and no lint rule is turned off.
 - **Checked:** unit tests: `utils.satelliteUtils` (`pickShownSatellites`: at most 8, the brightest first, in the order of the list; a shown dot stays while brighter dots rise; a free place goes to the brightest new dot only; a dot that fades out takes no place; the same update gives the same pick; no more than the cap when more were shown before), `Satellites` (in StrictMode: the step x 380 → 5 has no transform transition, the other dot keeps it, a second render of the same update has none, the next step 5 → 7 has it again; the time play 10 → 385 → 360; 10 dots: the 8 brightest show, a brighter new dot waits, a dot that goes into the Earth's shadow frees its place and the brightest waiting dot fades in; a dot in a cloud gap shows when 8 brighter dots are behind the cloud). With the edge rule off, the two edge tests fail. Typecheck, lint, build and all 2078 tests (127 files) pass. The `index` chunk is 675.1 kB (limit 700 kB, item 125). The analysis again (the night above, 18:30–06:30 CEST, one step per second, through the `Satellites` component in jsdom, 360° view, 390 × 844, clear sky, no terrain): 0 slides; 202 steps across the edge with no transform transition (the spec's 197 plus the dots that fade out or wait); the fastest step with a transform transition 92 px/s; at most 8 dots at once (up to 38 in the sky); no shown dot hidden while it was in the sky. Dots at once on average (in the sky): 19 h 7.6 (22.8), 20 h 8.0 (20.0), 21 h 7.5 (11.1), 22 h 3.6 (3.7), 23–03 h 0–1.1 (the same), 04 h 7.2 (9.8), 05 h 8.0 (17.2). Headless Chromium (a static page, not the app, all requests blocked): a dot that moves 370 → 380 with the transition and then gets x 5 with no transform in the transition is at 5 on the next frame (the running transition stops); the next step 5 → 15 moves again (8 px after 300 ms). Not checked: the app in a browser (the tracking needs orbit data), a real phone, the compass view and the time play in a browser.
 
-### 163. The controls stay while the info panel scrolls — S — [SUN-CHASER-26](https://ainabler.sentry.io/issues/SUN-CHASER-26)
+### 163. The controls stay while the info panel scrolls — S — [SUN-CHASER-26](https://ainabler.sentry.io/issues/SUN-CHASER-26) — **✅ Done**
 
 - **Feedback (2026-10-17 17:54 CEST):** "Don't hide controls while scrolling the info panel".
 - **Now:**
@@ -3357,8 +3357,18 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Check:** `SunTracker` test in fullscreen: a scroll event in the panel each 2 s for 20 s keeps the controls; 10 s after the last scroll they hide. A `pointerdown` on the radio starts the timer again. Phone emulation (390 × 844, touch, browser fullscreen): a long touch scroll in the open panel, and the panel stays.
 - **Open:** (a) Spec 1 only, or with option 2? (b) "Controls" is read here as the fading controls (items 89, 147). It is not a part inside the panel that scrolls away: the panel head (the place and the collapse button) is already outside the scroll area.
 - **Decision (Lutz, 2026-10-19):** spec 1 only (use of a control is a wake). Option 2 not now.
+- **Built:**
+  - `SunTracker` (the effect of the items 133–158): a window listener in the capture phase takes `pointerdown`, `scroll`, `wheel` and `keydown` (`CONTROL_USE_EVENTS`). When the controls show and the target of the event is in a `[data-idle-control]` element (`InfoPanel`, `TopLeftButtons`, `MusicPlayer`), it calls `wakeCursor`: the controls stay, and the hide timer starts again. This is T3 of item 147. A scroll does not bubble, so the listener uses the capture phase. It is `passive`, so it does not slow the scroll.
+  - While the controls are hidden, the listener does nothing. A scroll that runs on after a sky tap hid the controls (a fling) does not show them. How hidden controls come back does not change (items 132, 136, 147, 157).
+  - On shown controls that take taps, a wake sets the same state: they keep their taps (`isTappable`), and React stops before it renders. After another state change, React can run `SunTracker` once more for the first wake, but it renders no child. `useIdleHide` does not change.
+  - **Deviations:** none from spec 1. Two results of "a use is a wake": (1) Before the first hide in browser fullscreen, a wake starts `ENTER_HIDE_MS` again (item 89). So a scroll in the first 3 s after the user enters fullscreen keeps the controls 3 s after the last scroll, not 10 s. In the installed app no timer runs before the first hide. (2) In the 400 ms after a show (`TAP_READY_MS`) the controls take no pointer. Only a scroll that runs on or a key can reach a control then, and it starts the 400 ms again, as each wake does.
+- **Checked:**
+  - `SunTracker` tests in fullscreen: a scroll 2 s after the user enters fullscreen hides the controls 3 s after the scroll (item 89). After a hide and a sky tap, a scroll in the panel each 2 s for 20 s keeps the controls, they keep their taps, and they hide 10 s after the last scroll (not at 9999 ms). A `pointerdown` on the radio, a `wheel` and a `keydown` in the panel each start the 10 s again, and the top-left buttons keep their taps. 100 scroll events in the panel give `SunVisualization` no new props. Hidden controls do not show on a scroll, a wheel, a key or a `pointerdown` in them (60 s). With the controls shown, a `pointerdown` on the sky, a scroll of the page and a key on the body do not keep them. Without the listener, the first two tests fail. `hooks.useIdleHide`: 100 wakes on shown controls render the hook at most once, keep the taps and start the 10 s again. The tests of the items 89, 136, 147, 157 and 158 pass as they are.
+  - Phone emulation (Playwright, headless Chrome, 390 × 844, touch, CPU 4 × slower, production build, BigDataCloud and the forecast stubbed before the load and every other host blocked, Ravensburg on 16 September 2026 at 14:00, real browser fullscreen, the panel open): the controls were hidden 3.8 s after the user entered fullscreen, and a sky tap showed them. Ten drags in the panel, about one each 2 s for 21 s (90 scroll events), kept the panel. It hid 10.0 s after the last scroll. One finger on the panel for 17.7 s, moved up and down (one `pointerdown`, 138 scroll events), kept the panel. It hid 10.0 s after the last scroll. The drags gave no click. The same steps on a build without the change: the panel hid 9.4 s after the show, during the drags and under the moving finger. Script time for the ten drags: 0.57–0.61 s in fullscreen (with the listener) and 0.51–0.56 s in a browser tab (no listener). The difference is about the spread of the two tab runs.
+  - Typecheck, lint, build and all 2073 tests (127 files) pass. The `index` chunk is 674.7 kB (limit 700 kB, item 125).
+  - Not checked: a real phone, the Play app, the installed-app mode in the browser, an iPhone home-screen app; a mouse wheel and keys in a desktop browser (unit tests only).
 
-### 164. Live planes and satellite tracking: a red icon and a refresh when the data does not come — M
+### 164. Live planes and satellite tracking: a red icon and a refresh when the data does not come — M — **✅ Done**
 
 - **Feedback (Lutz, 2026-10-19):** "add a feature for live planes and satellite tracking that it shows a red icon in the info panel if it is not working, ideally with a refresh option like the weather".
 - **Now:**
@@ -3378,6 +3388,236 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Check:** `hooks.useLivePlanes`: `refresh` asks at once and stops the request that runs. `useSatelliteTracking`: the status for each failure (no satellite.js, no data, old data) and `ok` after a refresh. `utils.satelliteData` (R-a): a refresh within `RETRY_MS` does not ask CelesTrak. `InfoPanel`: the red icon, the red line and the refresh button only in `error` and only with the switch on; the button turns while it loads. `SunTracker`: the tag `satellites`. `i18n`. Browser (`vite preview`, 390 × 844, `/api/planes` and the satellite data stubbed to fail, then to work): the icon, a tap on refresh, the icon goes.
 - **Open:** (a) Satellite refresh: R-a or R-b? (b) Option 6, the red dot on the closed panel? (c) A missing night catalogue only (the groups work): `ok`, or a status of its own?
 - **Decision (Lutz, 2026-10-19):** (a) R-a, the 2 h wait stays. (b) Yes, option 6. (c) Not decided: a missing night catalogue alone stays `ok`.
+- **Built:**
+  - Live planes: `useLivePlanes` gives `refresh` and `refreshing`. `refresh` starts a request at once and stops the request that runs. `refreshing` is true until the next answer (ok or error). The poll every 15 s stays.
+  - Satellites: `useSatelliteTracking` gives `status` (`SatelliteStatus`: `loading`, `ok` or `error`), `refresh`, `refreshing` and `nextTryAt`. `loading` until satellite.js and the first answer of the cache come. `error` when satellite.js does not load, `loadSatelliteData` gives null, no record gives a satellite, or the first record (the ISS) is not near its epoch (`isNearEpoch`, 3 days) at the real time. The hook sets the real time with each answer of the cache and once a minute (`Date.now()` is impure in render). A time preview far from the epoch stays `ok`: the scene shows the decorative dots, as before. A missing night catalogue alone stays `ok` (decision (c)).
+  - R-a: `getNextSatelliteTry` (`satelliteData`) gives the time of the next CelesTrak try from the cache: 24 h after the last full fetch, and not before 2 h after the last try; null when a fetch is due. `loadSatelliteData` uses the same rule (`nextTryAt`), so the two cannot differ. The refresh loads satellite.js again when it failed, and calls `loadSatelliteData`, which asks CelesTrak only when the wait is over. So the refresh cannot skip the 2 h. The hook gives `nextTryAt` only while the wait runs and satellite.js is loaded. Then the line says "Satellite data unavailable · next try at 21:40", and the button is disabled. When the browser blocks `localStorage`, the cache stays in the page (`pageCache`), so the wait holds there too.
+  - `InfoPanel`, only with the switch on and the status `error`: a red `CircleAlert` (14 px, `text-red-400`, `role="img"`, labelled "Live radar unavailable" or "Satellite data unavailable") next to the name, and a refresh button as the weather's (`RefreshCw` in `ICON_TOGGLE`; it turns and is disabled while the refresh runs) next to the switch. Live planes: the status line is red. Satellites: a red line under the row. The icon is outside the "Live planes" label, so the switch keeps its name. With `ok` or `loading`: no icon and no button.
+  - Option 6: a red dot (8 px, `bg-red-400`) on the expand button of the closed panel while one of the two switches is on and its status is `error`. The open panel shows the rows instead.
+  - The Sentry tag `satellites` (`getSatellitesTag`): `off`, `loading`, `error` or `ok-<n>`. `SunTracker` sets it only when the value changes, as `live-planes`. `off` while the switch is off or no place is loaded. n is the number of satellites in the hook's `sky` with `visible` true. It is not the drawn count: the scene hides satellites behind the terrain, and item 162 adds a cap.
+  - `red-400` is in the `@theme` block of `src/index.css` (`#f87171`). Keys `radar.refresh`, `satellite.unavailable`, `satellite.nextTry` and `satellite.refresh` in 5 languages.
+  - **Deviations:** (1) "next try at 21:40" starts lowercase after " · ", as `radar.compassAll` in the radar line. (2) The refresh button is next to the switch in both rows; the spec says "in the row".
+- **Checked:** unit tests: `hooks.useLivePlanes` (the refresh asks at once and stops the request that runs; `refreshing` until the answer; nothing while off), `hooks.useSatelliteTracking` (loading until satellite.js and the data come, then ok; error without data, and ok after a refresh with data; error with data more than 3 days old at the real time, while a scene time near the epoch still draws the ISS; ok in a time preview far from the epoch; the next try while the wait runs, and null when the minute clock passes it; error when satellite.js does not load, then no wait, and ok after a refresh loads it; the tag values), `utils.satelliteData` (a refresh within `RETRY_MS` after an error does not ask CelesTrak; the next try after an error, after a full fetch, and for a cache from the future; the wait with blocked storage), `InfoPanel` (the icon, the red line and the button only in `error` and with the switch on; the button turns and is disabled while it loads; the next try disables it; the switch keeps its name; the red dot only on the closed panel), `SunTracker` (live planes: a 502 shows the icon, the refresh asks at once, and the icon goes with the answer; satellites: the tag `error`, the icon, the line with the next try and the disabled button, then a refresh after the wait brings the ISS and the tag `ok-1`; the same value is never set twice in a row). Typecheck, lint, build and all 2085 tests (127 files) pass. The `index` chunk is 677.6 kB (limit 700 kB, item 125). Built app (`vite preview`, headless Chrome, 390 × 844, touch, Ravensburg, BigDataCloud stubbed before the load, all other hosts stubbed or blocked; first `/api/planes` 502, CelesTrak 403 and `/api/satellites` 503, then all 200): the closed panel showed the red dot. In the open panel both rows showed the red icon (rgb(248, 113, 113)), "Live radar unavailable" in red with a refresh, and "Satellite data unavailable · next try at 14:45" with the refresh disabled. CelesTrak got 1 request, and a tap on the disabled button sent none. With the feeds working, a tap on the live refresh asked `/api/planes` at once, and the icon went after 92 ms ("3 nearby · 0 in view · the compass shows all"). The page clock went 2 h 1 min forward: the satellite refresh was enabled 59 s later (the hook's minute clock), with no CelesTrak request before the tap. The tap asked the 3 groups and `/api/satellites`, and the icon, the line and the dot went. No page errors. Not checked: a real phone, the live feeds, a failed satellite.js chunk in a browser, data more than 3 days old in a browser, the other languages in a browser.
+- **Open:** (a) At 390 × 844 the label "Satellite tracking" takes two lines while the icon and the refresh show (the row also has the ISS passes toggle). (b) A browser can keep a failed dynamic import. Then the refresh cannot load satellite.js again, and only a reload helps.
+
+### 165. Launch check: five first-time users in a real browser — M — **✅ Done**
+
+- **Request (Lutz, 2026-10-19):** from an [X post](https://x.com/RoundtableSpace/status/2111717667228770611) (2026-10-18): before the launch, five sub-agents use the app as five different first-time users. Real first users do not say why they leave.
+- **Now:** the [Verification](#verification-2026-09-28) and the visual review check each item against its spec. No check follows a new user from the first load.
+- **Spec:**
+  1. Five sub-agents open the built app (`vite preview`) in Playwright, each as one user:
+     - **P1 Impatient:** skims, taps the first thing that looks like a button, and stops at the first error or long wait. Denies location.
+     - **P2 Skeptic:** reads the privacy page and the data sources (item 153) before it allows location. Compares the network requests with the privacy page.
+     - **P3 Mobile:** 375 × 667, touch, slow 3G and a 4× slower CPU (Chrome DevTools). Notes the time to the first sky.
+     - **P4 Non-native speaker:** browser language `pt` (the app falls back to `en`), then `de`, `es`, `it` and `fr`. Follows only what the UI says. Notes cut or overflowing text, and English text in another language.
+     - **P5 Breaker:** junk and very long text in the place search, back during a flow, double and triple taps, a rotation, offline during use, location denied and then allowed.
+  2. The goal of each user: from the first load to the first success, which is the sun and the moon at the right place for the user's location or a searched place, and one card opened by a tap.
+  3. Each user takes a screenshot at each point where it is confused, stuck or annoyed, with one line of text.
+  4. Each run routes `**/api.bigdatacloud.net/**` to a stub before the app loads (BigDataCloud bans the IP, see CLAUDE.md). The other hosts stay live.
+  5. One list of findings, ranked by the number of users that hit each one, with the screenshots, goes into this item. A finding of size S is fixed here. A larger finding gets its own item.
+  6. After the fixes, the five users run again.
+- **Depends on:** none. Do it before the production release (item 16).
+- **Done when:** the ranked list is in this item, each finding is fixed or has its own item, and the second run does not find the fixed findings again.
+- **Run 1 (2026-10-19, `main` at `d7f1079`):** the built app in `vite preview`. Each user is one sub-agent with its own headless Chrome (`playwright-core`, `channel: 'chrome'`) and a new browser context for each script run (a true first visit). BigDataCloud is answered by a stub (an answer built from Photon's reverse geocoder) and is also blocked by a `--host-resolver-rules` entry, so no request can reach it. The other hosts are live. All five users reached the goal. The sun and the moon were at the right place for each place: P3 compared them with its own calculation (sun 31.8° / 189.9° against 31.8° / 189.7°, moon −18.2° / 100.2° against −18.8° / 100.1°).
+- **Findings (run 1), ranked by the number of users:**
+
+  | # | Finding | Users | Result |
+  |---|---|---|---|
+  | 1 | The moon is below the horizon, and nothing in the sky says so. The Moon card (closed while the moon is down) shows only a negative altitude. | 5 (P1–P5) | Card: fixed here. Sky: item 168. |
+  | 2 | "Use my location" is a blank white pill: white text on the white fill of the `outline` button. | 4 (P1, P2, P4, P5) | Fixed. |
+  | 3 | A place in another time zone shows its times in the device's clock, with no zone: New York "Sunrise 13:12, Sunset 00:11" in Berlin, Tokyo "Sunrise 22:52". | 4 (P1, P2, P4, P5) | Item 169. |
+  | 4 | Location denied: at 0.3 s a red "Location unavailable … Please enable location services", and New York with "Dawn" at 13:37 Berlin time. Location allowed later: nothing changes. With no place name the header says "Your location 40.7128°, −74.0060°". | 3 (P1, P2, P5) | Item 170. |
+  | 5 | The weather service answers 503: "Check your connection" with a good connection, no new try for 30 min, and the default 20 °C under "Weather unavailable". | 3 (P1, P3, P5) | Fixed: a new try each minute, one toast. The default temperature: item 176. |
+  | 6 | Yellow "+" badges on about 10 controls. The meaning is only in a hover tooltip, which a phone does not show. | 3 (P1, P3, P4) | Item 171. |
+  | 7 | One tap on the sun does nothing. Only a double tap opens its card (item 116). | 3 (P3, P4, P5) | Item 172. |
+  | 8 | A tap on a card title ("Moon Information") does nothing. Only the 26 px chevron opens the card. | 2 (P1, P3) | Fixed. |
+  | 9 | Enter in the place search closes the form and keeps the old place: Enter submits the form with the coordinate fields. | 2 (P1, P5) | Fixed. |
+  | 10 | After a place change the weather of the previous place can stay: when its answer comes last, it stays until the 30-minute refresh. | 2 (P1, P2) | Fixed. |
+  | 11 | Two sunrise times: the sky label (line of sight) and the panel (flat horizon), and no reason shows. | 2 (P1, P4) | Item 176. |
+  | 12 | Pills in the scene: the solar-noon pill on the sun disc, the N and NE pills touch at the left edge, the altitude pill ("+31.8°") has no label. | 2 (P3, P4) | Item 176. |
+  | 13 | "Satellite data unavailable" (CelesTrak 403). | 2 (P4, P5) | Test setup: many first visits from one IP in 30 min. No change. Run 2 answers CelesTrak with an empty group. |
+  | 14 | Number and date fields with German formats ("40,7128", "19.10.2026") in the English UI. | 2 (P1, P4) | Test setup: the UI language of the test Chrome is German. No change. |
+  | 15 | Slow 3G and a 4× slower CPU: a plain dark screen for about 10 s (first paint 4.8 s, the sky at 10.0 s). | 1 (P3) | Fixed in part: the mark shows from the first paint. The first bundle: item 174. |
+  | 16 | Privacy: the link is only at the end of Data sources. The first load contacts 6 hosts before any consent. The page names the IP only for adsb.lol, CelesTrak and the radio. It does not name the Azure blob host or Sentry. The Live planes text leaves out our server. The device keeps more than §5 lists. | 1 (P2) | Item 175. |
+  | 17 | Phone: Back leaves the app while the panel, the search or a dialog is open (P5). A tap beside the open panel does not close it, and tap targets are 16–40 px (P3). | 1 each | Item 173. |
+  | 18 | "Midday" at 08:44 in São Paulo: the middle half of the daylight is "midday". | 1 (P4) | Item 176. |
+  | 19 | The open date field goes past the right edge of a phone (fr, es, pt). | 1 (P4) | Fixed. |
+  | 20 | The search hint is "e.g. Friedrichshafen" in all languages. | 1 (P4) | Fixed. |
+  | 21 | Two dash styles in time ranges: "17:17 – 18:05" and "18:05 - 18:40". | 1 (P4) | Fixed. |
+  | 22 | English text in de/es/it/fr: the Copernicus attribution, and "Easter Eggs" in de/it/fr. | 1 (P4) | No change: the attribution is the licence text, and "Easter Eggs" is the usual loanword. |
+  | 23 | 14 more findings of 1 user each. | 1 | Item 176, lines 5–18. |
+
+- **Run 2 (2026-10-19, the run-1 fixes built):** the same five users, new sub-agents. None of the fixed findings came back: "Use my location" was readable and worked (P2, P5); Enter in the search picked the first result (P1, P5); after a fast change A → B the weather belonged to B (P5); a failed weather came back by itself after about 60 s (P5); a tap on a card title opened the card (P1, P3); the Moon card said "below the horizon" (all); the mark showed at the first paint, 4.9 s (P3); no text went past a phone's edge (P4). Run 2 found 4 more findings of size S, fixed here (see Built): the cursor started in the latitude field (P1, P3); the fallback 20 °C read as real (P1, P2, P4, P5); Enter while "Searching…" was ignored (P5); the old place's weather showed under the new name for 3–9 s (P1, P5). Its other findings are in items 168–176. A last check of the final build in one browser: the cursor starts in the search, "Use my location" is white on transparent, and Enter before the results picks Hamburg.
+- **Screenshots:** [the findings page](https://claude.ai/artifact/QgWsBkKxLRpNKzYAxUXP1T) (private; Lutz shares it) has the ranked list with 17 screenshots, before and after.
+- **Built:**
+  - #1: the altitude row of the Moon card says "· below the horizon" after a negative altitude (`moon.belowHorizon`, 5 languages).
+  - #2: the "Use my location" button is transparent with a white border at 40 %.
+  - #5: `SunTracker` asks for the weather again 1, 2 and 5 min after a failed answer (`isRealWeather` false, `WEATHER_RETRY_MS`); after that only the 30-minute refresh asks, so a failure that lasts costs 2 requests an hour. A good answer, a place change or a refresh tap starts the series again. Only the first failure shows the toast. The toast says "Showing default weather. Trying again in a minute." (5 languages), not "Check your connection".
+  - #8: the chevron of each card (Moon, Golden & Blue Hour, twilight, Sun position) covers its header row with an `after:` element (`SECTION_TOGGLE`), so a tap on the title opens the card. The button and its label stay the same.
+  - #9: Enter in the place search picks the first result of the text in the field (`resultsFor`), and never submits the form. Enter before the results of that text come picks the first result when they come; a change of the text after Enter cancels this. "Change location" puts the cursor in the place search, not in the latitude field (run 2: a typed place and Enter in the latitude field set the old coordinates again).
+  - #10: `fetchWeatherData` numbers its requests. An answer of an older request is dropped. While a request runs, the weather rows are at 50 % opacity (`aria-busy`), so the old place's weather does not read as the new one's (run 2).
+  - #5 (run 2): with the fallback weather, the temperature row shows "–", not the default 20 °C.
+  - #15: `index.html` has the loading screen's mark inline in `#root` (inline SVG, inline styles, the first frame of the rise with the sun under the water), so it shows with the first paint. React replaces it.
+  - #19: the "Current time" row wraps, and the controls stay on the right.
+  - #20: the search hint is "Lisbon", "Sevilla", "Firenze" and "Marseille" (de keeps "Friedrichshafen").
+  - #21: all twilight ranges use the en dash.
+- **Checked:** new tests: `InfoPanel` (Enter with the results of the text; Enter with the results of an older text; Enter before the results, then the pick when they come; no pick when the text changed after Enter; the cursor in the place search; "–" for the fallback temperature), `SunTracker` (a new try after 60 s and one toast; an older place's answer that comes last is dropped). Each new `SunTracker` test fails without its fix. Typecheck, lint and all tests pass.
+- **Test setup notes:** five users from one IP at the same time gave Open-Meteo 503 answers (3 users) and CelesTrak 403 answers (2 users). CelesTrak answers a repeated download within 2 h with 403 and can block the IP, so run 2 answered it with an empty group (and a host-resolver rule blocked the host), and kept repeated third-party answers in a disk cache, except in the slow-3G run. Photon sometimes limited the stub, and then the app showed the coordinate fallback. The test Chrome formats native number and date fields in its own UI language (German).
+- **Follow-up (Lutz, 2026-10-19):** one PR per item, in this order: 170, 169, 173, 171, 176, 174, 175. No second persona check after them.
+
+### 166. Google Play: the developer name and the address on the store — S (owner)
+
+- **Request (Lutz, 2026-10-19):** from an [X post](https://x.com/MaxHirsch13/status/2111623992692138313) (2026-10-18): a personal name under the app looks like an amateur's app. The question: can the name and the address stay off the store?
+- **Research (2026-10-19, Play Console help: [account types](https://support.google.com/googleplay/android-developer/answer/13634885), [required information](https://support.google.com/googleplay/android-developer/answer/13628312), [account information](https://support.google.com/googleplay/android-developer/answer/13634081)):**
+  - **Personal account:** Play shows the legal name, the country and the developer e-mail. An account that monetizes (a paid app or in-app purchases) also shows the full legal address. Google checks this address with documents, so an address service cannot replace the home address.
+  - **Organization account:** Play shows the organization name and address (they must agree with the D-U-N-S record), a developer phone and a developer e-mail. It needs a D-U-N-S number (free). It has no closed test with 12 testers for 14 days.
+  - The developer name is free text for both account types (Play reviews a change).
+- **Now:** the Sun Chaser Play account is a personal account. Premium (items 14 and 45) uses Play Billing, so Play shows the home address when Premium goes on sale. The address service of item 16 step 2 is for the privacy page, not for the Play listing.
+- **Options:**
+
+  | Option | Name on Play | Home address on Play | Cost |
+  |---|---|---|---|
+  | O1 Personal account, monetized | own name | shown | €0 |
+  | O2 Personal account, no in-app purchase on Play | own name | not shown | €0, but no Premium income from Play (item 45 changes) |
+  | O3 Sole trader (Freiberufler, and probably a Gewerbe for the app sales) + D-U-N-S + virtual office + organization account | own name (a sole trader's D-U-N-S record has the person's name) | the virtual office, if Google accepts it (not confirmed) | about €10–50 per month, Gewerbeanmeldung €20–65 |
+  | O4 UG (haftungsbeschränkt) + D-U-N-S + virtual office + organization account | company name | the virtual office | about €500–700 once, €1,000–3,000 per year, 6–12 weeks |
+
+  - O4: the Impressum still names the managing director, and the Handelsregister shows the name, the birth date and the city. The virtual office must be the business address from the start, because the Handelsregister shows it.
+  - Not taken: a foreign company (US LLC, Estonian OÜ, UK Ltd). Managed from Germany, it pays German tax, a US LLC needs US forms each year (Form 5472, US$25,000 penalty), and the Impressum still names the manager.
+- **Spec:**
+  1. All options: set the developer name to the brand (Developer account → About you). Set the store listing contact to the e-mail of item 16 step 2 and the website `https://sun.chaser.page/` (item 16, PR #193).
+  2. O3 and O4: get the D-U-N-S number first (upik.de, up to about 30 days). Make the organization account (US$25), then transfer `com.ainabler.sunchaser` to it. Before the transfer, check what moves with the app: the in-app product `premium`, the closed test, the testers and the signing keys (`assetlinks.json`).
+  3. O3 and O4: ask a Steuerberater: Freiberufler or Gewerbe for the app sales, and a UG or not.
+- **Depends on:** item 16 (domain and e-mail). Decide before Premium goes on sale (item 14, `PREMIUM_ENFORCED`).
+- **Done when:** the Play listing shows the chosen developer name, and the home address does not show, or a Decision line here accepts it.
+- **Open:** (a) O1, O2, O3 or O4? (b) The developer name: `ainabler` (as in the package name) or another?
+
+### 167. Search: Search Console, Bing and a landing page in five languages — M
+
+- **Request (Lutz, 2026-10-19):** from an [X post](https://x.com/IndieBeaverHere/status/2111812808782295369) (2026-10-18): the lowest-effort marketing is a landing page in the store listing, Google Search Console and Bing Webmaster Tools, then pages for the searches that give impressions, in more languages.
+- **Now:**
+  - `/` is the app. `index.html` has the title "Sun Chaser", one English description, and Open Graph title, description and type. It has no `og:image`, no canonical link and no `hreflang`. There is no sitemap. `robots.txt` allows all.
+  - The site is not in Search Console or in Bing Webmaster Tools. The domain moves to `sun.chaser.page` (item 16, PR #193).
+  - `/privacy` is a static page in `public/`, outside the service worker's navigation fallback (`navigateFallbackDenylist` in `vite.config.ts`).
+- **Spec:**
+  1. After the move to `sun.chaser.page`: verify the domain in Search Console (a DNS TXT record at Cloudflare). Then import it to Bing Webmaster Tools from Search Console.
+  2. A static landing page for each app language (`en`, `de`, `es`, `it`, `fr`) at `/<lang>/`, as `/privacy`: in `public/`, in `navigateFallbackDenylist`, and inside the CSP of `public/_headers`. Content: what the app does in one line, 3–4 features, 3 screenshots from `store/screenshots/`, the Google Play badge, a link to the web app at `/`, and the privacy link. `hreflang` links between the five pages, `x-default` to `/en/`. The text comes from the Play listing text (item 67 step 7).
+  3. `public/sitemap.xml` with the five pages, and its URL in `robots.txt`.
+  4. `index.html`: `og:image` (`store/feature-graphic.png`, 1024 × 500) and a canonical link.
+  5. The website field of the Play listing: `https://sun.chaser.page/`.
+  6. Not in this item: pages for the searches with impressions (for example "sunset time <city>", "golden hour today", "sun dog", "ISS pass tonight"). Only after 4–8 weeks of Search Console data shows them. More languages only when the app has them.
+- **Depends on:** item 16 (the domain move) and item 67 step 7 (the Play listing text).
+- **Check:** built site: each `/<lang>/` page loads with no CSP error, has the right `lang` and the `hreflang` links; `/` still opens the app; the service worker does not serve the app for `/<lang>/`. Lighthouse SEO audit on each page.
+- **Done when:** Search Console and Bing show the domain as verified and the sitemap as read with no errors.
+
+### 168. The moon below the horizon: a mark at the horizon — S — **Closed: no change**
+
+- **Finding (item 165, #1):** 5 of 5 first users asked "where is the moon?" while it was below the horizon. The sky had no hint. The Moon card (closed while the moon is down) showed only "Altitude: −17.9°". Item 165 adds "· below the horizon" to that row.
+- **Spec:** while the moon is below the horizon, a pill on the horizon line at the moon's azimuth, as the sunrise and sunset pills: the `Moon` icon and the next moonrise ("rises 15:43"). A double tap opens the Moon card, as the sun (item 116). When the azimuth is outside the view (compass mode), no pill.
+- **Open:** (a) the pill at the azimuth, or one line under the time-of-day heading of the panel ("Moon below the horizon · rises 15:43")?
+- **Done when:** with the moon below the horizon, the scene shows where and when it rises; a unit test for the pill time and position.
+- **Decision (Lutz, 2026-10-19):** no change. The "· below the horizon" in the Moon card (item 165) is enough; nothing new in the sky or the panel.
+
+### 169. A place in another time zone: its times in its own clock — M
+
+- **Finding (item 165, #3):** 4 of 5 first users saw the times of another place in the device's clock, with no zone: New York "Sunrise 13:12, Sunset 00:11" in Berlin, Tokyo "Sunrise 22:52", London "08:31" from Madrid. The default place after a denied location (New York, item 170) makes the first screen look broken.
+- **Now:** all times use the device's time zone. The Open-Meteo geocoding results and the forecast (`timezone=auto`) give the IANA zone of the place; the app does not read it.
+- **Spec:** keep the place's zone with the place (the search result's `timezone`, or the forecast's for coordinates and a located position). Show all clock times (panel, scene pills, time travel field) in that zone with `Intl.DateTimeFormat`'s `timeZone`. When it differs from the device's zone, the panel says so under the place name ("Local time in New York, 6 h behind you").
+- **Open:** (a) the place's clock (recommended), or the device's clock with the zone label only?
+- **Done when:** a searched place in another zone shows its own sunrise and sunset clock times and the zone line; unit tests for the formatting across a date line.
+- **Decision (Lutz, 2026-10-19):** (a) the place's own clock: all times in the place's zone, and a line under the place name ("Local time · 6 h behind you").
+
+### 170. Location denied: ask for a place, not New York — M
+
+- **Finding (item 165, #4):** 3 of 5 first users. A user who says no to location gets a red "Location unavailable … Please enable location services" at 0.3 s and New York in Berlin time ("Dawn" at 13:37). Location allowed later changes nothing; only the "Use my location" button in Change location or a reload helps. With no place name the header says "Your location 40.7128°, −74.0060°".
+- **Now:** `SunTracker` sets New York and the toast on any geolocation error. The loading screen's "Choose a place" (item 39) shows only while the request waits (after 3 s), behind the Premium gate.
+- **Spec:**
+  1. On `PERMISSION_DENIED`: no toast. Keep the loading screen and show "Choose a place" at once, with a line "No location: choose a place".
+  2. On a timeout or `POSITION_UNAVAILABLE`: the same, with "Location not found".
+  3. Watch `navigator.permissions.query({ name: 'geolocation' })`: when the state turns `granted` and the user has not chosen a place, ask for the position.
+  4. The header says "Your location" only for a real position. A typed point says "Chosen point" (run 2, P5).
+  5. "Use my location" while location is blocked: the toast says how to allow it in the browser, not only "Could not get your current location" (run 2, P5).
+- **Open:** (a) "Choose a place" free for this first place (no Premium gate)? (b) A "Skip" that shows New York, or no default place at all?
+- **Done when:** denied location shows "Choose a place" with no red toast; allowing location later moves the scene to it without a reload; component tests for both.
+- **Decision (Lutz, 2026-10-19):** (a) yes: "Choose a place" is free for the first place; a later change of the place stays Premium. (b) No default place: no "Skip" and no New York.
+
+### 171. The "+" badge on a phone: what it means — S
+
+- **Finding (item 165, #6):** 3 of 5 first users did not know what the yellow "+" on about 10 controls means. "Premium feature, free for now" is only in a hover tooltip, which a phone does not show. A tap on the badge of the compass button turned the compass on.
+- **Options:** (a) the first tap on a control with a badge shows a toast "Premium feature, free for now" once; (b) one line at the end of the panel: "+ Premium feature, free for now"; (c) no badges until Premium is on sale (item 16, `PREMIUM_ENFORCED`).
+- **Open:** (a), (b) or (c)?
+- **Done when:** a first user on a phone can learn what the badge means without hover.
+- **Decision (Lutz, 2026-10-19):** (a) the first tap on a control with a badge shows "Premium feature · free for now" once (kept on the device); the control still works.
+
+### 172. A single tap on the sun or another scene thing — S — **Closed: no change**
+
+- **Finding (item 165, #7):** 3 of 5 first users tapped the sun once and saw nothing. Only a double tap opens its card (item 116, which keeps a single sky tap for the controls of item 136).
+- **Options:** (a) a single tap on a scene thing shows a short hint at the tap point ("Double-tap for info"), the first 3 times; (b) a single tap opens the card of the sun and the moon only, and the other scene things keep the double tap.
+- **Open:** (a) or (b)?
+- **Done when:** a single tap on the sun gives a visible answer; a component test.
+- **Decision (Lutz, 2026-10-19):** no change. The double tap of item 116 stays the only way to open a scene card.
+
+### 173. Phone: Back, a tap beside the panel, and tap targets — M
+
+- **Finding (item 165, #17):** Back leaves the app while the panel, the search, the collection or Data sources is open (P5). A tap on the sky beside the open panel (it covers about 80 % of a 375 px screen) does not close it (P3). Tap targets of 16–40 px: "Next station" 16 px, the volume knob 20 px, the panel chevron 30 px, the card chevrons 26 px (P3).
+- **Spec:**
+  1. Back closes the open layer first: a history entry when a dialog, the search or the expanded panel opens on a phone; `popstate` closes it.
+  2. Tap targets at least 44 × 44 px, with a larger hit area (padding or an `after:` element), not a larger icon.
+- **Open:** (a) a tap beside the open panel on a phone: close the panel, or keep the item 136 rule (it hides or shows the controls)?
+- **Done when:** on a 375 px phone, Back closes each open layer and a second Back leaves; no tap target under 44 px in the panel and the radio bar.
+- **Decision (Lutz, 2026-10-19):** (a) a tap on the sky beside the open panel on a phone closes the panel. With the panel closed, the item 136 rule stays.
+
+### 174. First load on slow 3G: a smaller first bundle — M
+
+- **Finding (item 165, #15):** at 375 × 667 with slow 3G (2 s RTT, 400 kbit/s) and a 4× slower CPU the first paint came at 4.8 s and the sky at 10.0 s. Item 165 shows the mark from the first paint. A second visit loads in 0.4 s (service worker).
+- **Now:** the first bundle is 678 kB (226 kB gzip), the stylesheet 79 kB (15 kB gzip), plus the language chunk.
+- **Spec:** find what the first sky does not need (dialogs, the collection, the radio, satellites, easter eggs, the time travel) and load it with `lazy()`. Measure the bundle with `vite build` and a source map once; no new dependency in the build.
+- **Done when:** the P3 setup of item 165 shows the sky in 6 s or less.
+
+### 175. Privacy page: every host, the IP and the storage — S (owner)
+
+- **Finding (item 165, #16, P2 Skeptic):**
+  - The privacy link is only at the end of the Data sources dialog, at the end of the panel.
+  - The first load, before any consent, contacts api.open-meteo.com, BigDataCloud, celestrak.org, s3.amazonaws.com (terrain tiles), planetarycomputer.microsoft.com and ai4edataeuwest.blob.core.windows.net. The page says "Like any web server, they receive your IP address" only for adsb.lol, CelesTrak and the radio.
+  - The page names "Microsoft Planetary Computer" but not the Azure blob host. Data sources names neither Microsoft nor Sentry nor our own server.
+  - The Live planes text says "Sends your place … to adsb.lol". The request goes to our server, which forwards it (the privacy page says this).
+  - §5 says the app keeps settings and caches weather and terrain. It also keeps the place name with its coordinates, terrain keys with 3-decimal coordinates for each place, and the satellite data.
+  - Matched: the weather and the place name use about 1 km; the planes about 11 km; the terrain z12 tiles about 10 km; CelesTrak gets no position.
+- **Spec:** one line per host with what it gets, and "your IP address" for each; the Azure host under Planetary Computer; Sentry; the Live planes text names our server; §5 lists each kept item; a "Privacy" link in the panel next to Data sources. Lutz checks the text.
+- **Depends on:** item 16 (the privacy policy in five languages) uses the new text.
+- **Done when:** each host in a first-load request log of item 165's P2 is on the page with what it gets.
+- **Decision (Lutz, 2026-10-19):** Claude drafts the text and the panel link; Lutz reviews it in the PR before the merge (no auto-merge for this PR).
+
+### 176. Launch check: small findings — S each
+
+- **Findings (item 165, 1–2 users each):**
+  1. Two sunrise times: the sky label (line of sight) and the panel (flat horizon), and no reason shows (P1, P4).
+  2. Scene pills: the solar-noon pill on the sun disc, the N and NE pills touch at the left edge, the altitude pill ("+31.8°") has no label (P3, P4).
+  3. "Midday" at 08:44 in São Paulo, and "Mittag" at 14:30 in Berlin: `getTimeOfDay` calls the middle half of the daylight "midday" (P4, runs 1 and 2). Option: solar noon ± 2 h.
+  4. "Weather unavailable" showed the default 20 °C (68 °F) as the temperature (P1, P5): fixed in item 165 (run 2).
+  5. "Sunset score 1/10 · clear sky" next to "Condition: Overcast": the score is for the sky at sunset, the text does not say so (P4).
+  6. Labels in two lines: "Seguimiento de satélites", "Satelliten-Tracking" (P4; item 164 Open (a)).
+  7. Taps with no visible answer: "Share this view" in a browser without a share sheet, the countdown bell, the twilight rows (P4).
+  8. The screen-reader label "Notifications (F8)" of the toasts is English in all languages (P4).
+  9. The Spanish search shows "Londres, Inglaterra, Reino Unido" twice (P4).
+  10. The "Badge unlocked" banner lies on the panel header, and the texts mix (P5).
+  11. Compass on a device without a compass: "Calibrating compass…", then the button goes away with no reason (P5).
+  12. A double tap on the music switch: "Playback failed. Click anywhere on the page first" (P5).
+  13. Offline: no hint; "Refresh weather" gives no answer; the search says "Could not search for places" (P5).
+  14. North Pole: "Sun does not rise" and a sunset score (P5).
+  15. The panel jumps about 1.5 s after it opens, when the weather block comes in (P5).
+  16. A searched place name stays in the old language after a language switch (P5).
+  17. The sticky panel header covers half a row while the panel scrolls (P2).
+  18. The main screen shows the weather only as clouds; the temperature is in the panel (P3). A question, not a defect.
+  19. Run 2: a long place name is cut ("Hamburg, Free and Hanseatic …"), and the search for "Hamburg" lists "Grafton, Wisconsin" third (P1).
+  20. Run 2: the twilight rows say "Click or hover for degree information", and a tap shows nothing (P3).
+  21. Run 2: "Satellite data unavailable · next try at 14:14" while the clock shows 14:15, a next try in the past (P2).
+  22. Run 2: the first weather of a first visit takes up to 5 s, and the weather block is not there until then, with no loading sign (P2).
+  23. Run 2: a closed card ("Moon Information", "Golden & Blue Hour") leaves an empty gap under its title (P4).
+  24. Run 2: on an overcast desktop the sun is only a faint outline behind the clouds (P4).
+  25. Run 2: at the first load in Paris the sky is clear while the panel says "Pluie faible"; the rain comes later (P4).
+- **Done when:** each line is fixed, or has a Decision line that keeps it.
+- **Decision (Lutz, 2026-10-19):** line 3: "Midday" is solar noon ± 2 h. The lines with a clear fix are built; the lines that need a design choice (1, 2, 5, 18, 24 and any other found while building) come back to Lutz with a proposal.
 
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 
