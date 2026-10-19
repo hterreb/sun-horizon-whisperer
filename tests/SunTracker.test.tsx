@@ -2335,7 +2335,7 @@ describe('SunTracker', () => {
       vi.useRealTimers();
     });
 
-    it('tries a failed weather answer again after a minute, with one toast for the first failure', async () => {
+    it('tries a failed weather answer again after 1, 2 and 5 min, then only at the 30-minute refresh', async () => {
       vi.useFakeTimers();
       saveManualLocation(47.78, 9.61, 'Ravensburg');
       render(<SunTracker />);
@@ -2348,6 +2348,20 @@ describe('SunTracker', () => {
       await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
       expect(forecastUrls()).toHaveLength(2);
       expect(weatherToasts()).toHaveLength(1);
+
+      // Then after 2 and 5 more minutes, and no more until the 30-minute refresh.
+      await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
+      expect(forecastUrls()).toHaveLength(3);
+      await act(async () => { await vi.advanceTimersByTimeAsync(300_000); });
+      expect(forecastUrls()).toHaveLength(4);
+      await act(async () => { await vi.advanceTimersByTimeAsync(1_300_000); });
+      expect(forecastUrls()).toHaveLength(4);
+      await act(async () => { await vi.advanceTimersByTimeAsync(20_000); });
+      expect(forecastUrls()).toHaveLength(5);
+      // The failed 30-minute refresh starts no new series of retries.
+      await act(async () => { await vi.advanceTimersByTimeAsync(600_000); });
+      expect(forecastUrls()).toHaveLength(5);
+      expect(weatherToasts()).toHaveLength(2);
     });
 
     it('drops the previous place\'s weather when it arrives after the new place\'s weather', async () => {
