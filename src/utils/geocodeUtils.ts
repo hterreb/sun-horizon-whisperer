@@ -65,5 +65,8 @@ export const searchPlaces = async (
       latitude: typeof r.latitude === 'number' ? r.latitude : NaN,
       longitude: typeof r.longitude === 'number' ? r.longitude : NaN,
     }))
-    .filter((r) => r.name.length > 0 && Number.isFinite(r.latitude) && Number.isFinite(r.longitude));
+    .filter((r) => r.name.length > 0 && Number.isFinite(r.latitude) && Number.isFinite(r.longitude))
+    // Item 176: two results with the same label (Spanish "Londres, Inglaterra, Reino Unido"
+    // twice) look like one place: keep the first.
+    .filter((r, index, all) => all.findIndex((other) => formatGeocodeResultLabel(other) === formatGeocodeResultLabel(r)) === index);
 };

@@ -58,6 +58,7 @@ export const es: Record<keyof typeof en, string> = {
   'search.placeholder': "p. ej., Sevilla",
   'search.searching': "Buscando…",
   'search.error': "No se pudieron buscar lugares.",
+  'search.offline': "Sin conexión. Vuelve a buscar cuando tengas conexión.",
   'search.noResults': "Sin resultados",
   'search.results': "Resultados de búsqueda",
 
@@ -128,9 +129,11 @@ export const es: Record<keyof typeof en, string> = {
   // Sun rows
   'sun.sunrise': "Salida del sol",
   'sun.sunset': "Puesta de sol",
+  'sun.overHills': "sobre los montes {time}",
   'sun.noSet': "El sol no se pone",
   'sun.noRise': "El sol no sale",
   'sun.countdown': "Cuenta atrás de la puesta de sol",
+  'sun.countdownOn': "Activada: los últimos 10 segundos antes de la puesta suenan y el cielo cuenta atrás.",
 
   // Sunset reminder (item 69)
   'reminder.toggle': "Avísame {minutes} minutos antes de la puesta de sol (con la app abierta)",
@@ -161,6 +164,7 @@ export const es: Record<keyof typeof en, string> = {
   'share.score': "Atardecer {score}/10 · {reason}",
   'share.failedTitle': "No se pudo compartir la puesta de sol",
   'share.failedDescription': "Inténtalo de nuevo.",
+  'share.savedTitle': "Imagen guardada",
 
   // Line of sight with terrain (items 13 and 30)
   'terrain.show': "Mostrar línea de visión",
@@ -607,7 +611,7 @@ export const es: Record<keyof typeof en, string> = {
   'info.ridgeHeight': "Altura de la cresta",
   'info.metresAsl': "{value} m s. n. m.",
   'scene.satellite': "Satélite",
-  'satellite.tracking': "Seguimiento de satélites",
+  'satellite.tracking': "Satélites",
   'satellite.trackingHint': "Satélites reales con datos de CelesTrak",
   'satellite.unavailable': "Datos de satélites no disponibles",
   'satellite.nextTry': "próximo intento a las {time}",
@@ -632,6 +636,8 @@ export const es: Record<keyof typeof en, string> = {
   'compass.disable': "Desactivar brújula",
   'compass.calibratingTitle': "Calibrando la brújula",
   'compass.calibratingDescription': "Mueve el móvil trazando un 8 para una orientación más precisa.",
+  'compass.unavailableTitle': "Brújula no disponible",
+  'compass.unavailableDescription': "Este dispositivo no da la orientación. El cielo sigue en la vista normal.",
 
   // Feedback (items 21 and 23)
   'feedback.send': "Enviar comentarios",
@@ -660,6 +666,8 @@ export const es: Record<keyof typeof en, string> = {
   'toast.weatherUnavailableDescription': "Se muestra el tiempo por defecto. Se reintentará en un minuto.",
   'toast.weatherFailedTitle': "Error al obtener el tiempo",
   'toast.weatherFailedDescription': "No se pudieron obtener los datos del tiempo.",
+  'toast.offlineTitle': "Sin conexión",
+  'toast.offlineWeather': "El tiempo se actualiza cuando vuelva la conexión.",
   'toast.geolocationUnsupportedTitle': "Geolocalización no disponible",
   'toast.geolocationUnsupportedDefault': "Tu navegador no admite la geolocalización. Se usa la ubicación por defecto.",
   'toast.geolocationUnsupported': "Tu navegador no admite la geolocalización.",

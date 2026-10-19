@@ -35,6 +35,14 @@ describe('ShareCardButton (ROADMAP item 68)', () => {
     expect(toast).not.toHaveBeenCalled();
   });
 
+  it('says "Picture saved" when there is no share sheet and the picture is saved (item 176)', async () => {
+    vi.mocked(drawShareCard).mockResolvedValue(new Blob(['png']));
+    vi.mocked(shareOrDownload).mockResolvedValueOnce('downloaded');
+    renderButton();
+    fireEvent.click(screen.getByRole('button', { name: 'Share this view' }));
+    await waitFor(() => expect(toast).toHaveBeenCalledWith({ title: 'Picture saved', description: 'sun-chaser-sunset-2026-10-01.png' }));
+  });
+
   it('shows a toast when the card cannot be made', async () => {
     vi.mocked(drawShareCard).mockRejectedValue(new Error('no canvas'));
     renderButton();

@@ -3614,7 +3614,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Done when:** each host in a first-load request log of item 165's P2 is on the page with what it gets.
 - **Decision (Lutz, 2026-10-19):** Claude drafts the text and the panel link; Lutz reviews it in the PR before the merge (no auto-merge for this PR).
 
-### 176. Launch check: small findings — S each
+### 176. Launch check: small findings — S each — **✅ Done**
 
 - **Findings (item 165, 1–2 users each):**
   1. Two sunrise times: the sky label (line of sight) and the panel (flat horizon), and no reason shows (P1, P4).
@@ -3643,7 +3643,31 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   24. Run 2: on an overcast desktop the sun is only a faint outline behind the clouds (P4).
   25. Run 2: at the first load in Paris the sky is clear while the panel says "Pluie faible"; the rain comes later (P4).
 - **Done when:** each line is fixed, or has a Decision line that keeps it.
-- **Decision (Lutz, 2026-10-19):** line 3: "Midday" is solar noon ± 2 h. The lines with a clear fix are built; the lines that need a design choice (1, 2, 5, 18, 24 and any other found while building) come back to Lutz with a proposal.
+- **Decision (Lutz, 2026-10-19):** line 3: "Midday" is solar noon ± 2 h; the clear lines are built, the design lines came back with a proposal. Design lines: line 1: the panel shows both times; line 2: only the overlaps; line 5: no change; lines 18 and 24: no change; line 19: one line, no change; line 16: search the name again; line 6: shorter texts.
+- **Built:**
+  1. Under the Sunrise and Sunset time of the panel, "over hills 08:17" (`sun.overHills`, 5 languages) when the line-of-sight time differs by 2 min or more.
+  2. The noon pill steps below the sun when it would lie on the sun and its rays (**deviation:** below the sun, not above the apex, which is under the closed panel on a phone). Two compass pills that would touch keep one: a main direction (N, E, S, W) before a between one, else the one at its true place (N stays, NE goes at the left edge of a 390 px screen).
+  3. "Midday" is solar noon ± 2 h (`MIDDAY_HALF_MS`), inside the hour after sunrise and the hour before sunset; it was the middle half of the daylight.
+  4. Built in item 165 (run 2): "–" for the fallback temperature.
+  6. Shorter labels: "Satelliten", "Satélites", "Satelliti", "Satellites".
+  7. Share without a share sheet: the toast "Picture saved" with the file name. The countdown bell, turned on: a toast that says what comes (`sun.countdownOn`). A twilight label: a tap opens its degrees (only a mouse hovers, only a keyboard focus opens; a tap's focus and touch events had opened it and the click closed it again).
+  9. Search results with the same label: the first one stays.
+  10. The "Badge unlocked" banner: 85 % glass instead of 58 %, so the panel header does not show through.
+  11. A compass that gives no heading after a tap: the toast "Compass not available".
+  12. A radio start cut short by a pause or a new station (`AbortError`): no "Playback failed".
+  13. Offline: a refresh tap says "You are offline"; the search says "No connection".
+  14. No sunset score on a polar day or night.
+  15/22. The weather block shows "–" before the first answer, so the panel does not jump.
+  16. On a language switch, the searched place's name is searched once more in the new language; the result within about 5 km of the place gives the name.
+  21. The satellite "next try" goes when its time comes (a timer at that time), not at the next minute step.
+  23. Built in the item 173 follow-up (#239): closed cards are a compact list.
+- **Perf check (Lutz asked, 2026-10-19):** a sub-agent compared main before (`bfae352`) and after today's merges (`308b55e`) with `npm run perf:trace` (day and night, phone and desktop, panel open, a place with its own time zone, CPU profiles) and with SunTracker test times. No slower render: the cost per clock tick was 3.9–4.4 ms before and 3.8–4.1 ms after; scripting and frame times within noise. The 40-minute retry test takes about 10 s because it runs 2400 ticks. The one new cost: `wallTime` built a new `Intl.DateTimeFormat` on each call (0.34 ms/s on a 4× slower phone CPU with a zoned place); it now keeps one formatter per zone.
+- **Checked:** new tests (Midday window; duplicate search results; the satellite next try drops at its time; the place name after a language switch; no "Playback failed" for an interrupted start; "Compass not available"; "Picture saved"; the countdown toast; a tap on a twilight label; NE hidden next to N at a 390 px edge). Typecheck, lint and all 2139 tests pass. Browser (built app, 390 × 844, Ravensburg at 13:04 CEST): "Midday"; the "↑ 13:07" pill below the sun, clear of its rays; compass pills N E SE S SW W NW (no NE next to N); "over hills 08:17" and "over hills 18:19" under the panel times; a tap on "Civil:" opens its degrees; offline, a refresh tap shows "You are offline".
+- **Not changed:**
+  - 5, 18, 19, 24: Decision above. Line 19's "Grafton, Wisconsin" for "Hamburg" is Open-Meteo's data.
+  - 8: the label "Notifications (F8)" is the default of the shadcn toaster in `src/components/ui` (not hand-edited), which renders outside the language context.
+  - 17: the panel header is not sticky over the rows; the scroll area cuts a row at its top edge, as any scroll list.
+  - 25: not reproduced in this item; the next live check watches for it.
 
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 

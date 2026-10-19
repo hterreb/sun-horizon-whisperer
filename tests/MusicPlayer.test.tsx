@@ -114,6 +114,20 @@ describe('MusicPlayer', () => {
     expect(onPlay).toHaveBeenCalledTimes(1);
   });
 
+  it('a start cut short by a pause (AbortError) shows no "Playback failed", another error does (item 176)', async () => {
+    vi.spyOn(window.HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+    const play = vi.spyOn(window.HTMLMediaElement.prototype, 'play')
+      .mockRejectedValueOnce(new DOMException('The play() request was interrupted by a call to pause().', 'AbortError'));
+    render(<MusicPlayer />);
+    await act(async () => { fireEvent.click(screen.getByRole('switch')); });
+    expect(toast).not.toHaveBeenCalled();
+
+    play.mockRejectedValueOnce(new DOMException('play() failed because the user didn\'t interact', 'NotAllowedError'));
+    await act(async () => { fireEvent.click(screen.getByRole('switch')); });
+    await act(async () => { fireEvent.click(screen.getByRole('switch')); });
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: 'destructive' }));
+  });
+
   it('tries fallback streams if one fails', () => {
     const instances = stubAudioConstructor();
     render(<MusicPlayer />);

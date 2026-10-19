@@ -109,7 +109,8 @@ const PlaceSearch: React.FC<PlaceSearchProps> = ({ onSelect, autoFocus }) => {
         <p className="opacity-70">{t('search.searching')}</p>
       )}
       {placeSearchStatus === 'error' && (
-        <p role="alert" className="text-brand-coral">{t('search.error')}</p>
+        // Item 176: offline, say so instead of "Could not search for places."
+        <p role="alert" className="text-brand-coral">{t(navigator.onLine ? 'search.error' : 'search.offline')}</p>
       )}
       {placeSearchStatus === 'done' && placeResults.length === 0 && (
         <p className="opacity-70">{t('search.noResults')}</p>

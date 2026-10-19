@@ -274,6 +274,7 @@ export const formatTime = (date: Date | null, locale?: string, timeZone?: string
 // comes from the sun's real altitude (`sunAltitude`, degrees) instead of those times.
 const POLAR_GOLDEN_ALTITUDE = 6; // below this the low sun gets dawn/evening light
 const POLAR_MIDDAY_MS = 3 * 3600000; // solar noon +-3 h, like an ordinary 24-hour day
+const MIDDAY_HALF_MS = 2 * 3600000; // item 176: "Midday" is solar noon ± 2 h
 
 const getPolarTimeOfDay = (now: number, sunTimes: SunTimes, sunAltitude: number): TimeOfDay => {
   if (sunAltitude < -18) return 'night';
@@ -298,12 +299,14 @@ export const getTimeOfDay = (date: Date, sunTimes: SunTimes, sunAltitude: number
   if (now < sunTimes.sunrise.getTime()) return 'civil-twilight';
   if (now < sunTimes.sunrise.getTime() + 3600000) return 'dawn';
   
+  // Item 176: "Midday" is solar noon ± 2 h (it was the middle half of the daylight, which
+  // began at 08:39 in São Paulo), inside the hour after sunrise and the hour before sunset.
   const noon = sunTimes.solarNoon.getTime();
-  const morning = (sunTimes.sunrise.getTime() + noon) / 2;
-  const afternoon = (noon + sunTimes.sunset.getTime()) / 2;
+  const middayStart = Math.max(noon - MIDDAY_HALF_MS, sunTimes.sunrise.getTime() + 3600000);
+  const middayEnd = Math.min(noon + MIDDAY_HALF_MS, sunTimes.sunset.getTime() - 3600000);
   
-  if (now < morning) return 'morning';
-  if (now < afternoon) return 'midday';
+  if (now < middayStart) return 'morning';
+  if (now < middayEnd) return 'midday';
   if (now < sunTimes.sunset.getTime() - 3600000) return 'afternoon';
   if (now < sunTimes.sunset.getTime()) return 'evening';
   if (now < sunTimes.dusk.getTime()) return 'civil-twilight';

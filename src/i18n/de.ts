@@ -58,6 +58,7 @@ export const de: Record<keyof typeof en, string> = {
   'search.placeholder': "z. B. Friedrichshafen",
   'search.searching': "Suche läuft…",
   'search.error': "Die Ortssuche ist fehlgeschlagen.",
+  'search.offline': "Keine Verbindung. Suche erneut, wenn du online bist.",
   'search.noResults': "Keine Treffer",
   'search.results': "Suchergebnisse",
 
@@ -128,9 +129,11 @@ export const de: Record<keyof typeof en, string> = {
   // Sun rows
   'sun.sunrise': "Sonnenaufgang",
   'sun.sunset': "Sonnenuntergang",
+  'sun.overHills': "über den Bergen {time}",
   'sun.noSet': "Sonne geht nicht unter",
   'sun.noRise': "Sonne geht nicht auf",
   'sun.countdown': "Countdown zum Sonnenuntergang",
+  'sun.countdownOn': "An: Die letzten 10 Sekunden vor Sonnenuntergang ticken, und der Himmel zählt herunter.",
 
   // Sunset reminder (item 69)
   'reminder.toggle': "Erinnere mich {minutes} Minuten vor Sonnenuntergang (solange die App offen ist)",
@@ -161,6 +164,7 @@ export const de: Record<keyof typeof en, string> = {
   'share.score': "Abendrot {score}/10 · {reason}",
   'share.failedTitle': "Teilen fehlgeschlagen",
   'share.failedDescription': "Bitte versuche es noch einmal.",
+  'share.savedTitle': "Bild gespeichert",
 
   // Line of sight with terrain (items 13 and 30)
   'terrain.show': "Sichtlinie zeigen",
@@ -607,7 +611,7 @@ export const de: Record<keyof typeof en, string> = {
   'info.ridgeHeight': "Höhe des Grats",
   'info.metresAsl': "{value} m ü. M.",
   'scene.satellite': "Satellit",
-  'satellite.tracking': "Satelliten-Tracking",
+  'satellite.tracking': "Satelliten",
   'satellite.trackingHint': "Echte Satelliten aus CelesTrak-Daten",
   'satellite.unavailable': "Satellitendaten nicht verfügbar",
   'satellite.nextTry': "nächster Versuch um {time}",
@@ -632,6 +636,8 @@ export const de: Record<keyof typeof en, string> = {
   'compass.disable': "Kompass ausschalten",
   'compass.calibratingTitle': "Kompass wird kalibriert",
   'compass.calibratingDescription': "Bewege dein Handy in Form einer 8, damit die Richtung genauer wird.",
+  'compass.unavailableTitle': "Kein Kompass verfügbar",
+  'compass.unavailableDescription': "Dieses Gerät liefert keine Richtung. Der Himmel bleibt in der normalen Ansicht.",
 
   // Feedback (items 21 and 23)
   'feedback.send': "Feedback senden",
@@ -660,6 +666,8 @@ export const de: Record<keyof typeof en, string> = {
   'toast.weatherUnavailableDescription': "Standardwetter wird angezeigt. Neuer Versuch in einer Minute.",
   'toast.weatherFailedTitle': "Wetterabruf fehlgeschlagen",
   'toast.weatherFailedDescription': "Die aktuellen Wetterdaten konnten nicht geladen werden.",
+  'toast.offlineTitle': "Du bist offline",
+  'toast.offlineWeather': "Das Wetter wird aktualisiert, sobald die Verbindung zurück ist.",
   'toast.geolocationUnsupportedTitle': "Standortbestimmung nicht unterstützt",
   'toast.geolocationUnsupportedDefault': "Dein Browser unterstützt keine Standortbestimmung. Der Standardort wird verwendet.",
   'toast.geolocationUnsupported': "Dein Browser unterstützt keine Standortbestimmung.",

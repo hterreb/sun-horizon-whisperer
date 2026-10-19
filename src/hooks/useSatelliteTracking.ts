@@ -129,6 +129,16 @@ export const useSatelliteTracking = (
     };
   }, [enabled, takeData]);
 
+  // Item 176: the clock steps once a minute, so "next try at 14:14" showed until 14:15. A
+  // timer at the next try sets the time, and the panel drops the past time at once.
+  useEffect(() => {
+    if (!enabled || dataNextTry === null) return;
+    const wait = dataNextTry - Date.now();
+    if (wait <= 0) return;
+    const timer = setTimeout(() => setNow(Date.now()), wait + 50);
+    return () => clearTimeout(timer);
+  }, [enabled, dataNextTry]);
+
   const refresh = useCallback(() => {
     setRefreshing(true);
     const libTry = libFailed

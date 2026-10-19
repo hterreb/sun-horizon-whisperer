@@ -1383,6 +1383,8 @@ describe('SunTracker', () => {
         // One S3 pluck: two voices (A5 and its third harmonic).
         expect(starts).toHaveLength(2);
         expect(localStorage.getItem('sunset-countdown')).toBe('on');
+        // Item 176: and says what comes.
+        expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Sunset countdown', description: expect.stringContaining('last 10 seconds') }));
       });
 
       it('starting the radio turns it on without a check tone, also after the user turned it off (item 152, B2)', () => {
@@ -1587,6 +1589,20 @@ describe('SunTracker', () => {
     afterEach(() => {
       vi.unstubAllGlobals();
       document.documentElement.lang = '';
+    });
+
+    it('a searched place\'s name follows a language switch, at the same place (item 176)', async () => {
+      saveManualLocation(64.15, -21.94, 'Reykjavik, Capital Region, Iceland', 'IS', 'Atlantic/Reykjavik');
+      global.fetch = vi.fn((url: string) => String(url).includes('geocoding-api') && String(url).includes('language=de')
+        ? Promise.resolve({ ok: true, json: () => Promise.resolve({ results: [
+          { name: 'Reykjavík', admin1: 'Hauptstadtregion', country: 'Island', latitude: 64.146, longitude: -21.942 },
+        ] }) })
+        : Promise.reject(new Error('offline'))) as unknown as typeof fetch;
+      render(<SunTracker />);
+      await screen.findByText('Reykjavik, Capital Region, Iceland');
+      fireEvent.click(screen.getByRole('button', { name: 'Deutsch' }));
+      expect(await screen.findByText('Reykjavík, Hauptstadtregion, Island')).toBeInTheDocument();
+      expect(loadManualLocation()).toEqual({ latitude: 64.15, longitude: -21.94, name: 'Reykjavík, Hauptstadtregion, Island', countryCode: 'IS', timeZone: 'Atlantic/Reykjavik' });
     });
 
     it('starts in the browser language, sets <html lang>, and saves a picked language', async () => {
@@ -2370,6 +2386,20 @@ describe('SunTracker', () => {
       }
     });
   });
+  it('says so when the compass gives no heading after a tap (item 176)', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('DeviceOrientationEvent', function DeviceOrientationEvent() {});
+    saveManualLocation(47.78, 9.61, 'Ravensburg');
+    render(<SunTracker />);
+    act(() => { vi.advanceTimersByTime(2000); });
+    fireEvent.click(screen.getByRole('button', { name: /enable compass/i }));
+    expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ title: 'Compass not available' }));
+    act(() => { vi.advanceTimersByTime(2100); });
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Compass not available' }));
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
   describe('weather after a failure or a place change (ROADMAP item 165)', () => {
     const forecastUrls = () =>
       vi.mocked(fetch).mock.calls.map(([url]) => String(url)).filter((url) => url.includes('api.open-meteo.com/v1/forecast'));

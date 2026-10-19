@@ -58,6 +58,7 @@ export const fr: Record<keyof typeof en, string> = {
   'search.placeholder': "ex. Marseille",
   'search.searching': "Recherche…",
   'search.error': "Impossible de rechercher des lieux.",
+  'search.offline': "Pas de connexion. Recherchez à nouveau une fois en ligne.",
   'search.noResults': "Aucun résultat",
   'search.results': "Résultats de recherche",
 
@@ -128,9 +129,11 @@ export const fr: Record<keyof typeof en, string> = {
   // Sun rows
   'sun.sunrise': "Lever du soleil",
   'sun.sunset': "Coucher du soleil",
+  'sun.overHills': "au-dessus du relief {time}",
   'sun.noSet': "Le soleil ne se couche pas",
   'sun.noRise': "Le soleil ne se lève pas",
   'sun.countdown': "Compte à rebours du coucher du soleil",
+  'sun.countdownOn': "Activé : les 10 dernières secondes avant le coucher font tic-tac et le ciel compte à rebours.",
 
   // Sunset reminder (item 69)
   'reminder.toggle': "Me prévenir {minutes} minutes avant le coucher du soleil (app ouverte)",
@@ -161,6 +164,7 @@ export const fr: Record<keyof typeof en, string> = {
   'share.score': "Note du coucher {score}/10 · {reason}",
   'share.failedTitle': "Impossible de partager le coucher du soleil",
   'share.failedDescription': "Veuillez réessayer.",
+  'share.savedTitle': "Image enregistrée",
 
   // Line of sight with terrain (items 13 and 30)
   'terrain.show': "Afficher la ligne de vue",
@@ -607,7 +611,7 @@ export const fr: Record<keyof typeof en, string> = {
   'info.ridgeHeight': "Altitude de la crête",
   'info.metresAsl': "{value} m",
   'scene.satellite': "Satellite",
-  'satellite.tracking': "Suivi des satellites",
+  'satellite.tracking': "Satellites",
   'satellite.trackingHint': "Des satellites réels d'après les données CelesTrak",
   'satellite.unavailable': "Données des satellites indisponibles",
   'satellite.nextTry': "prochain essai à {time}",
@@ -632,6 +636,8 @@ export const fr: Record<keyof typeof en, string> = {
   'compass.disable': "Désactiver la boussole",
   'compass.calibratingTitle': "Calibrage de la boussole",
   'compass.calibratingDescription': "Décrivez un 8 avec votre téléphone pour une direction plus précise.",
+  'compass.unavailableTitle': "Boussole indisponible",
+  'compass.unavailableDescription': "Cet appareil ne donne pas d’orientation. Le ciel garde la vue normale.",
 
   // Feedback (items 21 and 23)
   'feedback.send': "Envoyer un avis",
@@ -660,6 +666,8 @@ export const fr: Record<keyof typeof en, string> = {
   'toast.weatherUnavailableDescription': "Météo par défaut affichée. Nouvel essai dans une minute.",
   'toast.weatherFailedTitle': "Échec du chargement de la météo",
   'toast.weatherFailedDescription': "Impossible d’obtenir les données météo actuelles.",
+  'toast.offlineTitle': "Vous êtes hors ligne",
+  'toast.offlineWeather': "La météo se met à jour au retour de la connexion.",
   'toast.geolocationUnsupportedTitle': "Géolocalisation non prise en charge",
   'toast.geolocationUnsupportedDefault': "Votre navigateur ne prend pas en charge la géolocalisation. Lieu par défaut utilisé.",
   'toast.geolocationUnsupported': "Votre navigateur ne prend pas en charge la géolocalisation.",

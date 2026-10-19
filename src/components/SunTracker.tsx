@@ -66,6 +66,7 @@ import { SUNSET_REMINDER_MIN } from '@/utils/sunsetReminder';
 import { getSatellitesTag, useSatelliteTracking, useSatellitePassReminder } from '@/hooks/useSatelliteTracking';
 import { PASS_REMINDER_MIN, getSatelliteCard } from '@/utils/satelliteUtils';
 import { loadManualLocation, saveManualLocation, clearManualLocation } from '../utils/manualLocation';
+import { formatGeocodeResultLabel, searchPlaces } from '../utils/geocodeUtils';
 import {
   hasSeenCompassCalibrationHint,
   markCompassCalibrationHintSeen
@@ -246,6 +247,27 @@ const SunTracker: React.FC = () => {
     }, () => {});
   }, []);
   const t = useCallback<Translate>((key, vars) => translate(language, key, vars), [language]);
+  // Item 176: a searched place's name follows a language switch ("Reykjavik, Capital Region,
+  // Iceland" stayed English in German). One search in the new language; the result at the
+  // same place (within about 5 km) gives the name. The place itself does not change.
+  const nameLanguageRef = React.useRef(language);
+  useEffect(() => {
+    if (nameLanguageRef.current === language) return;
+    nameLanguageRef.current = language;
+    const manual = loadManualLocation();
+    if (!manual?.name) return;
+    const controller = new AbortController();
+    searchPlaces(manual.name.split(',')[0].trim(), controller.signal, language)
+      .then((results) => {
+        const same = results.find((r) => Math.abs(r.latitude - manual.latitude) < 0.05 && Math.abs(r.longitude - manual.longitude) < 0.05);
+        if (!same) return;
+        const name = formatGeocodeResultLabel(same);
+        setManualPlaceName(name);
+        saveManualLocation(manual.latitude, manual.longitude, name, manual.countryCode, manual.timeZone);
+      })
+      .catch(() => { /* offline or aborted: the name stays as it was */ });
+    return () => controller.abort();
+  }, [language]);
   const languageContext = useMemo(() => ({ language, setLanguage, t, timeZone: placeTimeZone }), [language, setLanguage, t, placeTimeZone]);
   // Premium (ROADMAP item 14): given to the components below through PremiumContext.
   // Line of sight is off while Premium is locked.
@@ -325,6 +347,16 @@ const SunTracker: React.FC = () => {
   // static, full-circle view.
   const { status: compassStatus, heading: rawCompassHeading, enable: enableCompass, disable: disableCompass } = useCompassHeading();
   const activeCompassHeading = compassStatus === 'active' ? rawCompassHeading : null;
+  // Item 176: a compass that gives no heading after a tap (no sensor, or iOS said no) hid its
+  // button with no word. Say so once, when the status turns 'unavailable' after a start.
+  const previousCompassStatusRef = React.useRef(compassStatus);
+  useEffect(() => {
+    const previous = previousCompassStatusRef.current;
+    previousCompassStatusRef.current = compassStatus;
+    if (compassStatus === 'unavailable' && previous !== 'unavailable') {
+      toast({ title: t('compass.unavailableTitle'), description: t('compass.unavailableDescription') });
+    }
+  }, [compassStatus, t]);
 
   // Line of sight with terrain (ROADMAP item 13): eye height is user-editable (via
   // InfoPanel) and persisted, and gates/feeds the horizon profile load below.
@@ -1099,8 +1131,12 @@ const SunTracker: React.FC = () => {
   const handleCountdownToggle = useCallback(() => {
     const next = !isCountdownOn;
     saveCountdown(next);
-    if (next) primeCountdownAudio();
-  }, [isCountdownOn, saveCountdown]);
+    if (next) {
+      primeCountdownAudio();
+      // Item 176: on, only the icon changed until the last seconds before sunset: say what comes.
+      toast({ title: t('sun.countdown'), description: t('sun.countdownOn') });
+    }
+  }, [isCountdownOn, saveCountdown, t]);
   // Item 152 (B2): starting the radio turns the countdown sound on, also after the user
   // turned it off. The play tap starts the audio, without the check tick.
   const handleRadioPlay = useCallback(() => {
@@ -1362,6 +1398,8 @@ const SunTracker: React.FC = () => {
   };
 
   const handleWeatherRefresh = () => {
+    // Item 176: offline, a refresh tap gave no answer (the cached weather stayed).
+    if (!navigator.onLine) toast({ title: t('toast.offlineTitle'), description: t('toast.offlineWeather') });
     weatherRetriesRef.current = 0;
     fetchWeatherData();
   };

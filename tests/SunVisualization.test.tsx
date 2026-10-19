@@ -328,6 +328,9 @@ describe('SunVisualization (rendered): static cardinal direction labels (ROADMAP
     );
     const north = screen.getByText('N').parentElement as HTMLElement;
     expect(parseFloat(north.style.left)).toBeGreaterThanOrEqual(18);
+    // Item 176: NE would touch N at the edge (49 px against 18 px): only N shows.
+    expect(screen.queryByText('NE')).not.toBeInTheDocument();
+    expect(screen.getByText('E')).toBeInTheDocument();
   });
 
   it('fades out together with the top-left buttons while idle in fullscreen (ROADMAP item 29)', () => {

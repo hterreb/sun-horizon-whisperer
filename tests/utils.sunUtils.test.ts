@@ -15,6 +15,18 @@ describe('sunUtils', () => {
     const tod = getTimeOfDay(new Date(), times, 0);
     expect(typeof tod).toBe('string');
   });
+  it('calls solar noon ± 2 h "midday", not the middle half of the daylight (item 176)', () => {
+    // São Paulo, 2026-10-19: sunrise 08:31 UTC, solar noon about 14:47 UTC.
+    const times = getSunTimes(new Date('2026-10-19T15:00:00Z'), -23.55, -46.63);
+    const noon = times.solarNoon.getTime();
+    const at = (ms: number) => getTimeOfDay(new Date(ms), times, 40);
+    expect(at(noon - 2 * 3600_000 - 60_000)).toBe('morning');
+    expect(at(noon - 2 * 3600_000 + 60_000)).toBe('midday');
+    expect(at(noon + 2 * 3600_000 - 60_000)).toBe('midday');
+    expect(at(noon + 2 * 3600_000 + 60_000)).toBe('afternoon');
+    // 08:44 local (11:44 UTC) said "Midday" before.
+    expect(at(Date.parse('2026-10-19T11:44:00Z'))).toBe('morning');
+  });
   it('keeps the time of day of an ordinary day at a normal latitude', () => {
     // Friedrichshafen, 2026-06-21 (TZ is UTC in tests): the times decide, the altitude does not.
     const times = getSunTimes(new Date('2026-06-21T12:00:00Z'), 47.65, 9.48);

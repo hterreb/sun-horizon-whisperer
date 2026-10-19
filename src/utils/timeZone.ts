@@ -21,14 +21,26 @@ export const isValidTimeZone = (timeZone: unknown): timeZone is string => {
   }
 };
 
+// One formatter per zone: creating an Intl.DateTimeFormat on each call was the new cost of
+// item 169 in the perf trace (0.34 ms/s on a 4x slower phone CPU with the panel open).
+const formatters = new Map<string, Intl.DateTimeFormat>();
+const formatterIn = (timeZone: string): Intl.DateTimeFormat => {
+  let formatter = formatters.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric',
+    });
+    formatters.set(timeZone, formatter);
+  }
+  return formatter;
+};
+
 // The clock fields of `date` in `timeZone`.
 export const wallTime = (date: Date, timeZone?: string): WallTime => {
   if (!timeZone) {
     return { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate(), hour: date.getHours(), minute: date.getMinutes() };
   }
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric',
-  }).formatToParts(date);
+  const parts = formatterIn(timeZone).formatToParts(date);
   const get = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value);
   return { year: get('year'), month: get('month'), day: get('day'), hour: get('hour'), minute: get('minute') };
 };

@@ -1022,6 +1022,29 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     [latitude, compassHeading]
   );
   const horizonLabelY = containerDimensions.height * 0.65;
+  // Item 176: two compass pills that would touch (one pushed against the screen edge, as N
+  // next to NE) keep one: a main direction (N, E, S, W) before a between one, else the one at
+  // its true place.
+  const cardinalPills = useMemo(() => {
+    const width = containerDimensions.width;
+    const pills = cardinalLabels
+      .map((direction) => {
+        const x = Math.max(CARDINAL_LABEL_HALF_WIDTH, Math.min(width - CARDINAL_LABEL_HALF_WIDTH, direction.fraction * width));
+        return { ...direction, x, isAtEdge: x !== direction.fraction * width };
+      })
+      .sort((a, b) => a.x - b.x);
+    const kept: typeof pills = [];
+    for (const pill of pills) {
+      const last = kept[kept.length - 1];
+      if (last && pill.x - last.x < CARDINAL_LABEL_HALF_WIDTH * 2 + 4) {
+        const isMain = (p: typeof pill) => p.label.length === 1;
+        if (isMain(pill) !== isMain(last) ? isMain(pill) : last.isAtEdge && !pill.isAtEdge) kept[kept.length - 1] = pill;
+        continue;
+      }
+      kept.push(pill);
+    }
+    return kept;
+  }, [cardinalLabels, containerDimensions.width]);
 
   // Arc label pixel positions: rise/set sit just above the horizon at their endpoint x,
   // zenith just below the apex - nudged inward (half a label width) so they stay on
@@ -1054,10 +1077,19 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         terrain.kind === label.kind &&
         (labelsOverlap(terrain, label) || formatTime(terrain.time) === formatTime(label.time))
     );
+  // Item 176: near solar noon the zenith pill sat on the sun's disc and rays; it steps below
+  // the sun (the 96 px icon's rays end 48 px from its centre).
+  const SUN_ICON_HALF = 48;
+  const offTheSun = (label: ReturnType<typeof toArcLabelPosition>) =>
+    label.kind === 'zenith' && sunDotVisible &&
+    Math.abs(label.x - sunX) < ARC_LABEL_HALF_WIDTH + SUN_ICON_HALF && Math.abs(label.y - sunY) < ARC_LABEL_HEIGHT / 2 + SUN_ICON_HALF
+      ? { ...label, y: sunY + SUN_ICON_HALF + ARC_LABEL_HEIGHT / 2 }
+      : label;
   const sunArcLabelPositions = sunArcLabelGeometry
     .map(toArcLabelPosition)
     .map((label) => avoidCollapsedPanel(label, containerDimensions.width))
-    .filter(notCoveredBy(terrainArcLabelPositions));
+    .filter(notCoveredBy(terrainArcLabelPositions))
+    .map(offTheSun);
   // A moon label that overlaps a sun label steps up until it is clear (ponytail: max 3
   // steps, it then stays overlapped rather than float off the arc).
   const offSunLabels = (moonLabel: ReturnType<typeof toArcLabelPosition>) => {
@@ -1727,12 +1759,12 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           }`}
           data-testid="cardinal-labels"
         >
-          {cardinalLabels.map(({ label, fraction }) => (
+          {cardinalPills.map(({ label, x }) => (
             <div
               key={label}
               className={`absolute flex flex-col items-center gap-1 ${compassActive ? '' : 'transition-all duration-1000'}`}
               style={{
-                left: `${Math.max(CARDINAL_LABEL_HALF_WIDTH, Math.min(containerDimensions.width - CARDINAL_LABEL_HALF_WIDTH, fraction * containerDimensions.width))}px`,
+                left: `${x}px`,
                 top: `${horizonLabelY}px`,
                 transform: 'translate(-50%, -50%)'
               }}
