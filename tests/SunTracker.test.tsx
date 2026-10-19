@@ -43,8 +43,8 @@ vi.mock('@/hooks/use-toast', () => ({
 import { toast } from '@/hooks/use-toast';
 
 // Satellite tracking (ROADMAP item 97): no CelesTrak data unless a test gives it.
-vi.mock('../src/utils/satelliteData', () => ({ loadSatelliteData: vi.fn(async () => null) }));
-import { loadSatelliteData, type GpRecord } from '../src/utils/satelliteData';
+vi.mock('../src/utils/satelliteData', () => ({ loadSatelliteData: vi.fn(async () => null), getNextSatelliteTry: vi.fn(() => null) }));
+import { getNextSatelliteTry, loadSatelliteData, type GpRecord } from '../src/utils/satelliteData';
 import issFixture from './fixtures/iss-omm-2026-10-05.json';
 import { BADGES } from '../src/utils/collection';
 import { FADE_OUT_MS, SHOW_MS } from '../src/components/BadgeUnlocked';
@@ -2238,6 +2238,81 @@ describe('SunTracker', () => {
       fireEvent.click(await screen.findByRole('switch', { name: 'Live planes' }));
       await waitFor(() => expect(screen.getByTestId('live-planes-status')).toHaveTextContent('Live radar unavailable'));
       expect(tags().at(-1)).toBe('error');
+    });
+
+    // Item 164: a red icon and a refresh when the feed does not come.
+    it('in error: a red icon and a refresh that asks at once; with an answer the icon goes (item 164)', async () => {
+      const failing = vi.fn(async (url: RequestInfo | URL) => (String(url).startsWith('/api/planes')
+        ? new Response('', { status: 502 })
+        : Promise.reject(new Error('offline')))) as unknown as typeof fetch;
+      global.fetch = failing;
+      render(<SunTracker />);
+      fireEvent.click(await screen.findByRole('switch', { name: 'Live planes' }));
+      const icon = await screen.findByRole('img', { name: 'Live radar unavailable' });
+      expect(icon).toHaveClass('text-red-400');
+      global.fetch = vi.fn(async (url: RequestInfo | URL) => (String(url).startsWith('/api/planes')
+        ? new Response(JSON.stringify({ now: 1, aircraft: [] }), { status: 200 })
+        : Promise.reject(new Error('offline')))) as unknown as typeof fetch;
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh live planes' }));
+      // At once, not at the next 15 s poll.
+      expect(radarCalls()).toHaveLength(1);
+      await waitFor(() => expect(screen.queryByRole('img', { name: 'Live radar unavailable' })).toBeNull());
+      expect(screen.getByTestId('live-planes-status')).toHaveTextContent('0 nearby · 0 in view');
+      expect(screen.queryByRole('button', { name: 'Refresh live planes' })).toBeNull();
+    });
+
+    describe('satellite tracking status (item 164)', () => {
+      const SYDNEY = issFixture.reference.observer;
+      const PASS_TOP = new Date(issFixture.reference.passes[0].max);
+      const tags = () => vi.mocked(setTag).mock.calls.filter(([name]) => name === 'satellites').map(([, value]) => value);
+      const flush = () => act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      beforeEach(async () => {
+        await import('satellite.js');
+        vi.useFakeTimers();
+        vi.setSystemTime(PASS_TOP);
+        global.fetch = vi.fn(() => Promise.reject(new Error('offline'))) as unknown as typeof fetch;
+        saveManualLocation(SYDNEY.latitude, SYDNEY.longitude, 'Sydney');
+      });
+      afterEach(() => {
+        vi.useRealTimers();
+        vi.mocked(loadSatelliteData).mockReset();
+        vi.mocked(loadSatelliteData).mockResolvedValue(null);
+        vi.mocked(getNextSatelliteTry).mockReset();
+        vi.mocked(getNextSatelliteTry).mockReturnValue(null);
+      });
+
+      it('sets the satellites tag, shows the red icon without data, and a refresh brings the ISS', async () => {
+        vi.mocked(loadSatelliteData).mockResolvedValue(null);
+        // CelesTrak's wait runs: the line gives the next try, and the refresh waits.
+        vi.mocked(getNextSatelliteTry).mockReturnValue(PASS_TOP.getTime() + 90 * 60_000);
+        render(<SunTracker />);
+        for (let i = 0; i < 3; i++) await flush();
+        expect(tags().at(-1)).toBe('error');
+        expect(screen.getByRole('img', { name: 'Satellite data unavailable' })).toHaveClass('text-red-400');
+        expect(screen.getByTestId('satellite-status')).toHaveTextContent(/^Satellite data unavailable · next try at \d{2}:\d{2}$/);
+        expect(screen.getByRole('button', { name: 'Refresh satellite data' })).toBeDisabled();
+
+        // The wait is over: the refresh asks again and brings the ISS.
+        vi.mocked(getNextSatelliteTry).mockReturnValue(null);
+        const toggle = screen.getByRole('switch', { name: 'Satellite tracking' });
+        fireEvent.click(toggle);
+        expect(tags().at(-1)).toBe('off');
+        fireEvent.click(toggle);
+        for (let i = 0; i < 2; i++) await flush();
+        expect(tags().at(-1)).toBe('error');
+        vi.mocked(loadSatelliteData).mockResolvedValue([issFixture.omm as unknown as GpRecord]);
+        const calls = vi.mocked(loadSatelliteData).mock.calls.length;
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh satellite data' }));
+        expect(loadSatelliteData).toHaveBeenCalledTimes(calls + 1);
+        for (let i = 0; i < 2; i++) await flush();
+        expect(screen.queryByRole('img', { name: 'Satellite data unavailable' })).toBeNull();
+        expect(screen.queryByTestId('satellite-status')).toBeNull();
+        expect(tags().at(-1)).toBe('ok-1');
+        // Set only when it changes.
+        expect(tags().filter((tag, i, all) => tag === all[i - 1])).toEqual([]);
+      });
     });
 
     it('starts off when the storage cannot be read', async () => {

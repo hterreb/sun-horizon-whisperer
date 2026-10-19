@@ -61,7 +61,7 @@ import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { useSunsetCountdown, primeCountdownAudio } from '@/hooks/useSunsetCountdown';
 import { useSunsetReminder, requestReminderPermission, getNotificationPermission } from '@/hooks/useSunsetReminder';
 import { SUNSET_REMINDER_MIN } from '@/utils/sunsetReminder';
-import { useSatelliteTracking, useSatellitePassReminder } from '@/hooks/useSatelliteTracking';
+import { getSatellitesTag, useSatelliteTracking, useSatellitePassReminder } from '@/hooks/useSatelliteTracking';
 import { PASS_REMINDER_MIN, getSatelliteCard } from '@/utils/satelliteUtils';
 import { loadManualLocation, saveManualLocation, clearManualLocation } from '../utils/manualLocation';
 import {
@@ -1152,6 +1152,12 @@ const SunTracker: React.FC = () => {
     isPassReminderOn
   );
   useSatellitePassReminder(satelliteTracking.issPass, isPassReminderOn, language);
+  // Item 164: the status for the panel and the Sentry tag `satellites`, set only when it changes
+  // (as `live-planes`): `off` while the tracking does not run; in `ok-<n>`, n is the visible
+  // satellites in the hook's sky (the scene can draw fewer: terrain, clouds).
+  const satelliteStatus = isSatelliteTrackingOn && location.loaded ? satelliteTracking.status : null;
+  const satellitesTag = getSatellitesTag(satelliteStatus, satelliteTracking.sky?.filter((sat) => sat.visible).length ?? 0);
+  useEffect(() => { Sentry.setTag('satellites', satellitesTag); }, [satellitesTag]);
   // The open card of a tracked satellite, updated every 10 s.
   const cardSatelliteId = infoCard?.target.type === 'satellite' ? infoCard.target.id : null;
   const satelliteCardStep = Math.floor(date.getTime() / SATELLITE_CARD_STEP_MS);
@@ -1243,7 +1249,9 @@ const SunTracker: React.FC = () => {
   const upperAir = useRealWeather ? getUpperAirAt(weatherData?.hourly ?? null, date) : null;
   const contrail = getContrail(upperAir?.tempC, upperAir?.rhPercent);
   const isLiveRadarActive = isLivePlanesOn && location.loaded && !premium.isLocked && !isTimePreview;
-  const { state: liveFeed, status: liveFeedStatus } = useLivePlanes(isLiveRadarActive, location.latitude, location.longitude);
+  const {
+    state: liveFeed, status: liveFeedStatus, refresh: refreshLivePlanes, refreshing: isLiveRefreshing,
+  } = useLivePlanes(isLiveRadarActive, location.latitude, location.longitude);
   // While the radar is on and its first answer is on the way, no plane shows.
   const livePlanes: LivePlanesState | null = isLiveRadarActive ? liveFeed ?? NO_LIVE_PLANES : null;
   // Item 155: the status line under the switch and the Sentry tag `live-planes` (no coordinates
@@ -1492,8 +1500,13 @@ const SunTracker: React.FC = () => {
             isLivePlanesOn={isLivePlanesOn}
             onLivePlanesToggle={handleLivePlanesToggle}
             liveRadarStatus={liveStatus && {
-              status: liveStatus, nearby: liveNearby, shown: liveShown, compassOff: compassStatus === 'idle',
+              status: liveStatus, nearby: liveNearby, shown: liveShown, compassOff: compassStatus === 'idle', refreshing: isLiveRefreshing,
             }}
+            onLivePlanesRefresh={refreshLivePlanes}
+            satelliteStatus={satelliteStatus && {
+              status: satelliteStatus, refreshing: satelliteTracking.refreshing, nextTryAt: satelliteTracking.nextTryAt,
+            }}
+            onSatelliteRefresh={satelliteTracking.refresh}
             onCollectionOpen={handleCollectionOpen}
             onCountryChange={setDetectedCountry}
           />

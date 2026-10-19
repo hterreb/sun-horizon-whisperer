@@ -6,6 +6,7 @@ import {
   SATELLITE_CACHE_KEY,
   SATELLITE_GROUPS,
   dedupeRecords,
+  getNextSatelliteTry,
   gpUrl,
   loadSatelliteData,
   type GpRecord,
@@ -89,6 +90,46 @@ describe('satelliteData (ROADMAP item 97)', () => {
     await loadSatelliteData(NOW, vi.fn(async () => response(200, [iss])));
     const fetchImpl = vi.fn(async () => response(200, [other]));
     expect((await loadSatelliteData(NOW - 3 * RETRY_MS, fetchImpl))?.[0].OBJECT_NAME).toBe('OTHER');
+  });
+
+  // Item 164 (R-a): the refresh button calls loadSatelliteData; it must not skip the wait.
+  it('a refresh within RETRY_MS after an error does not ask CelesTrak; the next try is in the cache', async () => {
+    expect(getNextSatelliteTry(NOW)).toBeNull();
+    const blocked = vi.fn(async () => response(403, 'blocked'));
+    expect(await loadSatelliteData(NOW, blocked)).toBeNull();
+    expect(getNextSatelliteTry(NOW + 60_000)).toBe(NOW + RETRY_MS);
+    const fetchImpl = vi.fn(async () => response(200, [iss]));
+    expect(await loadSatelliteData(NOW + 60_000, fetchImpl)).toBeNull();
+    expect(await loadSatelliteData(NOW + RETRY_MS - 1, fetchImpl)).toBeNull();
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(getNextSatelliteTry(NOW + RETRY_MS)).toBeNull();
+    expect(await loadSatelliteData(NOW + RETRY_MS, fetchImpl)).toHaveLength(1);
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
+    // After a full fetch the next try is a day later.
+    expect(getNextSatelliteTry(NOW + RETRY_MS + 1)).toBe(NOW + RETRY_MS + REFRESH_MS);
+  });
+
+  it('keeps the wait in the page when the browser blocks localStorage (item 164)', async () => {
+    // A new module, so no cache of an earlier test is in the page.
+    vi.resetModules();
+    const data = await import('../src/utils/satelliteData');
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked'); });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const blocked = vi.fn(async () => response(403, 'blocked'));
+      expect(await data.loadSatelliteData(NOW, blocked)).toBeNull();
+      expect(await data.loadSatelliteData(NOW + 60_000, blocked)).toBeNull();
+      expect(blocked).toHaveBeenCalledTimes(1);
+      expect(data.getNextSatelliteTry(NOW + 60_000)).toBe(NOW + RETRY_MS);
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it('gives no next try for a cache from the future (clock set back)', async () => {
+    await loadSatelliteData(NOW, vi.fn(async () => response(200, [iss])));
+    expect(getNextSatelliteTry(NOW - 3 * RETRY_MS)).toBeNull();
   });
 
   it('ignores a broken cache entry', async () => {
