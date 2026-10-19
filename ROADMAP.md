@@ -3309,6 +3309,68 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   - Badge: `egg:iceberg` (ultra rare). The collection shows the scene drawing (`IcebergShape`, exported from `TemperatureIceberg`). It counts on a double tap while the iceberg floats (real weather below 0 °C), not in a time preview.
 - **Checked:** `TemperatureIceberg` (one tap: nothing; two: the card; the ring; no taps without `onInfo`), `utils.sceneInfo` (the card text, the kicker), `utils.collection` (140 badges, 53 eggs, every egg card gives a badge), `SunTracker` (−5 °C: a double tap opens the card and counts `egg:iceberg`; 20 °C: no iceberg, nothing counts).
 
+### 162. Satellites: no slide across the screen at north, and fewer dots at once — S — [SUN-CHASER-27](https://ainabler.sentry.io/issues/SUN-CHASER-27)
+
+- **Feedback (2026-10-18 14:00 CEST, about the evening of 17 Oct in Stuttgart Vaihingen):** "Yesterday I finally had some satellites in Stuttgart Vaihingen but there were a lot on the screen at the same time. Some went by really fast under a second over the whole screen".
+- **Analysis:** the sky of 17 Oct 2026, 18:30–06:30 CEST, at 48.73° N / 9.10° E, computed with the app's code (`getCandidateSatellites`, `getSkySatellites`, one step per second) and the data of 19 Oct (the three CelesTrak groups and `/api/satellites`: 1,475 satellites), on a 390 × 844 screen. Terrain and clouds not included.
+  - **The slide (a bug):** in the 360° view, x is azimuth / 360 × width, so north is at both edges. A tracked dot moves to its next place with `transition: transform 1000ms linear` (`Satellites`, `stepMs`). When a satellite crosses north, x jumps from one edge to the other, and the transition slides the dot across the whole screen in 1 s. That night had 197 such slides (167 satellites), most from 19:00 to 21:00: about 1 per minute. Most satellites of the night catalogue (item 160) have polar orbits (Hulianwang, Centispace, Cosmos, Iridium), so they often cross north. No other step was faster than 100 px/s. The compass view has no transition (`stepMs` 0). The time play (`PLAY_TICK_MS`) has the same slide.
+  - **The count:** the dots at once, by the magnitude limit (`NAKED_EYE_MAGNITUDE` is 5.5 now):
+
+    | Hour (CEST) | ≤ 4.0 avg / max | ≤ 4.5 | ≤ 5.0 | ≤ 5.5 (now) |
+    |---|---|---|---|---|
+    | 19 | 3.8 / 12 | 7.9 / 16 | 13.9 / 26 | 22.8 / 36 |
+    | 20 | 2.4 / 6 | 6.1 / 13 | 11.8 / 20 | 20.0 / 30 |
+    | 21 | 0.5 / 3 | 2.0 / 5 | 5.6 / 22 | 11.1 / 32 |
+    | 22 | 0.1 / 1 | 0.4 / 2 | 1.3 / 7 | 3.7 / 12 |
+    | 23–03 | 0–0.4 | 0–0.2 | 0–0.3 | 0–1.1 |
+    | 05 | 2.8 / 7 | 6.0 / 14 | 10.8 / 17 | 17.2 / 26 |
+
+  - The 360° view puts the whole sky on one phone screen: 4 times the sky of the compass view (`COMPASS_FOV_DEG` 90°). A person who looks in one direction sees a part of these dots.
+- **Spec:**
+  1. **The slide:** a step in which x changes by more than half the screen width has no transition. The dot goes out at one edge and comes in at the other, as the live plane trails at north (item 159, deviation 1). The same in the time play.
+  2. **The count (options):**
+     - **N1 A lower limit:** `NAKED_EYE_MAGNITUDE` 4.5 (a town sky): 19:00–21:00 6–8 dots on average, at most 16. This also removes dots late in the evening (22:00: 0.4 instead of 3.7).
+     - **N2 A cap:** at most 8 tracked dots at once, the brightest first. A shown dot stays until it goes (into the Earth's shadow, below 10°, behind the terrain). A new one takes a free place, so no dot is removed while it is in the sky. The limit 5.5 stays, so the late evening and the morning keep their dots. In the compass view the cap counts only the dots in the field of view.
+     - **N3 Both:** the limit 5.0 and a cap of 8.
+- **Check:** `Satellites` test: a dot that goes from x 380 to x 5 has no transform transition in that render, and the next step has it again. `utils.satelliteUtils` test for the chosen rule (N2: the brightest first, a shown dot stays, no more than the cap). The analysis again with the rule: no slides, and no more dots at once than the cap.
+- **Open:** (a) N1, N2 or N3? (b) N2: 8 dots, or another number?
+- **Decision (Lutz, 2026-10-19):** spec 1 (the slide) and N2 with a cap of 8.
+
+### 163. The controls stay while the info panel scrolls — S — [SUN-CHASER-26](https://ainabler.sentry.io/issues/SUN-CHASER-26)
+
+- **Feedback (2026-10-17 17:54 CEST):** "Don't hide controls while scrolling the info panel".
+- **Now:**
+  - `useIdleHide`: in browser fullscreen the controls fade 3 s after fullscreen starts (`ENTER_HIDE_MS`) and 10 s after a wake (`WAKE_HIDE_MS`). In the installed app no timer runs before the first hide (a sky tap). After the first hide, each wake starts the 10 s timer there too.
+  - These are wakes: a mouse move (item 133: a touch `pointermove` is not a wake), a tap on the empty sky in the box of a hidden control (item 147 T2), a sky tap that shows the controls (item 136), and a focus in the panel (`onFocus={handleFocus}`).
+  - A touch scroll in the panel's `ScrollArea` gives no click and no focus, and its pointer moves are touch moves. So the timer runs on while the user scrolls and reads, and the panel fades under the finger after 10 s or less. A tap on a button in the panel is a wake only when the button takes the focus (Chrome does, Safari does not).
+- **Spec:**
+  1. Use of a control is a wake: a `pointerdown`, a `scroll` (in the capture phase, so the scroll in the `ScrollArea` counts), a `wheel` or a `keydown` in a `[data-idle-control]` element (the panel, the top-left buttons, the radio). The controls stay, and the hide timer starts again. Hidden controls take no taps (item 132), so this does not change how they come back.
+  2. Option: while the panel is open, no timer. Only a sky tap hides the controls.
+- **Check:** `SunTracker` test in fullscreen: a scroll event in the panel each 2 s for 20 s keeps the controls; 10 s after the last scroll they hide. A `pointerdown` on the radio starts the timer again. Phone emulation (390 × 844, touch, browser fullscreen): a long touch scroll in the open panel, and the panel stays.
+- **Open:** (a) Spec 1 only, or with option 2? (b) "Controls" is read here as the fading controls (items 89, 147). It is not a part inside the panel that scrolls away: the panel head (the place and the collapse button) is already outside the scroll area.
+- **Decision (Lutz, 2026-10-19):** spec 1 only (use of a control is a wake). Option 2 not now.
+
+### 164. Live planes and satellite tracking: a red icon and a refresh when the data does not come — M
+
+- **Feedback (Lutz, 2026-10-19):** "add a feature for live planes and satellite tracking that it shows a red icon in the info panel if it is not working, ideally with a refresh option like the weather".
+- **Now:**
+  - Weather: a refresh button (`RefreshCw`, it turns while the request runs) in the head of the weather section; `handleWeatherRefresh` fetches again. "Real weather unavailable" in peach when the forecast fails.
+  - Live planes (item 155): `useLivePlanes` gives `loading`, `ok` or `error`. In `error` the line under the switch says "Live radar unavailable", in the normal text colour. The hook asks again every 15 s, so the radar comes back by itself within 15 s after the feed works again. The SUN-CHASER-27 event (2026-10-18 14:00) had the tag `live-planes: error`. On 2026-10-19 12:05 `/api/planes` answered 200 in 1.7 s, and `/api/satellites` answered 200.
+  - Satellites: no status. A failure is silent: satellite.js does not load (a `console.error` only), `loadSatelliteData` gives null (no cached data and CelesTrak failed), or the data is more than 3 days from its epoch (`isNearEpoch`). Then `sky` is null, and the scene shows the decorative dots, which look like real ones. A failed night catalogue (item 160) is silent too: fewer satellites until the next daily fetch.
+  - CelesTrak blocks a client that asks again after an error. `loadSatelliteData` waits `RETRY_MS` (2 h) after a failed try. A refresh button must not skip this wait.
+- **Spec:**
+  1. **Live planes:** in `error`, a red alert icon (lucide `CircleAlert`, 14 px, `text-red-400`, with the text "Live radar unavailable" as its label) next to "Live planes", the status line in red, and a refresh button (as the weather's) in the row. The refresh asks the feed at once (`useLivePlanes` gives `refresh`); the button turns until the answer comes. With `ok` or `loading`, no icon and no button: the hook asks every 15 s.
+  2. **Satellites:** `useSatelliteTracking` gives a status: `loading` while satellite.js or the data loads, `ok` with data near its epoch, `error` when satellite.js does not load, no data comes, or the data is too old. In `error`: the same red icon next to "Satellite tracking", a line under the row "Satellite data unavailable" in red, and the refresh button. Only while the switch is on.
+  3. **The satellite refresh (options):**
+     - **R-a Keep the wait:** the refresh loads satellite.js again if it failed, and asks for the data again. The CelesTrak groups are asked again only when `RETRY_MS` is over since the last try. Before that, the line says "Next try at 21:40", and the button is disabled.
+     - **R-b Through our server:** `/api/satellites` also gives the three groups (the Edge function asks CelesTrak, and the edge cache keeps the answer as it keeps the night catalogue now). The app then never asks CelesTrak itself, so a refresh can always try, and `celestrak.org` goes out of the CSP `connect-src`. Larger: the Edge function, its cache rules and `loadSatelliteData` change.
+  4. **A Sentry tag** `satellites`: `off`, `loading`, `error` or `ok-<shown>`, set only when it changes, as `live-planes` (item 155 P4). So a feedback event shows the state.
+  5. New keys in 5 languages: `satellite.unavailable`, `satellite.nextTry` (R-a), and the label of the refresh buttons.
+  6. Option: a small red dot on the panel's expand button while one of the two is in `error`, so a closed panel shows it too.
+- **Check:** `hooks.useLivePlanes`: `refresh` asks at once and stops the request that runs. `useSatelliteTracking`: the status for each failure (no satellite.js, no data, old data) and `ok` after a refresh. `utils.satelliteData` (R-a): a refresh within `RETRY_MS` does not ask CelesTrak. `InfoPanel`: the red icon, the red line and the refresh button only in `error` and only with the switch on; the button turns while it loads. `SunTracker`: the tag `satellites`. `i18n`. Browser (`vite preview`, 390 × 844, `/api/planes` and the satellite data stubbed to fail, then to work): the icon, a tap on refresh, the icon goes.
+- **Open:** (a) Satellite refresh: R-a or R-b? (b) Option 6, the red dot on the closed panel? (c) A missing night catalogue only (the groups work): `ok`, or a status of its own?
+- **Decision (Lutz, 2026-10-19):** (a) R-a, the 2 h wait stays. (b) Yes, option 6. (c) Not decided: a missing night catalogue alone stays `ok`.
+
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 
 Rules for all items:
