@@ -26,6 +26,18 @@ describe('weatherUtils', () => {
     const data = await fetchCurrentWeather(0, 0);
     expect(data).toBeDefined();
   });
+  it.each([
+    ['no temperature and no code', { cloud_cover: 0 }],
+    ['a null temperature', { temperature_2m: null, weather_code: 0 }],
+  ])('falls back and caches nothing for a current block with %s', async (_, current) => {
+    localStorage.removeItem('weather_cache');
+    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current }) })) as unknown as typeof fetch;
+    const data = await fetchCurrentWeather(3, 3);
+    expect(data.isRealWeather).toBe(false);
+    expect(data.conditionKey).toBe('condition.unavailable');
+    expect(Number.isFinite(data.temperature)).toBe(true);
+    expect(localStorage.getItem('weather_cache')).toBeNull();
+  });
 
   it('rounds coordinates to 2 decimals before sending them to Open-Meteo (S-8)', async () => {
     const fetchMock = vi.fn(() =>
