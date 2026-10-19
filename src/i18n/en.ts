@@ -50,7 +50,7 @@ export const en = {
 
   // Place search
   'search.label': 'Search for a place',
-  'search.placeholder': 'e.g. Friedrichshafen',
+  'search.placeholder': 'e.g. Lisbon',
   'search.searching': 'Searching…',
   'search.error': 'Could not search for places.',
   'search.noResults': 'No results',
@@ -178,6 +178,7 @@ export const en = {
   'moon.set': 'Moonset',
   'moon.upAllDay': 'Up all day',
   'moon.downAllDay': 'Down all day',
+  'moon.belowHorizon': 'below the horizon',
   'moon.nextFull': 'Next full moon:',
   'moon.nextNew': 'Next new moon:',
   'moonPhase.new': 'New Moon',
@@ -651,7 +652,7 @@ export const en = {
 
   // Toasts from SunTracker
   'toast.weatherUnavailableTitle': 'Weather unavailable',
-  'toast.weatherUnavailableDescription': 'Using default weather. Check your connection.',
+  'toast.weatherUnavailableDescription': 'Showing default weather. Trying again in a minute.',
   'toast.weatherFailedTitle': 'Weather fetch failed',
   'toast.weatherFailedDescription': 'Could not get current weather data.',
   'toast.geolocationUnsupportedTitle': 'Geolocation not supported',

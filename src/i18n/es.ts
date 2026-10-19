@@ -50,7 +50,7 @@ export const es: Record<keyof typeof en, string> = {
 
   // Place search
   'search.label': "Buscar un lugar",
-  'search.placeholder': "p. ej., Friedrichshafen",
+  'search.placeholder': "p. ej., Sevilla",
   'search.searching': "Buscando…",
   'search.error': "No se pudieron buscar lugares.",
   'search.noResults': "Sin resultados",
@@ -178,6 +178,7 @@ export const es: Record<keyof typeof en, string> = {
   'moon.set': "Puesta de la luna",
   'moon.upAllDay': "Visible todo el día",
   'moon.downAllDay': "Oculta todo el día",
+  'moon.belowHorizon': "bajo el horizonte",
   'moon.nextFull': "Próxima luna llena:",
   'moon.nextNew': "Próxima luna nueva:",
   'moonPhase.new': "Luna nueva",
@@ -651,7 +652,7 @@ export const es: Record<keyof typeof en, string> = {
 
   // Toasts from SunTracker
   'toast.weatherUnavailableTitle': "Tiempo no disponible",
-  'toast.weatherUnavailableDescription': "Se usa el tiempo por defecto. Comprueba tu conexión.",
+  'toast.weatherUnavailableDescription': "Se muestra el tiempo por defecto. Se reintentará en un minuto.",
   'toast.weatherFailedTitle': "Error al obtener el tiempo",
   'toast.weatherFailedDescription': "No se pudieron obtener los datos del tiempo.",
   'toast.geolocationUnsupportedTitle': "Geolocalización no disponible",

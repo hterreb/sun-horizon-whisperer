@@ -15,7 +15,15 @@ const PlaceSearch: React.FC<PlaceSearchProps> = ({ onSelect, autoFocus }) => {
   const [placeQuery, setPlaceQuery] = useState('');
   const [placeResults, setPlaceResults] = useState<GeocodeResult[]>([]);
   const [placeSearchStatus, setPlaceSearchStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
+  // The query the shown results belong to: Enter picks a result only for the text in the field.
+  const [resultsFor, setResultsFor] = useState('');
   const placeAbortRef = useRef<AbortController | null>(null);
+  // Enter before the results of the typed text came: the first result is picked when they come.
+  const enterPendingRef = useRef(false);
+  const onSelectRef = useRef(onSelect);
+  useEffect(() => {
+    onSelectRef.current = onSelect;
+  }, [onSelect]);
   const { t, language } = useLanguage();
 
   // Debounced search: waits 300ms after typing stops, ignores queries under 2
@@ -42,7 +50,13 @@ const PlaceSearch: React.FC<PlaceSearchProps> = ({ onSelect, autoFocus }) => {
         .then((results) => {
           if (controller.signal.aborted) return;
           setPlaceResults(results);
+          setResultsFor(trimmed);
           setPlaceSearchStatus('done');
+          const first = results[0];
+          if (enterPendingRef.current && first) {
+            enterPendingRef.current = false;
+            onSelectRef.current(first.latitude, first.longitude, formatGeocodeResultLabel(first), first.countryCode);
+          }
         })
         .catch((error) => {
           if (controller.signal.aborted) return;
@@ -69,7 +83,20 @@ const PlaceSearch: React.FC<PlaceSearchProps> = ({ onSelect, autoFocus }) => {
         id="manual-location-search"
         type="text"
         value={placeQuery}
-        onChange={(e) => setPlaceQuery(e.target.value)}
+        onChange={(e) => {
+          enterPendingRef.current = false;
+          setPlaceQuery(e.target.value);
+        }}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return;
+          // Item 165: Enter picks the first result of the typed text, now or when the results
+          // come. It never submits the surrounding form, which would set the coordinate fields
+          // and drop the search.
+          e.preventDefault();
+          const first = resultsFor === placeQuery.trim() ? placeResults[0] : undefined;
+          if (first) onSelect(first.latitude, first.longitude, formatGeocodeResultLabel(first), first.countryCode);
+          else enterPendingRef.current = placeQuery.trim().length >= 2;
+        }}
         placeholder={t('search.placeholder')}
         className={`bg-black/30 rounded px-2 py-1 text-white ${FOCUS_RING}`}
         role="combobox"
