@@ -69,18 +69,46 @@ describe('SunTracker', () => {
     );
   });
 
-  it('falls back to default location if geolocation fails', async () => {
+  it('a denied location keeps the loading screen with "Choose a place", no toast and no default place (item 170)', async () => {
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (_s, e) => e({ code: 1 }) } });
     render(<SunTracker />);
-    // Assert that toast was called with the fallback message
-    await waitFor(() => {
-      expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: expect.stringContaining('Location unavailable'),
-          description: expect.stringContaining('Using default location'),
-        })
-      );
+    expect(screen.getByRole('status')).toHaveTextContent('No location: choose a place');
+    // Free for the first place: no gold plus on the button.
+    const choose = screen.getByRole('button', { name: /choose a place/i });
+    expect(choose.querySelector('[data-testid="premium-badge"]')).toBeNull();
+    expect(screen.queryByTestId('sun-visualization')).not.toBeInTheDocument();
+    expect(toast).not.toHaveBeenCalled();
+  });
+
+  it('a location allowed later moves the scene there without a reload (item 170)', async () => {
+    let granted = false;
+    const status = Object.assign(new EventTarget(), { state: 'denied' as PermissionState });
+    vi.stubGlobal('navigator', {
+      geolocation: {
+        getCurrentPosition: (s: (p: unknown) => void, e?: (err: { code: number }) => void) =>
+          granted ? s({ coords: { latitude: 47.78, longitude: 9.61 } }) : e?.({ code: 1 }),
+      },
+      permissions: { query: vi.fn(async () => status) },
     });
+    render(<SunTracker />);
+    expect(screen.getByRole('status')).toHaveTextContent('No location: choose a place');
+    await act(async () => {});
+
+    granted = true;
+    status.state = 'granted';
+    act(() => { status.dispatchEvent(new Event('change')); });
+    await waitFor(() => expect(screen.getByTestId('sun-visualization')).toBeInTheDocument());
+    expect(document.body.textContent).toContain('47.7800');
+  });
+
+  it('"Use my location" while location is blocked says where to allow it (item 170)', async () => {
+    saveManualLocation(10, 20);
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (_s: unknown, e: (err: { code: number }) => void) => e({ code: 1 }) } });
+    render(<SunTracker />);
+    await waitFor(() => expect(screen.getByTestId('sun-visualization')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /change location/i }));
+    fireEvent.click(screen.getByRole('button', { name: /use my location/i }));
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ description: expect.stringContaining("browser's site settings") }));
   });
 
   it('renders InfoPanel and SunVisualization after location is loaded', async () => {
@@ -856,7 +884,7 @@ describe('SunTracker', () => {
     });
 
     it('persists a location entered via the manual form to localStorage', async () => {
-      vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (_s, e) => e({ code: 1 }) } });
+      vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 1, longitude: 2 } }) } });
       render(<SunTracker />);
       await waitFor(() => expect(screen.getByTestId('sun-visualization')).toBeInTheDocument());
 
@@ -867,6 +895,8 @@ describe('SunTracker', () => {
 
       expect(loadManualLocation()).toEqual({ latitude: 35, longitude: 139 });
       expect(document.body.textContent).toContain('35.0000');
+      // Item 170: typed coordinates with no place name are "Chosen point", not "Your location".
+      expect(await screen.findByText('Chosen point', undefined, { timeout: 5000 })).toBeInTheDocument();
     });
 
     it('clears the stored manual location when "Use my location" succeeds', async () => {
@@ -974,7 +1004,8 @@ describe('SunTracker', () => {
       expect(screen.getByTestId('loading-mark-sun')).toHaveClass('animate-mark-sink');
 
       const chooseButton = screen.getByRole('button', { name: /choose a place/i });
-      expect(chooseButton.querySelector('[data-testid="premium-badge"]')).not.toBeNull();
+      // Item 170: the first place is free.
+      expect(chooseButton.querySelector('[data-testid="premium-badge"]')).toBeNull();
       fireEvent.click(chooseButton);
       const search = screen.getByLabelText(/search for a place/i);
       expect(search).toHaveFocus();
@@ -992,16 +1023,18 @@ describe('SunTracker', () => {
       expect(document.body.textContent).toContain('Lindau, Germany');
     });
 
-    it('asks for the position with a 10 s timeout, and a timeout gives the default location and the toast', () => {
+    it('asks for the position with a 10 s timeout, and a timeout asks for a place, with no toast (item 170)', () => {
       const geo = stubPendingGeolocation();
       render(<SunTracker />);
       expect(geo.getCurrentPosition).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), { timeout: 10000 });
 
       advance(10000);
       geo.fail();
-      expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Location unavailable' }));
+      expect(toast).not.toHaveBeenCalled();
       advance(1000);
-      expect(document.body.textContent).toContain('40.7128');
+      expect(screen.getByRole('status')).toHaveTextContent('Location not found: choose a place');
+      expect(screen.getByRole('button', { name: /choose a place/i })).toBeInTheDocument();
+      expect(document.body.textContent).not.toContain('40.7128');
     });
 
     it('with reduced motion, applies no rise and no circle, only the fade', () => {
@@ -1547,12 +1580,11 @@ describe('SunTracker', () => {
     it('starts in the browser language, sets <html lang>, and saves a picked language', async () => {
       vi.stubGlobal('navigator', {
         language: 'de-DE',
-        geolocation: { getCurrentPosition: (_s: unknown, e: (err: { code: number }) => void) => e({ code: 1 }) },
+        geolocation: { getCurrentPosition: (s: (p: unknown) => void) => s({ coords: { latitude: 1, longitude: 2 } }) },
       });
       render(<SunTracker />);
       await waitFor(() => expect(screen.getByText('Sonnenuntergang')).toBeInTheDocument());
       expect(document.documentElement.lang).toBe('de');
-      expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Standort nicht verfügbar' }));
 
       fireEvent.click(screen.getByRole('button', { name: 'Français' }));
       expect(await screen.findByText('Coucher du soleil')).toBeInTheDocument();

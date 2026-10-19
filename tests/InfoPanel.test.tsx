@@ -1084,7 +1084,9 @@ describe('InfoPanel: line of sight as an icon at the sun and moon rows (ROADMAP 
         </PremiumContext.Provider>
       );
       expect(screen.queryByText('7/10')).not.toBeInTheDocument();
+      // Item 170: "Change location" opens for everyone; setting a place by hand is gated.
       fireEvent.click(screen.getByRole('button', { name: /change location/i }));
+      fireEvent.click(screen.getByRole('button', { name: /set location/i }));
       fireEvent.click(screen.getByRole('button', { name: 'Manual' }));
       fireEvent.click(screen.getByRole('button', { name: /play time forward/i }));
       fireEvent.click(screen.getByRole('button', { name: /sunset score/i }));
@@ -1094,7 +1096,27 @@ describe('InfoPanel: line of sight as an icon at the sun and moon rows (ROADMAP 
       expect(value.requirePremium).toHaveBeenCalledTimes(6);
       expect(onWeatherModeToggle).not.toHaveBeenCalled();
       expect(onTimePlay).not.toHaveBeenCalled();
-      expect(screen.queryByLabelText('Latitude')).not.toBeInTheDocument();
+    });
+
+    it('while locked, "Use my location" stays free and a place set by hand goes through requirePremium (item 170)', () => {
+      const value = premiumValue({});
+      const onUseMyLocation = vi.fn();
+      const onLocationChange = vi.fn();
+      render(
+        <PremiumContext.Provider value={value}>
+          <InfoPanel {...defaultProps} onUseMyLocation={onUseMyLocation} onLocationChange={onLocationChange} />
+        </PremiumContext.Provider>
+      );
+      fireEvent.click(screen.getByRole('button', { name: /change location/i }));
+      fireEvent.change(screen.getByLabelText(/latitude/i), { target: { value: '48.1' } });
+      fireEvent.change(screen.getByLabelText(/longitude/i), { target: { value: '11.6' } });
+      fireEvent.click(screen.getByRole('button', { name: /set location/i }));
+      expect(value.requirePremium).toHaveBeenCalledTimes(1);
+      expect(onLocationChange).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole('button', { name: /use my location/i }));
+      expect(onUseMyLocation).toHaveBeenCalledTimes(1);
+      expect(value.requirePremium).toHaveBeenCalledTimes(1);
     });
 
     it('has a satellite tracking switch with the gold plus (item 97), gated while locked', () => {

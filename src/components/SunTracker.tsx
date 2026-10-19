@@ -47,7 +47,7 @@ import TopLeftButtons from './TopLeftButtons';
 import PWAInstallPrompt from './PWAInstallPrompt';
 import MidnightGhost, { GHOST_RING } from './MidnightGhost';
 import TemperatureIceberg, { ICEBERG_RING } from './TemperatureIceberg';
-import LoadingScreen, { FAST_START_MS } from './LoadingScreen';
+import LoadingScreen, { FAST_START_MS, type LocationProblem } from './LoadingScreen';
 import { type WeatherType } from './CloudLayer';
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -192,6 +192,10 @@ const SunTracker: React.FC = () => {
     }
     return { latitude: 0, longitude: 0, loaded: false };
   });
+  // Item 170: why the startup request gave no position; the loading screen then asks for a place.
+  const [locationProblem, setLocationProblem] = useState<LocationProblem>(null);
+  // Item 170: the place was set by hand (search or typed coordinates), not by geolocation.
+  const [isManualLocation, setIsManualLocation] = useState(() => loadManualLocation() !== null);
   // The place name chosen via search (ROADMAP item 12); takes priority over the
   // reverse-geocode guess InfoPanel would otherwise compute for the same coordinates.
   // Cleared whenever the location changes without a name (typed lat/lon, geolocation).
@@ -621,34 +625,49 @@ const SunTracker: React.FC = () => {
       return;
     }
 
+    const onPosition = (position: GeolocationPosition) => {
+      if (locationChosenRef.current) return;
+      setLocationProblem(null);
+      setLocation({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        loaded: true
+      });
+    };
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        if (locationChosenRef.current) return;
-        setLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          loaded: true
-        });
-      },
+      onPosition,
       (error) => {
         console.error("Error getting location:", error);
         if (locationChosenRef.current) return;
-        setLocation({
-          latitude: 40.7128,
-          longitude: -74.0060,
-          loaded: true
-        });
-        toast({
-          title: t('toast.locationUnavailableTitle'),
-          description: t('toast.locationUnavailableDefault'),
-          variant: "destructive"
-        });
+        // Item 170: no default place and no toast. The loading screen stays and asks for a
+        // place, with the reason (1 = PERMISSION_DENIED; 2, 3 = unavailable, timeout).
+        setLocationProblem(error.code === 1 ? 'denied' : 'unavailable');
       },
-      // AUDIT C-16: give up after 10 s and use the default location. Browsers start
-      // this timer once permission is granted; an open prompt is covered by the
-      // loading screen's "Choose a place".
+      // AUDIT C-16: give up after 10 s. Browsers start this timer once permission is
+      // granted; an open prompt is covered by the loading screen's "Choose a place".
       { timeout: 10000 }
     );
+
+    // Item 170: location allowed later (a new prompt or the browser's site settings): ask
+    // for the position, unless the user has chosen a place by then.
+    let status: PermissionStatus | null = null;
+    let cancelled = false;
+    const onPermissionChange = () => {
+      if (status?.state === 'granted' && !locationChosenRef.current) {
+        navigator.geolocation.getCurrentPosition(onPosition, () => {});
+      }
+    };
+    navigator.permissions?.query({ name: 'geolocation' })
+      .then((result) => {
+        if (cancelled) return;
+        status = result;
+        result.addEventListener('change', onPermissionChange);
+      })
+      .catch(() => { /* no Permissions API: "Use my location" still works */ });
+    return () => {
+      cancelled = true;
+      status?.removeEventListener('change', onPermissionChange);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- asks for the location once at start; `t` is the start language
   }, []);
 
@@ -656,6 +675,7 @@ const SunTracker: React.FC = () => {
   // place selected from search (in which case `name` is set alongside the coordinates).
   const handleLocationChange = useCallback((latitude: number, longitude: number, name?: string, countryCode?: string) => {
     locationChosenRef.current = true;
+    setIsManualLocation(true);
     setLocation({ latitude, longitude, loaded: true });
     setManualPlaceName(name ?? null);
     setManualCountry(name ? countryCode ?? null : null);
@@ -677,6 +697,7 @@ const SunTracker: React.FC = () => {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         clearManualLocation();
+        setIsManualLocation(false);
         setManualPlaceName(null);
         setManualCountry(null);
         setLocation({
@@ -693,7 +714,8 @@ const SunTracker: React.FC = () => {
         console.error("Error getting location:", error);
         toast({
           title: t('toast.locationUnavailableTitle'),
-          description: t('toast.locationUnavailable'),
+          // Item 170: blocked (1 = PERMISSION_DENIED) says where to allow it.
+          description: t(error.code === 1 ? 'toast.locationBlocked' : 'toast.locationUnavailable'),
           variant: "destructive"
         });
       }
@@ -1363,6 +1385,7 @@ const SunTracker: React.FC = () => {
     {reveal !== 'done' && (
       <LoadingScreen
         still={prefersReducedMotion || reveal !== 'loading'}
+        problem={locationProblem}
         onSelectPlace={handleLocationChange}
       />
     )}
@@ -1494,6 +1517,7 @@ const SunTracker: React.FC = () => {
             nextGoldenBlueHours={nextGoldenBlueHours}
             location={location}
             manualPlaceName={manualPlaceName}
+            isChosenPoint={isManualLocation && !manualPlaceName}
             onPlaceName={setPlaceName}
             timeOfDay={timeOfDay}
             currentTime={date}
