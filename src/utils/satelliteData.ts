@@ -73,9 +73,18 @@ export const dedupeRecords = (records: GpRecord[]): GpRecord[] => {
   });
 };
 
+// The last cache of this page, for a browser that blocks localStorage: the wait after a failed
+// try still holds, also for the refresh button (item 164).
+let pageCache: SatelliteCache | null = null;
+
 const readCache = (): SatelliteCache | null => {
+  let raw: string | null;
   try {
-    const raw = localStorage.getItem(SATELLITE_CACHE_KEY);
+    raw = localStorage.getItem(SATELLITE_CACHE_KEY);
+  } catch {
+    return pageCache;
+  }
+  try {
     if (!raw) return null;
     const cache = JSON.parse(raw) as SatelliteCache;
     return Array.isArray(cache.records) && Number.isFinite(cache.triedAt) ? cache : null;
@@ -85,6 +94,7 @@ const readCache = (): SatelliteCache | null => {
 };
 
 const writeCache = (cache: SatelliteCache): void => {
+  pageCache = cache;
   try {
     localStorage.setItem(SATELLITE_CACHE_KEY, JSON.stringify(cache));
   } catch (error) {
@@ -105,18 +115,32 @@ const fetchNightCatalogue = async (fetchImpl: typeof fetch): Promise<GpRecord[]>
   }
 };
 
+// When loadSatelliteData asks CelesTrak again: REFRESH_MS after the last full fetch, and not
+// before RETRY_MS after the last try. Null when a fetch is due now. A future time in the cache
+// (device clock set back) does not delay it.
+const nextTryAt = (cache: SatelliteCache, now: number): number | null => {
+  const fresh = cache.fetchedAt <= now && now - cache.fetchedAt < REFRESH_MS;
+  const waiting = cache.triedAt <= now && now - cache.triedAt < RETRY_MS;
+  if (!fresh && !waiting) return null;
+  return Math.max(fresh ? cache.fetchedAt + REFRESH_MS : 0, waiting ? cache.triedAt + RETRY_MS : 0);
+};
+
+// Item 164 (R-a): the time of the next CelesTrak try, for the refresh button ("Next try at
+// 21:40"); null when a refresh fetches at once.
+export const getNextSatelliteTry = (now: number = Date.now()): number | null => {
+  const cache = readCache();
+  return cache && nextTryAt(cache, now);
+};
+
 // The cached records when they are fresh or a try is not due yet; else one fetch per group,
-// then the night catalogue. A failed group keeps the cached records and waits RETRY_MS. A
-// future time in the cache (device clock set back) does not keep it fresh. Null when there
-// are no records at all.
+// then the night catalogue. A failed group keeps the cached records and waits RETRY_MS. Null
+// when there are no records at all.
 export const loadSatelliteData = async (
   now: number = Date.now(),
   fetchImpl: typeof fetch = fetch,
 ): Promise<GpRecord[] | null> => {
   const cache = readCache();
-  const fresh = cache && cache.fetchedAt <= now && now - cache.fetchedAt < REFRESH_MS;
-  const waiting = cache && cache.triedAt <= now && now - cache.triedAt < RETRY_MS;
-  if (cache && (fresh || waiting)) return cache.records.length > 0 ? cache.records : null;
+  if (cache && nextTryAt(cache, now) !== null) return cache.records.length > 0 ? cache.records : null;
 
   const records: GpRecord[] = [];
   let failed = false;

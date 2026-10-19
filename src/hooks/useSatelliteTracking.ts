@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { loadSatelliteData, type GpRecord } from '@/utils/satelliteData';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { getNextSatelliteTry, loadSatelliteData, type GpRecord } from '@/utils/satelliteData';
 import {
   CANDIDATE_STEP_MS,
   ISS_NORAD_ID,
@@ -24,6 +24,19 @@ import { type Language } from '@/utils/language';
 const DATA_CHECK_MS = 60 * 60 * 1000;
 // The ISS pass for the reminder is searched again every 5 min.
 const PASS_STEP_MS = 5 * 60 * 1000;
+// Item 164: the real time for the status (the data's age, the wait) moves once a minute.
+const CLOCK_STEP_MS = 60 * 1000;
+
+// Item 164: the tracking's state, for the panel and the Sentry tag `satellites`. `loading` while
+// satellite.js or the data loads. `error` when satellite.js does not load, no data comes, or the
+// data is too old (isNearEpoch at the real time). A time preview far from the epoch is not an
+// error: the scene then shows the decorative dots by design.
+export type SatelliteStatus = 'loading' | 'ok' | 'error';
+
+// The Sentry tag `satellites` (item 164): `off` (no status: the tracking is off), `loading`,
+// `error`, or `ok-<n>` (n: the visible satellites in the hook's sky).
+export const getSatellitesTag = (status: SatelliteStatus | null, visible: number): string =>
+  status === 'ok' ? `ok-${visible}` : status ?? 'off';
 
 export interface SatelliteTracking {
   lib: SatelliteLib | null;
@@ -34,7 +47,26 @@ export interface SatelliteTracking {
   sky: SkySatellite[] | null;
   // The next ISS pass (or the one in progress), only while `wantIssPass`.
   issPass: SatellitePass | null;
+  status: SatelliteStatus;
+  // Item 164 (R-a): loads satellite.js again if it failed, and the data. loadSatelliteData asks
+  // CelesTrak only when its wait (RETRY_MS after a failed try) is over.
+  refresh: () => void;
+  // True from a refresh until its answer.
+  refreshing: boolean;
+  // The time of the next CelesTrak try while a refresh can load nothing new; null when a
+  // refresh can try (no wait, or satellite.js to load again).
+  nextTryAt: number | null;
 }
+
+// satellite.js in its own chunk, only when the tracking is on; null when it does not load.
+const importSatelliteLib = (): Promise<SatelliteLib | null> =>
+  import('satellite.js').then(
+    (module) => module,
+    (error) => {
+      console.error('Error loading satellite.js:', error);
+      return null;
+    },
+  );
 
 // Satellite tracking (ROADMAP item 97, Premium): loads satellite.js with a dynamic import()
 // and the CelesTrak data only when `showSky` (the tracking switch) or `wantIssPass` (the
@@ -50,34 +82,64 @@ export const useSatelliteTracking = (
   wantIssPass: boolean,
 ): SatelliteTracking => {
   const [lib, setLib] = useState<SatelliteLib | null>(null);
-  const [records, setRecords] = useState<GpRecord[] | null>(null);
+  const [libFailed, setLibFailed] = useState(false);
+  // undefined until the first answer of loadSatelliteData; null: no data.
+  const [records, setRecords] = useState<GpRecord[] | null | undefined>(undefined);
+  // The cache's next CelesTrak try after the last answer (getNextSatelliteTry).
+  const [dataNextTry, setDataNextTry] = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  // The real time (Date.now() is impure in render): set with each answer and once a minute.
+  const [now, setNow] = useState(0);
   const enabled = showSky || wantIssPass;
 
   useEffect(() => {
     if (!enabled || lib) return;
     let cancelled = false;
-    import('satellite.js').then(
-      (module) => !cancelled && setLib(module),
-      (error) => console.error('Error loading satellite.js:', error),
-    );
+    importSatelliteLib().then((module) => {
+      if (cancelled) return;
+      setLib(module);
+      setLibFailed(!module);
+    });
     return () => {
       cancelled = true;
     };
   }, [enabled, lib]);
 
+  // One answer of the cache: the records, its next try and the time.
+  const takeData = useCallback((data: GpRecord[] | null) => {
+    const time = Date.now();
+    setRecords(data);
+    setDataNextTry(getNextSatelliteTry(time));
+    setNow(time);
+  }, []);
+
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
     const load = () => {
-      loadSatelliteData().then((data) => !cancelled && setRecords(data));
+      loadSatelliteData().then((data) => !cancelled && takeData(data));
     };
     load();
     const timer = setInterval(load, DATA_CHECK_MS);
+    const clock = setInterval(() => setNow(Date.now()), CLOCK_STEP_MS);
     return () => {
       cancelled = true;
       clearInterval(timer);
+      clearInterval(clock);
     };
-  }, [enabled]);
+  }, [enabled, takeData]);
+
+  const refresh = useCallback(() => {
+    setRefreshing(true);
+    const libTry = libFailed
+      ? importSatelliteLib().then((module) => {
+        setLib(module);
+        setLibFailed(!module);
+      })
+      : Promise.resolve();
+    const dataTry = loadSatelliteData().then(takeData);
+    void Promise.all([libTry, dataTry]).finally(() => setRefreshing(false));
+  }, [libFailed, takeData]);
 
   const satellites = useMemo(() => (lib && records ? toTrackedSatellites(lib, records) : []), [lib, records]);
   const observer = useMemo(() => ({ latitude, longitude }), [latitude, longitude]);
@@ -105,7 +167,13 @@ export const useSatelliteTracking = (
     [enabled, wantIssPass, lib, iss, passStep, observer],
   );
 
-  return { lib, satellites, sky, issPass };
+  const tooOld = satellites.length > 0 && !isNearEpoch(satellites[0], new Date(now));
+  const status: SatelliteStatus = libFailed || records === null || (lib && records && (satellites.length === 0 || tooOld))
+    ? 'error'
+    : lib && records ? 'ok' : 'loading';
+  const nextTryAt = !libFailed && dataNextTry !== null && dataNextTry > now ? dataNextTry : null;
+
+  return { lib, satellites, sky, issPass, status, refresh, refreshing, nextTryAt };
 };
 
 const REMINDER_CHECK_MS = 30_000;

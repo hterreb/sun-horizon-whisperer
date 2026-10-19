@@ -61,7 +61,7 @@ import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { useSunsetCountdown, primeCountdownAudio } from '@/hooks/useSunsetCountdown';
 import { useSunsetReminder, requestReminderPermission, getNotificationPermission } from '@/hooks/useSunsetReminder';
 import { SUNSET_REMINDER_MIN } from '@/utils/sunsetReminder';
-import { useSatelliteTracking, useSatellitePassReminder } from '@/hooks/useSatelliteTracking';
+import { getSatellitesTag, useSatelliteTracking, useSatellitePassReminder } from '@/hooks/useSatelliteTracking';
 import { PASS_REMINDER_MIN, getSatelliteCard } from '@/utils/satelliteUtils';
 import { loadManualLocation, saveManualLocation, clearManualLocation } from '../utils/manualLocation';
 import {
@@ -135,6 +135,8 @@ const isOnIdleControl = ({ clientX: x, clientY: y }: MouseEvent): boolean =>
     const box = el.getBoundingClientRect();
     return x >= box.left && x < box.right && y >= box.top && y < box.bottom;
   });
+// Item 163: these events in a shown control (`data-idle-control`) are a use of it, and a wake.
+const CONTROL_USE_EVENTS = ['pointerdown', 'scroll', 'wheel', 'keydown'] as const;
 
 const clampEyeHeight = (value: number): number =>
   Number.isFinite(value) ? Math.min(MAX_EYE_HEIGHT_M, Math.max(0, value)) : DEFAULT_EYE_HEIGHT_M;
@@ -379,6 +381,14 @@ const SunTracker: React.FC = () => {
     const onPointerDown = () => {
       downClosesCardRef.current = infoCardOpenRef.current;
     };
+    // Item 163: use of a shown control is a wake: the controls stay, and the hide timer starts
+    // again. A touch scroll in the panel gives no click and no focus. A scroll does not bubble, so
+    // the window listens in the capture phase. A wake on shown controls changes no state.
+    const onControlUse = (event: Event) => {
+      if (showCursor && event.target instanceof Element && event.target.closest('[data-idle-control]') !== null) {
+        wakeCursor();
+      }
+    };
     // T2: a hidden control takes no taps (pointer-events-none), so a tap in its box lands on the
     // scene below. The window catches a tap on the empty sky first (capture), shows the controls
     // and stops it. A scene thing keeps its taps (item 157): a single tap shows the controls (T1),
@@ -426,9 +436,11 @@ const SunTracker: React.FC = () => {
     window.addEventListener('click', onClickCapture, true);
     document.addEventListener('pointermove', onPointerMove);
     document.addEventListener('click', onClick);
+    for (const type of CONTROL_USE_EVENTS) window.addEventListener(type, onControlUse, { capture: true, passive: true });
 
     return () => {
       cancelThingToggle();
+      for (const type of CONTROL_USE_EVENTS) window.removeEventListener(type, onControlUse, true);
       window.removeEventListener('pointerdown', onPointerDown, true);
       window.removeEventListener('click', onClickCapture, true);
       document.removeEventListener('pointermove', onPointerMove);
@@ -1140,6 +1152,12 @@ const SunTracker: React.FC = () => {
     isPassReminderOn
   );
   useSatellitePassReminder(satelliteTracking.issPass, isPassReminderOn, language);
+  // Item 164: the status for the panel and the Sentry tag `satellites`, set only when it changes
+  // (as `live-planes`): `off` while the tracking does not run; in `ok-<n>`, n is the visible
+  // satellites in the hook's sky (the scene can draw fewer: terrain, clouds).
+  const satelliteStatus = isSatelliteTrackingOn && location.loaded ? satelliteTracking.status : null;
+  const satellitesTag = getSatellitesTag(satelliteStatus, satelliteTracking.sky?.filter((sat) => sat.visible).length ?? 0);
+  useEffect(() => { Sentry.setTag('satellites', satellitesTag); }, [satellitesTag]);
   // The open card of a tracked satellite, updated every 10 s.
   const cardSatelliteId = infoCard?.target.type === 'satellite' ? infoCard.target.id : null;
   const satelliteCardStep = Math.floor(date.getTime() / SATELLITE_CARD_STEP_MS);
@@ -1231,7 +1249,9 @@ const SunTracker: React.FC = () => {
   const upperAir = useRealWeather ? getUpperAirAt(weatherData?.hourly ?? null, date) : null;
   const contrail = getContrail(upperAir?.tempC, upperAir?.rhPercent);
   const isLiveRadarActive = isLivePlanesOn && location.loaded && !premium.isLocked && !isTimePreview;
-  const { state: liveFeed, status: liveFeedStatus } = useLivePlanes(isLiveRadarActive, location.latitude, location.longitude);
+  const {
+    state: liveFeed, status: liveFeedStatus, refresh: refreshLivePlanes, refreshing: isLiveRefreshing,
+  } = useLivePlanes(isLiveRadarActive, location.latitude, location.longitude);
   // While the radar is on and its first answer is on the way, no plane shows.
   const livePlanes: LivePlanesState | null = isLiveRadarActive ? liveFeed ?? NO_LIVE_PLANES : null;
   // Item 155: the status line under the switch and the Sentry tag `live-planes` (no coordinates
@@ -1480,8 +1500,13 @@ const SunTracker: React.FC = () => {
             isLivePlanesOn={isLivePlanesOn}
             onLivePlanesToggle={handleLivePlanesToggle}
             liveRadarStatus={liveStatus && {
-              status: liveStatus, nearby: liveNearby, shown: liveShown, compassOff: compassStatus === 'idle',
+              status: liveStatus, nearby: liveNearby, shown: liveShown, compassOff: compassStatus === 'idle', refreshing: isLiveRefreshing,
             }}
+            onLivePlanesRefresh={refreshLivePlanes}
+            satelliteStatus={satelliteStatus && {
+              status: satelliteStatus, refreshing: satelliteTracking.refreshing, nextTryAt: satelliteTracking.nextTryAt,
+            }}
+            onSatelliteRefresh={satelliteTracking.refresh}
             onCollectionOpen={handleCollectionOpen}
             onCountryChange={setDetectedCountry}
           />
