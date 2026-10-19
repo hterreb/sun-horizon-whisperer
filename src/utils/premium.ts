@@ -12,6 +12,8 @@ export const PREMIUM_ENFORCED = false;
 export const PLAY_BILLING = 'https://play.google.com/billing';
 export const PREMIUM_SKU = 'premium';
 const OWNED_KEY = 'premium-owned';
+// Item 171: the "free for now" toast of the gold plus was shown on this device.
+const BADGE_HINT_KEY = 'premium-badge-hint';
 
 // Dev only: `?premium=enforce` turns the gate on for screenshots and manual checks.
 // import.meta.env.DEV is false in a production build, so the build drops this branch.
@@ -33,6 +35,22 @@ export const loadOwnedHint = (): boolean => {
     return localStorage.getItem(OWNED_KEY) === 'true';
   } catch {
     return false;
+  }
+};
+
+export const loadBadgeHintShown = (): boolean => {
+  try {
+    return localStorage.getItem(BADGE_HINT_KEY) === 'shown';
+  } catch {
+    return false;
+  }
+};
+
+export const saveBadgeHintShown = (): void => {
+  try {
+    localStorage.setItem(BADGE_HINT_KEY, 'shown');
+  } catch {
+    // Storage blocked: the toast may come once more on the next start.
   }
 };
 

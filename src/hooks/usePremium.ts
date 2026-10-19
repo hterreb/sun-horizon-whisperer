@@ -8,8 +8,10 @@ import {
   formatPrice,
   isPremiumEnforced,
   isPremiumLocked,
+  loadBadgeHintShown,
   loadOwnedHint,
   ownsPremium,
+  saveBadgeHintShown,
   saveOwnedHint,
 } from '@/utils/premium';
 
@@ -131,12 +133,23 @@ export const usePremium = (language: Language, enforced: boolean = isPremiumEnfo
   }, [setOwnedAndHint, showError]);
 
   const isLocked = isPremiumLocked(isBillingAvailable, enforced, owned);
+  // Item 171: while Premium is free, the first use of a gold-plus control says what the plus
+  // means, once per device ("Premium feature, free for now"); the control still works. No toast
+  // when the plus is gone (Premium bought).
   const requirePremium = useCallback(
     (action?: () => void) => {
-      if (isLocked) setDialogOpen(true);
-      else action?.();
+      if (isLocked) {
+        setDialogOpen(true);
+        return;
+      }
+      const isBadgeShown = !(isBillingAvailable && owned);
+      if (isBadgeShown && !loadBadgeHintShown()) {
+        saveBadgeHintShown();
+        toast({ title: translate(language, 'common.premium') });
+      }
+      action?.();
     },
-    [isLocked]
+    [isLocked, isBillingAvailable, owned, language]
   );
 
   const price = useMemo(() => (priceDetails ? formatPrice(priceDetails, language) : null), [priceDetails, language]);
