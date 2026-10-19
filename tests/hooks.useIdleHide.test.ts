@@ -100,6 +100,29 @@ describe('useIdleHide (ROADMAP item 89)', () => {
     expect(result.current.isTappable).toBe(true);
   });
 
+  it('wakes on shown controls render at most once and keep their taps; they start the timer again (item 163)', () => {
+    let renders = 0;
+    const { result } = renderHook(() => {
+      renders++;
+      return useIdleHide(true);
+    });
+    advance(3000);
+    act(() => result.current.wake());
+    advance(TAP_READY_MS);
+    const before = renders;
+
+    // A scroll in the panel: many wakes per second. The state does not change. After a state
+    // change React can call the hook once more before it bails out; then no wake renders.
+    for (let i = 0; i < 100; i++) act(() => result.current.wake());
+    advance(TAP_READY_MS);
+    expect(renders - before).toBeLessThanOrEqual(1);
+    expect(result.current.isTappable).toBe(true);
+    advance(WAKE_HIDE_MS - TAP_READY_MS - 1);
+    expect(result.current.isVisible).toBe(true);
+    advance(1);
+    expect(result.current.isVisible).toBe(false);
+  });
+
   describe('toggle (a tap on the empty sky, item 136)', () => {
     it('hides at once with no taps, and stays hidden until the next toggle', () => {
       const { result } = enterFullscreen();
