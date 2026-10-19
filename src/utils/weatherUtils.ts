@@ -381,6 +381,11 @@ export const fetchCurrentWeather = async (
     const data: OpenMeteoResponse = await response.json();
 
     const { current } = data;
+    // An answer without the temperature or the weather code is no answer: else the panel shows
+    // "NaN°" (or 0° for a null) and "Unknown", and the cache keeps it.
+    if (!Number.isFinite(current?.temperature_2m) || !Number.isFinite(current?.weather_code)) {
+      throw new Error('Weather API: no current temperature or weather code');
+    }
     const weatherMapping = mapWeather(current.weather_code, current.visibility, current.cloud_cover);
 
     const weatherData: WeatherData = {

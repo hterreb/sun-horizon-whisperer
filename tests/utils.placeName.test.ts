@@ -142,6 +142,17 @@ describe('fetchPlace', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('makes no retry when the caller has cancelled by then', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(limited);
+    vi.stubGlobal('fetch', fetchMock);
+    let cancelled = false;
+    const result = fetchPlace(41.9, 12.5, 'it', () => cancelled).catch((error: unknown) => error);
+    cancelled = true;
+    await vi.advanceTimersByTimeAsync(PLACE_RETRY_MS);
+    expect(await result).toMatchObject({ httpStatus: 429 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('throws a PlaceError with the HTTP status and the body status (a ban: 400 with 402)', async () => {
     const banned = { ok: false, status: 400, json: () => Promise.resolve({ status: 402, description: 'this endpoint does not support server-side operations' }) };
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(banned));

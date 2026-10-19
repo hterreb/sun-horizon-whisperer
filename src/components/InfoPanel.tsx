@@ -383,7 +383,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
         setLoadingLocation(true);
       }
       try {
-        const place = await fetchPlace(latitude, longitude, language);
+        const place = await fetchPlace(latitude, longitude, language, () => cancelled);
         if (cancelled) return;
         savePlace(latitude, longitude, language, place);
         showPlace(place);
