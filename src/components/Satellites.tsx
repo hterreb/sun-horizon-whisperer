@@ -4,7 +4,7 @@ import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { useScenePlaybackRate } from '@/hooks/useScenePlaybackRate';
 import { useDoubleTap } from '@/hooks/useDoubleTap';
 import { getSpawnGapFactor, type PlayDirection } from '@/utils/timeTravel';
-import { getSatelliteDotPx, getSatelliteGlowPx, makeDotPath, type DotPath } from '@/utils/satelliteUtils';
+import { getSatelliteDotPx, getSatelliteGlowPx, makeDotPath, pickShownSatellites, type DotPath } from '@/utils/satelliteUtils';
 import { type SceneInfoHandler } from './CloudLayer';
 import { getStarGapShow } from '@/utils/weatherEffectsUtils';
 
@@ -59,6 +59,32 @@ interface Decor {
 
 // A tracked satellite's gap from its id, so the same satellite stays behind its cloud or in its gap.
 const trackedGap = (id: number): number => (id * 0.6180339887) % 1;
+
+// Item 162: one update of the tracked dots (a new `tracked` list or cloud factor). A second render
+// of the same update uses the same step, so it gives the same result.
+interface TrackedStep {
+  tracked: SatelliteDot[] | null;
+  cloudFactor: number;
+  // The dots that show (the cap, pickShownSatellites): a shown dot keeps its place in the next step.
+  shownIds: ReadonlySet<number>;
+  // The dots whose x changed by more than half the width since the last step: in the 360° view
+  // north is at both edges, and a satellite that crosses north goes out at one edge and comes in
+  // at the other. It steps with no move transition, so it does not slide across the screen.
+  edgeIds: ReadonlySet<number>;
+}
+
+const nextTrackedStep = (last: TrackedStep | null, tracked: SatelliteDot[] | null, cloudFactor: number, width: number): TrackedStep => {
+  const dots = tracked ?? [];
+  const lastX = new Map(last?.tracked?.map((dot) => [dot.id, dot.x]));
+  // Item 135: a dot behind a cloud does not show, so it takes no place.
+  const visible = dots.map((dot) => ({ ...dot, shown: dot.shown && getStarGapShow(cloudFactor, trackedGap(dot.id)) > 0 }));
+  return {
+    tracked,
+    cloudFactor,
+    shownIds: new Set(pickShownSatellites(visible, last?.shownIds ?? new Set()).map((dot) => dot.id)),
+    edgeIds: new Set(dots.filter((dot) => Math.abs(dot.x - (lastX.get(dot.id) ?? dot.x)) > width / 2).map((dot) => dot.id)),
+  };
+};
 
 // A decorative dot takes a double tap as a tracked one: its hit area moves with it. It opens a
 // card without a name and gives no badge (Lutz, 2026-10-15). A dot behind a cloud, in the
@@ -134,6 +160,10 @@ const Satellites: React.FC<SatellitesProps> = ({
   }, [cloudFactor]);
   const nextId = useRef(0);
   useScenePlaybackRate(containerRef, playDirection);
+  // Item 162: the cap and the step across the edge come from the last update (state, not a ref,
+  // so a second render of the same update gives the same result).
+  const [step, setStep] = useState(() => nextTrackedStep(null, tracked, cloudFactor, width));
+  if (step.tracked !== tracked || step.cloudFactor !== cloudFactor) setStep(nextTrackedStep(step, tracked, cloudFactor, width));
 
   // Decorative dots: one after a random gap in `gapMs`, shorter during play (item 83). Also with
   // the tracking on while no tracked satellite shows (none in sunlight, or all behind clouds).
@@ -166,9 +196,8 @@ const Satellites: React.FC<SatellitesProps> = ({
 
   if (!tracked && decors.length === 0) return null;
 
-  const transition = prefersReducedMotion || stepMs === 0
-    ? `opacity ${FADE_OUT_MS}ms ease-out`
-    : `transform ${stepMs}ms linear, opacity ${FADE_OUT_MS}ms ease-out`;
+  const fadeTransition = `opacity ${FADE_OUT_MS}ms ease-out`;
+  const transition = prefersReducedMotion || stepMs === 0 ? fadeTransition : `transform ${stepMs}ms linear, ${fadeTransition}`;
 
   return (
     <div
@@ -200,7 +229,8 @@ const Satellites: React.FC<SatellitesProps> = ({
         const size = getSatelliteDotPx(dot.magnitude);
         const glow = getSatelliteGlowPx(dot.magnitude);
         // Item 135: clouds hide some satellites; the others shine at full strength in the gaps.
-        const shown = dot.shown && getStarGapShow(cloudFactor, trackedGap(dot.id)) > 0;
+        // Item 162: a dot without a place (the cap) is hidden; it fades in when it gets one.
+        const shown = step.shownIds.has(dot.id);
         const opacity = dot.opacity * getStarGapShow(cloudFactor, trackedGap(dot.id));
         return (
           <button
@@ -219,7 +249,7 @@ const Satellites: React.FC<SatellitesProps> = ({
               height: HIT_PX,
               transform: `translate(${dot.x - HIT_PX / 2}px, ${dot.y - HIT_PX / 2}px)`,
               opacity: shown ? opacity : 0,
-              transition,
+              transition: step.edgeIds.has(dot.id) ? fadeTransition : transition,
             }}
             title={t('scene.satellite')}
             data-testid="satellite-tracked"

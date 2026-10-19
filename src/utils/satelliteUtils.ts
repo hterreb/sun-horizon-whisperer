@@ -277,6 +277,26 @@ export const getSkySatellites = (lib: SatelliteLib, satellites: TrackedSatellite
   return result;
 };
 
+// Item 162 (N2): the 360° view puts the whole sky on one screen, so at most this many tracked
+// dots show at once. In the compass view only the dots in the field of view count.
+export const MAX_SHOWN_SATELLITES = 8;
+
+// The tracked dots to show, at most `max`. `shownBefore`: the ids that the last update showed.
+// A shown dot stays while its `shown` is true: it goes into the Earth's shadow, below 10°, behind
+// the terrain, or out of the view. A new dot takes a free place only, the brightest (lowest
+// magnitude) first, so no dot is swapped out while it is in the sky. A dot that fades out
+// (`shown` false) takes no place.
+export const pickShownSatellites = <T extends { id: number; magnitude: number; shown: boolean }>(
+  dots: T[], shownBefore: ReadonlySet<number>, max = MAX_SHOWN_SATELLITES,
+): T[] => {
+  const byBrightness = (a: T, b: T) => a.magnitude - b.magnitude;
+  const candidates = dots.filter((dot) => dot.shown);
+  const kept = candidates.filter((dot) => shownBefore.has(dot.id)).sort(byBrightness).slice(0, max);
+  const added = candidates.filter((dot) => !shownBefore.has(dot.id)).sort(byBrightness).slice(0, max - kept.length);
+  const ids = new Set([...kept, ...added].map((dot) => dot.id));
+  return dots.filter((dot) => ids.has(dot.id));
+};
+
 // A low satellite climbs less than 0.3°/s near the horizon, so one that is below this
 // elevation cannot be above the horizon within CANDIDATE_STEP_MS.
 export const CANDIDATE_STEP_MS = 30_000;
