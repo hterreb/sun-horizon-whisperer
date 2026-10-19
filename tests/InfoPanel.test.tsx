@@ -1481,3 +1481,74 @@ describe('InfoPanel: the place\'s clock (ROADMAP item 169)', () => {
     expect(screen.getByTestId('clock-note')).toHaveTextContent('Times in your time zone');
   });
 });
+
+describe('InfoPanel on a phone (ROADMAP item 173)', () => {
+  const width = window.innerWidth;
+  beforeEach(() => {
+    window.innerWidth = 390;
+  });
+  afterEach(() => {
+    window.innerWidth = width;
+    vi.restoreAllMocks();
+  });
+  const sunTimes = {
+    sunrise: new Date('2026-10-19T05:46:00Z'), sunset: new Date('2026-10-19T16:28:00Z'), solarNoon: new Date('2026-10-19T11:07:00Z'),
+    dawn: new Date('2026-10-19T05:15:00Z'), dusk: new Date('2026-10-19T16:59:00Z'), nauticalDawn: new Date('2026-10-19T04:40:00Z'),
+    nauticalDusk: new Date('2026-10-19T17:34:00Z'), astronomicalDawn: new Date('2026-10-19T04:06:00Z'), astronomicalDusk: new Date('2026-10-19T18:08:00Z'), polar: null,
+  } as SunTimes;
+  const props = {
+    sunPosition: { azimuth: 180, altitude: 30 },
+    moonPosition: { azimuth: 90, altitude: -10, phase: 0.5, illumination: 1, visible: false },
+    moonTimes: { rise: null, set: null, alwaysUp: false, alwaysDown: false },
+    nextFullMoon: new Date('2026-10-26T12:00:00Z'),
+    nextNewMoon: new Date('2026-11-09T12:00:00Z'),
+    sunTimes,
+    nextGoldenBlueHours: null,
+    location: { latitude: 47.78, longitude: 9.61, loaded: true },
+    manualPlaceName: 'Ravensburg, Germany',
+    timeOfDay: 'midday' as TimeOfDay,
+    currentTime: new Date('2026-10-19T12:00:00Z'),
+    weatherType: 'clear' as WeatherType,
+    weatherData: null,
+    isLoadingWeather: false,
+    useRealWeather: true,
+    isFullscreen: false,
+    onWeatherChange: () => {},
+    onWeatherModeToggle: () => {},
+    onWeatherRefresh: () => {},
+    onLocationChange: () => {},
+    onUseMyLocation: () => {},
+  };
+
+  it('a tap on the empty sky beside the open panel closes it and goes no further', () => {
+    vi.spyOn(window.history, 'back').mockImplementation(() => { window.dispatchEvent(new PopStateEvent('popstate')); });
+    render(<div data-share-root><div data-testid="sky" /><InfoPanel {...props} /></div>);
+    fireEvent.click(screen.getByRole('button', { name: /expand info panel/i }));
+    expect(screen.getByRole('button', { name: /collapse info panel/i })).toBeInTheDocument();
+
+    const pastThePanel = vi.fn();
+    document.addEventListener('click', pastThePanel);
+    // A tap inside the panel does not close it.
+    fireEvent.click(screen.getByRole('heading', { level: 1 }));
+    expect(screen.getByRole('button', { name: /collapse info panel/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('sky'));
+    document.removeEventListener('click', pastThePanel);
+    expect(screen.getByRole('button', { name: /expand info panel/i })).toBeInTheDocument();
+    expect(pastThePanel).toHaveBeenCalledTimes(1); // only the tap inside the panel
+  });
+
+  it('Back closes the open search first, then the panel', () => {
+    vi.spyOn(window.history, 'back').mockImplementation(() => { window.dispatchEvent(new PopStateEvent('popstate')); });
+    render(<InfoPanel {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: /expand info panel/i }));
+    fireEvent.click(screen.getByRole('button', { name: /change location/i }));
+    expect(screen.getByLabelText(/search for a place/i)).toBeInTheDocument();
+
+    act(() => { window.dispatchEvent(new PopStateEvent('popstate')); });
+    expect(screen.queryByLabelText(/search for a place/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /collapse info panel/i })).toBeInTheDocument();
+
+    act(() => { window.dispatchEvent(new PopStateEvent('popstate')); });
+    expect(screen.getByRole('button', { name: /expand info panel/i })).toBeInTheDocument();
+  });
+});

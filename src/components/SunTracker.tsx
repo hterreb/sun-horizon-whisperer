@@ -51,6 +51,8 @@ import LoadingScreen, { FAST_START_MS, type LocationProblem } from './LoadingScr
 import { type WeatherType } from './CloudLayer';
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { isSceneTap } from '@/utils/sceneTap';
+import { useBackToClose } from '@/hooks/useBackToClose';
 import { useWakeLock } from '@/hooks/useWakeLock';
 import { ENTER_HIDE_MS, useIdleHide } from '@/hooks/useIdleHide';
 import { DOUBLE_TAP_MS } from '@/hooks/useDoubleTap';
@@ -121,13 +123,6 @@ const DEFAULT_EYE_HEIGHT_M = 1.7;
 const MANUAL_STRONG_WIND_KMH = 50;
 const HOUR_MS = 60 * 60 * 1000;
 const MAX_EYE_HEIGHT_M = 1000;
-// Item 136: a tap on these is not a tap on the empty sky (scene things, controls, cards, dialogs).
-const NOT_SKY = '[data-scene-hit], [data-share-hide], button, a, input, [role="dialog"]';
-// Item 147: a tap on the scene, the empty sky or a scene thing (the sun is a `button`), not on a
-// control, a card, a toast or a dialog.
-const isSceneTap = (target: EventTarget | null): target is Element =>
-  target instanceof Element && target.closest('[data-share-root]') !== null &&
-  (target.closest('[data-scene-hit]') !== null || target.closest(NOT_SKY) === null);
 // Item 147 (T2): the tap point is in the box of a control that fades (`data-idle-control`:
 // TopLeftButtons, InfoPanel, MusicPlayer). An empty box (jsdom, not drawn) has no inside.
 const isOnIdleControl = ({ clientX: x, clientY: y }: MouseEvent): boolean =>
@@ -1035,6 +1030,11 @@ const SunTracker: React.FC = () => {
   useEffect(() => {
     infoCardOpenRef.current = infoCard !== null;
   }, [infoCard]);
+  // Item 173, on a phone: Back closes an open card, the collection or the Premium dialog first.
+  const closePremiumDialog = useCallback(() => premium.setDialogOpen(false), [premium]);
+  useBackToClose(infoCard !== null, handleInfoClose, isMobile);
+  useBackToClose(isCollectionOpen, handleCollectionClose, isMobile);
+  useBackToClose(premium.isDialogOpen, closePremiumDialog, isMobile);
   // Rare lenticular and mammatus clouds (ROADMAP item 84, X1): one day in 30 per place;
   // `?egg=lenticular` or `?egg=mammatus` forces the day.
   const [cloudEggForced] = useState(() => isCloudEggForced(window.location.search));

@@ -1,3 +1,4 @@
+import { TAP_TARGET } from '@/utils/glassChrome';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Wind, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward, Bell, BellRing, AlarmClock, AlarmClockCheck, Satellite, Award, Database, CircleAlert } from 'lucide-react';
 import { isFeedbackAvailable, openFeedbackForm } from '@/utils/feedback';
@@ -42,6 +43,9 @@ import { type SatelliteStatus } from '@/hooks/useSatelliteTracking';
 import { LANGUAGES, LANGUAGE_NAMES, type Language } from '@/utils/language';
 import { formatNumber, translate, type MessageKey } from '@/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { useBackToClose } from '@/hooks/useBackToClose';
+import { isEmptySkyTap } from '@/utils/sceneTap';
 
 // Direction D "Polished Classic" (ROADMAP items 7 & 15): shared classes so every
 // row/section/focus ring in the panel reads as one system. ROW, ICON_TOGGLE and
@@ -50,16 +54,18 @@ import { useLanguage } from '@/hooks/useLanguage';
 // glassChrome.ts for the one style helper shared more broadly, and its test.
 export const ROW = 'flex justify-between items-center gap-2 border-t border-[hsl(var(--panel-border)/0.12)] pt-1';
 const SECTION_HEADING = 'text-title font-bold flex items-center';
-export const ICON_TOGGLE = 'p-1.5 rounded-full hover:bg-white/10 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70';
+const ICON_TOGGLE_BASE = 'p-1.5 rounded-full hover:bg-white/10 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70';
+// Item 173: a 44 px tap area (TAP_TARGET) around the 26-30 px button.
+export const ICON_TOGGLE = `${ICON_TOGGLE_BASE} ${TAP_TARGET}`;
 export const FOCUS_RING = 'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70';
 // Item 165: a card's toggle stretches over its header row (the row is `relative`), so a tap
-// on the title opens the card too, not only the chevron.
-const SECTION_TOGGLE = `${ICON_TOGGLE} after:absolute after:inset-0`;
+// on the title opens the card too, not only the chevron. Item 173: the row is at least 44 px high.
+const SECTION_TOGGLE = `${ICON_TOGGLE_BASE} after:absolute after:inset-0`;
 
 // A compact variant of ICON_TOGGLE for the inline "line of sight" buttons (ROADMAP
 // item 30), which sit inside an already-tight row and must not push it past one
 // line at 360px.
-const INLINE_ICON_TOGGLE = 'p-0.5 rounded-full hover:bg-white/10 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 shrink-0';
+const INLINE_ICON_TOGGLE = `p-0.5 rounded-full hover:bg-white/10 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 shrink-0 ${TAP_TARGET}`;
 
 // Line-of-sight terrain rows (ROADMAP items 13 & 30): formats the terrain-adjusted
 // rise/set time against the astronomical one, as a short value, e.g. "18:42 (-23 min)"
@@ -445,6 +451,25 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     changeLocationButtonRef.current?.focus();
   };
 
+  // Item 173, on a phone: Back closes the open search, Data sources or the panel first.
+  const isPhone = useIsMobile();
+  const collapse = useCallback(() => setIsCollapsed(true), []);
+  useBackToClose(!isCollapsed, collapse, isPhone);
+  useBackToClose(!isCollapsed && isLocationFormOpen, closeLocationForm, isPhone);
+  useBackToClose(isDataSourcesOpen, closeDataSources, isPhone);
+  // Item 173, on a phone: a tap on the empty sky beside the open panel closes the panel and
+  // does nothing else (it stops before the item 136 toggle). The panel covers most of the sky.
+  useEffect(() => {
+    if (isCollapsed || !isPhone) return;
+    const onClick = (event: MouseEvent) => {
+      if (!isEmptySkyTap(event.target)) return;
+      event.stopPropagation();
+      setIsCollapsed(true);
+    };
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
+  }, [isCollapsed, isPhone]);
+
   const handleSubmitLocation = (e: React.FormEvent) => {
     e.preventDefault();
     const lat = parseFloat(latInput);
@@ -594,7 +619,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
       )}
 
       {/* Header with toggle button */}
-      <div className="p-4 pb-2 flex items-start justify-between shrink-0">
+      <div className="p-4 pb-3 flex items-start justify-between shrink-0">
         <div className="flex-1 min-w-0">
           <h1 className="text-display leading-none font-bold tracking-tight">{t(getTimeOfDayLabel(timeOfDay))}</h1>
           <div className="flex items-start text-body opacity-80 mt-1">
@@ -631,7 +656,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   type="button"
                   variant="link"
                   size="sm"
-                  className={`h-auto p-0 mt-1 gap-1 text-caption opacity-80 hover:opacity-100 text-white justify-start ${FOCUS_RING}`}
+                  className={`h-auto p-0 mt-1 gap-1 text-caption opacity-80 hover:opacity-100 text-white justify-start ${TAP_TARGET} ${FOCUS_RING}`}
                   onClick={() => (isLocationFormOpen ? closeLocationForm() : openLocationForm())}
                   aria-expanded={isLocationFormOpen}
                 >
@@ -727,7 +752,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
               {/* Item 165: dimmed while a new answer loads, so the old place's weather does not read as the new one's. */}
               <div className={`space-y-1 transition-opacity ${isLoadingWeather ? 'opacity-50' : ''}`} aria-busy={isLoadingWeather}>
-                <div className={ROW}>
+                <div className={`${ROW} min-h-11`}>
                   <span className="opacity-80 text-body">{t('weather.temperature')}</span>
                   <div className="flex items-center gap-2">
                     {/* Item 165: the fallback weather's 20 °C read as a real temperature. */}
@@ -738,7 +763,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                           key={unit}
                           onClick={() => onTemperatureUnitChange(unit)}
                           aria-pressed={temperatureUnit === unit}
-                          className={`text-caption px-2 py-1 rounded-full transition-colors ${FOCUS_RING} ${
+                          className={`text-caption px-2 py-1 min-w-11 rounded-full transition-colors ${TAP_TARGET} ${FOCUS_RING} ${
                             temperatureUnit === unit
                               ? 'bg-white/20 text-white'
                               : 'text-white opacity-60'
@@ -765,12 +790,12 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
           {/* Weather Mode Toggle */}
           <div className="mb-4 pt-2 border-t border-white/20">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-2 min-h-11">
               <h3 className={SECTION_HEADING}>{t('weather.mode')}</h3>
               <div className="flex bg-white/10 rounded-full p-1">
                 <button
                   onClick={() => onWeatherModeToggle(true)}
-                  className={`text-caption px-2 py-1 rounded-full transition-colors ${FOCUS_RING} ${
+                  className={`text-caption px-2 py-1 min-w-11 rounded-full transition-colors ${TAP_TARGET} ${FOCUS_RING} ${
                     useRealWeather
                       ? 'bg-white/20 text-white'
                       : 'text-white opacity-60'
@@ -780,7 +805,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 </button>
                 <button
                   onClick={() => requirePremium(() => onWeatherModeToggle(false))}
-                  className={`text-caption px-2 py-1 rounded-full transition-colors ${FOCUS_RING} ${
+                  className={`text-caption px-2 py-1 min-w-11 rounded-full transition-colors ${TAP_TARGET} ${FOCUS_RING} ${
                     !useRealWeather
                       ? 'bg-white/20 text-white'
                       : 'text-white opacity-60'
@@ -795,7 +820,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           {/* Live planes (ROADMAP item 96): the live flight radar, Premium in the Play app. */}
           {onLivePlanesToggle && (
             <div className="mb-4 pt-2 border-t border-white/20">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center justify-between gap-2 min-h-11">
                 <label htmlFor="live-planes" className={`${SECTION_HEADING} inline-flex items-center gap-1`}>
                   {t('radar.livePlanes')}<PremiumBadge />
                 </label>
@@ -809,6 +834,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   </>
                 )}
                 <Switch
+                  className={TAP_TARGET}
                   id="live-planes"
                   checked={isLivePlanesOn}
                   onCheckedChange={on => (on ? requirePremium(() => onLivePlanesToggle(true)) : onLivePlanesToggle(false))}
@@ -867,12 +893,12 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           <div className="space-y-1">
             {/* Item 165: the open date field is wider than the row on a phone in fr/es: the
                 controls wrap to a second line, on the right. */}
-            <div className={`${ROW} flex-wrap`}>
+            <div className={`${ROW} flex-wrap min-h-11`}>
               <div className="flex items-center">
                 <Clock size={18} className="mr-2" />
                 <span className="text-body inline-flex items-center gap-1 whitespace-nowrap">{isTimePreview ? t('time.preview') : t('time.current')}<PremiumBadge /></span>
               </div>
-              <div className="flex items-center gap-1 ml-auto">
+              <div className="flex items-center gap-3.5 ml-auto">
                 <button
                   type="button"
                   onClick={() => requirePremium(() => onTimePlay(-1))}
@@ -901,7 +927,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   <button
                     type="button"
                     onClick={() => requirePremium(() => setTimePickerRange(getTimeTravelRange(new Date())))}
-                    className={`font-semibold text-body tabular-nums whitespace-nowrap rounded ${FOCUS_RING}`}
+                    className={`font-semibold text-body tabular-nums whitespace-nowrap rounded ${TAP_TARGET} ${FOCUS_RING}`}
                     title={t('time.set')}
                   >
                     {isTimePreview
@@ -921,7 +947,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               </div>
             </div>
 
-            <div className={ROW}>
+            <div className={`${ROW} min-h-11`}>
               <div className="flex items-center min-w-0">
                 <Sunrise size={18} className="mr-2 shrink-0" />
                 <span className="text-body truncate">{t('sun.sunrise')}</span>
@@ -941,7 +967,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               <span className="font-semibold text-body tabular-nums">{polarSunLabel ?? formatLocalTime(shownSunrise)}</span>
             </div>
 
-            <div className={ROW}>
+            <div className={`${ROW} min-h-11`}>
               <div className="flex items-center">
                 <Sunset size={18} className="mr-2" />
                 <span className="text-body">{t('sun.sunset')}</span>
@@ -960,7 +986,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   <button
                     type="button"
                     onClick={onSunsetReminderToggle}
-                    className={`${INLINE_ICON_TOGGLE} ml-1 ${isSunsetReminderOn ? 'bg-white/20' : ''}`}
+                    className={`${INLINE_ICON_TOGGLE} ml-[26px] ${isSunsetReminderOn ? 'bg-white/20' : ''}`}
                     aria-label={t('reminder.toggle', { minutes: SUNSET_REMINDER_MIN })}
                     title={t('reminder.toggle', { minutes: SUNSET_REMINDER_MIN })}
                     aria-pressed={isSunsetReminderOn}
@@ -970,7 +996,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 )}
                 {!polarSunLabel && shownSunset && (
                   <ShareCardButton
-                    className={INLINE_ICON_TOGGLE}
+                    className={`${INLINE_ICON_TOGGLE} ml-[26px]`}
                     card={{
                       placeName: hasPlaceName ? locationName : null,
                       now: currentTime,
@@ -1032,7 +1058,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
           {/* Moon information - collapsible, shown even when the moon is below the horizon */}
           <div className="mt-6 pt-4 border-t border-white/20">
-            <div className="relative flex items-center justify-between mb-2">
+            <div className="relative flex items-center justify-between mb-2 min-h-11">
               <h3 className={SECTION_HEADING}>
                 <Moon size={16} className="mr-2" />
                 {t('moon.title')}
@@ -1141,7 +1167,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               default (ROADMAP item 24) - not part of the time-of-day auto-collapse
               effect, so it stays as the user left it. */}
           <div className="mt-6 pt-4 border-t border-white/20">
-            <div className="relative flex items-center justify-between mb-2">
+            <div className="relative flex items-center justify-between mb-2 min-h-11">
               <h3 className={SECTION_HEADING}>
                 {t('golden.title')}
               </h3>
@@ -1191,7 +1217,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
           {/* Upcoming twilight times - collapsible */}
           <div className="mt-6 pt-4 border-t border-white/20">
-            <div className="relative flex items-center justify-between mb-2">
+            <div className="relative flex items-center justify-between mb-2 min-h-11">
               <h3 className={SECTION_HEADING}>
                 {relevantTwilightTimes.type === 'dawn' ? t('twilight.dawnTitle') : t('twilight.duskTitle')}
               </h3>
@@ -1213,10 +1239,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               <div className="space-y-1">
                 {relevantTwilightTimes.type === 'dusk' ? (
                   <>
-                    <div className={ROW}>
+                    <div className={`${ROW} min-h-11`}>
                       <button
                         type="button"
-                        className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left text-caption rounded ${FOCUS_RING}`}
+                        className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left text-caption rounded ${TAP_TARGET} ${FOCUS_RING}`}
                         onMouseEnter={() => setHoveredTwilight('civil')}
                         onMouseLeave={() => setHoveredTwilight(null)}
                         onFocus={() => setHoveredTwilight('civil')}
@@ -1235,10 +1261,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                         {getDegreeInfo('civil')}
                       </div>
                     )}
-                    <div className={ROW}>
+                    <div className={`${ROW} min-h-11`}>
                       <button
                         type="button"
-                        className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left text-caption rounded ${FOCUS_RING}`}
+                        className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left text-caption rounded ${TAP_TARGET} ${FOCUS_RING}`}
                         onMouseEnter={() => setHoveredTwilight('nautical')}
                         onMouseLeave={() => setHoveredTwilight(null)}
                         onFocus={() => setHoveredTwilight('nautical')}
@@ -1257,10 +1283,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                         {getDegreeInfo('nautical')}
                       </div>
                     )}
-                    <div className={ROW}>
+                    <div className={`${ROW} min-h-11`}>
                       <button
                         type="button"
-                        className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left text-caption rounded ${FOCUS_RING}`}
+                        className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left text-caption rounded ${TAP_TARGET} ${FOCUS_RING}`}
                         onMouseEnter={() => setHoveredTwilight('astronomical')}
                         onMouseLeave={() => setHoveredTwilight(null)}
                         onFocus={() => setHoveredTwilight('astronomical')}
@@ -1282,10 +1308,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   </>
                 ) : (
                   <>
-                    <div className={ROW}>
+                    <div className={`${ROW} min-h-11`}>
                       <button
                         type="button"
-                        className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left text-caption rounded ${FOCUS_RING}`}
+                        className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left text-caption rounded ${TAP_TARGET} ${FOCUS_RING}`}
                         onMouseEnter={() => setHoveredTwilight('astronomical')}
                         onMouseLeave={() => setHoveredTwilight(null)}
                         onFocus={() => setHoveredTwilight('astronomical')}
@@ -1304,10 +1330,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                         {getDegreeInfo('astronomical')}
                       </div>
                     )}
-                    <div className={ROW}>
+                    <div className={`${ROW} min-h-11`}>
                       <button
                         type="button"
-                        className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left text-caption rounded ${FOCUS_RING}`}
+                        className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left text-caption rounded ${TAP_TARGET} ${FOCUS_RING}`}
                         onMouseEnter={() => setHoveredTwilight('nautical')}
                         onMouseLeave={() => setHoveredTwilight(null)}
                         onFocus={() => setHoveredTwilight('nautical')}
@@ -1326,10 +1352,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                         {getDegreeInfo('nautical')}
                       </div>
                     )}
-                    <div className={ROW}>
+                    <div className={`${ROW} min-h-11`}>
                       <button
                         type="button"
-                        className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left text-caption rounded ${FOCUS_RING}`}
+                        className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left text-caption rounded ${TAP_TARGET} ${FOCUS_RING}`}
                         onMouseEnter={() => setHoveredTwilight('civil')}
                         onMouseLeave={() => setHoveredTwilight(null)}
                         onFocus={() => setHoveredTwilight('civil')}
@@ -1356,7 +1382,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
           {/* Sun position - collapsible */}
           <div className="mt-6 pt-4 border-t border-white/20">
-            <div className="relative flex items-center justify-between mb-2">
+            <div className="relative flex items-center justify-between mb-2 min-h-11">
               <h3 className={SECTION_HEADING}>{t('sunPosition.title')}</h3>
               <button
                 onClick={() => {
@@ -1390,7 +1416,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               toggle sits next to the switch (item 154) and works with the tracking off. */}
           {onSatelliteTrackingToggle && (
             <div className="mt-6 pt-4 border-t border-white/20">
-              <div className="flex items-center justify-between gap-2" title={t('satellite.trackingHint')}>
+              <div className="flex items-center justify-between gap-2 min-h-11" title={t('satellite.trackingHint')}>
                 <span className="text-caption opacity-80 inline-flex items-center gap-1">
                   <Satellite size={14} className="mr-1" />
                   {t('satellite.tracking')}
@@ -1402,7 +1428,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   <button
                     type="button"
                     onClick={() => requirePremium(onIssReminderToggle)}
-                    className={`${INLINE_ICON_TOGGLE} relative ml-auto ${isIssReminderOn ? 'bg-white/20' : ''}`}
+                    className={`${INLINE_ICON_TOGGLE} relative ml-auto mr-1.5 ${isIssReminderOn ? 'bg-white/20' : ''}`}
                     aria-label={t('issReminder.label')}
                     title={t('issReminder.toggle', { minutes: PASS_REMINDER_MIN })}
                     aria-pressed={isIssReminderOn}
@@ -1421,6 +1447,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   />
                 )}
                 <Switch
+                  className={TAP_TARGET}
                   checked={isSatelliteTrackingOn}
                   onCheckedChange={() => requirePremium(onSatelliteTrackingToggle)}
                   aria-label={t('satellite.tracking')}
@@ -1442,7 +1469,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             <div className="mt-6 pt-4 border-t border-white/20">
               <button
                 onClick={() => { setIsCollapsed(true); onCollectionOpen?.(); }}
-                className={`flex items-center gap-2 text-caption opacity-80 hover:opacity-100 transition-opacity rounded ${FOCUS_RING}`}
+                className={`flex items-center gap-2 text-caption opacity-80 hover:opacity-100 transition-opacity rounded ${TAP_TARGET} ${FOCUS_RING}`}
               >
                 <Award size={14} />
                 {t('collection.title')}
@@ -1462,7 +1489,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   aria-pressed={language === code}
                   aria-label={LANGUAGE_NAMES[code]}
                   title={LANGUAGE_NAMES[code]}
-                  className={`text-caption px-2 py-1 rounded-full uppercase transition-colors ${FOCUS_RING} ${
+                  className={`text-caption px-2 py-1 min-w-11 rounded-full uppercase transition-colors ${TAP_TARGET} ${FOCUS_RING} ${
                     language === code
                       ? 'bg-white/20 text-white'
                       : 'text-white opacity-60'
@@ -1479,7 +1506,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             <div className="mt-6 pt-4 border-t border-white/20">
               <button
                 onClick={() => openFeedbackForm(t)}
-                className={`flex items-center gap-2 text-caption opacity-80 hover:opacity-100 transition-opacity rounded ${FOCUS_RING}`}
+                className={`flex items-center gap-2 text-caption opacity-80 hover:opacity-100 transition-opacity rounded ${TAP_TARGET} ${FOCUS_RING}`}
               >
                 <MessageSquare size={14} />
                 {t('feedback.send')}
@@ -1491,7 +1518,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           <div className="mt-6 pt-4 border-t border-white/20">
             <button
               onClick={() => setIsDataSourcesOpen(true)}
-              className={`flex items-center gap-2 text-caption opacity-80 hover:opacity-100 transition-opacity rounded ${FOCUS_RING}`}
+              className={`flex items-center gap-2 text-caption opacity-80 hover:opacity-100 transition-opacity rounded ${TAP_TARGET} ${FOCUS_RING}`}
               aria-haspopup="dialog"
             >
               <Database size={14} />
