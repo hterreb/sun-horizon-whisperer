@@ -122,6 +122,8 @@ interface InfoPanelProps {
   // The place name chosen via search, when the current location came from one; takes
   // priority over the reverse-geocode guess below for the same coordinates.
   manualPlaceName: string | null;
+  // Item 170: a place set by hand with no name (typed coordinates): "Chosen point", not "Your location".
+  isChosenPoint?: boolean;
   // Tells SunTracker the place name shown here (null: none yet), for Santa's card (lookbook S7).
   onPlaceName?: (name: string | null) => void;
   timeOfDay: TimeOfDay;
@@ -206,6 +208,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   nextGoldenBlueHours,
   location,
   manualPlaceName,
+  isChosenPoint = false,
   onPlaceName,
   timeOfDay,
   currentTime,
@@ -438,13 +441,19 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
       return;
     }
 
-    onLocationChange(lat, lon);
-    closeLocationForm();
+    requirePremium(() => {
+      onLocationChange(lat, lon);
+      closeLocationForm();
+    });
   };
 
+  // Item 170: the form opens for everyone, so "Use my location" is always free; a place
+  // set by hand (search or coordinates) is Premium.
   const handleSelectPlace = (latitude: number, longitude: number, name: string, countryCode?: string) => {
-    onLocationChange(latitude, longitude, name, countryCode);
-    closeLocationForm();
+    requirePremium(() => {
+      onLocationChange(latitude, longitude, name, countryCode);
+      closeLocationForm();
+    });
   };
 
   const handleUseMyLocationClick = () => {
@@ -576,7 +585,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               {loadingLocation ? (
                 <span>{t('location.loading')}</span>
               ) : (
-                locationName !== '' && <span className="mb-1 truncate">{locationName ?? t('location.unknown')}</span>
+                locationName !== '' && <span className="mb-1 truncate">{locationName ?? t(isChosenPoint ? 'location.chosenPoint' : 'location.unknown')}</span>
               )}
               {showCoordinates && (
                 <span className="text-caption opacity-70 tabular-nums">
@@ -604,7 +613,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   variant="link"
                   size="sm"
                   className={`h-auto p-0 mt-1 gap-1 text-caption opacity-80 hover:opacity-100 text-white justify-start ${FOCUS_RING}`}
-                  onClick={() => (isLocationFormOpen ? closeLocationForm() : requirePremium(openLocationForm))}
+                  onClick={() => (isLocationFormOpen ? closeLocationForm() : openLocationForm())}
                   aria-expanded={isLocationFormOpen}
                 >
                   {isLocationFormOpen ? t('common.cancel') : <>{t('location.change')}<PremiumBadge /></>}

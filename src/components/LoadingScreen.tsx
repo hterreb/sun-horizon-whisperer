@@ -3,9 +3,7 @@ import { Search } from 'lucide-react';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
 import { FOCUS_RING } from './InfoPanel';
 import PlaceSearch from './PlaceSearch';
-import PremiumBadge from './PremiumBadge';
 import { useLanguage } from '@/hooks/useLanguage';
-import { usePremiumGate } from '@/hooks/usePremium';
 
 // A location that arrives sooner than this skips the rise: SunTracker fades the scene
 // in instead, and the rise animation waits this long before it starts
@@ -30,25 +28,31 @@ const WORDMARK_GLYPHS: [number, string][] = [
 
 const fill = (token: string) => ({ fill: `hsl(var(--${token}))` });
 
+// Why the startup location request gave no position (ROADMAP item 170).
+export type LocationProblem = 'denied' | 'unavailable' | null;
+
 interface LoadingScreenProps {
   // Reduced motion, or the reveal has started: the mark rests in its logo pose.
   still: boolean;
+  // Denied or not found: "Choose a place" shows at once, with the reason.
+  problem?: LocationProblem;
   onSelectPlace: (latitude: number, longitude: number, name: string, countryCode?: string) => void;
 }
 
 // Loading screen "Rising Mark" (ROADMAP item 39): the app mark on Night (the manifest
 // background_color, so the Android splash runs straight into it). Its sun rises once
-// out of the water; after WAITING_MS it sinks to half-risen and offers
-// "Choose a place". SunTracker renders it under the scene and removes it after the
-// hand-off.
-const LoadingScreen: React.FC<LoadingScreenProps> = ({ still, onSelectPlace }) => {
-  const [isWaiting, setIsWaiting] = useState(false);
+// out of the water; after WAITING_MS, or at once when the location is denied or not
+// found (item 170), it sinks to half-risen and offers "Choose a place". The first place
+// is free (no Premium gate, item 170). SunTracker renders it under the scene and removes
+// it after the hand-off.
+const LoadingScreen: React.FC<LoadingScreenProps> = ({ still, problem = null, onSelectPlace }) => {
+  const [hasWaited, setHasWaited] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const { t } = useLanguage();
-  const { requirePremium } = usePremiumGate();
+  const isWaiting = hasWaited || problem !== null;
 
   useEffect(() => {
-    const timeoutId = setTimeout(() => setIsWaiting(true), WAITING_MS);
+    const timeoutId = setTimeout(() => setHasWaited(true), WAITING_MS);
     return () => clearTimeout(timeoutId);
   }, []);
 
@@ -105,7 +109,11 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ still, onSelectPlace }) =
         </svg>
 
         <p role="status" className="text-body text-white/75">
-          {isWaiting ? t('loading.waiting') : t('loading.locating')}
+          {problem === 'denied'
+            ? t('loading.denied')
+            : problem === 'unavailable'
+              ? t('loading.notFound')
+              : isWaiting ? t('loading.waiting') : t('loading.locating')}
         </p>
 
         {isWaiting && (isSearchOpen ? (
@@ -115,12 +123,11 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ still, onSelectPlace }) =
         ) : (
           <button
             type="button"
-            onClick={() => requirePremium(() => setIsSearchOpen(true))}
+            onClick={() => setIsSearchOpen(true)}
             className={`${GLASS_SURFACE} rounded-full inline-flex items-center gap-2 px-4 py-2 text-body font-semibold ${FOCUS_RING}`}
           >
             <Search className="h-4 w-4" aria-hidden="true" />
             {t('loading.choosePlace')}
-            <PremiumBadge />
           </button>
         ))}
       </div>

@@ -39,6 +39,7 @@ export const it: Record<keyof typeof en, string> = {
   'panel.collapse': "Comprimi pannello",
   'location.loading': "Caricamento posizione…",
   'location.unknown': "La tua posizione",
+  'location.chosenPoint': "Punto scelto",
   'location.osmAttribution': "© contributori di OpenStreetMap",
   'location.change': "Cambia posizione",
   'location.latitude': "Latitudine",
@@ -659,14 +660,16 @@ export const it: Record<keyof typeof en, string> = {
   'toast.geolocationUnsupportedDefault': "Il browser non supporta la geolocalizzazione. Uso la posizione predefinita.",
   'toast.geolocationUnsupported': "Il browser non supporta la geolocalizzazione.",
   'toast.locationUnavailableTitle': "Posizione non disponibile",
-  'toast.locationUnavailableDefault': "Uso la posizione predefinita. Attiva la localizzazione per dati precisi.",
   'toast.locationUnavailable': "Impossibile ottenere la posizione attuale.",
+  'toast.locationBlocked': "La posizione è bloccata per questo sito. Consentila nelle impostazioni del sito del browser, poi riprova.",
   'toast.locationDetectedTitle': "Posizione rilevata",
   'toast.locationDetectedDescription': "Uso la posizione attuale per calcolare il sole.",
 
   // Loading screen (item 39)
   'loading.locating': "Localizzazione…",
   'loading.waiting': "In attesa dell’accesso alla posizione",
+  'loading.denied': "Nessuna posizione: scegli un luogo",
+  'loading.notFound': "Posizione non trovata: scegli un luogo",
   'loading.choosePlace': "Scegli un luogo",
 
   // Radio
