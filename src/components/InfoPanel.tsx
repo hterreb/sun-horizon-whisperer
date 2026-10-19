@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Wind, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward, Bell, BellRing, AlarmClock, AlarmClockCheck, Satellite, Award, Database } from 'lucide-react';
+import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Wind, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward, Bell, BellRing, AlarmClock, AlarmClockCheck, Satellite, Award, Database, CircleAlert } from 'lucide-react';
 import { isFeedbackAvailable, openFeedbackForm } from '@/utils/feedback';
 import DataSourcesDialog from './DataSourcesDialog';
 import { ScrollArea } from './ui/scroll-area';
@@ -37,6 +37,7 @@ import { formatTemperature, type TemperatureUnit } from '@/utils/temperatureUnit
 import { SUNSET_REMINDER_MIN } from '@/utils/sunsetReminder';
 import { PASS_REMINDER_MIN } from '@/utils/satelliteUtils';
 import { type LiveStatus } from '@/utils/liveRadar';
+import { type SatelliteStatus } from '@/hooks/useSatelliteTracking';
 import { LANGUAGES, LANGUAGE_NAMES, type Language } from '@/utils/language';
 import { formatNumber, translate, type MessageKey } from '@/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -83,6 +84,25 @@ const formatMoonDate = (date: Date, language: Language): string =>
 // terrain delta above.
 const renderWindow = ({ text, isNow }: { text: string; isNow: boolean }): React.ReactNode =>
   isNow ? <span className="text-brand-peach">{text}</span> : text;
+
+// Item 164: a live feed in `error` (live planes, satellite tracking) gets a red icon next to its
+// name and a refresh button as the weather's (the icon turns while the refresh runs).
+const FeedErrorIcon = ({ label }: { label: string }) => (
+  <CircleAlert size={14} className="text-red-400 shrink-0" role="img" aria-label={label} />
+);
+const FeedRefreshButton = ({ label, onClick, refreshing, disabled = false, className = '' }: {
+  label: string; onClick: () => void; refreshing: boolean; disabled?: boolean; className?: string;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={refreshing || disabled}
+    className={`${ICON_TOGGLE} disabled:opacity-50 shrink-0 ${className}`}
+    aria-label={label}
+  >
+    <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+  </button>
+);
 
 interface InfoPanelProps {
   sunPosition: SunPosition;
@@ -156,7 +176,13 @@ interface InfoPanelProps {
   // Item 155: the status line under the switch while the radar runs; null: no line. `nearby` is
   // the aircraft in the last answer, `shown` the planes drawn; `compassOff`: the compass button
   // is there and compass mode is off.
-  liveRadarStatus?: { status: LiveStatus; nearby: number; shown: number; compassOff: boolean } | null;
+  liveRadarStatus?: { status: LiveStatus; nearby: number; shown: number; compassOff: boolean; refreshing?: boolean } | null;
+  // Item 164: in `error`, a red icon, a red line and this refresh (asks the feed at once).
+  onLivePlanesRefresh?: () => void;
+  // Item 164: the satellite tracking's status while the tracking runs (null: none). In `error`:
+  // a red icon, a red line and the refresh; `nextTryAt` (CelesTrak's wait) disables the refresh.
+  satelliteStatus?: { status: SatelliteStatus; refreshing: boolean; nextTryAt: number | null } | null;
+  onSatelliteRefresh?: () => void;
   // Collection badges (ROADMAP item 112): the row button that opens the collection.
   onCollectionOpen?: () => void;
   // National days (utils/nationalDays): the place's country code from the reverse-geocode
@@ -215,6 +241,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   isLivePlanesOn = false,
   onLivePlanesToggle,
   liveRadarStatus = null,
+  onLivePlanesRefresh,
+  satelliteStatus = null,
+  onSatelliteRefresh,
   onCollectionOpen,
   onCountryChange,
 }) => {
@@ -222,6 +251,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   // Premium gate (ROADMAP item 14): every gold-plus control goes through requirePremium.
   const { isLocked, requirePremium } = usePremiumGate();
   const formatLocalTime = (date: Date | null) => formatTime(date, language);
+  // Item 164: a live feed in `error` while its switch is on.
+  const isLiveRadarError = isLivePlanesOn && liveRadarStatus?.status === 'error';
+  const isSatelliteError = isSatelliteTrackingOn && satelliteStatus?.status === 'error';
   // '' until the first lookup ends; null when the lookup found no place name.
   const [locationName, setLocationName] = useState<string | null>('');
   // Item 137: the shown name comes from Photon (OpenStreetMap data) and needs the attribution.
@@ -589,10 +621,14 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className={`ml-2 ${ICON_TOGGLE} shrink-0`}
+          className={`ml-2 ${ICON_TOGGLE} shrink-0 relative`}
           aria-label={isCollapsed ? t('panel.expand') : t('panel.collapse')}
         >
           {isCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+          {/* Item 164 (option 6): the closed panel shows a feed in `error` too. */}
+          {isCollapsed && (isLiveRadarError || isSatelliteError) && (
+            <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-red-400" data-testid="panel-error-dot" aria-hidden="true" />
+          )}
         </button>
       </div>
 
@@ -736,6 +772,15 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 <label htmlFor="live-planes" className={`${SECTION_HEADING} inline-flex items-center gap-1`}>
                   {t('radar.livePlanes')}<PremiumBadge />
                 </label>
+                {/* Item 164: outside the label, so the switch keeps its name. */}
+                {isLiveRadarError && (
+                  <>
+                    <span className="mr-auto inline-flex"><FeedErrorIcon label={t('radar.unavailable')} /></span>
+                    {onLivePlanesRefresh && (
+                      <FeedRefreshButton label={t('radar.refresh')} onClick={onLivePlanesRefresh} refreshing={!!liveRadarStatus?.refreshing} />
+                    )}
+                  </>
+                )}
                 <Switch
                   id="live-planes"
                   checked={isLivePlanesOn}
@@ -744,7 +789,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               </div>
               {/* Item 155: what the radar finds; without the compass the 360° view shows few. */}
               {isLivePlanesOn && liveRadarStatus && (
-                <p className="text-caption mt-1" data-testid="live-planes-status">
+                <p className={`text-caption mt-1 ${isLiveRadarError ? 'text-red-400' : ''}`} data-testid="live-planes-status">
                   {liveRadarStatus.status === 'ok'
                     ? t('radar.status', { nearby: liveRadarStatus.nearby, shown: liveRadarStatus.shown })
                       + (liveRadarStatus.compassOff && liveRadarStatus.shown < liveRadarStatus.nearby ? ` · ${t('radar.compassAll')}` : '')
@@ -1312,30 +1357,51 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           {/* Satellite tracking (ROADMAP item 97): Premium in the Play app. The ISS passes
               toggle sits next to the switch (item 154) and works with the tracking off. */}
           {onSatelliteTrackingToggle && (
-            <div className="mt-6 pt-4 border-t border-white/20 flex items-center justify-between gap-2" title={t('satellite.trackingHint')}>
-              <span className="text-caption opacity-80 inline-flex items-center gap-1">
-                <Satellite size={14} className="mr-1" />
-                {t('satellite.tracking')}
-                <PremiumBadge />
-              </span>
-              {onIssReminderToggle && (
-                <button
-                  type="button"
-                  onClick={() => requirePremium(onIssReminderToggle)}
-                  className={`${INLINE_ICON_TOGGLE} relative ml-auto ${isIssReminderOn ? 'bg-white/20' : ''}`}
-                  aria-label={t('issReminder.label')}
-                  title={t('issReminder.toggle', { minutes: PASS_REMINDER_MIN })}
-                  aria-pressed={isIssReminderOn}
-                >
-                  <Satellite size={14} />
-                  <PremiumBadge className="absolute -right-1 -top-1 h-2.5 w-2.5" />
-                </button>
+            <div className="mt-6 pt-4 border-t border-white/20">
+              <div className="flex items-center justify-between gap-2" title={t('satellite.trackingHint')}>
+                <span className="text-caption opacity-80 inline-flex items-center gap-1">
+                  <Satellite size={14} className="mr-1" />
+                  {t('satellite.tracking')}
+                  <PremiumBadge />
+                </span>
+                {/* Item 164: outside the span, so its opacity does not dim the red. */}
+                {isSatelliteError && <FeedErrorIcon label={t('satellite.unavailable')} />}
+                {onIssReminderToggle && (
+                  <button
+                    type="button"
+                    onClick={() => requirePremium(onIssReminderToggle)}
+                    className={`${INLINE_ICON_TOGGLE} relative ml-auto ${isIssReminderOn ? 'bg-white/20' : ''}`}
+                    aria-label={t('issReminder.label')}
+                    title={t('issReminder.toggle', { minutes: PASS_REMINDER_MIN })}
+                    aria-pressed={isIssReminderOn}
+                  >
+                    <Satellite size={14} />
+                    <PremiumBadge className="absolute -right-1 -top-1 h-2.5 w-2.5" />
+                  </button>
+                )}
+                {isSatelliteError && onSatelliteRefresh && (
+                  <FeedRefreshButton
+                    label={t('satellite.refresh')}
+                    onClick={onSatelliteRefresh}
+                    refreshing={!!satelliteStatus?.refreshing}
+                    disabled={satelliteStatus?.nextTryAt != null}
+                    className={onIssReminderToggle ? '' : 'ml-auto'}
+                  />
+                )}
+                <Switch
+                  checked={isSatelliteTrackingOn}
+                  onCheckedChange={() => requirePremium(onSatelliteTrackingToggle)}
+                  aria-label={t('satellite.tracking')}
+                />
+              </div>
+              {/* Item 164 (R-a): CelesTrak blocks a client that asks again after an error, so the
+                  refresh waits for the cache's next try. */}
+              {isSatelliteError && (
+                <p className="text-caption text-red-400 mt-1" data-testid="satellite-status">
+                  {t('satellite.unavailable')}
+                  {satelliteStatus?.nextTryAt != null && ` · ${t('satellite.nextTry', { time: formatLocalTime(new Date(satelliteStatus.nextTryAt)) })}`}
+                </p>
               )}
-              <Switch
-                checked={isSatelliteTrackingOn}
-                onCheckedChange={() => requirePremium(onSatelliteTrackingToggle)}
-                aria-label={t('satellite.tracking')}
-              />
             </div>
           )}
 

@@ -1162,6 +1162,116 @@ describe('InfoPanel: line of sight as an icon at the sun and moon rows (ROADMAP 
       rerender(panel({ liveRadarStatus: null }));
       expect(line()).toBeNull();
     });
+
+    // Item 164: a red icon and a refresh when a feed does not come.
+    it('live planes in error: a red icon, a red line and a refresh that turns while it loads (item 164)', () => {
+      const onLivePlanesRefresh = vi.fn();
+      const ok = { status: 'ok' as const, nearby: 27, shown: 0, compassOff: false };
+      const panel = (props: Partial<React.ComponentProps<typeof InfoPanel>>) => (
+        <InfoPanel {...defaultProps} weatherData={weatherData} isLivePlanesOn onLivePlanesToggle={vi.fn()} onLivePlanesRefresh={onLivePlanesRefresh} {...props} />
+      );
+      const icon = () => screen.queryByRole('img', { name: 'Live radar unavailable' });
+      const refresh = () => screen.queryByRole('button', { name: 'Refresh live planes' });
+      const { rerender } = render(panel({ liveRadarStatus: ok }));
+      expect(icon()).toBeNull();
+      expect(refresh()).toBeNull();
+      rerender(panel({ liveRadarStatus: { ...ok, status: 'loading' } }));
+      expect(icon()).toBeNull();
+      expect(refresh()).toBeNull();
+      expect(screen.getByTestId('live-planes-status')).not.toHaveClass('text-red-400');
+
+      rerender(panel({ liveRadarStatus: { ...ok, status: 'error' } }));
+      expect(icon()).toHaveClass('text-red-400');
+      expect(screen.getByTestId('live-planes-status')).toHaveClass('text-red-400');
+      // The icon is outside the label: the switch keeps its name.
+      expect(screen.getByRole('switch', { name: /live planes/i })).not.toHaveAccessibleName(/unavailable/);
+      expect(refresh()).toBeEnabled();
+      expect(refresh()!.querySelector('svg')).not.toHaveClass('animate-spin');
+      fireEvent.click(refresh()!);
+      expect(onLivePlanesRefresh).toHaveBeenCalledTimes(1);
+      rerender(panel({ liveRadarStatus: { ...ok, status: 'error', refreshing: true } }));
+      expect(refresh()).toBeDisabled();
+      expect(refresh()!.querySelector('svg')).toHaveClass('animate-spin');
+
+      // Switch off: no icon, no button.
+      rerender(panel({ liveRadarStatus: { ...ok, status: 'error' }, isLivePlanesOn: false }));
+      expect(icon()).toBeNull();
+      expect(refresh()).toBeNull();
+    });
+
+    it('satellite tracking in error: the red icon, the line and the refresh; the next try disables it (item 164)', () => {
+      const onSatelliteRefresh = vi.fn();
+      const error = { status: 'error' as const, refreshing: false, nextTryAt: null };
+      const panel = (props: Partial<React.ComponentProps<typeof InfoPanel>>) => (
+        <InfoPanel {...defaultProps} isSatelliteTrackingOn onSatelliteTrackingToggle={vi.fn()} onIssReminderToggle={vi.fn()} onSatelliteRefresh={onSatelliteRefresh} {...props} />
+      );
+      const icon = () => screen.queryByRole('img', { name: 'Satellite data unavailable' });
+      const refresh = () => screen.queryByRole('button', { name: 'Refresh satellite data' });
+      const line = () => screen.queryByTestId('satellite-status');
+      const { rerender } = render(panel({ satelliteStatus: { ...error, status: 'ok' } }));
+      expect(icon()).toBeNull();
+      expect(refresh()).toBeNull();
+      expect(line()).toBeNull();
+      rerender(panel({ satelliteStatus: { ...error, status: 'loading' } }));
+      expect(icon()).toBeNull();
+      expect(line()).toBeNull();
+
+      rerender(panel({ satelliteStatus: error }));
+      expect(icon()).toHaveClass('text-red-400');
+      expect(line()).toHaveTextContent(/^Satellite data unavailable$/);
+      expect(line()).toHaveClass('text-red-400');
+      // Next to the switch, after the ISS passes toggle.
+      expect(refresh()!.nextElementSibling).toBe(screen.getByRole('switch', { name: 'Satellite tracking' }));
+      fireEvent.click(refresh()!);
+      expect(onSatelliteRefresh).toHaveBeenCalledTimes(1);
+      rerender(panel({ satelliteStatus: { ...error, refreshing: true } }));
+      expect(refresh()).toBeDisabled();
+      expect(refresh()!.querySelector('svg')).toHaveClass('animate-spin');
+
+      // R-a: CelesTrak's wait runs: the time of the next try, and no refresh.
+      const nextTryAt = new Date(2026, 9, 19, 21, 40).getTime();
+      rerender(panel({ satelliteStatus: { ...error, nextTryAt } }));
+      expect(line()).toHaveTextContent('Satellite data unavailable · next try at 21:40');
+      expect(refresh()).toBeDisabled();
+      expect(refresh()!.querySelector('svg')).not.toHaveClass('animate-spin');
+
+      rerender(panel({ satelliteStatus: error, isSatelliteTrackingOn: false }));
+      expect(icon()).toBeNull();
+      expect(refresh()).toBeNull();
+      expect(line()).toBeNull();
+    });
+
+    it('a red dot on the expand button of the closed panel while a feed is in error (item 164, option 6)', () => {
+      const panel = (props: Partial<React.ComponentProps<typeof InfoPanel>>) => (
+        <InfoPanel
+          {...defaultProps}
+          isLivePlanesOn
+          onLivePlanesToggle={vi.fn()}
+          liveRadarStatus={{ status: 'ok', nearby: 2, shown: 1, compassOff: false }}
+          isSatelliteTrackingOn
+          onSatelliteTrackingToggle={vi.fn()}
+          satelliteStatus={{ status: 'ok', refreshing: false, nextTryAt: null }}
+          {...props}
+        />
+      );
+      const dot = () => screen.queryByTestId('panel-error-dot');
+      const { rerender } = render(panel({}));
+      fireEvent.click(screen.getByRole('button', { name: 'Collapse info panel' }));
+      expect(dot()).toBeNull();
+      rerender(panel({ liveRadarStatus: { status: 'error', nearby: 0, shown: 0, compassOff: false } }));
+      expect(screen.getByRole('button', { name: 'Expand info panel' })).toContainElement(dot());
+      expect(dot()).toHaveClass('bg-red-400');
+      rerender(panel({ satelliteStatus: { status: 'error', refreshing: false, nextTryAt: null } }));
+      expect(dot()).not.toBeNull();
+      // Only while the switch is on.
+      rerender(panel({ satelliteStatus: { status: 'error', refreshing: false, nextTryAt: null }, isSatelliteTrackingOn: false }));
+      expect(dot()).toBeNull();
+      // The open panel shows the rows instead.
+      rerender(panel({ liveRadarStatus: { status: 'error', nearby: 0, shown: 0, compassOff: false } }));
+      expect(dot()).not.toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'Expand info panel' }));
+      expect(dot()).toBeNull();
+    });
   });
   describe('collection button (ROADMAP item 112)', () => {
     it('calls onCollectionOpen from the Collection row', () => {

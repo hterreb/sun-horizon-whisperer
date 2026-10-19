@@ -103,4 +103,39 @@ describe('useLivePlanes', () => {
     await flush();
     expect(result.current.status).toBe('loading');
   });
+
+  // Item 164: the refresh button in the panel.
+  it('refresh asks at once, stops the request that runs, and is refreshing until the answer', async () => {
+    fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
+    const { result } = renderHook(() => useLivePlanes(true, 47.8, 9.6));
+    await flush();
+    expect(result.current.status).toBe('error');
+    expect(result.current.refreshing).toBe(false);
+    // The next poll hangs; the refresh stops it and asks again.
+    const signals: AbortSignal[] = [];
+    let answer: (response: Response) => void = () => {};
+    fetchMock.mockImplementation((_url: string, init: RequestInit) => {
+      signals.push(init.signal!);
+      return new Promise<Response>(resolve => { answer = resolve; });
+    });
+    act(() => { vi.advanceTimersByTime(15_000); });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    act(() => { result.current.refresh(); });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(signals[0].aborted).toBe(true);
+    expect(signals[1].aborted).toBe(false);
+    expect(result.current.refreshing).toBe(true);
+    expect(result.current.status).toBe('error');
+    answer(new Response(JSON.stringify({ now: 5, aircraft: [] }), { status: 200 }));
+    await flush();
+    expect(result.current.refreshing).toBe(false);
+    expect(result.current.status).toBe('ok');
+  });
+
+  it('refresh does nothing while off', () => {
+    const { result } = renderHook(() => useLivePlanes(false, 47.8, 9.6));
+    act(() => { result.current.refresh(); });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result.current.refreshing).toBe(false);
+  });
 });
