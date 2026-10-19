@@ -130,14 +130,17 @@ const fetchOnce = async (latitude: number, longitude: number, language: string):
     `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${round(latitude)}&longitude=${round(longitude)}&localityLanguage=${language}`,
   ));
 
-// BigDataCloud with one retry after `retryMs`; throws when both calls fail.
+// BigDataCloud with one retry after `retryMs`; throws when both calls fail. No retry when
+// `isCancelled()` is true by then (the caller moved on or unmounted): one call less to BigDataCloud.
 export const fetchPlace = async (
-  latitude: number, longitude: number, language: string, retryMs = PLACE_RETRY_MS,
+  latitude: number, longitude: number, language: string,
+  isCancelled: () => boolean = () => false, retryMs = PLACE_RETRY_MS,
 ): Promise<PlaceInfo> => {
   try {
     return await fetchOnce(latitude, longitude, language);
-  } catch {
+  } catch (error) {
     await new Promise((resolve) => setTimeout(resolve, retryMs));
+    if (isCancelled()) throw error;
     return fetchOnce(latitude, longitude, language);
   }
 };
