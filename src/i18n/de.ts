@@ -39,6 +39,7 @@ export const de: Record<keyof typeof en, string> = {
   'panel.collapse': "Infobereich zuklappen",
   'location.loading': "Ort wird geladen…",
   'location.unknown': "Dein Standort",
+  'location.chosenPoint': "Gewählter Punkt",
   'location.osmAttribution': "© OpenStreetMap-Mitwirkende",
   'location.change': "Ort ändern",
   'location.latitude': "Breitengrad",
@@ -659,14 +660,16 @@ export const de: Record<keyof typeof en, string> = {
   'toast.geolocationUnsupportedDefault': "Dein Browser unterstützt keine Standortbestimmung. Der Standardort wird verwendet.",
   'toast.geolocationUnsupported': "Dein Browser unterstützt keine Standortbestimmung.",
   'toast.locationUnavailableTitle': "Standort nicht verfügbar",
-  'toast.locationUnavailableDefault': "Der Standardort wird verwendet. Aktiviere die Ortungsdienste für genaue Daten.",
   'toast.locationUnavailable': "Dein aktueller Standort konnte nicht ermittelt werden.",
+  'toast.locationBlocked': "Der Standort ist für diese Seite gesperrt. Erlaube ihn in den Website-Einstellungen deines Browsers und versuche es dann noch einmal.",
   'toast.locationDetectedTitle': "Standort erkannt",
   'toast.locationDetectedDescription': "Dein aktueller Standort wird für die Sonnenberechnung verwendet.",
 
   // Loading screen (item 39)
   'loading.locating': "Standort wird ermittelt…",
   'loading.waiting': "Warte auf Standortfreigabe",
+  'loading.denied': "Kein Standort: wähle einen Ort",
+  'loading.notFound': "Standort nicht gefunden: wähle einen Ort",
   'loading.choosePlace': "Ort wählen",
 
   // Radio

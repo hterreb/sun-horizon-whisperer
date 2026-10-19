@@ -39,6 +39,7 @@ export const en = {
   'panel.collapse': 'Collapse info panel',
   'location.loading': 'Loading location...',
   'location.unknown': 'Your location',
+  'location.chosenPoint': 'Chosen point',
   'location.osmAttribution': '© OpenStreetMap contributors',
   'location.change': 'Change location',
   'location.latitude': 'Latitude',
@@ -659,14 +660,16 @@ export const en = {
   'toast.geolocationUnsupportedDefault': "Your browser doesn't support geolocation. Using default location.",
   'toast.geolocationUnsupported': "Your browser doesn't support geolocation.",
   'toast.locationUnavailableTitle': 'Location unavailable',
-  'toast.locationUnavailableDefault': 'Using default location. Please enable location services for accurate data.',
   'toast.locationUnavailable': 'Could not get your current location.',
+  'toast.locationBlocked': "Location is blocked for this site. Allow it in your browser's site settings, then try again.",
   'toast.locationDetectedTitle': 'Location detected',
   'toast.locationDetectedDescription': 'Using your current location for sun calculations.',
 
   // Loading screen (item 39)
   'loading.locating': 'Locating…',
   'loading.waiting': 'Waiting for location access',
+  'loading.denied': 'No location: choose a place',
+  'loading.notFound': 'Location not found: choose a place',
   'loading.choosePlace': 'Choose a place',
 
   // Radio

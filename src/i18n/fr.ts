@@ -39,6 +39,7 @@ export const fr: Record<keyof typeof en, string> = {
   'panel.collapse': "Replier le panneau",
   'location.loading': "Chargement du lieu…",
   'location.unknown': "Votre position",
+  'location.chosenPoint': "Point choisi",
   'location.osmAttribution': "© les contributeurs d'OpenStreetMap",
   'location.change': "Changer de lieu",
   'location.latitude': "Latitude",
@@ -659,14 +660,16 @@ export const fr: Record<keyof typeof en, string> = {
   'toast.geolocationUnsupportedDefault': "Votre navigateur ne prend pas en charge la géolocalisation. Lieu par défaut utilisé.",
   'toast.geolocationUnsupported': "Votre navigateur ne prend pas en charge la géolocalisation.",
   'toast.locationUnavailableTitle': "Position indisponible",
-  'toast.locationUnavailableDefault': "Lieu par défaut utilisé. Activez la localisation pour des données précises.",
   'toast.locationUnavailable': "Impossible d’obtenir votre position actuelle.",
+  'toast.locationBlocked': "La position est bloquée pour ce site. Autorisez-la dans les paramètres du site de votre navigateur, puis réessayez.",
   'toast.locationDetectedTitle': "Position détectée",
   'toast.locationDetectedDescription': "Votre position actuelle sert au calcul du soleil.",
 
   // Loading screen (item 39)
   'loading.locating': "Localisation…",
   'loading.waiting': "En attente de l’accès à la position",
+  'loading.denied': "Pas de position : choisissez un lieu",
+  'loading.notFound': "Position introuvable : choisissez un lieu",
   'loading.choosePlace': "Choisir un lieu",
 
   // Radio

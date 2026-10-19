@@ -3527,7 +3527,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Done when:** a searched place in another zone shows its own sunrise and sunset clock times and the zone line; unit tests for the formatting across a date line.
 - **Decision (Lutz, 2026-10-19):** (a) the place's own clock: all times in the place's zone, and a line under the place name ("Local time · 6 h behind you").
 
-### 170. Location denied: ask for a place, not New York — M
+### 170. Location denied: ask for a place, not New York — M — **✅ Done**
 
 - **Finding (item 165, #4):** 3 of 5 first users. A user who says no to location gets a red "Location unavailable … Please enable location services" at 0.3 s and New York in Berlin time ("Dawn" at 13:37). Location allowed later changes nothing; only the "Use my location" button in Change location or a reload helps. With no place name the header says "Your location 40.7128°, −74.0060°".
 - **Now:** `SunTracker` sets New York and the toast on any geolocation error. The loading screen's "Choose a place" (item 39) shows only while the request waits (after 3 s), behind the Premium gate.
@@ -3540,6 +3540,16 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Open:** (a) "Choose a place" free for this first place (no Premium gate)? (b) A "Skip" that shows New York, or no default place at all?
 - **Done when:** denied location shows "Choose a place" with no red toast; allowing location later moves the scene to it without a reload; component tests for both.
 - **Decision (Lutz, 2026-10-19):** (a) yes: "Choose a place" is free for the first place; a later change of the place stays Premium. (b) No default place: no "Skip" and no New York.
+- **Decision (Lutz, 2026-10-19, while building):** "Use my location" is always free, so a free first place never blocks the real location later.
+- **Built:**
+  - `SunTracker`: on a startup geolocation error there is no default place and no toast. `locationProblem` (`denied` for code 1, else `unavailable`) goes to `LoadingScreen`, which stays and shows "Choose a place" at once with "No location: choose a place" or "Location not found: choose a place" (`loading.denied`, `loading.notFound`). The 10 s timeout gives `unavailable`.
+  - `LoadingScreen`: "Choose a place" has no Premium gate and no gold plus (the first place is free).
+  - `SunTracker` listens to `navigator.permissions.query({ name: 'geolocation' })`: when the state turns `granted` and no place was chosen, it asks for the position and the scene opens there. No Permissions API: nothing (the panel's "Use my location" still works).
+  - `InfoPanel`: "Change location" opens the form for everyone. "Use my location" is free; a search pick and "Set location" go through `requirePremium`.
+  - A typed point with no place name says "Chosen point" (`location.chosenPoint`, `isChosenPoint` from `SunTracker`'s `isManualLocation`), not "Your location".
+  - "Use my location" with location blocked (code 1): the toast says "Location is blocked for this site. Allow it in your browser's site settings, then try again." (`toast.locationBlocked`).
+  - New keys in 5 languages; `toast.locationUnavailableDefault` removed. **Deviation:** with no geolocation API at all (no real browser; jsdom tests) New York and its toast stay.
+- **Checked:** component tests: denied keeps the loading screen with the free "Choose a place", no toast and no scene; a permission change to `granted` opens the scene at the position; a timeout says "Location not found"; "Use my location" while blocked gives the site-settings toast; typed coordinates say "Chosen point"; while Premium is locked, "Use my location" runs and "Set location" goes through `requirePremium`. Typecheck, lint and all 2107 tests pass. Browser (built app, 390 × 844, location denied): "No location: choose a place" and the button, no red toast, no scene; after the permission was granted the scene opened at Ravensburg without a reload.
 
 ### 171. The "+" badge on a phone: what it means — S
 
