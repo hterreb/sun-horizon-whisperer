@@ -648,7 +648,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   playDirection = 0,
   satellites = null
 }) => {
-  const { t, language } = useLanguage();
+  const { t, language, timeZone } = useLanguage();
   // Compass mode (ROADMAP item 19): a real field of view centered on the heading,
   // replacing the static full-circle mapping - also turns off the CSS transitions
   // below (the heading's own low-pass filter already smooths the motion).
@@ -1796,7 +1796,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
                 style={{ left: `${label.x}px`, top: `${label.y}px`, transform: 'translate(-50%, -50%)', color: 'hsl(var(--brand-sunset))' }}
               >
                 <Icon size={10} />
-                {formatTime(label.time, language)}
+                {formatTime(label.time, language, timeZone)}
               </div>
             );
           })}
@@ -1810,7 +1810,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
               style={{ left: `${label.x}px`, top: `${label.y}px`, transform: 'translate(-50%, -50%)', color: 'hsl(var(--brand-sunset))' }}
             >
               <Mountain size={10} />
-              {formatTime(label.time, language)}
+              {formatTime(label.time, language, timeZone)}
               <PremiumBadge className="absolute -right-1 -top-1 h-2.5 w-2.5" />
             </div>
           ))}
@@ -1824,7 +1824,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
                 style={{ left: `${label.x}px`, top: `${label.y}px`, transform: 'translate(-50%, -50%)', color: 'hsl(var(--scene-moon))' }}
               >
                 <Icon size={10} />
-                {formatTime(label.time, language)}
+                {formatTime(label.time, language, timeZone)}
               </div>
             );
           })}
@@ -1837,7 +1837,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
               style={{ left: `${label.x}px`, top: `${label.y}px`, transform: 'translate(-50%, -50%)', color: 'hsl(var(--scene-moon))' }}
             >
               <Mountain size={10} />
-              {formatTime(label.time, language)}
+              {formatTime(label.time, language, timeZone)}
               <PremiumBadge className="absolute -right-1 -top-1 h-2.5 w-2.5" />
             </div>
           ))}

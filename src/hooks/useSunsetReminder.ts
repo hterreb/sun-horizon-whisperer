@@ -43,7 +43,7 @@ export const showReminderNotification = async (body: string, tag: string) => {
 // `sunset`, only while `active` (toggle on, permission granted, live time). A timer is set
 // to the reminder time. Background tabs slow down timers, so the hook also checks once a
 // minute and when the page becomes visible again. The text is in `language`.
-export const useSunsetReminder = (sunset: Date | null, active: boolean, language: Language = 'en') => {
+export const useSunsetReminder = (sunset: Date | null, active: boolean, language: Language = 'en', timeZone?: string) => {
   const shownKeyRef = useRef<string | null>(null);
   const sunsetMs = sunset?.getTime() ?? null;
 
@@ -54,7 +54,7 @@ export const useSunsetReminder = (sunset: Date | null, active: boolean, language
     const check = () => {
       if (!isReminderDue(new Date(), target, shownKeyRef.current)) return;
       shownKeyRef.current = getReminderKey(target);
-      void showReminderNotification(getReminderText(target, language), 'sunset-reminder');
+      void showReminderNotification(getReminderText(target, language, timeZone), 'sunset-reminder');
     };
     const reminderMs = getReminderTime(target)!.getTime();
     const timeout = setTimeout(check, Math.max(0, reminderMs - Date.now()));
@@ -68,5 +68,5 @@ export const useSunsetReminder = (sunset: Date | null, active: boolean, language
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, [sunsetMs, active, language]);
+  }, [sunsetMs, active, language, timeZone]);
 };

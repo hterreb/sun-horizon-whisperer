@@ -78,6 +78,19 @@ describe('geocodeUtils', () => {
       expect(nowhere.countryCode).toBeUndefined();
     });
 
+    it('keeps the time zone for the place\'s clock (item 169), and drops an unknown one', async () => {
+      vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ results: [
+          { name: 'New York', country: 'United States', timezone: 'America/New_York', latitude: 40.71, longitude: -74.01 },
+          { name: 'Nowhere', timezone: 'Mars/Olympus', latitude: 1, longitude: 2 },
+        ] }),
+      })));
+      const [newYork, nowhere] = await searchPlaces('test');
+      expect(newYork.timeZone).toBe('America/New_York');
+      expect(nowhere.timeZone).toBeUndefined();
+    });
+
     it('drops results missing a usable name or coordinates', async () => {
       const fetchMock = vi.fn(() =>
         Promise.resolve({

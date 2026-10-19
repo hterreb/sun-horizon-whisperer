@@ -9,6 +9,8 @@ export interface LanguageContextValue {
   language: Language;
   setLanguage: (language: Language) => void;
   t: Translate;
+  // The shown place's time zone for clock times (ROADMAP item 169); undefined: the device's.
+  timeZone?: string;
 }
 
 export const LanguageContext = createContext<LanguageContextValue>({

@@ -32,7 +32,8 @@ import { type WeatherType } from './CloudLayer';
 import {
   type PlaceInfo, loadPlace, savePlace, fetchPlace, fetchPhotonPlace, deviceCountry, reportPlace, placeStatusOf, errorStatusOf,
 } from '@/utils/placeName';
-import { getTimeTravelRange, toDateTimeLocalValue } from '@/utils/timeTravel';
+import { fromDateTimeLocalValue, getTimeTravelRange, toDateTimeLocalValue } from '@/utils/timeTravel';
+import { placeClockDifferenceMinutes } from '@/utils/timeZone';
 import { formatTemperature, type TemperatureUnit } from '@/utils/temperatureUnit';
 import { SUNSET_REMINDER_MIN } from '@/utils/sunsetReminder';
 import { PASS_REMINDER_MIN } from '@/utils/satelliteUtils';
@@ -69,19 +70,20 @@ export const formatTerrainDelta = (
   body: 'sun' | 'moon',
   terrainDate: Date | null,
   astronomicalDate: Date | null,
-  language: Language = 'en'
+  language: Language = 'en',
+  timeZone?: string
 ): string => {
   if (!astronomicalDate) return '—';
   if (!terrainDate) return translate(language, body === 'sun' ? 'terrain.sunHidden' : 'terrain.moonHidden');
   const diffMinutes = Math.round((terrainDate.getTime() - astronomicalDate.getTime()) / 60000);
   const sign = diffMinutes >= 0 ? '+' : '';
-  return `${formatTime(terrainDate, language)} (${sign}${translate(language, 'common.minutes', { value: diffMinutes })})`;
+  return `${formatTime(terrainDate, language, timeZone)} (${sign}${translate(language, 'common.minutes', { value: diffMinutes })})`;
 };
 
 // "Oct 7, 14:05" in the UI language, as date-fns 'MMM d, HH:mm' did, with Intl instead
 // (AUDIT P-7, ROADMAP item 67).
-const formatMoonDate = (date: Date, language: Language): string =>
-  `${date.toLocaleDateString(language, { month: 'short', day: 'numeric' })}, ${formatTime(date, language)}`;
+const formatMoonDate = (date: Date, language: Language, timeZone?: string): string =>
+  `${date.toLocaleDateString(language, { month: 'short', day: 'numeric', timeZone })}, ${formatTime(date, language, timeZone)}`;
 
 // Highlights "now, until 19:42" in peach, the same D `--panel-hi` treatment as the
 // terrain delta above.
@@ -124,6 +126,8 @@ interface InfoPanelProps {
   manualPlaceName: string | null;
   // Item 170: a place set by hand with no name (typed coordinates): "Chosen point", not "Your location".
   isChosenPoint?: boolean;
+  // Item 169: a place set by hand with no known time zone; its times are in the device's clock.
+  isPlaceZoneUnknown?: boolean;
   // Tells SunTracker the place name shown here (null: none yet), for Santa's card (lookbook S7).
   onPlaceName?: (name: string | null) => void;
   timeOfDay: TimeOfDay;
@@ -143,7 +147,7 @@ interface InfoPanelProps {
   onManualWindyChange?: (windy: boolean) => void;
   onWeatherModeToggle: (useReal: boolean) => void;
   onWeatherRefresh: () => void;
-  onLocationChange: (latitude: number, longitude: number, name?: string, countryCode?: string) => void;
+  onLocationChange: (latitude: number, longitude: number, name?: string, countryCode?: string, timeZone?: string) => void;
   onUseMyLocation: () => void;
   // Line of sight with terrain (ROADMAP item 13): hidden entirely while `idle` (the
   // feature is off, or location isn't loaded yet). Defaults keep every existing
@@ -209,6 +213,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   location,
   manualPlaceName,
   isChosenPoint = false,
+  isPlaceZoneUnknown = false,
   onPlaceName,
   timeOfDay,
   currentTime,
@@ -253,10 +258,23 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   onCollectionOpen,
   onCountryChange,
 }) => {
-  const { t, language, setLanguage } = useLanguage();
+  const { t, language, setLanguage, timeZone } = useLanguage();
   // Premium gate (ROADMAP item 14): every gold-plus control goes through requirePremium.
   const { isLocked, requirePremium } = usePremiumGate();
-  const formatLocalTime = (date: Date | null) => formatTime(date, language);
+  const formatLocalTime = (date: Date | null) => formatTime(date, language, timeZone);
+  // Item 169: the place's clock against the device's, under the place name.
+  const clockDifference = timeZone ? placeClockDifferenceMinutes(currentTime, timeZone) : 0;
+  const clockOffsetText = (minutes: number) => {
+    const abs = Math.abs(minutes);
+    return abs % 60 === 0 ? t('common.hours', { value: abs / 60 }) : t('info.hoursMinutes', { hours: Math.floor(abs / 60), minutes: abs % 60 });
+  };
+  const clockNote = isPlaceZoneUnknown
+    ? t('location.clockYours')
+    : clockDifference > 0
+      ? t('location.clockAhead', { offset: clockOffsetText(clockDifference) })
+      : clockDifference < 0
+        ? t('location.clockBehind', { offset: clockOffsetText(clockDifference) })
+        : null;
   // Item 164: a live feed in `error` while its switch is on.
   const isLiveRadarError = isLivePlanesOn && liveRadarStatus?.status === 'error';
   const isSatelliteError = isSatelliteTrackingOn && satelliteStatus?.status === 'error';
@@ -449,9 +467,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
   // Item 170: the form opens for everyone, so "Use my location" is always free; a place
   // set by hand (search or coordinates) is Premium.
-  const handleSelectPlace = (latitude: number, longitude: number, name: string, countryCode?: string) => {
+  const handleSelectPlace = (latitude: number, longitude: number, name: string, countryCode?: string, timeZone?: string) => {
     requirePremium(() => {
-      onLocationChange(latitude, longitude, name, countryCode);
+      onLocationChange(latitude, longitude, name, countryCode, timeZone);
       closeLocationForm();
     });
   };
@@ -592,6 +610,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                   {formatNumber(language, location.latitude, 4)}°, {formatNumber(language, location.longitude, 4)}°
                 </span>
               )}
+              {clockNote && <span className="text-caption opacity-70" data-testid="clock-note">{clockNote}</span>}
               {/* Item 137: a name from Photon is OpenStreetMap data (ODbL); the attribution takes
                   the coordinates' line, so the panel is not higher than while it loads. */}
               {isOsmName && !showCoordinates && (
@@ -868,12 +887,12 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                     type="datetime-local"
                     aria-label={t('time.set')}
                     autoFocus
-                    value={toDateTimeLocalValue(currentTime)}
-                    min={toDateTimeLocalValue(timePickerRange.min)}
-                    max={toDateTimeLocalValue(timePickerRange.max)}
+                    value={toDateTimeLocalValue(currentTime, timeZone)}
+                    min={toDateTimeLocalValue(timePickerRange.min, timeZone)}
+                    max={toDateTimeLocalValue(timePickerRange.max, timeZone)}
                     onChange={(e) => {
-                      const target = new Date(e.target.value);
-                      if (!Number.isNaN(target.getTime())) onTimeJump(target);
+                      const target = fromDateTimeLocalValue(e.target.value, timeZone);
+                      if (target && !Number.isNaN(target.getTime())) onTimeJump(target);
                     }}
                     onBlur={() => setTimePickerRange(null)}
                     className={`bg-black/30 rounded px-1 text-caption text-white tabular-nums scheme-dark ${FOCUS_RING}`}
@@ -886,8 +905,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                     title={t('time.set')}
                   >
                     {isTimePreview
-                      ? formatMoonDate(currentTime, language)
-                      : currentTime.toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })}
+                      ? formatMoonDate(currentTime, language, timeZone)
+                      : currentTime.toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23', timeZone })}
                   </button>
                 )}
                 <button
@@ -976,8 +995,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 eyeHeightMeters={eyeHeightMeters}
                 onEyeHeightChange={onEyeHeightChange}
                 rows={[
-                  { label: t('sun.sunrise'), value: formatTerrainDelta('sun', terrainSunTimes?.sunrise ?? null, shownSunrise, language) },
-                  { label: t('sun.sunset'), value: formatTerrainDelta('sun', terrainSunTimes?.sunset ?? null, shownSunset, language) },
+                  { label: t('sun.sunrise'), value: formatTerrainDelta('sun', terrainSunTimes?.sunrise ?? null, shownSunrise, language, timeZone) },
+                  { label: t('sun.sunset'), value: formatTerrainDelta('sun', terrainSunTimes?.sunset ?? null, shownSunset, language, timeZone) },
                 ]}
               />
             )}
@@ -1099,19 +1118,19 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                     eyeHeightMeters={eyeHeightMeters}
                     onEyeHeightChange={onEyeHeightChange}
                     rows={[
-                      { label: t('moon.rise'), value: formatTerrainDelta('moon', terrainMoonTimes?.rise ?? null, moonTimes.rise, language) },
-                      { label: t('moon.set'), value: formatTerrainDelta('moon', terrainMoonTimes?.set ?? null, moonTimes.set, language) },
+                      { label: t('moon.rise'), value: formatTerrainDelta('moon', terrainMoonTimes?.rise ?? null, moonTimes.rise, language, timeZone) },
+                      { label: t('moon.set'), value: formatTerrainDelta('moon', terrainMoonTimes?.set ?? null, moonTimes.set, language, timeZone) },
                     ]}
                   />
                 )}
 
                 <div className={ROW}>
                   <span className="text-caption">{t('moon.nextFull')}</span>
-                  <span className="text-caption tabular-nums">{formatMoonDate(nextFullMoon, language)}</span>
+                  <span className="text-caption tabular-nums">{formatMoonDate(nextFullMoon, language, timeZone)}</span>
                 </div>
                 <div className={ROW}>
                   <span className="text-caption">{t('moon.nextNew')}</span>
-                  <span className="text-caption tabular-nums">{formatMoonDate(nextNewMoon, language)}</span>
+                  <span className="text-caption tabular-nums">{formatMoonDate(nextNewMoon, language, timeZone)}</span>
                 </div>
               </div>
             </div>

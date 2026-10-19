@@ -1,3 +1,5 @@
+import { fromWallTime, wallTime } from './timeZone';
+
 // Time travel (ROADMAP item 44): the range a preview may reach (today ± 1 year) and
 // the value format of the native <input type="datetime-local">.
 
@@ -39,8 +41,18 @@ export const clampTimeOffset = (offsetMs: number, now: Date): number => {
   return target - now.getTime();
 };
 
-// "2026-09-30T18:30", the local-time value of a datetime-local input.
-export const toDateTimeLocalValue = (date: Date): string => {
+// "2026-09-30T18:30", the value of a datetime-local input, in the place's time zone (item
+// 169; undefined: the device's zone).
+export const toDateTimeLocalValue = (date: Date, timeZone?: string): string => {
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  const w = wallTime(date, timeZone);
+  return `${w.year}-${pad(w.month)}-${pad(w.day)}T${pad(w.hour)}:${pad(w.minute)}`;
+};
+
+// The moment of a datetime-local value read in the place's time zone; null for junk.
+export const fromDateTimeLocalValue = (value: string, timeZone?: string): Date | null => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(value);
+  if (!match) return null;
+  const [year, month, day, hour, minute] = match.slice(1).map(Number);
+  return fromWallTime({ year, month, day, hour, minute }, timeZone);
 };

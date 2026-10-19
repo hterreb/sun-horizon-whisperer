@@ -180,14 +180,14 @@ const REMINDER_CHECK_MS = 30_000;
 
 // The ISS pass reminder (ROADMAP item 97): item 69's notification PASS_REMINDER_MIN before
 // the pass, once per pass, only while `active` (live time, notifications allowed).
-export const useSatellitePassReminder = (pass: SatellitePass | null, active: boolean, language: Language) => {
+export const useSatellitePassReminder = (pass: SatellitePass | null, active: boolean, language: Language, timeZone?: string) => {
   const shownKeyRef = useRef<string | null>(null);
   useEffect(() => {
     if (!active || !pass) return;
     const check = () => {
       if (!isPassReminderDue(new Date(), pass, shownKeyRef.current)) return;
       shownKeyRef.current = getPassReminderKey(pass);
-      void showReminderNotification(getPassReminderText(pass, language), 'satellite-pass');
+      void showReminderNotification(getPassReminderText(pass, language, timeZone), 'satellite-pass');
     };
     check();
     const timer = setInterval(check, REMINDER_CHECK_MS);
@@ -199,5 +199,5 @@ export const useSatellitePassReminder = (pass: SatellitePass | null, active: boo
       clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, [pass, active, language]);
+  }, [pass, active, language, timeZone]);
 };

@@ -27,5 +27,5 @@ export const isReminderDue = (now: Date, sunset: Date | null, shownKey: string |
   return lateMs >= 0 && lateMs < REMINDER_LATE_MS;
 };
 
-export const getReminderText = (sunset: Date, language: Language): string =>
-  translate(language, 'reminder.notification', { minutes: SUNSET_REMINDER_MIN, time: formatTime(sunset, language) });
+export const getReminderText = (sunset: Date, language: Language, timeZone?: string): string =>
+  translate(language, 'reminder.notification', { minutes: SUNSET_REMINDER_MIN, time: formatTime(sunset, language, timeZone) });

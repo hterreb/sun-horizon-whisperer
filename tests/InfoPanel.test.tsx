@@ -6,6 +6,8 @@ import { type TimeOfDay, type SunTimes, type NextGoldenBlueHours } from '../src/
 import { type WeatherType } from '../src/components/CloudLayer';
 import { type WeatherData } from '../src/utils/weatherUtils';
 import { PremiumContext, type PremiumValue } from '../src/hooks/usePremium';
+import { LanguageContext } from '../src/hooks/useLanguage';
+import { translate } from '../src/i18n';
 
 vi.mock('@sentry/react', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sentry/react')>()),
@@ -685,6 +687,7 @@ describe('InfoPanel', () => {
                   admin1: 'Baden-Württemberg',
                   country: 'Germany',
                   country_code: 'DE',
+                  timezone: 'Europe/Berlin',
                   latitude: 47.65,
                   longitude: 9.48,
                 },
@@ -722,7 +725,8 @@ describe('InfoPanel', () => {
       });
       fireEvent.click(resultOption);
 
-      expect(onLocationChange).toHaveBeenCalledWith(47.65, 9.48, 'Friedrichshafen, Baden-Württemberg, Germany', 'DE');
+      // Item 169: the place's time zone comes with it.
+      expect(onLocationChange).toHaveBeenCalledWith(47.65, 9.48, 'Friedrichshafen, Baden-Württemberg, Germany', 'DE', 'Europe/Berlin');
       // Selecting a result closes the form, like submitting or "Use my location" do.
       expect(screen.queryByLabelText(/search for a place/i)).not.toBeInTheDocument();
     });
@@ -753,7 +757,7 @@ describe('InfoPanel', () => {
       fireEvent.change(searchInput, { target: { value: 'Hamburg' } });
       fireEvent.keyDown(searchInput, { key: 'Enter' });
       expect(onLocationChange).not.toHaveBeenCalled();
-      await waitFor(() => expect(onLocationChange).toHaveBeenCalledWith(53.55, 9.99, 'Hamburg, Germany', 'DE'), { timeout: 2000 });
+      await waitFor(() => expect(onLocationChange).toHaveBeenCalledWith(53.55, 9.99, 'Hamburg, Germany', 'DE', undefined), { timeout: 2000 });
       expect(onLocationChange).toHaveBeenCalledTimes(1);
       expect(screen.queryByLabelText(/search for a place/i)).not.toBeInTheDocument();
     });
@@ -771,7 +775,7 @@ describe('InfoPanel', () => {
       fireEvent.change(searchInput, { target: { value: 'Hamburg' } });
       await screen.findByRole('option', { name: 'Hamburg, Germany' });
       fireEvent.keyDown(searchInput, { key: 'Enter' });
-      expect(onLocationChange).toHaveBeenCalledWith(53.55, 9.99, 'Hamburg, Germany', 'DE');
+      expect(onLocationChange).toHaveBeenCalledWith(53.55, 9.99, 'Hamburg, Germany', 'DE', undefined);
     });
 
     it('shows "No results" for an empty response and an error state for a failed request', async () => {
@@ -1410,5 +1414,70 @@ describe('formatTerrainDelta (ROADMAP items 13 & 30)', () => {
 
   it('falls back to an em dash when the astronomical time itself is unknown', () => {
     expect(formatTerrainDelta('moon', null, null)).toBe('—');
+  });
+});
+
+describe('InfoPanel: the place\'s clock (ROADMAP item 169)', () => {
+  const at = new Date('2026-10-19T12:00:00Z'); // the tests run with TZ=UTC
+  const props = {
+    sunPosition: { azimuth: 120, altitude: 10 },
+    moonPosition: { azimuth: 300, altitude: -10, phase: 0.5, illumination: 1, visible: false },
+    moonTimes: { rise: null, set: null, alwaysUp: false, alwaysDown: false },
+    nextFullMoon: new Date('2026-10-26T12:00:00Z'),
+    nextNewMoon: new Date('2026-11-09T12:00:00Z'),
+    sunTimes: {
+      sunrise: new Date('2026-10-19T11:12:00Z'),
+      sunset: new Date('2026-10-19T22:11:00Z'),
+      solarNoon: new Date('2026-10-19T16:41:00Z'),
+      dawn: new Date('2026-10-19T10:45:00Z'),
+      dusk: new Date('2026-10-19T22:38:00Z'),
+      nauticalDawn: new Date('2026-10-19T10:14:00Z'),
+      nauticalDusk: new Date('2026-10-19T23:09:00Z'),
+      astronomicalDawn: new Date('2026-10-19T09:43:00Z'),
+      astronomicalDusk: new Date('2026-10-19T23:40:00Z'),
+      polar: null,
+    } as SunTimes,
+    nextGoldenBlueHours: null,
+    location: { latitude: 40.71, longitude: -74.01, loaded: true },
+    manualPlaceName: 'New York, United States',
+    timeOfDay: 'morning' as TimeOfDay,
+    currentTime: at,
+    weatherType: 'clear' as WeatherType,
+    weatherData: null,
+    isLoadingWeather: false,
+    useRealWeather: true,
+    isFullscreen: false,
+    onWeatherChange: () => {},
+    onWeatherModeToggle: () => {},
+    onWeatherRefresh: () => {},
+    onLocationChange: () => {},
+    onUseMyLocation: () => {},
+  };
+  const renderIn = (timeZone: string | undefined, extra: { isPlaceZoneUnknown?: boolean } = {}) =>
+    render(
+      <LanguageContext.Provider value={{ language: 'en', setLanguage: () => {}, t: (key, vars) => translate('en', key, vars), timeZone }}>
+        <InfoPanel {...props} {...extra} />
+      </LanguageContext.Provider>
+    );
+
+  it('shows the clock in the place\'s zone and how far it is from the device', () => {
+    renderIn('America/New_York');
+    expect(screen.getByTestId('clock-note')).toHaveTextContent('Local time · 4 h behind you');
+    expect(screen.getByTitle('Set date and time')).toHaveTextContent('08:00:00');
+    // Sunrise 11:12 UTC is 07:12 in New York.
+    expect(screen.getByText('07:12')).toBeInTheDocument();
+  });
+
+  it('says half hours, and "ahead" for a place east of the device', () => {
+    renderIn('Asia/Kolkata');
+    expect(screen.getByTestId('clock-note')).toHaveTextContent('Local time · 5 h 30 min ahead of you');
+  });
+
+  it('shows no line in the device\'s zone, and "Times in your time zone" for a place with no known zone', () => {
+    const { unmount } = renderIn(undefined);
+    expect(screen.queryByTestId('clock-note')).not.toBeInTheDocument();
+    unmount();
+    renderIn(undefined, { isPlaceZoneUnknown: true });
+    expect(screen.getByTestId('clock-note')).toHaveTextContent('Times in your time zone');
   });
 });

@@ -257,12 +257,13 @@ export const getDayLengthMinutes = (date: Date, latitude: number, longitude: num
   return Math.round((times.sunset.getTime() - times.sunrise.getTime()) / 60_000);
 };
 
-// 24-hour "18:42" in the UI language (ROADMAP item 67); "—" for a missing time.
-export const formatTime = (date: Date | null, locale?: string): string => {
+// 24-hour "18:42" in the UI language (ROADMAP item 67) and in the place's time zone (item
+// 169; undefined: the device's zone); "—" for a missing time.
+export const formatTime = (date: Date | null, locale?: string, timeZone?: string): string => {
   if (!isValidDate(date)) return '—';
   
   try {
-    return date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+    return date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone });
   } catch (error) {
     console.error('Error formatting time:', error);
     return '—';

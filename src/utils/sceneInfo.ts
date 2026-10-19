@@ -3,6 +3,7 @@
 // (SceneInfoCard) translates them. No React, no DOM. Item 107 (field guide look): also the
 // kicker (type name and icon), the Latin name, the fact and the rarity tier.
 
+import { startOfDayIn } from './timeZone';
 import { formatNumber, type MessageKey, type Translate } from '@/i18n';
 import { type Language } from './language';
 import { formatTime, type NextGoldenBlueHours, type SunPosition, type SunTimes, type TimeOfDay } from './sunUtils';
@@ -89,6 +90,8 @@ export interface SceneInfo {
 // What the sun, moon, cloud and terrain cards read; SunTracker has all of it.
 export interface SceneInfoContext {
   language: Language;
+  // The place's time zone for clock times (item 169); undefined: the device's.
+  timeZone?: string;
   now: Date;
   // Day or night fish pool (item 105).
   timeOfDay: TimeOfDay;
@@ -413,11 +416,11 @@ const nextSunEvent = ({ now, sunTimes, terrainSunTimes }: SceneInfoContext): Inf
   return { value: { key: next.key, vars: { time: durationText(next.time.getTime() - now.getTime()) } } };
 };
 
-// "05:43" today, else "Wed 05:43".
-const dayTime = (time: Date, now: Date, language: Language): string =>
-  time.toDateString() === now.toDateString()
-    ? formatTime(time, language)
-    : `${new Intl.DateTimeFormat(language, { weekday: 'short' }).format(time)} ${formatTime(time, language)}`;
+// "05:43" today, else "Wed 05:43", in the place's clock.
+const dayTime = (time: Date, now: Date, language: Language, timeZone?: string): string =>
+  startOfDayIn(time, timeZone).getTime() === startOfDayIn(now, timeZone).getTime()
+    ? formatTime(time, language, timeZone)
+    : `${new Intl.DateTimeFormat(language, { weekday: 'short', timeZone }).format(time)} ${formatTime(time, language, timeZone)}`;
 
 // "Paris (CDG) → Tel Aviv (TLV)" when both places are short, else "CDG → TLV".
 const ROUTE_NAME_MAX = 12;
@@ -430,7 +433,7 @@ const routeText = ({ from, to }: LiveRoute): string => {
 // The satellite card (item 97): the name, the height, the speed, the time until it enters the
 // Earth's shadow ("now" when it is in the shadow) and the next pass.
 const satelliteLines = (name: string, ctx: SceneInfoContext): InfoLine[] => {
-  const { language, now } = ctx;
+  const { language, now, timeZone } = ctx;
   const details = ctx.satellite?.details ?? null;
   const pass = ctx.satellite?.nextPass ?? null;
   const shadow: InfoText | string = !details ? '—'
@@ -444,15 +447,15 @@ const satelliteLines = (name: string, ctx: SceneInfoContext): InfoLine[] => {
       { label: 'info.speed' as const, value: { key: 'info.kmPerSecond' as const, vars: { value: formatNumber(language, details.speedKmS, 1) } } },
     ] : []),
     { label: 'info.toShadow', value: shadow },
-    { label: 'info.nextPass', value: pass ? dayTime(pass.start, now, language) : '—' },
+    { label: 'info.nextPass', value: pass ? dayTime(pass.start, now, language, timeZone) : '—' },
   ];
 };
 
-const goldenHour = ({ now, nextGoldenBlueHours, language }: SceneInfoContext): InfoText | string => {
+const goldenHour = ({ now, nextGoldenBlueHours, language, timeZone }: SceneInfoContext): InfoText | string => {
   const window = nextGoldenBlueHours?.golden;
   if (!window) return '—';
-  if (now.getTime() >= window.start.getTime()) return { key: 'golden.nowUntil', vars: { time: formatTime(window.end, language) } };
-  return { key: 'info.timeRange', vars: { start: formatTime(window.start, language), end: formatTime(window.end, language) } };
+  if (now.getTime() >= window.start.getTime()) return { key: 'golden.nowUntil', vars: { time: formatTime(window.end, language, timeZone) } };
+  return { key: 'info.timeRange', vars: { start: formatTime(window.start, language, timeZone), end: formatTime(window.end, language, timeZone) } };
 };
 
 export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): SceneInfo => {
@@ -569,7 +572,7 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
       const { moonPosition, moonTimes, now } = ctx;
       const distanceKm = getMoonEclipticGeocentric(now).distanceKm;
       const riseSet = (time: Date | null): InfoText | string =>
-        time ? formatTime(time, language) : moonTimes.alwaysUp ? { key: 'moon.upAllDay' } : moonTimes.alwaysDown ? { key: 'moon.downAllDay' } : '—';
+        time ? formatTime(time, language, ctx.timeZone) : moonTimes.alwaysUp ? { key: 'moon.upAllDay' } : moonTimes.alwaysDown ? { key: 'moon.downAllDay' } : '—';
       return {
         kicker: 'infoKind.sky',
         icon: 'moon',

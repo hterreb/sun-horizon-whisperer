@@ -36,7 +36,7 @@ interface LoadingScreenProps {
   still: boolean;
   // Denied or not found: "Choose a place" shows at once, with the reason.
   problem?: LocationProblem;
-  onSelectPlace: (latitude: number, longitude: number, name: string, countryCode?: string) => void;
+  onSelectPlace: (latitude: number, longitude: number, name: string, countryCode?: string, timeZone?: string) => void;
 }
 
 // Loading screen "Rising Mark" (ROADMAP item 39): the app mark on Night (the manifest

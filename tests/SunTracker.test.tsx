@@ -899,6 +899,18 @@ describe('SunTracker', () => {
       expect(await screen.findByText('Chosen point', undefined, { timeout: 5000 })).toBeInTheDocument();
     });
 
+    it('a searched place keeps its time zone: the panel uses its clock and says how far it is (item 169)', async () => {
+      saveManualLocation(40.71, -74.01, 'New York, United States', 'US', 'America/New_York');
+      render(<SunTracker />);
+      // The tests run with TZ=UTC; New York is 4 or 5 h behind.
+      expect(await screen.findByTestId('clock-note')).toHaveTextContent(/^Local time · [45] h behind you$/);
+      const newYorkNow = () => new Date().toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'America/New_York' });
+      const shown = screen.getByTitle('Set date and time').textContent ?? '';
+      // The minute can turn between the render and this line.
+      expect([newYorkNow(), new Date(Date.now() - 60_000).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'America/New_York' })])
+        .toContain(shown.slice(0, 5));
+    });
+
     it('clears the stored manual location when "Use my location" succeeds', async () => {
       saveManualLocation(10, 20);
       vi.stubGlobal('navigator', {
