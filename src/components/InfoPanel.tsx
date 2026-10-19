@@ -54,6 +54,13 @@ import { isEmptySkyTap } from '@/utils/sceneTap';
 // glassChrome.ts for the one style helper shared more broadly, and its test.
 export const ROW = 'flex justify-between items-center gap-2 border-t border-[hsl(var(--panel-border)/0.12)] pt-1';
 const SECTION_HEADING = 'text-title font-bold flex items-center';
+// Lookbook round 2 (Lutz, 2026-10-19, option A2): a closed card is one row of a compact list (a
+// faint line, a 16 px title, 44 px high); an open card keeps its gap and big title. The first
+// card keeps a gap above it, so the list does not touch the block before.
+const cardSection = (isClosed: boolean, isFirst = false) =>
+  isClosed ? `border-t border-white/10 ${isFirst ? 'mt-4' : ''}` : 'mt-6 pt-4 border-t border-white/20';
+const cardHeaderRow = (isClosed: boolean) => `relative flex items-center justify-between min-h-11 ${isClosed ? '' : 'mb-2'}`;
+const cardTitle = (isClosed: boolean) => (isClosed ? 'text-body font-semibold flex items-center' : SECTION_HEADING);
 const ICON_TOGGLE_BASE = 'p-1.5 rounded-full hover:bg-white/10 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70';
 // Item 173: a 44 px tap area (TAP_TARGET) around the 26-30 px button.
 export const ICON_TOGGLE = `${ICON_TOGGLE_BASE} ${TAP_TARGET}`;
@@ -1057,9 +1064,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           </div>
 
           {/* Moon information - collapsible, shown even when the moon is below the horizon */}
-          <div className="mt-6 pt-4 border-t border-white/20">
-            <div className="relative flex items-center justify-between mb-2 min-h-11">
-              <h3 className={SECTION_HEADING}>
+          <div className={cardSection(isMoonCollapsed, true)}>
+            <div className={cardHeaderRow(isMoonCollapsed)}>
+              <h3 className={cardTitle(isMoonCollapsed)}>
                 <Moon size={16} className="mr-2" />
                 {t('moon.title')}
               </h3>
@@ -1166,9 +1173,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               (ROADMAP item 20). Moved below Moon Information and collapsed by
               default (ROADMAP item 24) - not part of the time-of-day auto-collapse
               effect, so it stays as the user left it. */}
-          <div className="mt-6 pt-4 border-t border-white/20">
-            <div className="relative flex items-center justify-between mb-2 min-h-11">
-              <h3 className={SECTION_HEADING}>
+          <div className={cardSection(isGoldenBlueCollapsed)}>
+            <div className={cardHeaderRow(isGoldenBlueCollapsed)}>
+              <h3 className={cardTitle(isGoldenBlueCollapsed)}>
                 {t('golden.title')}
               </h3>
               <button
@@ -1216,9 +1223,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           </div>
 
           {/* Upcoming twilight times - collapsible */}
-          <div className="mt-6 pt-4 border-t border-white/20">
-            <div className="relative flex items-center justify-between mb-2 min-h-11">
-              <h3 className={SECTION_HEADING}>
+          <div className={cardSection(isTwilightCollapsed)}>
+            <div className={cardHeaderRow(isTwilightCollapsed)}>
+              <h3 className={cardTitle(isTwilightCollapsed)}>
                 {relevantTwilightTimes.type === 'dawn' ? t('twilight.dawnTitle') : t('twilight.duskTitle')}
               </h3>
               <button
@@ -1381,9 +1388,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           </div>
 
           {/* Sun position - collapsible */}
-          <div className="mt-6 pt-4 border-t border-white/20">
-            <div className="relative flex items-center justify-between mb-2 min-h-11">
-              <h3 className={SECTION_HEADING}>{t('sunPosition.title')}</h3>
+          <div className={cardSection(isSunPositionCollapsed)}>
+            <div className={cardHeaderRow(isSunPositionCollapsed)}>
+              <h3 className={cardTitle(isSunPositionCollapsed)}>{t('sunPosition.title')}</h3>
               <button
                 onClick={() => {
                   userToggledSunPositionRef.current = true;
@@ -1415,10 +1422,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           {/* Satellite tracking (ROADMAP item 97): Premium in the Play app. The ISS passes
               toggle sits next to the switch (item 154) and works with the tracking off. */}
           {onSatelliteTrackingToggle && (
-            <div className="mt-6 pt-4 border-t border-white/20">
+            // Lookbook round 2: less space after the card list, and a heading like Live planes.
+            <div className="mt-2 pt-2 border-t border-white/20">
               <div className="flex items-center justify-between gap-2 min-h-11" title={t('satellite.trackingHint')}>
-                <span className="text-caption opacity-80 inline-flex items-center gap-1">
-                  <Satellite size={14} className="mr-1" />
+                <span className={`${SECTION_HEADING} gap-1`}>
+                  <Satellite size={16} className="mr-1" />
                   {t('satellite.tracking')}
                   <PremiumBadge />
                 </span>
@@ -1466,21 +1474,23 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
           {/* Collection badges (ROADMAP item 112) */}
           {onCollectionOpen && (
-            <div className="mt-6 pt-4 border-t border-white/20">
+            <div className="mt-2 pt-2 border-t border-white/20">
+              {/* Lookbook round 2: a heading row; the whole row opens the collection. */}
               <button
                 onClick={() => { setIsCollapsed(true); onCollectionOpen?.(); }}
-                className={`flex items-center gap-2 text-caption opacity-80 hover:opacity-100 transition-opacity rounded ${TAP_TARGET} ${FOCUS_RING}`}
+                className={`${SECTION_HEADING} gap-2 w-full min-h-11 hover:opacity-80 transition-opacity rounded ${FOCUS_RING}`}
               >
-                <Award size={14} />
+                <Award size={16} />
                 {t('collection.title')}
               </button>
             </div>
           )}
 
           {/* Language (ROADMAP item 67): the same segmented style as the °C/°F toggle. */}
-          <div className="mt-6 pt-4 border-t border-white/20 flex items-center justify-between gap-2">
-            <span className="text-caption opacity-80">{t('language.label')}</span>
-            <div className="flex bg-white/10 rounded-full p-1" role="group" aria-label={t('language.label')}>
+          {/* Lookbook round 2: a heading, and the buttons on a second line. */}
+          <div className="mt-2 pt-2 border-t border-white/20">
+            <h3 className={`${SECTION_HEADING} min-h-11`}>{t('language.label')}</h3>
+            <div className="flex w-fit bg-white/10 rounded-full p-1" role="group" aria-label={t('language.label')}>
               {LANGUAGES.map((code) => (
                 <button
                   key={code}
