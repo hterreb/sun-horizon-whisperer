@@ -3463,6 +3463,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   - #21: all twilight ranges use the en dash.
 - **Checked:** new tests: `InfoPanel` (Enter with the results of the text; Enter with the results of an older text; Enter before the results, then the pick when they come; no pick when the text changed after Enter; the cursor in the place search; "–" for the fallback temperature), `SunTracker` (a new try after 60 s and one toast; an older place's answer that comes last is dropped). Each new `SunTracker` test fails without its fix. Typecheck, lint and all tests pass.
 - **Test setup notes:** five users from one IP at the same time gave Open-Meteo 503 answers (3 users) and CelesTrak 403 answers (2 users). CelesTrak answers a repeated download within 2 h with 403 and can block the IP, so run 2 answered it with an empty group (and a host-resolver rule blocked the host), and kept repeated third-party answers in a disk cache, except in the slow-3G run. Photon sometimes limited the stub, and then the app showed the coordinate fallback. The test Chrome formats native number and date fields in its own UI language (German).
+- **Follow-up (Lutz, 2026-10-19):** one PR per item, in this order: 170, 169, 173, 171, 176, 174, 175. No second persona check after them.
 
 ### 166. Google Play: the developer name and the address on the store — S (owner)
 
@@ -3509,12 +3510,13 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Check:** built site: each `/<lang>/` page loads with no CSP error, has the right `lang` and the `hreflang` links; `/` still opens the app; the service worker does not serve the app for `/<lang>/`. Lighthouse SEO audit on each page.
 - **Done when:** Search Console and Bing show the domain as verified and the sitemap as read with no errors.
 
-### 168. The moon below the horizon: a mark at the horizon — S
+### 168. The moon below the horizon: a mark at the horizon — S — **Closed: no change**
 
 - **Finding (item 165, #1):** 5 of 5 first users asked "where is the moon?" while it was below the horizon. The sky had no hint. The Moon card (closed while the moon is down) showed only "Altitude: −17.9°". Item 165 adds "· below the horizon" to that row.
 - **Spec:** while the moon is below the horizon, a pill on the horizon line at the moon's azimuth, as the sunrise and sunset pills: the `Moon` icon and the next moonrise ("rises 15:43"). A double tap opens the Moon card, as the sun (item 116). When the azimuth is outside the view (compass mode), no pill.
 - **Open:** (a) the pill at the azimuth, or one line under the time-of-day heading of the panel ("Moon below the horizon · rises 15:43")?
 - **Done when:** with the moon below the horizon, the scene shows where and when it rises; a unit test for the pill time and position.
+- **Decision (Lutz, 2026-10-19):** no change. The "· below the horizon" in the Moon card (item 165) is enough; nothing new in the sky or the panel.
 
 ### 169. A place in another time zone: its times in its own clock — M
 
@@ -3523,6 +3525,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Spec:** keep the place's zone with the place (the search result's `timezone`, or the forecast's for coordinates and a located position). Show all clock times (panel, scene pills, time travel field) in that zone with `Intl.DateTimeFormat`'s `timeZone`. When it differs from the device's zone, the panel says so under the place name ("Local time in New York, 6 h behind you").
 - **Open:** (a) the place's clock (recommended), or the device's clock with the zone label only?
 - **Done when:** a searched place in another zone shows its own sunrise and sunset clock times and the zone line; unit tests for the formatting across a date line.
+- **Decision (Lutz, 2026-10-19):** (a) the place's own clock: all times in the place's zone, and a line under the place name ("Local time · 6 h behind you").
 
 ### 170. Location denied: ask for a place, not New York — M
 
@@ -3536,6 +3539,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   5. "Use my location" while location is blocked: the toast says how to allow it in the browser, not only "Could not get your current location" (run 2, P5).
 - **Open:** (a) "Choose a place" free for this first place (no Premium gate)? (b) A "Skip" that shows New York, or no default place at all?
 - **Done when:** denied location shows "Choose a place" with no red toast; allowing location later moves the scene to it without a reload; component tests for both.
+- **Decision (Lutz, 2026-10-19):** (a) yes: "Choose a place" is free for the first place; a later change of the place stays Premium. (b) No default place: no "Skip" and no New York.
 
 ### 171. The "+" badge on a phone: what it means — S
 
@@ -3543,13 +3547,15 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Options:** (a) the first tap on a control with a badge shows a toast "Premium feature, free for now" once; (b) one line at the end of the panel: "+ Premium feature, free for now"; (c) no badges until Premium is on sale (item 16, `PREMIUM_ENFORCED`).
 - **Open:** (a), (b) or (c)?
 - **Done when:** a first user on a phone can learn what the badge means without hover.
+- **Decision (Lutz, 2026-10-19):** (a) the first tap on a control with a badge shows "Premium feature · free for now" once (kept on the device); the control still works.
 
-### 172. A single tap on the sun or another scene thing — S
+### 172. A single tap on the sun or another scene thing — S — **Closed: no change**
 
 - **Finding (item 165, #7):** 3 of 5 first users tapped the sun once and saw nothing. Only a double tap opens its card (item 116, which keeps a single sky tap for the controls of item 136).
 - **Options:** (a) a single tap on a scene thing shows a short hint at the tap point ("Double-tap for info"), the first 3 times; (b) a single tap opens the card of the sun and the moon only, and the other scene things keep the double tap.
 - **Open:** (a) or (b)?
 - **Done when:** a single tap on the sun gives a visible answer; a component test.
+- **Decision (Lutz, 2026-10-19):** no change. The double tap of item 116 stays the only way to open a scene card.
 
 ### 173. Phone: Back, a tap beside the panel, and tap targets — M
 
@@ -3559,6 +3565,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   2. Tap targets at least 44 × 44 px, with a larger hit area (padding or an `after:` element), not a larger icon.
 - **Open:** (a) a tap beside the open panel on a phone: close the panel, or keep the item 136 rule (it hides or shows the controls)?
 - **Done when:** on a 375 px phone, Back closes each open layer and a second Back leaves; no tap target under 44 px in the panel and the radio bar.
+- **Decision (Lutz, 2026-10-19):** (a) a tap on the sky beside the open panel on a phone closes the panel. With the panel closed, the item 136 rule stays.
 
 ### 174. First load on slow 3G: a smaller first bundle — M
 
@@ -3579,6 +3586,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Spec:** one line per host with what it gets, and "your IP address" for each; the Azure host under Planetary Computer; Sentry; the Live planes text names our server; §5 lists each kept item; a "Privacy" link in the panel next to Data sources. Lutz checks the text.
 - **Depends on:** item 16 (the privacy policy in five languages) uses the new text.
 - **Done when:** each host in a first-load request log of item 165's P2 is on the page with what it gets.
+- **Decision (Lutz, 2026-10-19):** Claude drafts the text and the panel link; Lutz reviews it in the PR before the merge (no auto-merge for this PR).
 
 ### 176. Launch check: small findings — S each
 
@@ -3609,6 +3617,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   24. Run 2: on an overcast desktop the sun is only a faint outline behind the clouds (P4).
   25. Run 2: at the first load in Paris the sky is clear while the panel says "Pluie faible"; the rain comes later (P4).
 - **Done when:** each line is fixed, or has a Decision line that keeps it.
+- **Decision (Lutz, 2026-10-19):** line 3: "Midday" is solar noon ± 2 h. The lines with a clear fix are built; the lines that need a design choice (1, 2, 5, 18, 24 and any other found while building) come back to Lutz with a proposal.
 
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 
