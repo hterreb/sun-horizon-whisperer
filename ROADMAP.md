@@ -3518,7 +3518,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Done when:** with the moon below the horizon, the scene shows where and when it rises; a unit test for the pill time and position.
 - **Decision (Lutz, 2026-10-19):** no change. The "· below the horizon" in the Moon card (item 165) is enough; nothing new in the sky or the panel.
 
-### 169. A place in another time zone: its times in its own clock — M
+### 169. A place in another time zone: its times in its own clock — M — **✅ Done**
 
 - **Finding (item 165, #3):** 4 of 5 first users saw the times of another place in the device's clock, with no zone: New York "Sunrise 13:12, Sunset 00:11" in Berlin, Tokyo "Sunrise 22:52", London "08:31" from Madrid. The default place after a denied location (New York, item 170) makes the first screen look broken.
 - **Now:** all times use the device's time zone. The Open-Meteo geocoding results and the forecast (`timezone=auto`) give the IANA zone of the place; the app does not read it.
@@ -3526,6 +3526,13 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Open:** (a) the place's clock (recommended), or the device's clock with the zone label only?
 - **Done when:** a searched place in another zone shows its own sunrise and sunset clock times and the zone line; unit tests for the formatting across a date line.
 - **Decision (Lutz, 2026-10-19):** (a) the place's own clock: all times in the place's zone, and a line under the place name ("Local time · 6 h behind you").
+- **Built:**
+  - `src/utils/timeZone.ts`: `isValidTimeZone`, `wallTime`, `zoneOffsetMinutes`, `fromWallTime` (two passes, for a time next to a daylight-saving change), `startOfDayIn` and `placeClockDifferenceMinutes`. `undefined` is the device's zone everywhere.
+  - The zone of a searched place comes from the Open-Meteo geocoding result (`timezone`, checked with `isValidTimeZone`) through `PlaceSearch`, `InfoPanel` and `LoadingScreen` to `SunTracker`, and `manualLocation` keeps it. A located position uses the device's zone.
+  - `SunTracker` gives the zone through the language context (`timeZone`). `formatTime` (and so the panel, the sky pills, the scene cards, the share card, the sunset and ISS reminders), the Current Time row, the moon dates, the terrain rows and the time travel field (`toDateTimeLocalValue`, `fromDateTimeLocalValue`) use it. `getMoonTimes` looks for rise and set in the place's day.
+  - Under the place name: "Local time · 6 h behind you" or "· 5 h 30 min ahead of you" when the place's clock differs from the device's. A place set by hand with no known zone (typed coordinates, or a place saved before this item) keeps the device's clock and says "Times in your time zone". New keys `common.hours`, `location.clockAhead`, `location.clockBehind`, `location.clockYours` in 5 languages.
+  - **Not changed:** the calendar and festival eggs and the midnight ghost keep the device's date and clock; the time travel range stays today ± 1 year in the device's days.
+- **Checked:** unit tests (`utils.timeZone`: offsets with daylight saving and half hours, wall time back to the moment on a change day, the place's day start, the time travel value both ways, `formatTime` in a zone, moon rise or set inside the place's day; the zone from geocoding and in storage), `InfoPanel` (the note behind, ahead with half hours, none in the device's zone, "Times in your time zone"; the clock and sunrise in New York time), `SunTracker` (a saved place with its zone: the note and the clock). Typecheck, lint and all 2121 tests pass. Browser (built app, from Ravensburg): no note at home; after a search for New York the heading says "Morning" at 09:53 New York time, the clock shows 09:53:32 (15:53:32 in Berlin), sunrise 07:12 and sunset 18:11 in the panel and the sky, and "Local time · 6 h behind you".
 
 ### 170. Location denied: ask for a place, not New York — M — **✅ Done**
 

@@ -1,4 +1,5 @@
 
+import { startOfDayIn } from './timeZone';
 import SunCalc from 'suncalc';
 import { scanMoonEvents } from './lunarEphemeris';
 import { type MessageKey } from '@/i18n';
@@ -162,10 +163,9 @@ export interface MoonTimes {
 // yesterday and sets today, or rises today and sets tomorrow). When that happens,
 // search the next day for the missing event; if it still isn't there (e.g. the next day
 // is alwaysUp/alwaysDown) leave it null so the caller can show "-" for it.
-export const getMoonTimes = (date: Date, latitude: number, longitude: number): MoonTimes => {
-  const dayStart = new Date(date);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayStartMs = dayStart.getTime();
+export const getMoonTimes = (date: Date, latitude: number, longitude: number, timeZone?: string): MoonTimes => {
+  // Item 169: the day of the place's clock (undefined: the device's).
+  const dayStartMs = startOfDayIn(date, timeZone).getTime();
   const dayEndMs = dayStartMs + 24 * 60 * 60 * 1000;
 
   const scan = scanMoonEvents(dayStartMs, dayEndMs, latitude, longitude);

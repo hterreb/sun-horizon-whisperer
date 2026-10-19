@@ -474,9 +474,9 @@ const DIRECTION_KEYS = [
 export const directionKey = (azimuth: number) => DIRECTION_KEYS[Math.round((((azimuth % 360) + 360) % 360) / 45) % 8];
 
 // "ISS visible at 20:14, from W to SE, up to 54°"
-export const getPassReminderText = (pass: SatellitePass, language: Language): string =>
+export const getPassReminderText = (pass: SatellitePass, language: Language, timeZone?: string): string =>
   translate(language, 'satellite.passReminder', {
-    time: formatTime(pass.start, language),
+    time: formatTime(pass.start, language, timeZone),
     from: translate(language, directionKey(pass.startAzimuth)),
     to: translate(language, directionKey(pass.endAzimuth)),
     elevation: Math.round(pass.maxElevation),

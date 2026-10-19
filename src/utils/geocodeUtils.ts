@@ -2,6 +2,7 @@
 // free, keyless Open-Meteo geocoding API. Pure fetch + parsing only; debouncing,
 // aborting stale requests, and rendering results are the caller's job (InfoPanel).
 
+import { isValidTimeZone } from './timeZone';
 import { type Language } from '@/utils/language';
 
 const GEOCODE_URL = 'https://geocoding-api.open-meteo.com/v1/search';
@@ -12,6 +13,8 @@ export interface GeocodeResult {
   country?: string;
   // ISO 3166-1 alpha-2 ("DE"), for the national days (ROADMAP item 130).
   countryCode?: string;
+  // IANA time zone ("Europe/Berlin"), for the place's clock times (ROADMAP item 169).
+  timeZone?: string;
   latitude: number;
   longitude: number;
 }
@@ -22,6 +25,7 @@ interface OpenMeteoGeocodeResponse {
     admin1?: unknown;
     country?: unknown;
     country_code?: unknown;
+    timezone?: unknown;
     latitude?: unknown;
     longitude?: unknown;
   }>;
@@ -57,6 +61,7 @@ export const searchPlaces = async (
       admin1: typeof r.admin1 === 'string' ? r.admin1 : undefined,
       country: typeof r.country === 'string' ? r.country : undefined,
       countryCode: typeof r.country_code === 'string' && /^[A-Z]{2}$/i.test(r.country_code) ? r.country_code.toUpperCase() : undefined,
+      timeZone: isValidTimeZone(r.timezone) ? r.timezone : undefined,
       latitude: typeof r.latitude === 'number' ? r.latitude : NaN,
       longitude: typeof r.longitude === 'number' ? r.longitude : NaN,
     }))

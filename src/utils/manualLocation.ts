@@ -1,6 +1,7 @@
 // Persists a user-chosen manual location (A-4) so it survives a reload and is
 // preferred over the New York fallback. Mirrors the try/catch-wrapped
 // localStorage pattern already used for the weather cache in weatherUtils.ts.
+import { isValidTimeZone } from './timeZone';
 
 export interface ManualLocation {
   latitude: number;
@@ -10,6 +11,8 @@ export interface ManualLocation {
   name?: string;
   // The searched place's country code (ROADMAP item 130), for the national days.
   countryCode?: string;
+  // The searched place's IANA time zone (ROADMAP item 169), for its clock times.
+  timeZone?: string;
 }
 
 const STORAGE_KEY = 'manual-location';
@@ -26,7 +29,7 @@ export const loadManualLocation = (): ManualLocation | null => {
     if (!raw) return null;
 
     const parsed = JSON.parse(raw);
-    const { latitude, longitude, name, countryCode } = parsed ?? {};
+    const { latitude, longitude, name, countryCode, timeZone } = parsed ?? {};
     if (
       typeof latitude === 'number' &&
       typeof longitude === 'number' &&
@@ -34,9 +37,13 @@ export const loadManualLocation = (): ManualLocation | null => {
       isValidLongitude(longitude)
     ) {
       if (typeof name !== 'string' || name.length === 0) return { latitude, longitude };
-      return typeof countryCode === 'string' && /^[A-Z]{2}$/.test(countryCode)
-        ? { latitude, longitude, name, countryCode }
-        : { latitude, longitude, name };
+      return {
+        latitude,
+        longitude,
+        name,
+        ...(typeof countryCode === 'string' && /^[A-Z]{2}$/.test(countryCode) ? { countryCode } : {}),
+        ...(isValidTimeZone(timeZone) ? { timeZone } : {}),
+      };
     }
     return null;
   } catch (error) {
@@ -45,9 +52,9 @@ export const loadManualLocation = (): ManualLocation | null => {
   }
 };
 
-export const saveManualLocation = (latitude: number, longitude: number, name?: string, countryCode?: string): void => {
+export const saveManualLocation = (latitude: number, longitude: number, name?: string, countryCode?: string, timeZone?: string): void => {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ latitude, longitude, name, countryCode }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ latitude, longitude, name, countryCode, timeZone }));
   } catch (error) {
     console.error('Error saving manual location:', error);
   }

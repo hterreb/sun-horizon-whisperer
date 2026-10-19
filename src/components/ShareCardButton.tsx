@@ -21,13 +21,13 @@ interface ShareCardButtonProps {
 const ShareCardButton: React.FC<ShareCardButtonProps> = ({ card, latitude, longitude, horizonProfile, className = '' }) => {
   const [isBusy, setIsBusy] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const { t, language } = useLanguage();
+  const { t, language, timeZone } = useLanguage();
   const { requirePremium } = usePremiumGate();
 
   const handleClick = async () => {
     setIsBusy(true);
     try {
-      const data = getShareCardData(card, language);
+      const data = getShareCardData(card, language, timeZone);
       const root = buttonRef.current?.closest<HTMLElement>('[data-share-root]');
       let blob: Blob;
       let fileName = data.viewFileName;

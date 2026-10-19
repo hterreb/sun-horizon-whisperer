@@ -207,6 +207,12 @@ const SunTracker: React.FC = () => {
   const [manualCountry, setManualCountry] = useState<string | null>(
     () => loadManualLocation()?.countryCode ?? null
   );
+  // Item 169: the searched place's time zone (Open-Meteo). Clock times use it; a located
+  // position or a place with no known zone uses the device's zone (undefined).
+  const [manualTimeZone, setManualTimeZone] = useState<string | null>(
+    () => loadManualLocation()?.timeZone ?? null
+  );
+  const placeTimeZone = isManualLocation ? manualTimeZone ?? undefined : undefined;
   // Time travel (ROADMAP item 44): the one time source. `date` is always
   // `Date.now() + timeOffsetMs`; 0 is live. Play moves the offset (-1 back, 1 forward).
   const [timeOffsetMs, setTimeOffsetMs] = useState(0);
@@ -245,7 +251,7 @@ const SunTracker: React.FC = () => {
     }, () => {});
   }, []);
   const t = useCallback<Translate>((key, vars) => translate(language, key, vars), [language]);
-  const languageContext = useMemo(() => ({ language, setLanguage, t }), [language, setLanguage, t]);
+  const languageContext = useMemo(() => ({ language, setLanguage, t, timeZone: placeTimeZone }), [language, setLanguage, t, placeTimeZone]);
   // Premium (ROADMAP item 14): given to the components below through PremiumContext.
   // Line of sight is off while Premium is locked.
   const premium = usePremium(language);
@@ -673,13 +679,14 @@ const SunTracker: React.FC = () => {
 
   // Manual location form (InfoPanel): validated lat/lon submitted by the user, or a
   // place selected from search (in which case `name` is set alongside the coordinates).
-  const handleLocationChange = useCallback((latitude: number, longitude: number, name?: string, countryCode?: string) => {
+  const handleLocationChange = useCallback((latitude: number, longitude: number, name?: string, countryCode?: string, timeZone?: string) => {
     locationChosenRef.current = true;
     setIsManualLocation(true);
     setLocation({ latitude, longitude, loaded: true });
     setManualPlaceName(name ?? null);
     setManualCountry(name ? countryCode ?? null : null);
-    saveManualLocation(latitude, longitude, name, name ? countryCode : undefined);
+    setManualTimeZone(name ? timeZone ?? null : null);
+    saveManualLocation(latitude, longitude, name, name ? countryCode : undefined, name ? timeZone : undefined);
   }, []);
 
   // "Use my location" inside the manual form: re-requests geolocation and, on
@@ -700,6 +707,7 @@ const SunTracker: React.FC = () => {
         setIsManualLocation(false);
         setManualPlaceName(null);
         setManualCountry(null);
+        setManualTimeZone(null);
         setLocation({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
@@ -773,12 +781,12 @@ const SunTracker: React.FC = () => {
     return {
       sunPath: getSunPathAround(date, location.latitude, location.longitude),
       moonPath: getMoonPathAround(date, location.latitude, location.longitude),
-      moonTimes: getMoonTimes(date, location.latitude, location.longitude),
+      moonTimes: getMoonTimes(date, location.latitude, location.longitude, placeTimeZone),
       nextFullMoon: getNextFullMoon(date),
       nextNewMoon: getNextNewMoon(date),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on moonHourKey (the hour), not `date` itself
-  }, [moonHourKey, location.loaded, location.latitude, location.longitude]);
+  }, [moonHourKey, location.loaded, location.latitude, location.longitude, placeTimeZone]);
 
   // Item 156: the sun's pass stays until the line-of-sight sunset of the solar day is over
   // (findSunPass), so it is computed for that day here, not for the pass day below.
@@ -1138,7 +1146,7 @@ const SunTracker: React.FC = () => {
       console.error('Error saving sunset reminder:', error);
     }
   }, [isReminderOn, t]);
-  useSunsetReminder(countdownTarget?.time ?? null, isReminderOn && !isTimePreview, language);
+  useSunsetReminder(countdownTarget?.time ?? null, isReminderOn && !isTimePreview, language, placeTimeZone);
 
   // Satellite tracking (ROADMAP item 97): on by default; Premium in the Play app (item 45).
   // It sends no place: the CelesTrak data is global.
@@ -1204,7 +1212,7 @@ const SunTracker: React.FC = () => {
     sunPosition.altitude,
     isPassReminderOn
   );
-  useSatellitePassReminder(satelliteTracking.issPass, isPassReminderOn, language);
+  useSatellitePassReminder(satelliteTracking.issPass, isPassReminderOn, language, placeTimeZone);
   // Item 164: the status for the panel and the Sentry tag `satellites`, set only when it changes
   // (as `live-planes`): `off` while the tracking does not run; in `ok-<n>`, n is the visible
   // satellites in the hook's sky (the scene can draw fewer: terrain, clouds).
@@ -1361,6 +1369,7 @@ const SunTracker: React.FC = () => {
   // The open info card's content (item 95); its rarity tier also colours the ring (item 107).
   const infoCardInfo = infoCard && location.loaded ? getSceneInfo(infoCard.target, {
     language,
+    timeZone: placeTimeZone,
     now: date,
     timeOfDay,
     sceneSunTimes: sunTimes,
@@ -1518,6 +1527,7 @@ const SunTracker: React.FC = () => {
             location={location}
             manualPlaceName={manualPlaceName}
             isChosenPoint={isManualLocation && !manualPlaceName}
+            isPlaceZoneUnknown={isManualLocation && !manualTimeZone}
             onPlaceName={setPlaceName}
             timeOfDay={timeOfDay}
             currentTime={date}

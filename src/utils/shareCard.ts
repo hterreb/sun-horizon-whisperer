@@ -61,9 +61,9 @@ export const getShareCardData = ({
   terrainSunset,
   scoreToday = null,
   scoreTomorrow = null,
-}: ShareCardInput, language: Language): ShareCardData => {
+}: ShareCardInput, language: Language, timeZone?: string): ShareCardData => {
   const hasProfile = terrainSunset !== undefined;
-  const flatTime = formatTime(flatSunset, language);
+  const flatTime = formatTime(flatSunset, language, timeZone);
   let timeLabel = translate(language, 'sun.sunset');
   let timeText = flatTime;
   let flatText: string | null = null;
@@ -72,7 +72,7 @@ export const getShareCardData = ({
     timeLabel = translate(language, 'share.lineOfSight');
     if (terrainSunset) {
       const diff = Math.round((terrainSunset.getTime() - flatSunset.getTime()) / 60000);
-      timeText = formatTime(terrainSunset, language);
+      timeText = formatTime(terrainSunset, language, timeZone);
       flatText += ` (${diff >= 0 ? '+' : '−'}${translate(language, 'common.minutes', { value: Math.abs(diff) })})`;
     } else {
       timeText = translate(language, 'terrain.behind');
@@ -84,14 +84,14 @@ export const getShareCardData = ({
 
   return {
     placeName: placeName?.trim() || null,
-    dateText: flatSunset.toLocaleDateString(language, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
+    dateText: flatSunset.toLocaleDateString(language, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone }),
     timeLabel,
     timeText,
     flatText,
     scoreText: score ? translate(language, 'share.score', { score: score.score, reason: getScoreReason(score, language) }) : null,
     sunTime: terrainSunset ?? flatSunset,
     fileName: `sun-chaser-sunset-${flatSunset.getFullYear()}-${pad(flatSunset.getMonth() + 1)}-${pad(flatSunset.getDate())}.png`,
-    viewText: `${now.toLocaleDateString(language, { day: 'numeric', month: 'long', year: 'numeric' })}, ${formatTime(now, language)}`,
+    viewText: `${now.toLocaleDateString(language, { day: 'numeric', month: 'long', year: 'numeric', timeZone })}, ${formatTime(now, language, timeZone)}`,
     viewFileName: `sun-chaser-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}.png`,
   };
 };

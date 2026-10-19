@@ -4,7 +4,7 @@ import { FOCUS_RING } from './InfoPanel';
 import { useLanguage } from '@/hooks/useLanguage';
 
 interface PlaceSearchProps {
-  onSelect: (latitude: number, longitude: number, name: string, countryCode?: string) => void;
+  onSelect: (latitude: number, longitude: number, name: string, countryCode?: string, timeZone?: string) => void;
   autoFocus?: boolean;
 }
 
@@ -55,7 +55,7 @@ const PlaceSearch: React.FC<PlaceSearchProps> = ({ onSelect, autoFocus }) => {
           const first = results[0];
           if (enterPendingRef.current && first) {
             enterPendingRef.current = false;
-            onSelectRef.current(first.latitude, first.longitude, formatGeocodeResultLabel(first), first.countryCode);
+            onSelectRef.current(first.latitude, first.longitude, formatGeocodeResultLabel(first), first.countryCode, first.timeZone);
           }
         })
         .catch((error) => {
@@ -94,7 +94,7 @@ const PlaceSearch: React.FC<PlaceSearchProps> = ({ onSelect, autoFocus }) => {
           // and drop the search.
           e.preventDefault();
           const first = resultsFor === placeQuery.trim() ? placeResults[0] : undefined;
-          if (first) onSelect(first.latitude, first.longitude, formatGeocodeResultLabel(first), first.countryCode);
+          if (first) onSelect(first.latitude, first.longitude, formatGeocodeResultLabel(first), first.countryCode, first.timeZone);
           else enterPendingRef.current = placeQuery.trim().length >= 2;
         }}
         placeholder={t('search.placeholder')}
@@ -127,7 +127,7 @@ const PlaceSearch: React.FC<PlaceSearchProps> = ({ onSelect, autoFocus }) => {
                 type="button"
                 role="option"
                 aria-selected={false}
-                onClick={() => onSelect(result.latitude, result.longitude, formatGeocodeResultLabel(result), result.countryCode)}
+                onClick={() => onSelect(result.latitude, result.longitude, formatGeocodeResultLabel(result), result.countryCode, result.timeZone)}
                 className={`w-full text-left px-2 py-1 rounded bg-white/5 hover:bg-white/20 transition-colors ${FOCUS_RING}`}
               >
                 {formatGeocodeResultLabel(result)}

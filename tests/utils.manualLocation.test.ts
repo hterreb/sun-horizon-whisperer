@@ -65,6 +65,13 @@ describe('manualLocation', () => {
       expect(loadManualLocation()).toEqual({ latitude: 41.9, longitude: 12.5, name: 'Roma' });
     });
 
+    it('round-trips the time zone of a searched place (item 169), and drops an unknown one', () => {
+      saveManualLocation(40.71, -74.01, 'New York', 'US', 'America/New_York');
+      expect(loadManualLocation()).toEqual({ latitude: 40.71, longitude: -74.01, name: 'New York', countryCode: 'US', timeZone: 'America/New_York' });
+      localStorage.setItem('manual-location', JSON.stringify({ latitude: 1, longitude: 2, name: 'X', timeZone: 'Mars/Olympus' }));
+      expect(loadManualLocation()).toEqual({ latitude: 1, longitude: 2, name: 'X' });
+    });
+
     it('clears the stored location', () => {
       saveManualLocation(1, 2);
       clearManualLocation();
