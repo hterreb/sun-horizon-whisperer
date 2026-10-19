@@ -97,6 +97,85 @@ describe('Satellites (ROADMAP item 97)', () => {
     expect(screen.getByTestId('satellite-tracked').style.transition).not.toContain('transform');
   });
 
+  it('steps across the edge of the 360° view with no move transition, and moves the next step again (item 162)', () => {
+    // North is at both edges: the satellite crosses north from x 380 to x 5 on a 390 px screen.
+    const at = (x: number, otherX: number): SatelliteDot[] => [{ ...iss, x }, { ...iss, id: 2, name: 'COSMOS 2000', x: otherX, magnitude: 3 }];
+    const scene = (dots: SatelliteDot[], ring: string | null = null) => (
+      <React.StrictMode>
+        <Satellites {...base} tracked={dots} gapMs={null} infoRing={ring} />
+      </React.StrictMode>
+    );
+    const dot = () => screen.getByRole('button', { name: 'ISS (ZARYA)' });
+    const other = () => screen.getByRole('button', { name: 'COSMOS 2000' });
+    const { rerender } = render(scene(at(370, 200)));
+    rerender(scene(at(380, 201)));
+    expect(dot().style.transition).toContain('transform 1000ms linear');
+    const across = at(5, 202);
+    rerender(scene(across));
+    expect(dot().style.transform).toBe('translate(-17px, 28px)');
+    expect(dot().style.transition).not.toContain('transform');
+    expect(dot().style.transition).toContain('opacity 5000ms');
+    expect(dot().style.opacity).toBe('1');
+    // Only the dot at the edge: the other one moves on.
+    expect(other().style.transition).toContain('transform 1000ms linear');
+    // A second render of the same update (a ring) gives the same result.
+    rerender(scene(across, 'satellite-2'));
+    expect(dot().style.transition).not.toContain('transform');
+    // The next step moves with the transition again.
+    rerender(scene(at(7, 203)));
+    expect(dot().style.transform).toBe('translate(-15px, 28px)');
+    expect(dot().style.transition).toContain('transform 1000ms linear');
+  });
+
+  it('steps across the edge also in the time play', () => {
+    const { rerender } = render(<Satellites {...base} stepMs={100} tracked={[{ ...iss, x: 10 }]} gapMs={null} />);
+    rerender(<Satellites {...base} stepMs={100} tracked={[{ ...iss, x: 385 }]} gapMs={null} />);
+    expect(screen.getByTestId('satellite-tracked').style.transition).not.toContain('transform');
+    rerender(<Satellites {...base} stepMs={100} tracked={[{ ...iss, x: 360 }]} gapMs={null} />);
+    expect(screen.getByTestId('satellite-tracked').style.transition).toContain('transform 100ms linear');
+  });
+
+  it('shows at most 8 tracked dots, the brightest first, and keeps a shown dot (item 162)', () => {
+    // 10 dots: id 1 is the brightest; ids 9 and 10 wait for a place.
+    const dots = Array.from({ length: 10 }, (_, i): SatelliteDot => ({
+      id: i + 1, name: `SAT ${i + 1}`, x: 20 + i * 30, y: 100, opacity: 0.9, shown: true, magnitude: 1 + i * 0.3,
+    }));
+    const scene = (list: SatelliteDot[]) => (
+      <React.StrictMode>
+        <Satellites {...base} tracked={list} gapMs={null} />
+      </React.StrictMode>
+    );
+    const shownNames = () => screen.getAllByTestId('satellite-tracked')
+      .filter((el) => el.style.opacity !== '0')
+      .map((el) => el.getAttribute('aria-label'));
+    const { rerender } = render(scene(dots));
+    expect(shownNames()).toEqual(['SAT 1', 'SAT 2', 'SAT 3', 'SAT 4', 'SAT 5', 'SAT 6', 'SAT 7', 'SAT 8']);
+    const waiting = screen.getByRole('button', { name: 'SAT 9' });
+    expect(waiting.className).not.toContain('pointer-events-auto');
+    expect(waiting.tabIndex).toBe(-1);
+    // A brighter dot rises: no shown dot is swapped out.
+    const bright: SatelliteDot = { id: 11, name: 'SAT 11', x: 50, y: 60, opacity: 1, shown: true, magnitude: -1 };
+    rerender(scene([...dots.map((d) => ({ ...d, x: d.x + 1 })), bright]));
+    expect(shownNames()).toEqual(['SAT 1', 'SAT 2', 'SAT 3', 'SAT 4', 'SAT 5', 'SAT 6', 'SAT 7', 'SAT 8']);
+    // SAT 3 goes into the Earth's shadow: it fades out, and the brightest waiting dot takes its place.
+    rerender(scene([...dots.map((d) => ({ ...d, x: d.x + 2, shown: d.id !== 3 })), bright]));
+    expect(shownNames()).toEqual(['SAT 1', 'SAT 2', 'SAT 4', 'SAT 5', 'SAT 6', 'SAT 7', 'SAT 8', 'SAT 11']);
+    const came = screen.getByRole('button', { name: 'SAT 11' });
+    expect(came.style.opacity).toBe('1');
+    expect(came.style.transition).toContain('opacity 5000ms');
+    expect(came.className).toContain('pointer-events-auto');
+  });
+
+  it('gives no place to a dot behind a cloud (item 135), so a dot in a gap shows', () => {
+    // At a cloud factor of 0.4 a gap above 0.5 is behind the cloud; the ISS (0.06) is in a gap.
+    const behind = Array.from({ length: 40 }, (_, i): SatelliteDot => ({ ...iss, id: i + 1, name: `SAT ${i + 1}`, magnitude: -5 }))
+      .filter((d) => (d.id * 0.6180339887) % 1 > 0.5)
+      .slice(0, 8);
+    expect(behind).toHaveLength(8);
+    render(<Satellites {...base} cloudFactor={0.4} tracked={[...behind, iss]} gapMs={null} />);
+    expect(screen.getByRole('button', { name: 'ISS (ZARYA)' }).style.opacity).toBe('1');
+  });
+
   it('with reduced motion: tracked dots step without a transition, and no decorative dots', () => {
     setReducedMotion(true);
     vi.useFakeTimers();
