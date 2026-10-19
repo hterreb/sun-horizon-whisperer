@@ -2326,6 +2326,53 @@ describe('SunTracker', () => {
       }
     });
   });
+  describe('weather after a failure or a place change (ROADMAP item 165)', () => {
+    const forecastUrls = () =>
+      vi.mocked(fetch).mock.calls.map(([url]) => String(url)).filter((url) => url.includes('api.open-meteo.com/v1/forecast'));
+    const weatherToasts = () => vi.mocked(toast).mock.calls.filter(([arg]) => arg.title === 'Weather unavailable');
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('tries a failed weather answer again after a minute, with one toast for the first failure', async () => {
+      vi.useFakeTimers();
+      saveManualLocation(47.78, 9.61, 'Ravensburg');
+      render(<SunTracker />);
+      await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+      expect(forecastUrls()).toHaveLength(1);
+      expect(weatherToasts()).toHaveLength(1);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(59_000); });
+      expect(forecastUrls()).toHaveLength(1);
+      await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+      expect(forecastUrls()).toHaveLength(2);
+      expect(weatherToasts()).toHaveLength(1);
+    });
+
+    it('drops the previous place\'s weather when it arrives after the new place\'s weather', async () => {
+      let answerRavensburg: (response: unknown) => void = () => {};
+      const answer = (temperature: number) => ({ ok: true, json: () => Promise.resolve({ current: { temperature_2m: temperature, weather_code: 0 } }) });
+      global.fetch = vi.fn((url: string) => {
+        if (!String(url).includes('api.open-meteo.com/v1/forecast')) return Promise.reject(new Error('offline'));
+        if (String(url).includes('latitude=47.78')) return new Promise((resolve) => { answerRavensburg = resolve; });
+        return Promise.resolve(answer(30));
+      }) as unknown as typeof fetch;
+      saveManualLocation(47.78, 9.61, 'Ravensburg');
+      render(<SunTracker />);
+      await waitFor(() => expect(forecastUrls()).toHaveLength(1));
+
+      fireEvent.click(screen.getByRole('button', { name: /change location/i }));
+      fireEvent.change(screen.getByLabelText(/latitude/i), { target: { value: '53.55' } });
+      fireEvent.change(screen.getByLabelText(/longitude/i), { target: { value: '9.99' } });
+      fireEvent.click(screen.getByRole('button', { name: /set location/i }));
+      await screen.findByText('86°F');
+
+      await act(async () => { answerRavensburg(answer(-5)); });
+      expect(screen.getByText('86°F')).toBeInTheDocument();
+      expect(screen.queryByText('23°F')).not.toBeInTheDocument();
+    });
+  });
 });
 
 // National days (utils/nationalDays): the country comes from InfoPanel's reverse-geocode answer.
@@ -2431,4 +2478,5 @@ describe('SunTracker national days', () => {
     await waitFor(() => expect(screen.getByTestId('national-jets')).toBeInTheDocument());
     expect(localStorage.getItem('collection')).toBeNull();
   });
+
 });

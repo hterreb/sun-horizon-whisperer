@@ -38,7 +38,10 @@
   </head>
 
   <body>
-    <div id="root"></div>
+    <!-- Item 165: the loading screen's mark (LoadingScreen.tsx) before the script arrives, in
+         the first frame of its rise (sun still under the water), so a slow connection shows
+         the app at once. React replaces it on its first render. -->
+    <div id="root"><div style="position:fixed;inset:0;background:#0F1016"><svg viewBox="0 0 120 120" width="136" height="136" aria-hidden="true" style="position:absolute;left:50%;top:calc(36% - 68px);margin-left:-68px"><defs><clipPath id="boot-mark-clip"><circle cx="60" cy="60" r="58"/></clipPath><linearGradient id="boot-mark-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5A4A8C"/><stop offset=".55" stop-color="#F97316"/><stop offset="1" stop-color="#FEC6A1"/></linearGradient></defs><g clip-path="url(#boot-mark-clip)"><rect width="120" height="84" fill="url(#boot-mark-sky)"/><rect y="84" width="120" height="36" fill="#0EA5E9"/></g><circle cx="60" cy="60" r="58" fill="none" stroke-width="2" stroke="#FEC6A1" stroke-opacity=".35"/></svg></div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

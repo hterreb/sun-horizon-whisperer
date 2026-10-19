@@ -530,6 +530,9 @@ describe('InfoPanel', () => {
 
       expect(screen.queryByText(/updated:/i)).not.toBeInTheDocument();
       expect(screen.getByText(/real weather unavailable/i)).toBeInTheDocument();
+      // Item 165: no fallback temperature that reads as real.
+      expect(screen.queryByText('10°C')).not.toBeInTheDocument();
+      expect(screen.getByText('–')).toBeInTheDocument();
       expect(screen.getByLabelText(/refresh weather/i)).toBeInTheDocument();
     });
   });
@@ -585,7 +588,8 @@ describe('InfoPanel', () => {
       const lonField = screen.getByLabelText(/longitude/i) as HTMLInputElement;
       expect(latField).toHaveValue(12.3456);
       expect(lonField).toHaveValue(-65.4321);
-      expect(latField).toHaveFocus();
+      // Item 165: the cursor starts in the place search, not in the latitude field.
+      expect(screen.getByLabelText(/search for a place/i)).toHaveFocus();
 
       fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
       expect(screen.queryByLabelText(/latitude/i)).not.toBeInTheDocument();
@@ -721,6 +725,53 @@ describe('InfoPanel', () => {
       expect(onLocationChange).toHaveBeenCalledWith(47.65, 9.48, 'Friedrichshafen, Baden-Württemberg, Germany', 'DE');
       // Selecting a result closes the form, like submitting or "Use my location" do.
       expect(screen.queryByLabelText(/search for a place/i)).not.toBeInTheDocument();
+    });
+
+    it('Enter picks the first result of the typed text, and never submits the coordinates (ROADMAP 165)', async () => {
+      vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ results: [{ name: 'Hamburg', country: 'Germany', country_code: 'DE', latitude: 53.55, longitude: 9.99 }] }),
+      })));
+      const onLocationChange = vi.fn();
+      render(<InfoPanel {...defaultProps} manualPlaceName="Somewhere Else" onLocationChange={onLocationChange} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /change location/i }));
+      const searchInput = screen.getByLabelText(/search for a place/i);
+      fireEvent.change(searchInput, { target: { value: 'Hamburg' } });
+      await screen.findByRole('option', { name: 'Hamburg, Germany' });
+      // Results of an older text: Enter does not pick them; it waits for the results of the new text.
+      fireEvent.change(searchInput, { target: { value: 'Hamburg-Altona' } });
+      fireEvent.keyDown(searchInput, { key: 'Enter' });
+      expect(onLocationChange).not.toHaveBeenCalled();
+      expect(screen.getByLabelText(/search for a place/i)).toBeInTheDocument();
+      // Text changed after Enter: no pick when those results come.
+      fireEvent.change(searchInput, { target: { value: 'Hamburg-Alton' } });
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      expect(onLocationChange).not.toHaveBeenCalled();
+
+      // Enter before the results of this text: the first result is picked when they come.
+      fireEvent.change(searchInput, { target: { value: 'Hamburg' } });
+      fireEvent.keyDown(searchInput, { key: 'Enter' });
+      expect(onLocationChange).not.toHaveBeenCalled();
+      await waitFor(() => expect(onLocationChange).toHaveBeenCalledWith(53.55, 9.99, 'Hamburg, Germany', 'DE'), { timeout: 2000 });
+      expect(onLocationChange).toHaveBeenCalledTimes(1);
+      expect(screen.queryByLabelText(/search for a place/i)).not.toBeInTheDocument();
+    });
+
+    it('Enter with the results of the typed text picks the first one at once (ROADMAP 165)', async () => {
+      vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ results: [{ name: 'Hamburg', country: 'Germany', country_code: 'DE', latitude: 53.55, longitude: 9.99 }] }),
+      })));
+      const onLocationChange = vi.fn();
+      render(<InfoPanel {...defaultProps} manualPlaceName="Somewhere Else" onLocationChange={onLocationChange} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /change location/i }));
+      const searchInput = screen.getByLabelText(/search for a place/i);
+      fireEvent.change(searchInput, { target: { value: 'Hamburg' } });
+      await screen.findByRole('option', { name: 'Hamburg, Germany' });
+      fireEvent.keyDown(searchInput, { key: 'Enter' });
+      expect(onLocationChange).toHaveBeenCalledWith(53.55, 9.99, 'Hamburg, Germany', 'DE');
     });
 
     it('shows "No results" for an empty response and an error state for a failed request', async () => {

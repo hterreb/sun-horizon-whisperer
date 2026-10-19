@@ -178,6 +178,7 @@ export const de: Record<keyof typeof en, string> = {
   'moon.set': "Monduntergang",
   'moon.upAllDay': "Ganztags am Himmel",
   'moon.downAllDay': "Ganztags nicht zu sehen",
+  'moon.belowHorizon': "unter dem Horizont",
   'moon.nextFull': "Nächster Vollmond:",
   'moon.nextNew': "Nächster Neumond:",
   'moonPhase.new': "Neumond",
@@ -651,7 +652,7 @@ export const de: Record<keyof typeof en, string> = {
 
   // Toasts from SunTracker
   'toast.weatherUnavailableTitle': "Wetter nicht verfügbar",
-  'toast.weatherUnavailableDescription': "Standardwetter wird verwendet. Prüfe deine Verbindung.",
+  'toast.weatherUnavailableDescription': "Standardwetter wird angezeigt. Neuer Versuch in einer Minute.",
   'toast.weatherFailedTitle': "Wetterabruf fehlgeschlagen",
   'toast.weatherFailedDescription': "Die aktuellen Wetterdaten konnten nicht geladen werden.",
   'toast.geolocationUnsupportedTitle': "Standortbestimmung nicht unterstützt",

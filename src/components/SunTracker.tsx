@@ -502,9 +502,14 @@ const SunTracker: React.FC = () => {
     applyTimeOffset(0);
   }, [applyTimeOffset]);
 
-  const fetchWeatherData = useCallback(async () => {
+  // Item 165: the number of the latest weather request. An older place's answer that
+  // arrives later is dropped, or it would stay until the next 30-minute refresh.
+  const weatherRequestRef = React.useRef(0);
+  const fetchWeatherData = useCallback(async (isRetry = false) => {
     if (!location.loaded) return;
 
+    const request = ++weatherRequestRef.current;
+    const isLatest = () => request === weatherRequestRef.current;
     setIsLoadingWeather(true);
     try {
       // Sunset score (ROADMAP item 11) needs today's and tomorrow's sunset time.
@@ -523,6 +528,7 @@ const SunTracker: React.FC = () => {
         todaySunTimes.sunset,
         tomorrowSunTimes.sunset
       );
+      if (!isLatest()) return;
       setWeatherData(weather);
 
       if (useRealWeather) {
@@ -530,8 +536,9 @@ const SunTracker: React.FC = () => {
       }
 
       // Only surface a toast when the refresh actually failed; a successful
-      // refresh (every 30 min, or a cache hit) should stay silent.
-      if (!weather.isRealWeather) {
+      // refresh (every 30 min, or a cache hit) should stay silent. A retry that fails
+      // again stays silent too: the first toast already said it tries again.
+      if (!weather.isRealWeather && !isRetry) {
         toast({
           title: t('toast.weatherUnavailableTitle'),
           description: t('toast.weatherUnavailableDescription'),
@@ -539,6 +546,7 @@ const SunTracker: React.FC = () => {
         });
       }
     } catch (error) {
+      if (!isLatest()) return;
       console.error('[SunTracker Debug] Error fetching weather:', error);
       toast({
         title: t('toast.weatherFailedTitle'),
@@ -546,7 +554,7 @@ const SunTracker: React.FC = () => {
         variant: "destructive"
       });
     } finally {
-      setIsLoadingWeather(false);
+      if (isLatest()) setIsLoadingWeather(false);
     }
   }, [location.loaded, location.latitude, location.longitude, useRealWeather, t]);
 
@@ -563,6 +571,17 @@ const SunTracker: React.FC = () => {
 
     return () => clearTimeout(timeoutId);
   }, [location.loaded, useRealWeather, fetchWeatherData]);
+
+  // Item 165: a failed weather answer (a 503, a dropped connection) tries again each
+  // minute, not only at the 30-minute refresh. Each failed answer is a new object, so the
+  // timer starts again after each try.
+  // ponytail: no back-off; one small request a minute until it works.
+  const isWeatherFailed = useRealWeather && liveWeatherData?.isRealWeather === false;
+  useEffect(() => {
+    if (!isWeatherFailed) return;
+    const retryTimer = setTimeout(() => fetchWeatherData(true), 60_000);
+    return () => clearTimeout(retryTimer);
+  }, [isWeatherFailed, liveWeatherData, fetchWeatherData]);
 
   // Auto-refresh weather every 30 minutes
   useEffect(() => {
