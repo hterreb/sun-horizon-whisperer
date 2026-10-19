@@ -3371,6 +3371,70 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Open:** (a) Satellite refresh: R-a or R-b? (b) Option 6, the red dot on the closed panel? (c) A missing night catalogue only (the groups work): `ok`, or a status of its own?
 - **Decision (Lutz, 2026-10-19):** (a) R-a, the 2 h wait stays. (b) Yes, option 6. (c) Not decided: a missing night catalogue alone stays `ok`.
 
+### 165. Launch check: five first-time users in a real browser — M
+
+- **Request (Lutz, 2026-10-19):** from an [X post](https://x.com/RoundtableSpace/status/2111717667228770611) (2026-10-18): before the launch, five sub-agents use the app as five different first-time users. Real first users do not say why they leave.
+- **Now:** the [Verification](#verification-2026-09-28) and the visual review check each item against its spec. No check follows a new user from the first load.
+- **Spec:**
+  1. Five sub-agents open the built app (`vite preview`) in Playwright, each as one user:
+     - **P1 Impatient:** skims, taps the first thing that looks like a button, and stops at the first error or long wait. Denies location.
+     - **P2 Skeptic:** reads the privacy page and the data sources (item 153) before it allows location. Compares the network requests with the privacy page.
+     - **P3 Mobile:** 375 × 667, touch, slow 3G and a 4× slower CPU (Chrome DevTools). Notes the time to the first sky.
+     - **P4 Non-native speaker:** browser language `pt` (the app falls back to `en`), then `de`, `es`, `it` and `fr`. Follows only what the UI says. Notes cut or overflowing text, and English text in another language.
+     - **P5 Breaker:** junk and very long text in the place search, back during a flow, double and triple taps, a rotation, offline during use, location denied and then allowed.
+  2. The goal of each user: from the first load to the first success, which is the sun and the moon at the right place for the user's location or a searched place, and one card opened by a tap.
+  3. Each user takes a screenshot at each point where it is confused, stuck or annoyed, with one line of text.
+  4. Each run routes `**/api.bigdatacloud.net/**` to a stub before the app loads (BigDataCloud bans the IP, see CLAUDE.md). The other hosts stay live.
+  5. One list of findings, ranked by the number of users that hit each one, with the screenshots, goes into this item. A finding of size S is fixed here. A larger finding gets its own item.
+  6. After the fixes, the five users run again.
+- **Depends on:** none. Do it before the production release (item 16).
+- **Done when:** the ranked list is in this item, each finding is fixed or has its own item, and the second run does not find the fixed findings again.
+
+### 166. Google Play: the developer name and the address on the store — S (owner)
+
+- **Request (Lutz, 2026-10-19):** from an [X post](https://x.com/MaxHirsch13/status/2111623992692138313) (2026-10-18): a personal name under the app looks like an amateur's app. The question: can the name and the address stay off the store?
+- **Research (2026-10-19, Play Console help: [account types](https://support.google.com/googleplay/android-developer/answer/13634885), [required information](https://support.google.com/googleplay/android-developer/answer/13628312), [account information](https://support.google.com/googleplay/android-developer/answer/13634081)):**
+  - **Personal account:** Play shows the legal name, the country and the developer e-mail. An account that monetizes (a paid app or in-app purchases) also shows the full legal address. Google checks this address with documents, so an address service cannot replace the home address.
+  - **Organization account:** Play shows the organization name and address (they must agree with the D-U-N-S record), a developer phone and a developer e-mail. It needs a D-U-N-S number (free). It has no closed test with 12 testers for 14 days.
+  - The developer name is free text for both account types (Play reviews a change).
+- **Now:** the Sun Chaser Play account is a personal account. Premium (items 14 and 45) uses Play Billing, so Play shows the home address when Premium goes on sale. The address service of item 16 step 2 is for the privacy page, not for the Play listing.
+- **Options:**
+
+  | Option | Name on Play | Home address on Play | Cost |
+  |---|---|---|---|
+  | O1 Personal account, monetized | own name | shown | €0 |
+  | O2 Personal account, no in-app purchase on Play | own name | not shown | €0, but no Premium income from Play (item 45 changes) |
+  | O3 Sole trader (Freiberufler, and probably a Gewerbe for the app sales) + D-U-N-S + virtual office + organization account | own name (a sole trader's D-U-N-S record has the person's name) | the virtual office, if Google accepts it (not confirmed) | about €10–50 per month, Gewerbeanmeldung €20–65 |
+  | O4 UG (haftungsbeschränkt) + D-U-N-S + virtual office + organization account | company name | the virtual office | about €500–700 once, €1,000–3,000 per year, 6–12 weeks |
+
+  - O4: the Impressum still names the managing director, and the Handelsregister shows the name, the birth date and the city. The virtual office must be the business address from the start, because the Handelsregister shows it.
+  - Not taken: a foreign company (US LLC, Estonian OÜ, UK Ltd). Managed from Germany, it pays German tax, a US LLC needs US forms each year (Form 5472, US$25,000 penalty), and the Impressum still names the manager.
+- **Spec:**
+  1. All options: set the developer name to the brand (Developer account → About you). Set the store listing contact to the e-mail of item 16 step 2 and the website `https://sun.chaser.page/` (item 16, PR #193).
+  2. O3 and O4: get the D-U-N-S number first (upik.de, up to about 30 days). Make the organization account (US$25), then transfer `com.ainabler.sunchaser` to it. Before the transfer, check what moves with the app: the in-app product `premium`, the closed test, the testers and the signing keys (`assetlinks.json`).
+  3. O3 and O4: ask a Steuerberater: Freiberufler or Gewerbe for the app sales, and a UG or not.
+- **Depends on:** item 16 (domain and e-mail). Decide before Premium goes on sale (item 14, `PREMIUM_ENFORCED`).
+- **Done when:** the Play listing shows the chosen developer name, and the home address does not show, or a Decision line here accepts it.
+- **Open:** (a) O1, O2, O3 or O4? (b) The developer name: `ainabler` (as in the package name) or another?
+
+### 167. Search: Search Console, Bing and a landing page in five languages — M
+
+- **Request (Lutz, 2026-10-19):** from an [X post](https://x.com/IndieBeaverHere/status/2111812808782295369) (2026-10-18): the lowest-effort marketing is a landing page in the store listing, Google Search Console and Bing Webmaster Tools, then pages for the searches that give impressions, in more languages.
+- **Now:**
+  - `/` is the app. `index.html` has the title "Sun Chaser", one English description, and Open Graph title, description and type. It has no `og:image`, no canonical link and no `hreflang`. There is no sitemap. `robots.txt` allows all.
+  - The site is not in Search Console or in Bing Webmaster Tools. The domain moves to `sun.chaser.page` (item 16, PR #193).
+  - `/privacy` is a static page in `public/`, outside the service worker's navigation fallback (`navigateFallbackDenylist` in `vite.config.ts`).
+- **Spec:**
+  1. After the move to `sun.chaser.page`: verify the domain in Search Console (a DNS TXT record at Cloudflare). Then import it to Bing Webmaster Tools from Search Console.
+  2. A static landing page for each app language (`en`, `de`, `es`, `it`, `fr`) at `/<lang>/`, as `/privacy`: in `public/`, in `navigateFallbackDenylist`, and inside the CSP of `public/_headers`. Content: what the app does in one line, 3–4 features, 3 screenshots from `store/screenshots/`, the Google Play badge, a link to the web app at `/`, and the privacy link. `hreflang` links between the five pages, `x-default` to `/en/`. The text comes from the Play listing text (item 67 step 7).
+  3. `public/sitemap.xml` with the five pages, and its URL in `robots.txt`.
+  4. `index.html`: `og:image` (`store/feature-graphic.png`, 1024 × 500) and a canonical link.
+  5. The website field of the Play listing: `https://sun.chaser.page/`.
+  6. Not in this item: pages for the searches with impressions (for example "sunset time <city>", "golden hour today", "sun dog", "ISS pass tonight"). Only after 4–8 weeks of Search Console data shows them. More languages only when the app has them.
+- **Depends on:** item 16 (the domain move) and item 67 step 7 (the Play listing text).
+- **Check:** built site: each `/<lang>/` page loads with no CSP error, has the right `lang` and the `hreflang` links; `/` still opens the app; the service worker does not serve the app for `/<lang>/`. Lighthouse SEO audit on each page.
+- **Done when:** Search Console and Bing show the domain as verified and the sitemap as read with no errors.
+
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 
 Rules for all items:
