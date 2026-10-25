@@ -3600,7 +3600,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Spec:** find what the first sky does not need (dialogs, the collection, the radio, satellites, easter eggs, the time travel) and load it with `lazy()`. Measure the bundle with `vite build` and a source map once; no new dependency in the build.
 - **Done when:** the P3 setup of item 165 shows the sky in 6 s or less.
 
-### 175. Privacy page: every host, the IP and the storage — S (owner)
+### 175. Privacy page: every host, the IP and the storage — S (owner) — **✅ Done**
 
 - **Finding (item 165, #16, P2 Skeptic):**
   - The privacy link is only at the end of the Data sources dialog, at the end of the panel.
@@ -3616,6 +3616,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Built:** `public/privacy/index.html` section 1 lists each host with what it gets, when, and that it gets the IP address: Open-Meteo (forecast, place search), BigDataCloud, Photon, AWS terrain tiles, Microsoft Planetary Computer with its Azure blob host, CelesTrak, our server (`/api/satellites`, `/api/planes`, adsb.lol), the ten radio hosts and Sentry (section 3: what goes in a report and what the scrub removes). It says that there is no consent screen and that the first load contacts the hosts as soon as the app has a place. Section 5 lists every `localStorage` key and the `sessionStorage` key, with the rounding of each. The Live planes hint names our server in five languages. The panel has a "Privacy" link next to "Data sources" (key `dataSources.privacy`, no new key). The Data sources dialog adds Microsoft Planetary Computer, Vercel (`dataSources.hosting`) and Sentry (`dataSources.errors`). `tests/privacyPage.test.ts` fails when a CSP `connect-src` host, a radio host or a storage key is missing from the page.
 - **Checked:** `npm run typecheck`, `npm run lint`, `npx vitest run` (130 files) and `npm run build` pass; `tests/headers.test.ts` is unchanged. Waiting for Lutz's review of the privacy text.
 - **Found while writing (the page says it, Lutz decides):** (a) adsb.lol and the CelesTrak copy behind `/api/satellites` get the IP of our server, not the user's: the old text said the user's IP. (b) `terrain_horizon_profile_v2_*` and `terrain_tree_cover_v1_*` have no age limit and no clean-up: one entry per place (about 100 m) stays until the user clears the storage. (c) The WorldCover file name (a 3-degree square) is in a Sentry breadcrumb: the scrub covers only query values and terrain tile paths. (d) Sentry gets the IP with each report. Lutz keeps Sentry's default settings (2026-10-25); the app sets `dataCollection.userInfo: false` (`src/main.tsx`), so the SDK (v11.1, `BrowserClient`) sends `infer_ip: "never"` and Sentry does not take the IP from the request. The page says so.
+- **Decision (Lutz, 2026-10-25):** the text is approved and merged. Sentry keeps its default settings. Open as follow-ups: an age limit for the terrain and tree caches (b), and the WorldCover file name in Sentry breadcrumbs (c). The "short time" of Vercel's request logs is carried over unverified; it goes away with the move to Cloudflare (item 16).
 
 ### 176. Launch check: small findings — S each — **✅ Done**
 
