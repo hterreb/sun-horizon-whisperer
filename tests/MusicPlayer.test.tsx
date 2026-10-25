@@ -23,7 +23,7 @@ const stubAudioConstructor = (): HTMLAudioElement[] => {
 };
 
 describe('MusicPlayer', () => {
-  // jsdom has no load(); the pause path (item 180) calls it.
+  // jsdom has no load(); keep it quiet if a media element calls it.
   beforeEach(() => {
     vi.spyOn(window.HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
   });
@@ -357,16 +357,18 @@ describe('MusicPlayer', () => {
       delete (navigator as { mediaSession?: MediaSession }).mediaSession;
     });
 
-    it('a pause closes the stream and a new play sets the src again before play()', () => {
+    it('a pause keeps the src (the Android notification stays) and a new play sets it again before play()', () => {
       const { instances, calls } = stubElement();
       render(<MusicPlayer />);
       fireEvent.click(switchOn());
       expect(calls).toEqual([`play:${first}`]);
       fireEvent.click(switchOn());
-      expect(calls.slice(1)).toEqual(['pause', 'load:']);
-      expect(instances[0].hasAttribute('src')).toBe(false);
+      expect(calls.slice(1)).toEqual(['pause']);
+      expect(instances[0].getAttribute('src')).toBe(first);
+      // A stale value shows whether the start sets `src` again (a fresh stream).
+      instances[0].setAttribute('src', 'stale');
       fireEvent.click(switchOn());
-      expect(calls.slice(3)).toEqual([`play:${first}`]);
+      expect(calls.slice(2)).toEqual([`play:${first}`]);
     });
 
     it('a pause event from the element (OS pause) turns the switch off and starts nothing', () => {

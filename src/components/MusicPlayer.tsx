@@ -252,11 +252,11 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ controls = ALWAYS_SHOWN, duck
     if (isPlaying) {
       // The element already plays this state (its own `play` event set it): no second start.
       if (audio.paused) startStream(stationIndexRef.current, true);
-    } else if (audio.hasAttribute('src')) {
-      // Item 180: pause, then close the stream (no `src`, `load()`), which also saves data.
+    } else if (!audio.paused) {
+      // Item 180: a plain pause. The `src` stays, so Android keeps the media notification and
+      // its Play button (no `src` would end the player and the notification). The next start
+      // sets `src` again, so it plays a fresh stream.
       audio.pause();
-      audio.removeAttribute('src');
-      audio.load();
     }
   }, [isPlaying, startStream]);
 
