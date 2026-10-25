@@ -1,17 +1,19 @@
 import { TAP_TARGET } from '@/utils/glassChrome';
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { lazy, useState, useEffect, useRef, useCallback } from 'react';
+import LazyPart from './LazyPart';
 import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Wind, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward, Bell, BellRing, AlarmClock, AlarmClockCheck, Satellite, Award, Database, CircleAlert, ShieldCheck } from 'lucide-react';
 import { isFeedbackAvailable, openFeedbackForm } from '@/utils/feedback';
-import DataSourcesDialog from './DataSourcesDialog';
+// The dialogs, the line of sight details and the place search load when they open (ROADMAP item 174).
+const DataSourcesDialog = lazy(() => import('./DataSourcesDialog'));
 import { ScrollArea } from './ui/scroll-area';
 import { Switch } from './ui/switch';
 import { Button } from './ui/button';
-import LineOfSightDetails from './LineOfSightDetails';
+const LineOfSightDetails = lazy(() => import('./LineOfSightDetails'));
 import PremiumBadge from './PremiumBadge';
 import { usePremiumGate } from '@/hooks/usePremium';
 import { ALWAYS_SHOWN, type IdleHide } from '@/hooks/useIdleHide';
 import ShareCardButton from '@/components/ShareCardButton';
-import PlaceSearch from './PlaceSearch';
+const PlaceSearch = lazy(() => import('./PlaceSearch'));
 import {
   type SunPosition,
   type SunTimes,
@@ -709,7 +711,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
         <form onSubmit={handleSubmitLocation} noValidate className="mx-4 mb-3 p-2 space-y-2 text-caption bg-white/10 rounded">
           {/* Item 165: the cursor starts in the search, so a typed place and Enter search it
               (in the latitude field, Enter set the old coordinates again). */}
-          <PlaceSearch onSelect={handleSelectPlace} autoFocus />
+          <LazyPart><PlaceSearch onSelect={handleSelectPlace} autoFocus /></LazyPart>
           <div className="flex flex-col gap-1">
             <label htmlFor="manual-location-lat" className="opacity-80">{t('location.latitude')}</label>
             <input
@@ -1047,16 +1049,18 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             </div>
 
             {terrainStatus !== 'idle' && isSunTerrainOpen && (
-              <LineOfSightDetails
-                idPrefix="sun-terrain"
-                terrainStatus={terrainStatus}
-                eyeHeightMeters={eyeHeightMeters}
-                onEyeHeightChange={onEyeHeightChange}
-                rows={[
-                  { label: t('sun.sunrise'), value: formatTerrainDelta('sun', terrainSunTimes?.sunrise ?? null, shownSunrise, language, timeZone) },
-                  { label: t('sun.sunset'), value: formatTerrainDelta('sun', terrainSunTimes?.sunset ?? null, shownSunset, language, timeZone) },
-                ]}
-              />
+              <LazyPart>
+                <LineOfSightDetails
+                  idPrefix="sun-terrain"
+                  terrainStatus={terrainStatus}
+                  eyeHeightMeters={eyeHeightMeters}
+                  onEyeHeightChange={onEyeHeightChange}
+                  rows={[
+                    { label: t('sun.sunrise'), value: formatTerrainDelta('sun', terrainSunTimes?.sunrise ?? null, shownSunrise, language, timeZone) },
+                    { label: t('sun.sunset'), value: formatTerrainDelta('sun', terrainSunTimes?.sunset ?? null, shownSunset, language, timeZone) },
+                  ]}
+                />
+              </LazyPart>
             )}
 
             {/* Sunset score (ROADMAP item 11) */}
@@ -1171,16 +1175,18 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 </div>
 
                 {terrainStatus !== 'idle' && isMoonTerrainOpen && (
-                  <LineOfSightDetails
-                    idPrefix="moon-terrain"
-                    terrainStatus={terrainStatus}
-                    eyeHeightMeters={eyeHeightMeters}
-                    onEyeHeightChange={onEyeHeightChange}
-                    rows={[
-                      { label: t('moon.rise'), value: formatTerrainDelta('moon', terrainMoonTimes?.rise ?? null, moonTimes.rise, language, timeZone) },
-                      { label: t('moon.set'), value: formatTerrainDelta('moon', terrainMoonTimes?.set ?? null, moonTimes.set, language, timeZone) },
-                    ]}
-                  />
+                  <LazyPart>
+                    <LineOfSightDetails
+                      idPrefix="moon-terrain"
+                      terrainStatus={terrainStatus}
+                      eyeHeightMeters={eyeHeightMeters}
+                      onEyeHeightChange={onEyeHeightChange}
+                      rows={[
+                        { label: t('moon.rise'), value: formatTerrainDelta('moon', terrainMoonTimes?.rise ?? null, moonTimes.rise, language, timeZone) },
+                        { label: t('moon.set'), value: formatTerrainDelta('moon', terrainMoonTimes?.set ?? null, moonTimes.set, language, timeZone) },
+                      ]}
+                    />
+                  </LazyPart>
                 )}
 
                 <div className={ROW}>
@@ -1569,7 +1575,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               <ShieldCheck size={14} />
               {t('dataSources.privacy')}
             </a>
-            {isDataSourcesOpen && <DataSourcesDialog onClose={closeDataSources} />}
+            {isDataSourcesOpen && <LazyPart><DataSourcesDialog onClose={closeDataSources} /></LazyPart>}
           </div>
             </div>
           </ScrollArea>

@@ -13,7 +13,8 @@ interface TemperatureIcebergProps {
   ringTier?: RarityTier | null;
 }
 
-export const ICEBERG_RING = 'egg-iceberg';
+import { ICEBERG_RING } from '@/utils/hiddenEggs';
+export { ICEBERG_RING };
 const ICEBERG_PX = 96;
 
 // The iceberg drawing; the collection badge (item 161) uses it too.

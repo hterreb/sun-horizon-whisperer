@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { preloadMonitoring } from '../src/utils/monitoring';
 vi.mock('@sentry/react', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sentry/react')>()),
   captureException: vi.fn(),
@@ -13,6 +14,9 @@ const Broken = (): React.ReactElement => {
 };
 
 describe('LazyPart (ROADMAP item 125)', () => {
+  // Sentry is behind utils/monitoring (item 174): load it once, so the call runs at once.
+  beforeAll(preloadMonitoring);
+
   it('shows its child', () => {
     render(<LazyPart><p>egg</p></LazyPart>);
     expect(screen.getByText('egg')).toBeInTheDocument();

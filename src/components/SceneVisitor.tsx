@@ -6,13 +6,14 @@ import { useId, type CSSProperties, type ReactNode } from 'react';
 // V-wake behind the fin and each back. Drawn on a 48-unit grid, facing right, with the
 // waterline at `WL`; the component lifts itself so the waterline is at the top of its box.
 
-export const VISITOR_GRID = 48; // one animal's width in grid units
-export const DOLPHIN_SPACING = 34; // grid units from one dolphin to the next in the pod
-const VIEW_TOP = -2;
-export const VISITOR_VIEW_HEIGHT = 34; // the svg's height in grid units
+import {
+  DOLPHIN_SPACING, DOLPHIN_WATERLINE, SHARK_WATERLINE, VISITOR_GLINT, VISITOR_GRID, VISITOR_VIEW_HEIGHT, VISITOR_VIEW_TOP as VIEW_TOP,
+  type VisitorTone,
+} from '@/utils/sceneSizes';
+export { DOLPHIN_SPACING, VISITOR_GRID, VISITOR_VIEW_HEIGHT };
 
 const SHARK = {
-  WL: 10.6,
+  WL: SHARK_WATERLINE,
   body: 'M5 14.5C11 12 19 10.8 28 10.8c6.4 0 11.6 1.2 15 3.4-3.4 2.2-8.6 3.4-15 3.4-9 0-17-.8-23-3.1Z',
   fins: [
     'M6 14.2 1 6.8c.9 2.9 1.3 5.4 1.2 7.6L1.6 20l4.6-4.6', // tail
@@ -24,7 +25,7 @@ const SHARK = {
 };
 
 const DOLPHIN = {
-  WL: 10.2,
+  WL: DOLPHIN_WATERLINE,
   body: 'M4 13.4C9 9.8 15.4 8.2 22.6 8.2c6.4 0 11.2 1.6 14 4.4l5.4 1c-.6 1-2 1.4-4 1.2-2.8 2.4-7.8 3.6-14.2 3.6-7.4 0-14-1.8-19.8-5Z',
   fins: [
     'M5 13.3 1.2 10.2c.5 1.4 1.4 2.4 2.4 3-1 .7-1.8 1.8-2.2 3.2l3.8-2.6', // fluke
@@ -34,10 +35,6 @@ const DOLPHIN = {
   eye: [35, 12.4],
   mouth: 'M41.8 14.1c-1.4.4-3 .4-4.4 0',
 };
-
-// How far the svg reaches above the waterline, in grid units (the lane plan of item 92).
-export const SHARK_ABOVE_WATER = SHARK.WL - VIEW_TOP;
-export const DOLPHINS_ABOVE_WATER = DOLPHIN.WL - VIEW_TOP;
 
 // The pod's fixed formation, the leader in front: each dolphin's [x, y] offset in grid units.
 const POD: Record<number, [number, number][]> = {
@@ -70,25 +67,19 @@ const rollKeyframes = (): string => {
 };
 const ROLL_CSS = rollKeyframes();
 
-export type VisitorTone = 'day' | 'dusk' | 'moon';
-
 const fish = (token: string) => `hsl(var(--scene-fish-${token}))`;
 
 // The back and belly by light; the soft shadow under the surface; the glint on the water.
 const colors = (kind: 'shark' | 'dolphins', tone: VisitorTone) => {
   const species = kind === 'shark' ? 'shark' : 'dolphin';
   if (tone === 'moon') {
-    return { back: fish('visitor-moon'), belly: fish('moon-belly'), shadow: 'hsl(var(--scene-moon))', shadowOpacity: 0.14, glint: 'hsl(var(--scene-moon) / 0.75)' };
+    return { back: fish('visitor-moon'), belly: fish('moon-belly'), shadow: 'hsl(var(--scene-moon))', shadowOpacity: 0.14, glint: VISITOR_GLINT.moon };
   }
   if (tone === 'dusk') {
-    return { back: fish(`${species}-dusk`), belly: fish('visitor-dusk-belly'), shadow: fish('visitor-shadow-dusk'), shadowOpacity: 0.32, glint: 'hsl(var(--scene-fish-glint-dusk) / 0.8)' };
+    return { back: fish(`${species}-dusk`), belly: fish('visitor-dusk-belly'), shadow: fish('visitor-shadow-dusk'), shadowOpacity: 0.32, glint: VISITOR_GLINT.dusk };
   }
-  return { back: fish(species), belly: fish(`${species}-belly`), shadow: fish('visitor-shadow'), shadowOpacity: 0.3, glint: 'hsl(var(--scene-glow-white) / 0.75)' };
+  return { back: fish(species), belly: fish(`${species}-belly`), shadow: fish('visitor-shadow'), shadowOpacity: 0.3, glint: VISITOR_GLINT.day };
 };
-
-// The glint on the water by light (item 94's ripple and bubbles use it too).
-// eslint-disable-next-line react-refresh/only-export-components -- a colour helper next to its drawing
-export const getVisitorGlint = (tone: VisitorTone): string => colors('shark', tone).glint;
 
 const line = (color: string, width: number, opacity?: number): CSSProperties =>
   ({ fill: 'none', stroke: color, strokeWidth: width, strokeLinecap: 'round', opacity });

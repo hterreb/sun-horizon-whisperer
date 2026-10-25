@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import { BOAT_HEIGHT_PX, BOAT_WIDTH_PX } from '@/utils/sceneSizes';
 import { useBunting } from '@/hooks/useBunting';
 import BoatBunting from './BoatBunting';
 import { type BoatKind, type BoatTone } from '../utils/weatherEffectsUtils';
@@ -10,9 +11,8 @@ import { getBoatReflection, UNKNOWN_SEA_WIND_KMH } from '../utils/waveUtils';
 
 const W = 64;
 const H = 37;
-// Drawn this wide, then scaled by CloudLayer, like the 48 px line icons before.
-export const BOAT_WIDTH_PX = 48;
-export const BOAT_HEIGHT_PX = (BOAT_WIDTH_PX * H) / W;
+// Drawn this wide (BOAT_WIDTH_PX, utils/sceneSizes.ts), then scaled by CloudLayer, like the 48 px line icons before.
+export { BOAT_HEIGHT_PX, BOAT_WIDTH_PX };
 
 type Role = 'line' | 'hull' | 'stripe' | 'cabin' | 'roof' | 'sail' | 'jib' | 'funnel' | 'cap' | 'flag'
   | 'window' | 'rower' | 'cargo-1' | 'cargo-2' | 'cargo-3' | 'cargo-4';

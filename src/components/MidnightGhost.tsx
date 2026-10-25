@@ -13,7 +13,8 @@ interface MidnightGhostProps {
   ringTier?: RarityTier | null;
 }
 
-export const GHOST_RING = 'egg-ghost';
+import { GHOST_RING } from '@/utils/hiddenEggs';
+export { GHOST_RING };
 const GHOST_PX = 64;
 
 const MidnightGhost: React.FC<MidnightGhostProps> = ({ currentTime, onInfo, ringOn = false, ringTier = null }) => {
