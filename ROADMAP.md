@@ -3719,7 +3719,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Open:** (a) Boats: the code keeps them below the horizon. Was it a tall hull above the horizon line (by design), or is there a screenshot?
 - **Decision (Lutz, 2026-10-25):** fix the fish only. Boats stay as they are.
 
-### 180. Radio: Play works after a pause outside the app — S — [SUN-CHASER-2B](https://ainabler.sentry.io/issues/SUN-CHASER-2B)
+### 180. Radio: Play works after a pause outside the app — S — **✅ Done** — [SUN-CHASER-2B](https://ainabler.sentry.io/issues/SUN-CHASER-2B)
 
 - **Feedback (2026-10-25 18:53 CET, Ravensburg):** "Play after pause outside the app not possible for radio".
 - **Now:**
@@ -3737,6 +3737,15 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Check:** `MusicPlayer` tests with a fake audio element: after a pause and a play, `src` is set again before `play()`; a `pause` event from the element turns the switch off; the Media Session `play` calls `play()` when the element is paused but `isPlaying` is true; no toast for an `AbortError`; a station change keeps the radio on. Real phone (Play test app): pause in the notification, wait 1 min and 10 min, Play; pause by a headset button, a call and another app (YouTube), then Play in the notification and in the app; screen off; Wi-Fi and mobile data; five quick pause/play pairs.
 - **Open:** (a) Should a pause close the stream (spec 1: saves data, a start takes 1–2 s), or keep it for a faster start when the pause is short? (b) Spec 3: wait for a tap (recommended), or start again by itself after a call?
 - **Decision (Lutz, 2026-10-25):** a pause closes the stream (spec 1), and after a call or another app the radio waits for a tap (spec 3).
+- **Built:** `MusicPlayer.tsx` only.
+  - `startStream(index, reportFailure)` sets `src` from the station, then `play()`. The switch, the notification Play and a station change or error skip use it. The switch and Play show the "Playback failed" toast; a station change or error skip only logs. An `AbortError` gives no toast (item 176).
+  - A pause (switch off, notification Pause, or an OS pause) calls `pause()`, removes the `src` attribute and calls `load()`. This closes the stream. Without a `src` (the start state) nothing runs.
+  - `pause` and `play` listeners on the element set `isPlaying` to its real state. After an OS pause the switch turns off and the radio waits for a tap: no automatic restart.
+  - Media Session `play` runs `startStream` when `isPlaying` is true (element paused by the OS), and sets `isPlaying` when it is false (the effect then starts). `playbackState` follows `isPlaying`, which follows the element.
+  - Guard for our own `src` change: `ignorePauseRef` is set before the new `src` and cleared by the `play` event of that start. A `pause` event in between (a station change on a playing element, or a late event of an earlier pause) does not turn the radio off.
+  - Deviation: the first `src` is no longer set when the player mounts (the old mount call of `playStream`). The radio sets it at the first start.
+  - The `play` listener sets only the switch, not the rain sound (a station change must not turn the rain button on again).
+- **Checked:** unit tests with a fake element (`play`, `pause`, `load` spies): after a pause and a play, `src` is set again before `play()`; an element `pause` turns the switch off and starts nothing; Media Session `play` calls `play()` when the element is paused and `isPlaying` is true; a `pause` event of a station change does not turn the radio off, a later one does; `playbackState` follows the element events; an `AbortError` gives no toast. Typecheck, lint, build and all 2145 tests (129 files; 2139 before) pass. Not checked: a real phone. The `pause` event on a `src` change differs between browsers: the guard covers both cases, but only a real Chrome on Android shows it. The phone checks of the **Check** line (pause in the notification, 1 and 10 min wait, headset button, a call, YouTube, screen off, Wi-Fi and mobile data, five quick pause/play pairs) are open.
 
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 

@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
 import MusicPlayer from '../src/components/MusicPlayer';
 import { toast } from '@/hooks/use-toast';
+import { STREAMS } from '@/utils/radioStreams';
 
 vi.mock('@/hooks/use-toast', () => ({
   toast: vi.fn(),
@@ -22,6 +23,11 @@ const stubAudioConstructor = (): HTMLAudioElement[] => {
 };
 
 describe('MusicPlayer', () => {
+  // jsdom has no load(); the pause path (item 180) calls it.
+  beforeEach(() => {
+    vi.spyOn(window.HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -304,6 +310,125 @@ describe('MusicPlayer', () => {
       expect([...handlers.values()]).toEqual([null, null, null]);
       expect(session.metadata).toBeNull();
       expect(session.playbackState).toBe('none');
+    });
+  });
+
+  describe('resume after a pause (ROADMAP item 180)', () => {
+    const stubMediaSession = () => {
+      const handlers = new Map<MediaSessionAction, MediaSessionActionHandler | null>();
+      const session = {
+        metadata: null as MediaMetadataInit | null,
+        playbackState: 'none' as MediaSessionPlaybackState,
+        setActionHandler: (action: MediaSessionAction, handler: MediaSessionActionHandler | null) => {
+          handlers.set(action, handler);
+        },
+      };
+      Object.defineProperty(navigator, 'mediaSession', { value: session, configurable: true });
+      vi.stubGlobal('MediaMetadata', class {
+        constructor(init: MediaMetadataInit) {
+          Object.assign(this, init);
+        }
+      });
+      return { session, run: (action: MediaSessionAction) => act(() => handlers.get(action)!({ action })) };
+    };
+    // A fake element state: `paused` follows play() and pause() like a real one.
+    const stubElement = () => {
+      const instances = stubAudioConstructor();
+      const calls: string[] = [];
+      let paused = true;
+      vi.spyOn(window.HTMLMediaElement.prototype, 'paused', 'get').mockImplementation(() => paused);
+      const play = vi.spyOn(window.HTMLMediaElement.prototype, 'play').mockImplementation(function (this: HTMLMediaElement) {
+        calls.push(`play:${this.getAttribute('src') ?? ''}`);
+        paused = false;
+        return Promise.resolve();
+      });
+      vi.spyOn(window.HTMLMediaElement.prototype, 'pause').mockImplementation(() => { calls.push('pause'); paused = true; });
+      vi.spyOn(window.HTMLMediaElement.prototype, 'load').mockImplementation(function (this: HTMLMediaElement) {
+        calls.push(`load:${this.getAttribute('src') ?? ''}`);
+      });
+      return { instances, calls, play, setPaused: (v: boolean) => { paused = v; } };
+    };
+    const first = STREAMS[0].url;
+    const switchOn = () => screen.getByRole('switch');
+    beforeEach(() => { vi.mocked(toast).mockClear(); });
+
+    afterEach(() => {
+      cleanup();
+      delete (navigator as { mediaSession?: MediaSession }).mediaSession;
+    });
+
+    it('a pause closes the stream and a new play sets the src again before play()', () => {
+      const { instances, calls } = stubElement();
+      render(<MusicPlayer />);
+      fireEvent.click(switchOn());
+      expect(calls).toEqual([`play:${first}`]);
+      fireEvent.click(switchOn());
+      expect(calls.slice(1)).toEqual(['pause', 'load:']);
+      expect(instances[0].hasAttribute('src')).toBe(false);
+      fireEvent.click(switchOn());
+      expect(calls.slice(3)).toEqual([`play:${first}`]);
+    });
+
+    it('a pause event from the element (OS pause) turns the switch off and starts nothing', () => {
+      const { instances, calls } = stubElement();
+      render(<MusicPlayer />);
+      fireEvent.click(switchOn());
+      act(() => { instances[0].dispatchEvent(new Event('play')); });
+      act(() => { instances[0].dispatchEvent(new Event('pause')); });
+      expect(switchOn()).toHaveAttribute('aria-checked', 'false');
+      expect(calls.filter(c => c.startsWith('play:'))).toHaveLength(1);
+    });
+
+    it('Media Session play calls play() when the element is paused but isPlaying is true', () => {
+      const { session, run } = stubMediaSession();
+      const { calls, setPaused } = stubElement();
+      render(<MusicPlayer />);
+      fireEvent.click(switchOn());
+      expect(calls).toEqual([`play:${first}`]);
+      // The OS paused the element; the React state still says "playing".
+      setPaused(true);
+      run('play');
+      expect(calls).toEqual([`play:${first}`, `play:${first}`]);
+      expect(switchOn()).toHaveAttribute('aria-checked', 'true');
+      expect(session.playbackState).toBe('playing');
+    });
+
+    it('a pause event of our own src change does not turn the radio off; a station change keeps it on', () => {
+      const { instances, calls } = stubElement();
+      render(<MusicPlayer />);
+      fireEvent.click(switchOn());
+      act(() => { instances[0].dispatchEvent(new Event('play')); });
+      fireEvent.click(screen.getByRole('button', { name: 'Next station' }));
+      // The browser fires `pause` for the new src, then `play` for the new start.
+      act(() => { instances[0].dispatchEvent(new Event('pause')); });
+      act(() => { instances[0].dispatchEvent(new Event('play')); });
+      expect(switchOn()).toHaveAttribute('aria-checked', 'true');
+      expect(calls[calls.length - 1]).toBe(`play:${STREAMS[1].url}`);
+      // Later, a real pause turns it off again.
+      act(() => { instances[0].dispatchEvent(new Event('pause')); });
+      expect(switchOn()).toHaveAttribute('aria-checked', 'false');
+    });
+
+    it('playbackState follows the element', () => {
+      const { session } = stubMediaSession();
+      const { instances } = stubElement();
+      render(<MusicPlayer />);
+      fireEvent.click(switchOn());
+      act(() => { instances[0].dispatchEvent(new Event('play')); });
+      expect(session.playbackState).toBe('playing');
+      act(() => { instances[0].dispatchEvent(new Event('pause')); });
+      expect(session.playbackState).toBe('paused');
+    });
+
+    it('a play() cut short by AbortError gives no toast, also in a Media Session start', async () => {
+      const { run } = stubMediaSession();
+      const { play } = stubElement();
+      render(<MusicPlayer />);
+      fireEvent.click(switchOn());
+      play.mockRejectedValueOnce(new DOMException('interrupted', 'AbortError'));
+      await act(async () => { run('play'); });
+      expect(toast).not.toHaveBeenCalled();
+      expect(switchOn()).toHaveAttribute('aria-checked', 'true');
     });
   });
 
