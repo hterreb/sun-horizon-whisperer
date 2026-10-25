@@ -3599,6 +3599,29 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Now:** the first bundle is 678 kB (226 kB gzip), the stylesheet 79 kB (15 kB gzip), plus the language chunk.
 - **Spec:** find what the first sky does not need (dialogs, the collection, the radio, satellites, easter eggs, the time travel) and load it with `lazy()`. Measure the bundle with `vite build` and a source map once; no new dependency in the build.
 - **Done when:** the P3 setup of item 165 shows the sky in 6 s or less.
+- **Measured (2026-10-25, main `48ba5e0`, then with this build):** a script outside the repo (`playwright-core` with Chrome, a static server with gzip and HTTP/2, a fresh `vite build` with a fake Sentry DSN). Phone P3: 375 × 667, touch, 2000 ms RTT, 50 000 B/s (`Network.emulateNetworkConditions`), 4× CPU, no cache, no service worker. Every other host gets a stub that answers after 2 s (a stub does not pass the throttle, a real answer does) or is aborted; no real API is called. Clock fixed at 2026-09-16 14:00 in Ravensburg. Median of 3 runs.
+
+  | | First paint | Sky | Place name |
+  |---|--:|--:|--:|
+  | Before (main `48ba5e0`) | 4.84 s | 9.81 s | 11.85 s |
+  | After | **2.12 s** | **8.94 s** | 11.00 s |
+
+  | | Before | After |
+  |---|--:|--:|
+  | First JS (entry and the chunks it preloads) | 754 kB (252 kB gzip), 2 files | 554 kB (193 kB gzip), 21 files |
+  | Stylesheet | 79 kB (15 kB gzip) | 79 kB (15 kB gzip), no longer blocks the paint |
+  | Bytes before the sky (gzip, with the HTML) | 275 kB | 209 kB |
+
+  The 6-s target is **not met**. The sky time is `4.0 s + bytes / 50 000 + 0.8 s`: two requests in a row (the HTML, then the script and the stylesheet) cost 2 × 2 s of RTT before one byte of the app arrives, and the script runs for 0.8 s at 4× CPU. What is left after the 4.0 s is 209 kB = 4.2 s of transfer. Even a start with no app code at all (React and React DOM 45 kB, the English texts 12 kB, the stylesheet 15 kB) is 4.0 s + 1.5 s + 0.3 s = about 5.8 s. So 6 s cannot be met with two hops. Options for Lutz: (a) put the first script into the HTML (one hop, about 2 s less; the CSP has `script-src 'self'`, so it needs a build-time hash in `public/_headers` and `vercel.json`, which `tests/headers.test.ts` keeps equal); (b) a lighter first sky that React replaces (more code to keep in step with the real scene); (c) a lazy panel body (about 0.4 s more).
+- **Built:**
+  1. **Stylesheet:** `asyncCss` in `vite.config.ts` marks the `<link>` with `media="print"` in a build, and `main.tsx` sets `media="all"` after the sheet loads and before the first render. The first paint is the mark of item 165 at 2.1 s, not at 4.8 s.
+  2. **Sentry (about 88 kB raw):** `utils/monitoring.ts` is the only door to Sentry (`setTag`, `addBreadcrumb`, `captureMessage`, `captureException`). `main.tsx` starts it on idle after the first render (`startMonitoring`, max 4 s); a call before that waits and runs in order; an error before that is kept and sent. `utils/sentryEntry.ts` names the six calls, so the `import()` does not keep replay, tracing and profiling (a plain `import('@sentry/react')` gave 450 kB). `AppErrorBoundary` replaces `Sentry.ErrorBoundary`. `isFeedbackAvailable` checks the DSN.
+  3. **Lazy parts, each with its own `LazyPart`:** the radio, the Toaster, the midnight ghost (only at 00:00) and the iceberg (only below 0 °C); in `SunVisualization` the rainbow (only with a rainbow), the sky optics, the satellites and the live planes (`useEverTrue`: they mount when they can show and stay, so a fade-out ends), the fireworks (from the first trigger), the calendar eggs, the sky eggs and the playful eggs (only on an event); in `CloudLayer` the drawings of the fish, boats, birds and the shark and dolphins (`utils/sceneSizes.ts` keeps their sizes for the lanes); in `InfoPanel` the data sources dialog, the line of sight details and the place search (they open on a tap).
+  4. A clear day view loads no egg, satellite or optics chunk; the first sea creatures come with their chunk after the sky.
+- **Checked:**
+  - `npm run typecheck`, `npm run lint` and `npx vitest run` pass (133 files, 2150 tests). New tests: `utils.monitoring`, `hooks.useEverTrue`, `AppErrorBoundary`, `utils.sceneSizes`. The tests of `SunTracker`, `InfoPanel`, `LazyPart` and `placeName` call `preloadMonitoring()` first, so a tag or breadcrumb arrives at once; no test changed in meaning. The "March equinox" collection test did not fail in these runs.
+  - In Chrome, 375 × 667, 14:00 in Ravensburg: the same sky as before (screenshots side by side), fish, boats and birds come, the feedback button shows, and an error after the start (`setTimeout(() => { throw … })`) reaches the Sentry host (a stub).
+  - HTTP/1.1 with 6 connections made the 21 chunks wait (sky 11.9 s). The numbers above use HTTP/2, as Vercel and Cloudflare do.
 
 ### 175. Privacy page: every host, the IP and the storage — S (owner)
 

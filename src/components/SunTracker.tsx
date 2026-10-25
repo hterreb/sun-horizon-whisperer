@@ -1,6 +1,6 @@
 import React, { lazy, useState, useEffect, useCallback, useMemo } from 'react';
 import LazyPart from './LazyPart';
-import * as Sentry from '@sentry/react';
+import { addBreadcrumb, setTag } from '@/utils/monitoring';
 import {
   getSunPosition,
   getSunTimes,
@@ -42,11 +42,11 @@ import InfoPanel from './InfoPanel';
 import NightStars from './NightStars';
 import Aurora from '@/components/Aurora';
 import EventSkyTaps from '@/components/EventSkyTaps';
-import MusicPlayer from './MusicPlayer';
+const MusicPlayer = lazy(() => import('./MusicPlayer'));
 import TopLeftButtons from './TopLeftButtons';
 import PWAInstallPrompt from './PWAInstallPrompt';
-import MidnightGhost, { GHOST_RING } from './MidnightGhost';
-import TemperatureIceberg, { ICEBERG_RING } from './TemperatureIceberg';
+const MidnightGhost = lazy(() => import('./MidnightGhost'));
+const TemperatureIceberg = lazy(() => import('./TemperatureIceberg'));
 import LoadingScreen, { FAST_START_MS, type LocationProblem } from './LoadingScreen';
 import { type WeatherType } from './CloudLayer';
 import { toast } from '@/hooks/use-toast';
@@ -93,7 +93,7 @@ import { NO_PATIENT_WATCH, PLAYFUL_EVENT, advancePatientWatch, getPlayfulOverrid
 import { parseFestivalOverride } from '@/utils/festivalEvents';
 import { PLAY_SPEED, PLAY_TICK_MS, clampTimeOffset } from '@/utils/timeTravel';
 import { GLASS_SURFACE } from '@/utils/glassChrome';
-import { DISCO_MS, KONAMI_SEQUENCE, SUNGLASSES_MS, SUN_TAP_GAP_MS, UFO_RING, advanceKonami, getEggOverride, registerSunTap, rollUfo, type SunTaps } from '@/utils/hiddenEggs';
+import { DISCO_MS, KONAMI_SEQUENCE, SUNGLASSES_MS, SUN_TAP_GAP_MS, GHOST_RING, ICEBERG_RING, UFO_RING, advanceKonami, getEggOverride, registerSunTap, rollUfo, type SunTaps } from '@/utils/hiddenEggs';
 import { isCloudEggDay, isCloudEggForced } from '@/utils/skyCloudUtils';
 import { isInstalledApp } from '@/utils/installedApp';
 import { getStartReveal, isFastReturn, loadLastVisible, saveLastVisible } from '@/utils/fastReturn';
@@ -947,7 +947,7 @@ const SunTracker: React.FC = () => {
       sunEventWatchRef.current = watch;
       if (outcome) {
         const skipped = outcome !== 'fired' ? outcome : prefersReducedMotion ? 'reduced motion' : null;
-        Sentry.addBreadcrumb({ category: 'fireworks', message: skipped ? `skipped: ${skipped}` : 'fired', level: 'info' });
+        addBreadcrumb({ category: 'fireworks', message: skipped ? `skipped: ${skipped}` : 'fired', level: 'info' });
         if (outcome === 'fired') fire = true;
       }
     }
@@ -1254,7 +1254,7 @@ const SunTracker: React.FC = () => {
   // satellites in the hook's sky (the scene can draw fewer: terrain, clouds).
   const satelliteStatus = isSatelliteTrackingOn && location.loaded ? satelliteTracking.status : null;
   const satellitesTag = getSatellitesTag(satelliteStatus, satelliteTracking.sky?.filter((sat) => sat.visible).length ?? 0);
-  useEffect(() => { Sentry.setTag('satellites', satellitesTag); }, [satellitesTag]);
+  useEffect(() => { setTag('satellites', satellitesTag); }, [satellitesTag]);
   // The open card of a tracked satellite, updated every 10 s.
   const cardSatelliteId = infoCard?.target.type === 'satellite' ? infoCard.target.id : null;
   const satelliteCardStep = Math.floor(date.getTime() / SATELLITE_CARD_STEP_MS);
@@ -1356,7 +1356,7 @@ const SunTracker: React.FC = () => {
   const liveStatus = isLiveRadarActive ? liveFeedStatus : null;
   const liveNearby = liveFeed?.feed.aircraft.length ?? 0;
   const livePlanesTag = getLivePlanesTag(liveStatus, liveShown, liveNearby);
-  useEffect(() => { Sentry.setTag('live-planes', livePlanesTag); }, [livePlanesTag]);
+  useEffect(() => { setTag('live-planes', livePlanesTag); }, [livePlanesTag]);
   // A live plane's card asks for its route once (item 111).
   const liveRouteCallsign = infoCard?.target.type === 'livePlane' ? infoCard.target.callsign : null;
   const liveRoute = useLiveRoute(liveRouteCallsign, location.latitude, location.longitude);
@@ -1470,7 +1470,9 @@ const SunTracker: React.FC = () => {
       </LazyPart>
       {reveal === 'done' && (
         <>
-          <MusicPlayer controls={controls} duck={isCountdownSounding} onPlay={handleRadioPlay} rainMmH={getRainMmH(weatherType, rainMmH)} night={isDarkSky} />
+          <LazyPart>
+            <MusicPlayer controls={controls} duck={isCountdownSounding} onPlay={handleRadioPlay} rainMmH={getRainMmH(weatherType, rainMmH)} night={isDarkSky} />
+          </LazyPart>
           <TopLeftButtons
             showCursor={showCursor}
             isTappable={controls.isTappable}
@@ -1482,22 +1484,29 @@ const SunTracker: React.FC = () => {
         </>
       )}
       <PWAInstallPrompt />
-      {/* One special event at a time: New Year's fireworks replace the midnight ghost. */}
-      {calendarEvent !== 'new-year' && (
-        <MidnightGhost
-          currentTime={date}
-          onInfo={handleSceneTap}
-          ringOn={infoCard?.ring === GHOST_RING}
-          ringTier={infoCardInfo?.tier ?? null}
-        />
+      {/* One special event at a time: New Year's fireworks replace the midnight ghost. The ghost
+          and the iceberg load only when they can show (item 174): at 00:00, and below 0 degrees. */}
+      {calendarEvent !== 'new-year' && date.getHours() === 0 && date.getMinutes() === 0 && (
+        <LazyPart>
+          <MidnightGhost
+            currentTime={date}
+            onInfo={handleSceneTap}
+            ringOn={infoCard?.ring === GHOST_RING}
+            ringTier={infoCardInfo?.tier ?? null}
+          />
+        </LazyPart>
       )}
-      <TemperatureIceberg 
-        temperature={weatherData?.temperature || 20} 
-        isVisible={location.loaded && weatherData !== null} 
-        onInfo={handleSceneTap}
-        ringOn={infoCard?.ring === ICEBERG_RING}
-        ringTier={infoCardInfo?.tier ?? null}
-      />
+      {location.loaded && weatherData !== null && (weatherData.temperature || 20) < 0 && (
+        <LazyPart>
+          <TemperatureIceberg
+            temperature={weatherData.temperature || 20}
+            isVisible
+            onInfo={handleSceneTap}
+            ringOn={infoCard?.ring === ICEBERG_RING}
+            ringTier={infoCardInfo?.tier ?? null}
+          />
+        </LazyPart>
+      )}
       
       {location.loaded && (
         <>

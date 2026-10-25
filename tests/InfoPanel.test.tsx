@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, act, waitFor, within } from '@testing-library/react';
-import { vi } from 'vitest';
+import { beforeAll, vi } from 'vitest';
+import { preloadMonitoring } from '@/utils/monitoring';
 import InfoPanel, { formatTerrainDelta } from '../src/components/InfoPanel';
 import { type TimeOfDay, type SunTimes, type NextGoldenBlueHours } from '../src/utils/sunUtils';
 import { type WeatherType } from '../src/components/CloudLayer';
@@ -30,6 +31,7 @@ const premiumValue = (overrides: Partial<PremiumValue>): PremiumValue => ({
 });
 
 describe('InfoPanel', () => {
+  beforeAll(preloadMonitoring); // Sentry is behind utils/monitoring (ROADMAP item 174)
   // Item 130: the place name cache must not carry over between tests.
   beforeEach(() => localStorage.clear());
   const now = new Date();

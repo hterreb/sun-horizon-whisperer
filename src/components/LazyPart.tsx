@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import * as Sentry from '@sentry/react';
+import { captureException } from '@/utils/monitoring';
 
 // A part of the app that loads on demand (ROADMAP item 125). Nothing shows while it
 // loads. If it fails (its chunk does not load, for example offline before the precache
@@ -13,7 +13,7 @@ class LazyPart extends React.Component<{ children: React.ReactNode }, { failed: 
   }
 
   componentDidCatch(error: unknown) {
-    Sentry.captureException(error);
+    captureException(error);
   }
 
   render() {
