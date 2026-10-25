@@ -344,7 +344,7 @@ export const en = {
   'info.kmh': '{value} km/h',
   'info.route': 'Route',
   'radar.livePlanes': 'Live planes',
-  'radar.hint': 'Real aircraft within 100 km. Sends your place, rounded to about 11 km, to adsb.lol.',
+  'radar.hint': "Real aircraft within 100 km. Sends your place, rounded to about 11 km, to our server. It forwards the place to adsb.lol.",
   'radar.loading': 'Looking for planes…',
   'radar.status': '{nearby} nearby · {shown} in view',
   'radar.compassAll': 'the compass shows all',
@@ -659,6 +659,8 @@ export const en = {
   'dataSources.terrain': 'Terrain',
   'dataSources.trees': 'Trees',
   'dataSources.radio': 'Radio',
+  'dataSources.hosting': "Hosting and relay",
+  'dataSources.errors': "Error reports",
   'dataSources.privacy': 'Privacy',
 
   // Toasts from SunTracker
