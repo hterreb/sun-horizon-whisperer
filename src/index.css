@@ -179,7 +179,6 @@
   --animate-mark-glint-out: fade-out 1s ease-in-out both;
   --animate-scene-iris: scene-iris 1s cubic-bezier(0.65, 0, 0.25, 1) both;
   --animate-scene-fade: fade-in 0.2s ease-out both;
-  --animate-scene-handoff: fade-in 0.7s ease-in-out both; /* the full scene over the light first sky (item 174) */
   --animate-card-in: card-in 0.2s ease-out both;
   --animate-aurora-drift: aurora-drift 40s ease-in-out infinite;
   --animate-green-flash: green-flash 2.5s ease-in-out both;
