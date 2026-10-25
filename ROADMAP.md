@@ -3705,7 +3705,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Open:** (a) A or B? (b) Is "standard satellite" the size badge `satellite:small`, or only the old base badge?
 - **Decision (Lutz, 2026-10-25):** A, the base `plane` badge only. The satellite size badges stay.
 
-### 179. Rotating the phone: fish stay below the horizon — S — [SUN-CHASER-2A](https://ainabler.sentry.io/issues/SUN-CHASER-2A)
+### 179. Rotating the phone: fish stay below the horizon — S — [SUN-CHASER-2A](https://ainabler.sentry.io/issues/SUN-CHASER-2A) — **✅ Done**
 
 - **Feedback (2026-10-24 18:26 CEST, Ravensburg):** "When rotating from portrait to landscape sometimes fish or boats can end up above the horizon".
 - **Now (`CloudLayer`):**
@@ -3718,6 +3718,13 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Check:** a `CloudLayer` test: the lane and hunt variables have no `px`; a fish that moved 20 % up at 844 px is still 20 % up after a resize to 390 px. Browser: a rotation during a lane change (forced with the test hooks), the fish box stays below `0.65 × height` at 0.1, 0.4, 1.5 and 4 s.
 - **Open:** (a) Boats: the code keeps them below the horizon. Was it a tall hull above the horizon line (by design), or is there a screenshot?
 - **Decision (Lutz, 2026-10-25):** fix the fish only. Boats stay as they are.
+- **Built:**
+  - The lane move (`shift.dy`, `--shift-dy`) and the minnows' hunt moves (`dy` in `planPreyHunt`, `--hunt-dy`) are now a number in % of the layer height, with no unit. The keyframes `sceneLaneShift` and `sceneHuntShift` use `translateY(calc(var(--… -dy) * var(--layer-h, 100vh) / 100))`. The 3 s easing, the `both` fill, the scale and fade, and the hunt timing are as before.
+  - `--layer-h` is the layer's height in px. `CloudLayer` sets it on the layer root from `clientHeight` at mount, and again on each `ResizeObserver` callback (a `resize` listener when there is no `ResizeObserver`). It sets the property on the node and does not render again. A rotation changes the height, and a move in progress scales with it.
+  - **Why not `cqh`:** a size container applies layout containment. That makes the layer a stacking context, and the z-order of the fish (5), the water layers (5 and 6) and the boats (7) in the scene would change. A custom property has no such effect.
+  - Boats are not changed (decision).
+  - **Deviations:** (1) The browser check used a probe element with the real `sceneLaneShift` animation, not a real fish: the test hooks (`?fish=`, `?hunt=`) cannot force a lane change, which needs a boat that meets a fish on its fallback lane. (2) The `CloudLayer` test checks the variables and the keyframes text, and does not run a lane change in jsdom (jsdom has no layout).
+- **Checked:** unit tests: `CloudLayer` (the H3 minnows' `--hunt-dy` has no `px`; `--layer-h` is 844 px at mount and 390 px after a resize callback; the keyframes use the calc with `--layer-h` and no bare `translateY(var(--shift-dy))`; the plan's `shift.dy` is 50 for a move of 50 %), `utils.sharkHunt` (the minnow speed limit, now with `dy` in %). Browser (headless Chromium against `vite preview`, BigDataCloud stubbed, CelesTrak not resolved, other hosts blocked): a probe at `top: 70%` with `sceneLaneShift` and `--shift-dy: -20`, 390×844, then 844×390 0.5 s into the move. After the rotation the probe was at 267, 258, 212 and 195 px at 0.1, 0.4, 1.5 and 4 s; 195 px is 50 % of 390 px, so the move stayed 20 % of the height. Not checked: a real fish lane change during a rotation, a real device, landscape to portrait (it uses the same variable).
 
 ### 180. Radio: Play works after a pause outside the app — S — [SUN-CHASER-2B](https://ainabler.sentry.io/issues/SUN-CHASER-2B)
 

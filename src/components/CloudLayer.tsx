@@ -702,7 +702,7 @@ export const spawnTick = (
             ...f, path, hold: f.path, duration: path.duration, curve: path.curve,
             // Without a speed change (the depth is at its end already) the old easing stays.
             easing: path.curve ? toLinearEasing(path.curve) : f.easing,
-            shift: { at: from, dy: ((y - f.path.y) * view.height) / 100, scale, fade },
+            shift: { at: from, dy: y - f.path.y, scale, fade }, // dy in % of the layer height (item 179)
           };
         }
         y = next;
@@ -1128,6 +1128,22 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
   const prefersReducedMotion = usePrefersReducedMotion();
   const sceneRef = useRef<HTMLDivElement>(null);
   useScenePlaybackRate(sceneRef, playDirection);
+  // Item 179: the layer's height in px, for the lane and hunt moves (`--shift-dy`, `--hunt-dy`,
+  // in % of this height). A rotation updates it, and a move in progress scales with the layout.
+  // Not `cqh`: a size container would make the layer a stacking context and change the z order.
+  useEffect(() => {
+    const node = sceneRef.current;
+    if (!node) return;
+    const measure = () => node.style.setProperty('--layer-h', `${node.clientHeight || window.innerHeight}px`);
+    measure();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', measure);
+      return () => window.removeEventListener('resize', measure);
+    }
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
   // The scene clock (item 92) follows the play rate of the scene's animations (item 83), so the
   // lanes hold during time-travel play.
   const sceneClockRef = useRef(LIVE_SCENE_CLOCK);
@@ -1352,7 +1368,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
               left: spot.left, top: spot.top,
               // H3 (item 94): the minnow moves up or down around the shark and back.
               ...(hunted?.minnows?.[i] && {
-                ['--hunt-dy' as string]: `${hunted.minnows[i].dy}px`,
+                ['--hunt-dy' as string]: hunted.minnows[i].dy, // % of the layer height (item 179)
                 animation: `sceneHuntShift ${hunted.minnowSec}s linear ${hunted.minnows[i].delay}s both`,
               }),
             }}
@@ -1431,7 +1447,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
           <div
             data-testid={shift ? 'lane-shift' : undefined}
             style={shift && {
-              ['--shift-dy' as string]: `${shift.dy}px`,
+              ['--shift-dy' as string]: shift.dy, // % of the layer height (item 179)
               ['--shift-scale' as string]: shift.scale,
               ['--shift-o0' as string]: 1 / Math.max(1, shift.fade),
               ['--shift-o1' as string]: shift.fade / Math.max(1, shift.fade),
@@ -1798,7 +1814,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             opacity: var(--shift-o0);
           }
           to {
-            transform: translateY(var(--shift-dy)) scale(var(--shift-scale));
+            transform: translateY(calc(var(--shift-dy) * var(--layer-h, 100vh) / 100)) scale(var(--shift-scale));
             opacity: var(--shift-o1);
           }
         }
@@ -1815,11 +1831,11 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
             animation-timing-function: ease-in-out;
           }
           ${(SHIFT_KEYS.open * 100).toFixed(1)}% {
-            transform: translateY(var(--hunt-dy));
+            transform: translateY(calc(var(--hunt-dy) * var(--layer-h, 100vh) / 100));
             animation-timing-function: linear;
           }
           ${(SHIFT_KEYS.close * 100).toFixed(1)}% {
-            transform: translateY(var(--hunt-dy));
+            transform: translateY(calc(var(--hunt-dy) * var(--layer-h, 100vh) / 100));
             animation-timing-function: ease-in-out;
           }
           100% {

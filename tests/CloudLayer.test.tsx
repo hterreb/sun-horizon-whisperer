@@ -44,12 +44,38 @@ const endAnimation = (element: Element, animationName: string) => {
 // after its dive (the H4 fade), so it has no box then. Item 122: until the change the fish has its
 // old size and speed too (`hold`, the old path).
 type Mover = { path?: ScenePath; hold?: ScenePath; shift?: { at: number; dy: number }; dive?: number };
-const boxAt = (e: Mover, t: number, viewHeight: number) => {
+const boxAt = (e: Mover, t: number) => {
   const p = e.shift && e.hold && t < e.shift.at ? e.hold : e.path;
   if (!p || t < p.start || t > p.start + p.duration + (p.lag ?? 0) || (e.dive !== undefined && t >= e.dive)) return null;
-  const y = e.shift && !e.hold && t < e.shift.at ? p.y - (e.shift.dy * 100) / viewHeight : p.y;
+  const y = e.shift && !e.hold && t < e.shift.at ? p.y - e.shift.dy : p.y;
   return { l: xAt(p, t - (p.lag ?? 0)), r: xAt(p, t) + p.width, top: y, bottom: y + p.height };
 };
+
+describe('CloudLayer: rotation (item 179)', () => {
+  it('scales the lane and hunt moves with the layer height, in % and not in px', () => {
+    let notify: () => void = () => {};
+    const original = global.ResizeObserver;
+    global.ResizeObserver = class { constructor(cb: () => void) { notify = cb; } observe() {} unobserve() {} disconnect() {} } as unknown as typeof ResizeObserver;
+    const height = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(844);
+    try {
+      const { container } = render(<CloudLayer weatherType="clear" timeOfDay="midday" />);
+      const layer = container.firstElementChild as HTMLElement;
+      expect(layer.style.getPropertyValue('--layer-h')).toBe('844px');
+      // The rotation: the layer is 390 px high now, and the moves follow.
+      height.mockReturnValue(390);
+      act(() => notify());
+      expect(layer.style.getPropertyValue('--layer-h')).toBe('390px');
+      // The keyframes take the move as a share of that height: 20 % is 78 px at 390 px.
+      const css = [...container.querySelectorAll('style')].map(style => style.textContent).join('');
+      expect(css).toContain('translateY(calc(var(--shift-dy) * var(--layer-h, 100vh) / 100))');
+      expect(css.match(/translateY\(calc\(var\(--hunt-dy\) \* var\(--layer-h, 100vh\) \/ 100\)\)/g)).toHaveLength(2);
+      expect(css).not.toMatch(/translateY\(var\(--(shift|hunt)-dy\)\)/);
+    } finally {
+      height.mockRestore();
+      global.ResizeObserver = original;
+    }
+  });
+});
 
 describe('CloudLayer', () => {
   const renderLayer = (weatherType: WeatherType, timeOfDay: string) =>
@@ -787,9 +813,9 @@ describe('lane planning (ROADMAP item 92)', () => {
   };
   const endOf = (p: ScenePath) => p.start + p.duration + (p.lag ?? 0);
   // The pairs of boxes that touch at time t (no margin).
-  const touching = (list: ({ id: number } & Mover)[], t: number, seen: Set<string>, viewHeight: number) => {
+  const touching = (list: ({ id: number } & Mover)[], t: number, seen: Set<string>) => {
     const boxes = list.flatMap(e => {
-      const box = boxAt(e, t, viewHeight);
+      const box = boxAt(e, t);
       return box ? [{ id: e.id, ...box }] : [];
     });
     for (let i = 0; i < boxes.length; i++) {
@@ -822,10 +848,10 @@ describe('lane planning (ROADMAP item 92)', () => {
       scene = next;
       scene.fish.forEach(f => { if (f.dive !== undefined) dives.add(String(f.id)); });
       for (let dt = 0; dt < 0.5; dt += 0.1) {
-        touching(scene.fish, t + dt, touches, rules.view.height);
-        touching(scene.ships, t + dt, touches, rules.view.height);
-        touching([...scene.birds, ...scene.planes], t + dt, touches, rules.view.height);
-        touching([...scene.fish, ...scene.ships], t + dt, water, rules.view.height);
+        touching(scene.fish, t + dt, touches);
+        touching(scene.ships, t + dt, touches);
+        touching([...scene.birds, ...scene.planes], t + dt, touches);
+        touching([...scene.fish, ...scene.ships], t + dt, water);
       }
     }
     // A fish and a boat that meet, where the fish does not dive (item 94).
@@ -928,7 +954,7 @@ describe('a calmer sea that is full from the start (ROADMAP item 93)', () => {
       const sea = run(empty(), freshTimes(), () => rules(desktop), 500, 500, mulberry32(seed));
       const water: Mover[] = [...sea.fish, ...sea.ships];
       for (let t = 0.5; t < 120; t += 0.5) {
-        const boxes = water.flatMap(e => boxAt(e, t, desktop.height) ?? []);
+        const boxes = water.flatMap(e => boxAt(e, t) ?? []);
         for (let i = 0; i < boxes.length; i++) {
           for (let j = i + 1; j < boxes.length; j++) {
             const [a, b] = [boxes[i], boxes[j]];
@@ -1306,7 +1332,7 @@ describe('the shark hunt (ROADMAP item 94)', () => {
     const meet = firstMeeting(scene.ships[0].path!, path, 10)!;
     expect(scene.fish[0].dive).toBeUndefined();
     expect(scene.fish[0].path!.y).toBe(50);
-    expect(scene.fish[0].shift).toMatchObject({ at: Math.max(10, meet - 4), dy: (50 * 844) / 100 });
+    expect(scene.fish[0].shift).toMatchObject({ at: Math.max(10, meet - 4), dy: 50 });
   });
 
   // Item 122: the new lane is nearer or farther, so the fish's size, opacity and speed follow it.
@@ -1447,6 +1473,21 @@ describe('the shark hunt (ROADMAP item 94)', () => {
         .filter(minnow => minnow.getAttribute('style')?.includes('sceneHuntShift'));
       expect(moving.length).toBeGreaterThanOrEqual(4);
       expect(container.querySelectorAll('[data-testid="hunt-fx"]')).toHaveLength(0);
+    });
+  });
+
+  // Item 179: the minnows' move is a share of the layer height, so a rotation scales it.
+  it('H3: the minnows move in % of the layer height, not in px (item 179)', () => {
+    hunt('H3', container => {
+      advance(700);
+      const moves = [...container.querySelectorAll<HTMLElement>('[data-testid="scene-fish"]')]
+        .map(minnow => minnow.style.getPropertyValue('--hunt-dy'))
+        .filter(Boolean);
+      expect(moves.length).toBeGreaterThanOrEqual(4);
+      for (const move of moves) {
+        expect(move).not.toContain('px');
+        expect(Math.abs(Number(move))).toBeGreaterThan(0);
+      }
     });
   });
 
