@@ -49,12 +49,14 @@ export interface SatelliteTracking {
   issPass: SatellitePass | null;
   status: SatelliteStatus;
   // Item 164 (R-a): loads satellite.js again if it failed, and the data. loadSatelliteData asks
-  // CelesTrak only when its wait (RETRY_MS after a failed try) is over.
+  // CelesTrak only when its wait (RETRY_MS after a failed try) is over; while it waits and the
+  // data cannot be used, it asks our server at once (item 177).
   refresh: () => void;
   // True from a refresh until its answer.
   refreshing: boolean;
-  // The time of the next CelesTrak try while a refresh can load nothing new; null when a
-  // refresh can try (no wait, or satellite.js to load again).
+  // The time of the next try while a refresh can load nothing new (CelesTrak and, for data that
+  // cannot be used, our server both wait); null when a refresh can try (no wait, or satellite.js
+  // to load again).
   nextTryAt: number | null;
 }
 
