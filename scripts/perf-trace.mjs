@@ -204,7 +204,7 @@ const flatTerrainPng = (elevationM) => {
 const TERRAIN_TILE = flatTerrainPng(450);
 const fixture = (name) => readFileSync(path.join(FIXTURES, name), 'utf8');
 
-// The hosts of the CSP connect-src in vercel.json, plus the radio streams (media-src).
+// The hosts of the CSP connect-src in public/_headers, plus the radio streams (media-src).
 // The upper air (250 hPa) of each contrail kind (item 96 `getContrail`): −50 °C and the humidity.
 const UPPER_AIR = { short: 30, medium: 50, persistent: 80 };
 const forecastFor = (scene, contrail) => {
