@@ -7,7 +7,7 @@ import {
   isNightSatellite,
   orbitHeightsKm,
 } from '../src/utils/satelliteFeed';
-import { type GpRecord } from '../src/utils/satelliteData';
+import { gpUrl, type GpRecord } from '../src/utils/satelliteData';
 
 const iss = fixture.omm as unknown as GpRecord;
 // A Qianfan satellite: 1066 km, circular (CelesTrak, 15 Oct 2026).
@@ -53,6 +53,53 @@ describe('satelliteFeed: the night catalogue (ROADMAP item 160)', () => {
       expect(response.headers.get('Cache-Control')).toBe(SATELLITES_ERROR_CACHE_CONTROL);
       expect(await response.json()).toEqual([]);
     }
+  });
+
+  describe('?all=1: the groups and the night catalogue (item 177)', () => {
+    const allRequest = () => new Request('https://sun-chaser.vercel.app/api/satellites?all=1');
+    const poisk: GpRecord = { ...iss, OBJECT_NAME: 'POISK', NORAD_CAT_ID: 36086 };
+    const visual: GpRecord = { ...iss, OBJECT_NAME: 'VISUAL-1', NORAD_CAT_ID: 5, MEAN_ANOMALY: 99 };
+    const lists: Record<string, unknown[]> = {
+      [gpUrl('stations')]: [iss, poisk],
+      [gpUrl('visual')]: [visual, iss],
+      [gpUrl('last-30-days')]: [{ ...visual, OBJECT_NAME: 'NEW-1', NORAD_CAT_ID: 6, MEAN_ANOMALY: 98, EXTRA: 1 }],
+      [CELESTRAK_ACTIVE]: [iss, qianfan, starlink],
+    };
+
+    it('gives the four lists in sequence in one answer, the ISS first, no duplicates, cached for a day', async () => {
+      const fetchFn = vi.fn(async (url: string) => new Response(JSON.stringify(lists[url]), { status: 200 }));
+      const response = await handleSatellitesRequest(allRequest(), fetchFn as unknown as typeof fetch);
+      expect(fetchFn.mock.calls.map((call) => (call as unknown[])[0])).toEqual(Object.keys(lists));
+      expect(response.headers.get('Cache-Control')).toBe(SATELLITES_CACHE_CONTROL);
+      const body: GpRecord[] = await response.json();
+      expect(body.map((r) => r.OBJECT_NAME)).toEqual(['ISS (ZARYA)', 'VISUAL-1', 'NEW-1', 'QIANFAN-128']);
+      expect(body[2]).not.toHaveProperty('EXTRA');
+    });
+
+    it('stops at the first failed list and returns what it has with the 2 h cache', async () => {
+      const fetchFn = vi.fn(async (url: string) => (
+        url === gpUrl('visual') ? new Response('blocked', { status: 403 }) : new Response(JSON.stringify(lists[url]), { status: 200 })
+      ));
+      const response = await handleSatellitesRequest(allRequest(), fetchFn as unknown as typeof fetch);
+      expect(fetchFn).toHaveBeenCalledTimes(2);
+      expect(response.headers.get('Cache-Control')).toBe(SATELLITES_ERROR_CACHE_CONTROL);
+      expect((await response.json()).map((r: GpRecord) => r.OBJECT_NAME)).toEqual(['ISS (ZARYA)']);
+    });
+
+    it('gives an empty list with the 2 h cache when the first list fails', async () => {
+      const fetchFn = vi.fn(async () => { throw new TypeError('Failed to fetch'); });
+      const response = await handleSatellitesRequest(allRequest(), fetchFn as unknown as typeof fetch);
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+      expect(response.headers.get('Cache-Control')).toBe(SATELLITES_ERROR_CACHE_CONTROL);
+      expect(await response.json()).toEqual([]);
+    });
+
+    it('keeps the night catalogue alone without `all`', async () => {
+      const fetchFn = vi.fn(async (url: string) => new Response(JSON.stringify(lists[url]), { status: 200 }));
+      const response = await handleSatellitesRequest(request(), fetchFn as unknown as typeof fetch);
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+      expect((await response.json()).map((r: GpRecord) => r.OBJECT_NAME)).toEqual(['QIANFAN-128']);
+    });
   });
 
   it('answers 405 to another method', async () => {

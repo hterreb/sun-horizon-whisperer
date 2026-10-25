@@ -38,13 +38,14 @@ export { getPlaneHaul, getTerrainBand, type PlaneHaul, type SatelliteSize, type 
 export type StateBase = 'sun' | 'moon' | 'terrain' | 'plane' | 'satellite';
 export type BadgeGroup = 'fish' | 'flyer' | 'boat' | 'sky' | 'cloud' | 'egg';
 export type BadgeId =
-  | `fish:${FishKind}` | `flyer:${BirdKind | 'bat'}` | `boat:${BoatKind}` | 'plane' | `cloud:${CloudType}`
+  | `fish:${FishKind}` | `flyer:${BirdKind | 'bat'}` | `boat:${BoatKind}` | `cloud:${CloudType}`
   | 'rainbow' | `optic:${OpticKind}` | `egg:${EggKind}`
   | `sun:${SunState}` | `moon:${MoonState}` | `terrain:${TerrainBand}` | `plane:${PlaneHaul}` | `satellite:${SatelliteSize}`;
-// Item 138: the old base badges of the sun, the moon, the terrain and the satellite. They are not
-// in BADGES, so they do not show and do not count. An old save keeps them in storage.
-export type RetiredBadgeId = 'sun' | 'moon' | 'terrain' | 'satellite';
-const RETIRED_IDS = new Set<string>(['sun', 'moon', 'terrain', 'satellite'] satisfies RetiredBadgeId[]);
+// Item 138: the old base badges of the sun, the moon, the terrain and the satellite. Item 178: the
+// base badge of the plane. They are not in BADGES, so they do not show and do not count. An old
+// save keeps them in storage.
+export type RetiredBadgeId = 'sun' | 'moon' | 'terrain' | 'satellite' | 'plane';
+const RETIRED_IDS = new Set<string>(['sun', 'moon', 'terrain', 'satellite', 'plane'] satisfies RetiredBadgeId[]);
 export interface Badge {
   id: BadgeId;
   group: BadgeGroup;
@@ -143,7 +144,6 @@ export const BADGES: readonly Badge[] = [
   { id: 'rainbow', group: 'sky', name: 'scene.rainbow', rarity: RARITY_NAMES[RAINBOW_TIER] }, // item 121
   // Item 148: the sky optics join the rainbow's row, each with its fixed tier.
   ...OPTICS.map(({ kind, name, tier }): Badge => ({ id: `optic:${kind}`, group: 'sky', name, rarity: RARITY_NAMES[tier] })),
-  { id: 'plane', group: 'sky', name: 'plane.airliner', rarity: null },
   ...PLANE_HAULS.map(([haul, name]): Badge => ({ id: `plane:${haul}`, group: 'sky', name, rarity: RARITY_NAMES[HAUL_TIERS[haul]], base: 'plane' })),
   // Item 115: the states, one grid row each. Item 138: the satellite, the sun, the moon and the
   // terrain have no base badge, only their states.
@@ -190,14 +190,13 @@ export const addToCollection = (collection: Collection, id: BadgeId, now: Date):
 // The badge of a thing's kind. An egg card gives none here: item 123's eggBadgesForTarget has the
 // egg's badge, which counts only while the egg shows (the rules below and SunTracker). Item 138:
 // the sun, the moon, the terrain and the satellite give none here, only their state badge
-// (stateBadgeForTarget), so one tap gives one card.
+// (stateBadgeForTarget), so one tap gives one card. Item 178: the plane gives none either; a live
+// plane gives its haul badge when its route comes (badgeForRoute).
 export const badgeForTarget = (target: SceneInfoTarget): BadgeId | null => {
   switch (target.type) {
     case 'fish': return `fish:${target.kind}`;
     case 'bird': return `flyer:${target.kind}`;
     case 'boat': return `boat:${target.kind}`;
-    case 'plane':
-    case 'livePlane': return 'plane';
     case 'cloud': return `cloud:${target.cloudType}`;
     case 'rainbow': return 'rainbow';
     case 'optic': return `optic:${target.kind}`;
@@ -208,6 +207,8 @@ export const badgeForTarget = (target: SceneInfoTarget): BadgeId | null => {
     case 'terrain':
     case 'satellite':
     case 'satelliteDot': // a decorative dot, not a real satellite
+    case 'plane':
+    case 'livePlane':
     case 'egg': return null;
   }
 };

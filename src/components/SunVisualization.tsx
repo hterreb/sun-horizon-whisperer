@@ -8,21 +8,22 @@ import { shortestHeadingDelta } from '../utils/compassUtils';
 import { type HorizonProfile, horizonAngleAt } from '../utils/horizonUtils';
 import { type RidgePoint, type TreeLayer } from '@/utils/treeSilhouettes';
 import CloudLayer, { type SceneInfoHandler, type WeatherType } from './CloudLayer';
-import Fireworks from './Fireworks';
+const Fireworks = lazy(() => import('./Fireworks'));
 import SunSunglasses from './SunSunglasses';
-import CalendarEggs from './CalendarEggs';
-import SkyEggs from './SkyEggs';
+const CalendarEggs = lazy(() => import('./CalendarEggs'));
+const SkyEggs = lazy(() => import('./SkyEggs'));
+import { useEverTrue } from '@/hooks/useEverTrue';
 import { isFestivalEvent } from '@/utils/festivalEvents';
 // Loads only on a festival day (ROADMAP item 125).
 const FestivalEggs = lazy(() => import('./FestivalEggs'));
-import PlayfulEggs from './PlayfulEggs';
+const PlayfulEggs = lazy(() => import('./PlayfulEggs'));
 import { useAprilFoolsSwap } from '@/hooks/useAprilFoolsSwap';
 import { type PlayfulEgg } from '@/utils/playfulEggs';
 import { type CalendarEvent, type SeasonPath, getSolsticeTraceDates } from '@/utils/calendarEvents';
 import PremiumBadge from './PremiumBadge';
 import WeatherEffects from './WeatherEffects';
-import RainbowLayer from './RainbowLayer';
-import SkyOpticsLayer from './SkyOpticsLayer';
+const RainbowLayer = lazy(() => import('./RainbowLayer'));
+const SkyOpticsLayer = lazy(() => import('./SkyOpticsLayer'));
 import { getOpticOverride, getSkyOptics, type OpticKind } from '@/utils/skyOptics';
 import SolarEclipse from '@/components/SolarEclipse';
 import GreenFlash from '@/components/GreenFlash';
@@ -38,10 +39,11 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { formatNumber, type MessageKey } from '@/i18n';
 import { type Language } from '@/utils/language';
 import { PLAY_TICK_MS, type PlayDirection } from '@/utils/timeTravel';
-import Satellites, { type SatelliteDot } from './Satellites';
+import { type SatelliteDot } from './Satellites';
+const Satellites = lazy(() => import('./Satellites'));
 import { getDotGapMs, getTwilightFade, isSatelliteWeather, type SkySatellite } from '@/utils/satelliteUtils';
 import { getTrailColour, isPlaneWeather, showsPlaneLights, type ContrailKind } from '@/utils/planes';
-import LivePlanes from './LivePlanes';
+const LivePlanes = lazy(() => import('./LivePlanes'));
 import { type RarityTier } from '@/utils/rarityTier';
 import { type LivePlanesState } from '@/hooks/useLivePlanes';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
@@ -1207,19 +1209,33 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     });
   }, [satellites, containerDimensions, latitude, compassHeading, horizonProfile]);
 
+  // Lazy layers (ROADMAP item 174) mount when they can show, and stay mounted so a fade-out,
+  // a decorative dot or a trail can end. Loading nothing at all in a clear day view.
+  const satelliteGapMs = isSatelliteWeather(weatherType) ? getDotGapMs(date, sunPosition.altitude, sunTimes) : null;
+  const mountSatellites = useEverTrue(satelliteDots !== null || satelliteGapMs !== null);
+  const mountOptics = useEverTrue(optics.length > 0);
+  const mountLivePlanes = useEverTrue(showLivePlanes && livePlanes !== null);
+  const mountCalendarEggs = useEverTrue(!!calendarEvent || (isBlueMoonEgg && isMoonDiscShown) || santa || longestNight);
+
   return (
     <div ref={containerRef} className="w-full h-dvh relative overflow-hidden pointer-events-none" data-testid="sun-visualization">
       {/* Item 121 (decision 2026-10-10): the rainbow first, with no z-index, so everything after
           it (satellites, planes, clouds, birds, the terrain) draws over it and takes the tap. */}
-      <RainbowLayer
-        rainbow={rainbowGeometry}
-        timeOfDay={timeOfDay}
-        containerWidth={containerDimensions.width}
-        containerHeight={containerDimensions.height}
-        onInfo={onSceneInfo}
-        infoRing={infoRing}
-      />
+      {rainbowGeometry.visible && (
+        <LazyPart>
+        <RainbowLayer
+          rainbow={rainbowGeometry}
+          timeOfDay={timeOfDay}
+          containerWidth={containerDimensions.width}
+          containerHeight={containerDimensions.height}
+          onInfo={onSceneInfo}
+          infoRing={infoRing}
+        />
+        </LazyPart>
+      )}
       {/* Item 148: the sky optics, also with no z-index, under everything that follows. */}
+      {mountOptics && (
+      <LazyPart>
       <SkyOpticsLayer
         optics={optics}
         containerWidth={containerDimensions.width}
@@ -1231,11 +1247,15 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         onInfo={onSceneInfo}
         infoRing={infoRing}
       />
+      </LazyPart>
+      )}
+      {mountSatellites && (
+      <LazyPart>
       <Satellites
         width={containerDimensions.width}
         height={containerDimensions.height}
         tracked={satelliteDots}
-        gapMs={isSatelliteWeather(weatherType) ? getDotGapMs(date, sunPosition.altitude, sunTimes) : null}
+        gapMs={satelliteGapMs}
         cloudFactor={getStarCloudFactor(weatherType, cloudCoverPercent)}
         twilight={getTwilightFade(sunPosition.altitude)}
         stepMs={compassActive ? 0 : playDirection !== 0 ? PLAY_TICK_MS : 1000}
@@ -1243,7 +1263,10 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         onInfo={onSceneInfo}
         infoRing={infoRing}
       />
-      {showLivePlanes && (
+      </LazyPart>
+      )}
+      {mountLivePlanes && (
+        <LazyPart>
         <LivePlanes
           state={livePlanes}
           observer={{
@@ -1264,6 +1287,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           infoRing={infoRing}
           onShownChange={onLivePlanesShown}
         />
+        </LazyPart>
       )}
       <CloudLayer
         livePlanes={!!livePlanes && livePlanesShown > 0}
@@ -1309,7 +1333,9 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         containerHeight={containerDimensions.height}
       />
       {/* Item 123: SunTracker's EventSkyTaps takes the taps on a running show. */}
-      <Fireworks trigger={fireworksTrigger} onRunningChange={onFireworksRunning} />
+      <LazyPart>
+        {fireworksTrigger > 0 && <Fireworks trigger={fireworksTrigger} onRunningChange={onFireworksRunning} />}
+      </LazyPart>
 
       {(sunArcPath || moonArcPath || solsticeTracePaths.length > 0) && (
         <svg className="absolute inset-0 w-full h-full pointer-events-none">
@@ -1495,6 +1521,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         </button>
       )}
 
+      {mountCalendarEggs && (
+      <LazyPart>
       <CalendarEggs
         event={calendarEvent}
         timeOfDay={timeOfDay}
@@ -1509,6 +1537,10 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         soundOn={soundOn}
         longestNight={longestNight}
       />
+      </LazyPart>
+      )}
+      {astroEvent && (
+      <LazyPart>
       <SkyEggs
         event={astroEvent}
         project={projectSkyEgg}
@@ -1519,7 +1551,11 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         infoRing={infoRing}
         infoRingTier={infoRingTier}
       />
+      </LazyPart>
+      )}
 
+      {calendarEvent && (
+      <LazyPart>
       <PlayfulEggs
         event={calendarEvent}
         easterMorning={easterMorning}
@@ -1533,6 +1569,8 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         infoRingTier={infoRingTier}
         onShown={onEggShown}
       />
+      </LazyPart>
+      )}
 
       {isFestivalEvent(calendarEvent) && (
       <LazyPart>

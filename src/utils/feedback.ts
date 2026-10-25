@@ -1,9 +1,9 @@
-import { addIntegration, getClient } from '@sentry/react';
 import { type Translate } from '@/i18n';
+import { whenMonitoringStarted } from './monitoring';
 
 // Anonymous Sentry feedback (ROADMAP items 21 and 23). Available only when Sentry is
 // set up (VITE_SENTRY_DSN); the panel link and the top-left button share this.
-export const isFeedbackAvailable = (): boolean => Boolean(getClient());
+export const isFeedbackAvailable = (): boolean => Boolean(import.meta.env.VITE_SENTRY_DSN);
 
 // The feedback integration is not in the start bundle (ROADMAP item 125): it loads and
 // registers on the first open. Imported from @sentry/feedback, not @sentry/react, so it
@@ -11,7 +11,7 @@ export const isFeedbackAvailable = (): boolean => Boolean(getClient());
 // brings a second @sentry/core. A failed load is retried on the next open.
 let feedbackLoad: Promise<ReturnType<ReturnType<typeof import('@sentry/feedback').buildFeedbackIntegration>>> | null = null;
 const loadFeedback = () =>
-  (feedbackLoad ??= import('@sentry/feedback').then(({ buildFeedbackIntegration, feedbackModalIntegration, feedbackScreenshotIntegration }) => {
+  (feedbackLoad ??= Promise.all([import('@sentry/feedback'), whenMonitoringStarted()]).then(([{ buildFeedbackIntegration, feedbackModalIntegration, feedbackScreenshotIntegration }, { addIntegration }]) => {
     const feedback = buildFeedbackIntegration({
       getModalIntegration: () => feedbackModalIntegration,
       getScreenshotIntegration: () => feedbackScreenshotIntegration,

@@ -153,6 +153,34 @@ describe('useSatelliteTracking (ROADMAP item 97)', () => {
       expect(result.current.nextTryAt).toBeNull();
     });
 
+    // Item 177: the real loadSatelliteData with a blocked CelesTrak and our server's answer.
+    it('is ok from the server data while CelesTrak fails; error only when the server fails too', async () => {
+      const actual = await vi.importActual<typeof import('../src/utils/satelliteData')>('../src/utils/satelliteData');
+      localStorage.clear();
+      load.mockImplementation((...args) => actual.loadSatelliteData(...args));
+      const iss = fixture.omm as unknown as GpRecord;
+      let serverAnswer: GpRecord[] = [iss];
+      const fetchMock = vi.fn(async (url: string) => (
+        url === actual.ALL_GROUPS_URL ? new Response(JSON.stringify(serverAnswer), { status: 200 }) : new Response('blocked', { status: 403 })
+      ));
+      vi.stubGlobal('fetch', fetchMock);
+      try {
+        const { result } = render();
+        await waitFor(() => expect(result.current.status).toBe('ok'));
+        expect(result.current.satellites).toHaveLength(1);
+        expect(fetchMock.mock.calls.filter((call) => call[0] === actual.ALL_GROUPS_URL)).toHaveLength(1);
+
+        // The data is too old and both wait: error.
+        localStorage.clear();
+        serverAnswer = [];
+        const failed = render();
+        await waitFor(() => expect(failed.result.current.status).toBe('error'));
+      } finally {
+        vi.unstubAllGlobals();
+        localStorage.clear();
+      }
+    });
+
     it('is error when satellite.js does not load; a refresh loads it again', async () => {
       vi.spyOn(console, 'error').mockImplementation(() => {});
       // A lost chunk: the next import of satellite.js fails.
