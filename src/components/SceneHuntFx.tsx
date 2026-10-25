@@ -1,5 +1,5 @@
 import { type CSSProperties } from 'react';
-import { getVisitorGlint } from './SceneVisitor';
+import { getVisitorGlint } from '@/utils/sceneSizes';
 import { BODY_LINE, type HuntFx } from '@/utils/sharkHunt';
 
 // The traces of a shark hunt on the water (ROADMAP item 94): X1, a thin ring that opens on the

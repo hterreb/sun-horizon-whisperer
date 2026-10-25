@@ -13,6 +13,20 @@ const API_ROUTES: [string, (request: Request) => Promise<Response>][] = [
   ['/api/planes', handlePlanesRequest],
   ['/api/satellites', handleSatellitesRequest],
 ];
+// The stylesheet must not block the first paint (ROADMAP item 174): on slow 3G it shares the
+// line with the script and arrives late, and the page shows nothing until then. In a build,
+// the link gets `media="print"` (it still loads, but does not block the render) and a marker;
+// main.tsx waits for it, then sets `media="all"` before the first React render. The loading
+// mark in index.html has inline styles, so it shows without the stylesheet.
+const asyncCss = (): Plugin => ({
+  name: 'async-css',
+  apply: 'build',
+  transformIndexHtml: {
+    order: 'post',
+    handler: html => html.replace(/<link rel="stylesheet"([^>]*)>/g, '<link rel="stylesheet" media="print" data-async-css$1>'),
+  },
+});
+
 const edgeApi = (): Plugin => {
   const serve: Connect.NextHandleFunction = (req, res, next) => {
     const handler = API_ROUTES.find(([route]) => req.url?.startsWith(route))?.[1];
@@ -52,6 +66,7 @@ export default defineConfig(({ mode }) => {
   plugins: [
     react(),
     edgeApi(),
+    asyncCss(),
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {

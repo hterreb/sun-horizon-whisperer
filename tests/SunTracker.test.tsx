@@ -1,7 +1,8 @@
 import React from 'react';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import SunTracker from '../src/components/SunTracker';
-import { vi } from 'vitest';
+import { beforeAll, vi } from 'vitest';
+import { preloadMonitoring } from '@/utils/monitoring';
 import { TAP_READY_MS } from '../src/hooks/useIdleHide';
 import { DOUBLE_TAP_MS } from '../src/hooks/useDoubleTap';
 import { SUN_TAP_GAP_MS } from '../src/utils/hiddenEggs';
@@ -51,6 +52,8 @@ import { FADE_OUT_MS, SHOW_MS } from '../src/components/BadgeUnlocked';
 import { type EggCardKind } from '../src/utils/sceneInfo';
 
 describe('SunTracker', () => {
+  // Sentry is behind utils/monitoring (ROADMAP item 174): load it once, so a tag or a breadcrumb arrives at once.
+  beforeAll(preloadMonitoring);
   beforeEach(() => {
     vi.resetAllMocks();
     localStorage.clear();
@@ -1809,6 +1812,19 @@ describe('SunTracker', () => {
       expect(visProps.current!.infoRing).toBe('optic:halo');
       expect(JSON.parse(localStorage.getItem('collection')!)).toEqual({ 'optic:halo': expect.any(String) });
       expect(unlocked()).toHaveTextContent('Badge unlocked: 22° halo, Uncommon');
+      vi.useRealTimers();
+    });
+
+    it('a double tap on a decorative plane opens its card and shows no "Badge unlocked" (item 178)', () => {
+      vi.useFakeTimers();
+      render(<SunTracker />);
+      expect(visProps.current).toBeTruthy();
+      act(() => {
+        visProps.current!.onSceneInfo!({ type: 'plane', contrail: 'short' }, { x: 200, y: 300 }, 'plane');
+      });
+      expect(screen.getByRole('dialog', { name: 'Airliner' })).toBeInTheDocument();
+      expect(unlocked()).toBeNull();
+      expect(localStorage.getItem('collection')).toBeNull();
       vi.useRealTimers();
     });
 
