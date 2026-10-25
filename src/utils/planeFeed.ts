@@ -1,14 +1,14 @@
 // The live flight radar's proxy logic (ROADMAP item 96, Premium). Pure and host-neutral: the
-// Vercel Edge function `api/planes.ts` wraps handlePlanesRequest, and a Cloudflare Pages
-// Function can wrap it later (item 16). No `@/` imports: the Edge bundle resolves only
-// relative paths.
+// Vercel Edge function `api/planes.ts` and the Cloudflare Worker
+// `worker/index.ts` (item 16) wrap handlePlanesRequest. No `@/` imports: both bundles
+// resolve only relative paths.
 
 // The upstream: adsb.lol (ODbL, attribution "Data: adsb.lol"). The radius is in nautical
 // miles: 54 nm = 100 km.
 export const ADSB_LOL_POINT = 'https://api.adsb.lol/v2/point';
 // adsb.lol answers 403 "User-Agent too generic; include valid contact info" without one
 // (checked 2026-10-06). The privacy page has the contact.
-export const UPSTREAM_USER_AGENT = 'SunChaser/2.0 (+https://sun-chaser.vercel.app/privacy)';
+export const UPSTREAM_USER_AGENT = 'SunChaser/2.0 (+https://sun.chaser.page/privacy)';
 export const RADAR_RADIUS_NM = 54;
 export const UPSTREAM_TIMEOUT_MS = 6000;
 // The edge cache holds one answer per 0.1° cell for 15 s (one poll), and may serve it 15 s
