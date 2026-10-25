@@ -196,6 +196,16 @@ describe('satelliteData (ROADMAP item 97)', () => {
       expect(directCalls(fetchImpl)).toBe(1);
     });
 
+    it('after a server success, asks CelesTrak again only after a day, not after 2 h', async () => {
+      const fetchImpl = serverFetch(async () => response(403, 'blocked'));
+      await loadSatelliteData(NOW, fetchImpl as unknown as typeof fetch);
+      expect(directCalls(fetchImpl)).toBe(1);
+      expect(await loadSatelliteData(NOW + RETRY_MS + 1, fetchImpl as unknown as typeof fetch)).toHaveLength(2);
+      expect(directCalls(fetchImpl)).toBe(1);
+      await loadSatelliteData(NOW + REFRESH_MS, fetchImpl as unknown as typeof fetch);
+      expect(directCalls(fetchImpl)).toBe(2);
+    });
+
     it('keeps the data of an old cache entry without serverTriedAt (compatible format)', async () => {
       localStorage.setItem(SATELLITE_CACHE_KEY, JSON.stringify({ fetchedAt: NOW - 60_000, triedAt: NOW - 60_000, records: [iss] }));
       expect(await loadSatelliteData(NOW, vi.fn())).toHaveLength(1);

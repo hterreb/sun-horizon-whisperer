@@ -231,7 +231,9 @@ export const loadSatelliteData = async (
   }
   const fromServer = await fetchFromServer(fetchImpl);
   if (fromServer && isUsable(fromServer, now)) {
-    writeCache({ ...base, records: fromServer, serverTriedAt: undefined });
+    // The server's list is a full daily list, so it counts as a fetch: CelesTrak is asked again
+    // after REFRESH_MS, not after RETRY_MS. A blocked IP then asks CelesTrak once a day, not 12 times.
+    writeCache({ ...base, fetchedAt: now, records: fromServer, serverTriedAt: undefined });
     return fromServer;
   }
   writeCache({ ...base, serverTriedAt: now });
