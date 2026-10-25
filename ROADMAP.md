@@ -3623,6 +3623,22 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   - In Chrome, 375 × 667, 14:00 in Ravensburg: the same sky as before (screenshots side by side), fish, boats and birds come, the feedback button shows, and an error after the start (`setTimeout(() => { throw … })`) reaches the Sentry host (a stub).
   - HTTP/1.1 with 6 connections made the 21 chunks wait (sky 11.9 s). The numbers above use HTTP/2, as Vercel and Cloudflare do.
 
+- **Decision (Lutz, 2026-10-25):** option (a) is out: Vercel reads `vercel.json` before the build, so a build-time CSP hash cannot reach it, and the CSP stays strict (no `'unsafe-inline'` for scripts). Try (b) and (c). The inline script goes to a new item for after the move to Cloudflare (item 181).
+- **Built (follow-up, 2026-10-25):**
+  1. **(c) The panel body in its own chunk:** `InfoPanelBody.tsx` holds everything below the panel header (weather, time travel, sun and moon cards, twilight, golden hour, satellites, radar, language, data sources). `InfoPanel.tsx` keeps the header, the place name lookup, the location form, the cards' open and closed state and the Back handling, so the state survives a close. The body loads with the first open; `SunTracker` also loads it after the full scene is in, so a tap finds it. `LazyPart` got an optional `fallback`: the body's space is kept (`h-[calc(100dvh-120px)]`, the ScrollArea's own limit), so the panel does not grow when the body arrives.
+  2. **(b) A light first sky:** `LightSky.tsx` (3 kB) draws the sky gradient (SunTracker's own), the sea and horizon, the sun with its glow, the moon with its phase, and the compass labels. `SunVisualization` (with `CloudLayer`, the sea canvas, rain, terrain, fish, boats, birds and eggs) is a lazy chunk now. Its load starts with the app, not with the location. The geometry and the sun look moved from `SunVisualization.tsx` to `utils/skyLook.ts` (the azimuth and altitude mapping, the sea path, the compass pills, the sun colour and glow); both drawings call it, so the sun, the moon, the horizon and the labels sit at the same place. `SunVisualization` still exports the names its tests use. When the scene has loaded it fades in over the light sky (`SceneHandoff`, 0.7 s); the light sky stays opaque under it, then fades out (0.4 s) and goes (`useSceneHandoff`): no dip, no jump. The loading screen (item 170) is unchanged. If the scene chunk fails, the light sky stays and `LazyPart` reports the error.
+- **Measured (same P3 script, main `8923693` as before; median of 3 to 5 runs; "Sky" is now the light sky with the sea line and the sun, or the full scene's sun and sea where there is no light sky):**
+
+  | | First paint | Sky | Place name | Full scene | First JS |
+  |---|--:|--:|--:|--:|--|
+  | Before (main `8923693`) | 2.11 s | 9.08 s | 11.15 s | 9.1 s | 555 kB (193 kB gzip), 21 files |
+  | (c) panel body lazy | 2.11 s | 8.64 s | 10.71 s | 8.6 s | 498 kB (178 kB gzip), 18 files |
+  | (c) + (b) light first sky | **2.12 s** | **8.01 s** | 10.03 s | 12.07 s | 415 kB (149 kB gzip), 19 files |
+
+  (c) helps by 0.4 s and (b) by another 0.6 s: 1.1 s together. Both are kept. (b) costs time elsewhere: the full scene (clouds, fish, boats, birds) arrives 3.5 s after the light sky, because its chunk loads after the first bundle on the same 50 kB/s line. The bytes are the same; their order changed.
+- **Checked (follow-up):** `npm run typecheck`, `npm run lint` and `npx vitest run` pass. New tests: `InfoPanelBody` (no static import of the chunk in `src`; the header stays outside it; a closed panel draws no body; a card the user opened stays open after a close and an open), `LazyPart` (the fallback shows while a part loads), `LightSky` (the sun, the moon, the sea path and the compass pills equal the full scene's at four places and two screen sizes, north and south of the equator, in a polar night; no sun where the weather hides it; no taps; the hand-over stages and times; no static import of `SunVisualization` in `src`; the light sky imports none of the heavy scene code), `SunTracker` (the light sky shows with the scene, then only the scene). A screenshot pair at 375 × 667, 14:00 in Ravensburg, shows the light sky and the full scene with the sun, the horizon and the labels at the same pixels.
+- **Decision needed (Lutz):** the 6-s target is **not met**: sky 8.0 s, a gap of 2.0 s. The line is `4.0 s (two hops of RTT) + 164 kB / 50 000 B/s + 0.8 s of script`. Even React and the stylesheet alone (60 kB) give about 6.0 s. Only fewer hops can close the gap: the first script inline, about 2 s, which needs Cloudflare (item 181, after item 16). Until then: keep (b) and (c), and accept 8.0 s on this setup, or drop (b) if the later full scene is the worse trade.
+
 ### 175. Privacy page: every host, the IP and the storage — S (owner)
 
 - **Finding (item 165, #16, P2 Skeptic):**
@@ -3787,6 +3803,20 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   - Deviation: the first `src` is no longer set when the player mounts (the old mount call of `playStream`). The radio sets it at the first start.
   - The `play` listener sets only the switch, not the rain sound (a station change must not turn the rain button on again).
 - **Checked:** unit tests with a fake element (`play`, `pause`, `load` spies): a pause keeps the `src` and calls no `load()`; after a pause and a play, `src` is set again before `play()` (a stale value is replaced); an element `pause` turns the switch off and starts nothing; Media Session `play` calls `play()` when the element is paused and `isPlaying` is true; a `pause` event of a station change does not turn the radio off, a later one does; `playbackState` follows the element events; an `AbortError` gives no toast. Typecheck, lint, build and all 2145 tests (129 files; 2139 before) pass. Not checked: a real phone. The `pause` event on a `src` change differs between browsers: the guard covers both cases, but only a real Chrome on Android shows it. The phone checks of the **Check** line (pause in the notification and check that its Play button stays and plays, 1 and 10 min wait, headset button, a call, YouTube, screen off, Wi-Fi and mobile data, five quick pause/play pairs) are open.
+
+### 181. Cloudflare: the first script inline, with its CSP hash in dist/_headers — M
+
+- **Why:** on slow 3G, one request costs one round trip (2 s on the P3 setup of item 174). Today two requests run in a row before the app starts: the HTML, then the script. An inline first script removes the second one.
+- **Evidence (2026-10-25, item 174):** the CSP has `script-src 'self'`, so an inline script needs its hash in the CSP, and the CSP stays strict (no `'unsafe-inline'` for scripts). Vercel reads `vercel.json` before the build, so a hash made at build time cannot reach it (tested with Vercel CLI 65.2.0). Cloudflare Pages reads `dist/_headers` after the build, so a build step can write the hash there.
+- **Expected gain:** about 2 s on the sky: P3 sky 8.0 s (after item 174) to about 6 s. The first-load graph is 19 files (415 kB, 149 kB gzip), so the first-load code must be bundled into one inline script of about 150 kB gzip. The lazy chunks stay files. The HTML then carries the script and is not cached apart from it: a second visit relies on the service worker.
+- **Spec:**
+  1. A Vite build step (no new dependency) bundles the first-load code (the entry and its static imports) into one script and puts it inline in `index.html`.
+  2. The step computes the SHA-256 of the inline script and writes `'sha256-...'` into `script-src` in `dist/_headers`. The headers of `public/_headers` for every other directive stay as they are.
+  3. `tests/headers.test.ts` checks, on a build, that `dist/_headers` holds the hash of the inline script and that `script-src` has no `'unsafe-inline'`.
+  4. Check the service worker: the precache holds the new `index.html`, an update replaces it, and the offline start works.
+  5. Measure with the P3 script of item 174: first paint, sky, place name.
+- **Depends on:** item 16 (the move to Cloudflare, PR #194).
+- **Done when:** the P3 setup shows the sky in 6 s or less; the CSP has the hash and no `'unsafe-inline'` for scripts; a change in the source gives a new hash in the build with no manual step; the offline start and a service worker update work; the tests pass.
 
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 

@@ -34,11 +34,16 @@ import { getLivePlanesTag } from '@/utils/liveRadar';
 import { useLiveRoute } from '@/hooks/useLiveRoute';
 import { getMoonLook, getSkyOvercastMix, getStarCloudFactor, getStarCover } from '@/utils/weatherEffectsUtils';
 import { getAstroEvent, parseEggOverride } from '@/utils/astroEvents';
-import SunVisualization from './SunVisualization';
+// The full scene loads on its own (ROADMAP item 174); the light first sky shows until it has.
+const loadScene = () => import('./SunVisualization');
+const SunVisualization = lazy(loadScene);
+import LightSky from './LightSky';
+import SceneHandoff from './SceneHandoff';
+import { useSceneHandoff } from '@/hooks/useSceneHandoff';
 // The info card and the collection view load on their first open (ROADMAP item 125).
 const SceneInfoCard = lazy(() => import('./SceneInfoCard'));
 import { getSceneInfo, type SceneInfoTarget } from '@/utils/sceneInfo';
-import InfoPanel from './InfoPanel';
+import InfoPanel, { preloadPanelBody } from './InfoPanel';
 import NightStars from './NightStars';
 import Aurora from '@/components/Aurora';
 import EventSkyTaps from '@/components/EventSkyTaps';
@@ -309,6 +314,18 @@ const SunTracker: React.FC = () => {
   // mount only at 'done' and fade in (their own `animate-fade-in`).
   const prefersReducedMotion = usePrefersReducedMotion();
   const [reveal, setReveal] = useState<Reveal>(() => (location.loaded ? 'fade' : 'loading'));
+  // The light first sky shows until the full scene has loaded (item 174). The load starts with the
+  // app, not with the location: the scene's chunk is on its way while the place is found.
+  const sceneHandoff = useSceneHandoff();
+  useEffect(() => {
+    loadScene().catch(() => {}); // LazyPart reports a scene that does not load
+  }, []);
+  // The panel's body comes after the scene, so a tap on the panel finds it loaded (the closed
+  // panel on a phone does not need it for the first sky).
+  const isSceneIn = sceneHandoff.stage === 'full';
+  useEffect(() => {
+    if (isSceneIn) preloadPanelBody().catch(() => {}); // LazyPart reports it when the panel opens
+  }, [isSceneIn]);
   const [isSlowStart, setIsSlowStart] = useState(false);
   // Fast return (ROADMAP item 90): read once, before this page saves a new time.
   const [fastReturn] = useState(() => isFastReturn(loadLastVisible(), Date.now()));
@@ -1510,6 +1527,20 @@ const SunTracker: React.FC = () => {
       
       {location.loaded && (
         <>
+          {sceneHandoff.stage !== 'full' && (
+            <LightSky
+              sunPosition={sunPosition}
+              moonPosition={moonPosition}
+              timeOfDay={timeOfDay}
+              skyGradient={skyGradient}
+              weatherType={weatherType}
+              latitude={location.latitude}
+              cloudCoverPercent={starCover}
+              leaving={sceneHandoff.stage === 'leaving'}
+            />
+          )}
+          <LazyPart>
+          <SceneHandoff onShown={sceneHandoff.onShown}>
           <SunVisualization
             sunPosition={sunPosition}
             moonPosition={moonPosition}
@@ -1562,6 +1593,8 @@ const SunTracker: React.FC = () => {
             sunsetCountdown={countdownSeconds === null ? null : { seconds: countdownSeconds, lineOfSight: !!countdownTarget?.lineOfSight }}
             onCountdownSoundOn={isCountdownOn ? undefined : handleCountdownToggle}
           />
+          </SceneHandoff>
+          </LazyPart>
           <InfoPanel
             sunPosition={sunPosition}
             moonPosition={moonPosition}
