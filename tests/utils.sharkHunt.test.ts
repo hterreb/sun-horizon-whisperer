@@ -114,7 +114,7 @@ describe('the hunt on the prey', () => {
     expect(minnows!.some(m => m.dy < 0) && minnows!.some(m => m.dy > 0)).toBe(true);
     // The fastest move up or down: an ease-in-out at most 2x its mean, under 1.2 % of 390 px.
     const openSec = SHIFT_KEYS.open * minnowSec!;
-    for (const m of minnows!) expect((2 * Math.abs(m.dy)) / openSec).toBeLessThanOrEqual(4.68);
+    for (const m of minnows!) expect((2 * Math.abs(m.dy) * view.height / 100) / openSec).toBeLessThanOrEqual(4.68);
     // Too late: the school's front minnow would have to move before now.
     expect(planPreyHunt('H3', meet, shark, school, 86, view, plan.fireAt + 1)).toBeNull();
   });

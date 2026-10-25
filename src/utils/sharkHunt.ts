@@ -142,7 +142,7 @@ export const planMeeting = (
 export interface PreyHunt {
   variant: HuntVariant;
   slowPx?: number; // H1: the offset that slows the fish to the shark's speed (negative)
-  minnows?: { delay: number; dy: number }[]; // H3: each minnow's move, in the school's order
+  minnows?: { delay: number; dy: number }[]; // H3: each minnow's move (dy in % of the layer height), in the school's order
   minnowSec?: number; // H3: one minnow's whole move
 }
 
@@ -227,7 +227,7 @@ export const planPreyHunt = (
     huntPrey.minnowSec = ((CLOSE_AT - OPEN_AT) * unit) / gain;
     huntPrey.minnows = offsets.map((o, i) => ({
       delay: starts[i] - fireAt,
-      dy: o.y < 0 ? Math.min(-3, UP * unit - o.y) : Math.max(3, DOWN * unit - o.y),
+      dy: ((o.y < 0 ? Math.min(-3, UP * unit - o.y) : Math.max(3, DOWN * unit - o.y)) * 100) / view.height,
     }));
   }
   const rippleAt = RIPPLE_AT[variant];
