@@ -24,7 +24,8 @@ describe('the info panel body chunk (ROADMAP item 174)', () => {
       .filter((file) => staticImport.test(fs.readFileSync(file, 'utf8')));
     expect(offenders).toEqual([]);
     const panel = fs.readFileSync(path.join(SRC, 'components/InfoPanel.tsx'), 'utf8');
-    expect(panel).toMatch(/lazy\(\(\) => import\('\.\/InfoPanelBody'\)\)/);
+    expect(panel).toMatch(/import\('\.\/InfoPanelBody'\)/);
+    expect(panel).toMatch(/lazy\(preloadPanelBody\)/);
   });
 
   it('keeps the header (time of day, place, toggle) outside the chunk', () => {

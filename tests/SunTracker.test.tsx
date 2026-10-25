@@ -122,6 +122,17 @@ describe('SunTracker', () => {
     await waitFor(() => expect(screen.getByTestId('sun-visualization')).toBeInTheDocument(), { timeout: 5000 });
   });
 
+  it('shows the light first sky with the full scene, then only the full scene (item 174)', async () => {
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 47.78, longitude: 9.61 } }) } });
+    render(<SunTracker />);
+    // The light sky is in the first render of the located app, and the scene lands over it.
+    await waitFor(() => expect(screen.getByTestId('light-sky')).toBeInTheDocument(), { timeout: 5000 });
+    await waitFor(() => expect(screen.getByTestId('sun-visualization')).toBeInTheDocument(), { timeout: 5000 });
+    // After the fade (SCENE_HANDOFF_MS + LIGHT_SKY_FADE_MS) the light sky is gone and the scene stays.
+    await waitFor(() => expect(screen.queryByTestId('light-sky')).not.toBeInTheDocument(), { timeout: 5000 });
+    expect(screen.getByTestId('sun-visualization')).toBeInTheDocument();
+  });
+
   it('fetches and displays real weather (mocked)', async () => {
     global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ current: { temperature_2m: 20, weather_code: 0 } }) })) as unknown as typeof fetch;
     render(<SunTracker />);

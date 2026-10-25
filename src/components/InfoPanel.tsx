@@ -7,7 +7,9 @@ import { Button } from './ui/button';
 import PremiumBadge from './PremiumBadge';
 import { usePremiumGate } from '@/hooks/usePremium';
 import { ALWAYS_SHOWN, type IdleHide } from '@/hooks/useIdleHide';
-const InfoPanelBody = lazy(() => import('./InfoPanelBody'));
+// eslint-disable-next-line react-refresh/only-export-components -- SunTracker loads it ahead, once the scene is in
+export const preloadPanelBody = () => import('./InfoPanelBody');
+const InfoPanelBody = lazy(preloadPanelBody);
 const PlaceSearch = lazy(() => import('./PlaceSearch'));
 import {
   type SunPosition,
