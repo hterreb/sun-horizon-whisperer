@@ -37,17 +37,28 @@ export const gpUrl = (group: string): string =>
 export const SATELLITE_CACHE_KEY = 'satellite-gp';
 export const REFRESH_MS = 24 * 60 * 60 * 1000;
 export const RETRY_MS = 2 * 60 * 60 * 1000;
+// Item 177: a firewall block gives no answer, so a direct group fetch needs a timeout; a failed
+// server try waits less than CelesTrak (our server is not the one that blocks).
+export const DIRECT_TIMEOUT_MS = 8_000;
+export const SERVER_TIMEOUT_MS = 30_000;
+export const SERVER_RETRY_MS = 15 * 60 * 1000;
+// Data older than this at the real time is not used. Same value as satelliteUtils' MAX_EPOCH_AGE_MS
+// (not imported: satelliteFeed's Edge bundle takes only this file).
+const MAX_EPOCH_AGE_MS = 3 * 24 * 60 * 60 * 1000;
 
 interface SatelliteCache {
   fetchedAt: number; // the last full fetch, 0 when there was none
   triedAt: number; // the last try, also a failed one
   records: GpRecord[];
+  serverTriedAt?: number; // item 177: the last failed try of our server (absent in older caches)
 }
 
 // The night catalogue (ROADMAP item 160): the satellites of CelesTrak's `active` group (16,000,
 // 7 MB) in a 700-2000 km orbit, which stay in sunlight deep into the night. Our server
 // (api/satellites.ts, satelliteFeed) filters the group once a day.
 export const NIGHT_CATALOGUE_URL = '/api/satellites';
+// Item 177: the three groups and the night catalogue in one list, the fallback of the direct groups.
+export const ALL_GROUPS_URL = '/api/satellites?all=1';
 
 // Exported for satelliteFeed (the Edge function).
 export const isRecord = (value: unknown): value is GpRecord =>
@@ -125,52 +136,104 @@ const nextTryAt = (cache: SatelliteCache, now: number): number | null => {
   return Math.max(fresh ? cache.fetchedAt + REFRESH_MS : 0, waiting ? cache.triedAt + RETRY_MS : 0);
 };
 
-// Item 164 (R-a): the time of the next CelesTrak try, for the refresh button ("Next try at
-// 21:40"); null when a refresh fetches at once.
-export const getNextSatelliteTry = (now: number = Date.now()): number | null => {
-  const cache = readCache();
-  return cache && nextTryAt(cache, now);
+// Item 177: the cached data can be used when its first record (the ISS) is near the real time:
+// the same rule as isNearEpoch in the tracking hook.
+const isUsable = (records: GpRecord[], now: number): boolean => {
+  if (records.length === 0) return false;
+  const epochMs = Date.parse(`${records[0].EPOCH}Z`);
+  return Number.isFinite(epochMs) && Math.abs(now - epochMs) <= MAX_EPOCH_AGE_MS;
 };
 
-// The cached records when they are fresh or a try is not due yet; else one fetch per group,
-// then the night catalogue. A failed group keeps the cached records and waits RETRY_MS. Null
-// when there are no records at all.
+// When our server can be asked again after a failed try; null when it can be asked now.
+const serverNextTryAt = (cache: SatelliteCache, now: number): number | null => {
+  const tried = cache.serverTriedAt ?? 0;
+  return tried <= now && now - tried < SERVER_RETRY_MS ? tried + SERVER_RETRY_MS : null;
+};
+
+// Item 164 (R-a): the time from which a refresh can load something new ("Next try at 21:40");
+// null when it can at once. Item 177: while CelesTrak waits, a refresh asks our server, so with
+// data that cannot be used the time is the earlier end of the two waits.
+export const getNextSatelliteTry = (now: number = Date.now()): number | null => {
+  const cache = readCache();
+  const direct = cache && nextTryAt(cache, now);
+  if (!cache || direct === null) return null;
+  if (isUsable(cache.records, now)) return direct;
+  const server = serverNextTryAt(cache, now);
+  return server === null ? null : Math.min(direct, server);
+};
+
+// The three groups from CelesTrak, or null when one fails (no 200, no list, a network error or
+// a timeout).
+const fetchDirect = async (fetchImpl: typeof fetch): Promise<GpRecord[] | null> => {
+  const records: GpRecord[] = [];
+  for (const group of SATELLITE_GROUPS) {
+    try {
+      const response = await fetchImpl(gpUrl(group), { signal: AbortSignal.timeout(DIRECT_TIMEOUT_MS) });
+      // Only a 200 counts; CelesTrak asks clients to stop on anything else.
+      const data: unknown = response.status === 200 ? await response.json() : null;
+      if (!Array.isArray(data)) return null;
+      records.push(...data.filter(isRecord).map(trim));
+    } catch {
+      return null;
+    }
+  }
+  return records;
+};
+
+// Item 177: the groups and the night catalogue from our server, or null.
+const fetchFromServer = async (fetchImpl: typeof fetch): Promise<GpRecord[] | null> => {
+  try {
+    const response = await fetchImpl(ALL_GROUPS_URL, { signal: AbortSignal.timeout(SERVER_TIMEOUT_MS) });
+    const data: unknown = response.status === 200 ? await response.json() : null;
+    const records = Array.isArray(data) ? dedupeRecords(data.filter(isRecord).map(trim)) : [];
+    return records.length > 0 ? records : null;
+  } catch {
+    return null;
+  }
+};
+
+// The cached records when they are fresh or a CelesTrak try is not due yet; else one fetch per
+// group, then the night catalogue. When a group fails, or while the wait holds and the cached
+// data is too old or missing, our server gives the list (item 177). A failed group keeps the
+// cached records and waits RETRY_MS, a failed server try SERVER_RETRY_MS. Null when there are
+// no records at all.
 export const loadSatelliteData = async (
   now: number = Date.now(),
   fetchImpl: typeof fetch = fetch,
 ): Promise<GpRecord[] | null> => {
   const cache = readCache();
-  if (cache && nextTryAt(cache, now) !== null) return cache.records.length > 0 ? cache.records : null;
+  const cached = cache?.records ?? [];
+  const keep = (): GpRecord[] | null => (cached.length > 0 ? cached : null);
+  const directDue = !cache || nextTryAt(cache, now) === null;
+  if (!directDue && isUsable(cached, now)) return keep();
 
-  const records: GpRecord[] = [];
-  let failed = false;
-  for (const group of SATELLITE_GROUPS) {
-    try {
-      const response = await fetchImpl(gpUrl(group));
-      // Only a 200 counts; CelesTrak asks clients to stop on anything else.
-      if (response.status !== 200) {
-        failed = true;
-        break;
-      }
-      const data: unknown = await response.json();
-      if (!Array.isArray(data)) {
-        failed = true;
-        break;
-      }
-      records.push(...data.filter(isRecord).map(trim));
-    } catch {
-      failed = true;
-      break;
+  if (directDue) {
+    const direct = await fetchDirect(fetchImpl);
+    if (direct) {
+      // After the groups, so the ISS stays the first record (useSatelliteTracking's epoch check).
+      direct.push(...(await fetchNightCatalogue(fetchImpl)));
+      const deduped = dedupeRecords(direct);
+      writeCache({ fetchedAt: now, triedAt: now, records: deduped });
+      return deduped.length > 0 ? deduped : null;
     }
   }
-  if (failed) {
-    const kept = cache?.records ?? [];
-    writeCache({ fetchedAt: cache?.fetchedAt ?? 0, triedAt: now, records: kept });
-    return kept.length > 0 ? kept : null;
+
+  // The server: after a failed direct try, or while the direct wait holds with unusable data.
+  const base: SatelliteCache = {
+    fetchedAt: cache?.fetchedAt ?? 0,
+    triedAt: directDue ? now : cache?.triedAt ?? 0,
+    records: cached,
+    serverTriedAt: cache?.serverTriedAt,
+  };
+  if (cache && serverNextTryAt(cache, now) !== null) {
+    writeCache(base);
+    return keep();
   }
-  // After the groups, so the ISS stays the first record (useSatelliteTracking's epoch check).
-  records.push(...(await fetchNightCatalogue(fetchImpl)));
-  const deduped = dedupeRecords(records);
-  writeCache({ fetchedAt: now, triedAt: now, records: deduped });
-  return deduped.length > 0 ? deduped : null;
+  const fromServer = await fetchFromServer(fetchImpl);
+  if (fromServer && isUsable(fromServer, now)) {
+    writeCache({ ...base, records: fromServer, serverTriedAt: undefined });
+    return fromServer;
+  }
+  writeCache({ ...base, serverTriedAt: now });
+  return keep();
 };

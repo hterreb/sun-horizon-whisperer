@@ -3,6 +3,8 @@ import {
   NIGHT_CATALOGUE_URL,
   REFRESH_MS,
   RETRY_MS,
+  SERVER_RETRY_MS,
+  ALL_GROUPS_URL,
   SATELLITE_CACHE_KEY,
   SATELLITE_GROUPS,
   dedupeRecords,
@@ -19,6 +21,9 @@ const other: GpRecord = { ...iss, OBJECT_NAME: 'OTHER', NORAD_CAT_ID: 1, MEAN_AN
 
 const response = (status: number, body: unknown) => ({ status, json: async () => body }) as Response;
 const NOW = Date.parse('2026-10-06T08:00:00Z');
+const urlOf = (call: unknown[]) => String(call[0]);
+const directCalls = (fn: ReturnType<typeof vi.fn>) => fn.mock.calls.filter((c) => urlOf(c).includes('celestrak.org')).length;
+const serverCalls = (fn: ReturnType<typeof vi.fn>) => fn.mock.calls.filter((c) => urlOf(c) === ALL_GROUPS_URL).length;
 
 describe('satelliteData (ROADMAP item 97)', () => {
   beforeEach(() => localStorage.clear());
@@ -70,11 +75,12 @@ describe('satelliteData (ROADMAP item 97)', () => {
     const later = NOW + REFRESH_MS;
     const blocked = vi.fn(async () => response(403, 'blocked'));
     expect((await loadSatelliteData(later, blocked))?.[0].OBJECT_NAME).toBe('ISS (ZARYA)');
-    expect(blocked).toHaveBeenCalledTimes(1);
+    // One group request, then (item 177) one server request.
+    expect(directCalls(blocked)).toBe(1);
     await loadSatelliteData(later + RETRY_MS - 1, blocked);
-    expect(blocked).toHaveBeenCalledTimes(1);
+    expect(directCalls(blocked)).toBe(1);
     await loadSatelliteData(later + RETRY_MS, blocked);
-    expect(blocked).toHaveBeenCalledTimes(2);
+    expect(directCalls(blocked)).toBe(2);
   });
 
   it('returns null without any data, also after a network error', async () => {
@@ -83,7 +89,8 @@ describe('satelliteData (ROADMAP item 97)', () => {
     });
     expect(await loadSatelliteData(NOW, offline)).toBeNull();
     expect(await loadSatelliteData(NOW + 1000, offline)).toBeNull();
-    expect(offline).toHaveBeenCalledTimes(1);
+    expect(directCalls(offline)).toBe(1);
+    expect(serverCalls(offline)).toBe(1);
   });
 
   it('does not keep a cache from the future fresh (clock set back)', async () => {
@@ -97,11 +104,13 @@ describe('satelliteData (ROADMAP item 97)', () => {
     expect(getNextSatelliteTry(NOW)).toBeNull();
     const blocked = vi.fn(async () => response(403, 'blocked'));
     expect(await loadSatelliteData(NOW, blocked)).toBeNull();
-    expect(getNextSatelliteTry(NOW + 60_000)).toBe(NOW + RETRY_MS);
+    // Both wait (CelesTrak 2 h, our server 15 min): the next try is the server's.
+    expect(getNextSatelliteTry(NOW + 60_000)).toBe(NOW + SERVER_RETRY_MS);
     const fetchImpl = vi.fn(async () => response(200, [iss]));
     expect(await loadSatelliteData(NOW + 60_000, fetchImpl)).toBeNull();
-    expect(await loadSatelliteData(NOW + RETRY_MS - 1, fetchImpl)).toBeNull();
+    expect(await loadSatelliteData(NOW + SERVER_RETRY_MS - 1, fetchImpl)).toBeNull();
     expect(fetchImpl).not.toHaveBeenCalled();
+    expect(getNextSatelliteTry(NOW + SERVER_RETRY_MS)).toBeNull();
     expect(getNextSatelliteTry(NOW + RETRY_MS)).toBeNull();
     expect(await loadSatelliteData(NOW + RETRY_MS, fetchImpl)).toHaveLength(1);
     expect(fetchImpl).toHaveBeenCalledTimes(4);
@@ -120,8 +129,9 @@ describe('satelliteData (ROADMAP item 97)', () => {
       const blocked = vi.fn(async () => response(403, 'blocked'));
       expect(await data.loadSatelliteData(NOW, blocked)).toBeNull();
       expect(await data.loadSatelliteData(NOW + 60_000, blocked)).toBeNull();
-      expect(blocked).toHaveBeenCalledTimes(1);
-      expect(data.getNextSatelliteTry(NOW + 60_000)).toBe(NOW + RETRY_MS);
+      expect(directCalls(blocked)).toBe(1);
+      expect(serverCalls(blocked)).toBe(1);
+      expect(data.getNextSatelliteTry(NOW + 60_000)).toBe(NOW + SERVER_RETRY_MS);
     } finally {
       vi.restoreAllMocks();
     }
@@ -130,6 +140,73 @@ describe('satelliteData (ROADMAP item 97)', () => {
   it('gives no next try for a cache from the future (clock set back)', async () => {
     await loadSatelliteData(NOW, vi.fn(async () => response(200, [iss])));
     expect(getNextSatelliteTry(NOW - 3 * RETRY_MS)).toBeNull();
+  });
+
+  // Item 177: our server is the fallback of the direct groups.
+  describe('server fallback (item 177)', () => {
+    const serverRecords = [iss, other];
+    const serverFetch = (direct: () => Promise<Response>) => vi.fn(async (url: string) => (
+      url === ALL_GROUPS_URL ? response(200, serverRecords) : direct()
+    ));
+
+    it.each([
+      ['a 403', async () => response(403, 'blocked')],
+      ['a network error', async () => { throw new TypeError('Failed to fetch'); }],
+      ['a timeout', async () => { throw new DOMException('timed out', 'TimeoutError'); }],
+    ])('a direct group fails with %s: one server request and its records', async (_name, direct) => {
+      const fetchImpl = serverFetch(direct);
+      const records = await loadSatelliteData(NOW, fetchImpl as unknown as typeof fetch);
+      expect(records?.map((r) => r.OBJECT_NAME)).toEqual(['ISS (ZARYA)', 'OTHER']);
+      expect(directCalls(fetchImpl)).toBe(1);
+      expect(serverCalls(fetchImpl)).toBe(1);
+    });
+
+    it('gives every direct group request a timeout', async () => {
+      const fetchImpl = vi.fn(async () => response(200, [iss]));
+      await loadSatelliteData(NOW, fetchImpl);
+      const init = (fetchImpl.mock.calls[0] as unknown[])[1] as RequestInit;
+      expect(init.signal).toBeInstanceOf(AbortSignal);
+    });
+
+    it('does not ask CelesTrak again within 2 h, but asks the server when the cached data is too old', async () => {
+      const stale = { ...iss, EPOCH: '2026-09-20T00:00:00.000' };
+      localStorage.setItem(SATELLITE_CACHE_KEY, JSON.stringify({ fetchedAt: NOW - 3 * REFRESH_MS, triedAt: NOW - 60_000, records: [stale] }));
+      const fetchImpl = serverFetch(async () => response(403, 'blocked'));
+      const records = await loadSatelliteData(NOW, fetchImpl as unknown as typeof fetch);
+      expect(records?.map((r) => r.OBJECT_NAME)).toEqual(['ISS (ZARYA)', 'OTHER']);
+      expect(directCalls(fetchImpl)).toBe(0);
+      expect(serverCalls(fetchImpl)).toBe(1);
+    });
+
+    it('uses the cached data without the server while the wait holds and the data is usable', async () => {
+      localStorage.setItem(SATELLITE_CACHE_KEY, JSON.stringify({ fetchedAt: NOW - 3 * REFRESH_MS, triedAt: NOW - 60_000, records: [iss] }));
+      const fetchImpl = vi.fn(async () => response(200, []));
+      expect(await loadSatelliteData(NOW, fetchImpl)).toHaveLength(1);
+      expect(fetchImpl).not.toHaveBeenCalled();
+      expect(getNextSatelliteTry(NOW)).toBe(NOW - 60_000 + RETRY_MS);
+    });
+
+    it('a failed server try waits 15 min, then asks again; the 2 h CelesTrak wait stays', async () => {
+      const fetchImpl = vi.fn(async (url: string) => (url === ALL_GROUPS_URL ? response(200, []) : response(403, 'blocked')));
+      expect(await loadSatelliteData(NOW, fetchImpl as unknown as typeof fetch)).toBeNull();
+      expect(await loadSatelliteData(NOW + SERVER_RETRY_MS - 1, fetchImpl as unknown as typeof fetch)).toBeNull();
+      expect(serverCalls(fetchImpl)).toBe(1);
+      expect(await loadSatelliteData(NOW + SERVER_RETRY_MS, fetchImpl as unknown as typeof fetch)).toBeNull();
+      expect(serverCalls(fetchImpl)).toBe(2);
+      expect(directCalls(fetchImpl)).toBe(1);
+    });
+
+    it('keeps the data of an old cache entry without serverTriedAt (compatible format)', async () => {
+      localStorage.setItem(SATELLITE_CACHE_KEY, JSON.stringify({ fetchedAt: NOW - 60_000, triedAt: NOW - 60_000, records: [iss] }));
+      expect(await loadSatelliteData(NOW, vi.fn())).toHaveLength(1);
+    });
+
+    it('asks the server after a direct success only for the night catalogue (as before)', async () => {
+      const fetchImpl = vi.fn(async () => response(200, [iss]));
+      await loadSatelliteData(NOW, fetchImpl);
+      expect(serverCalls(fetchImpl)).toBe(0);
+      expect(fetchImpl.mock.calls.at(-1)?.[0]).toBe(NIGHT_CATALOGUE_URL);
+    });
   });
 
   it('ignores a broken cache entry', async () => {
