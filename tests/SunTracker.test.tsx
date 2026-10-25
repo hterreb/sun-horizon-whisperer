@@ -1,7 +1,8 @@
 import React from 'react';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import SunTracker from '../src/components/SunTracker';
-import { vi } from 'vitest';
+import { beforeAll, vi } from 'vitest';
+import { preloadMonitoring } from '@/utils/monitoring';
 import { TAP_READY_MS } from '../src/hooks/useIdleHide';
 import { DOUBLE_TAP_MS } from '../src/hooks/useDoubleTap';
 import { SUN_TAP_GAP_MS } from '../src/utils/hiddenEggs';
@@ -51,6 +52,8 @@ import { FADE_OUT_MS, SHOW_MS } from '../src/components/BadgeUnlocked';
 import { type EggCardKind } from '../src/utils/sceneInfo';
 
 describe('SunTracker', () => {
+  // Sentry is behind utils/monitoring (ROADMAP item 174): load it once, so a tag or a breadcrumb arrives at once.
+  beforeAll(preloadMonitoring);
   beforeEach(() => {
     vi.resetAllMocks();
     localStorage.clear();
