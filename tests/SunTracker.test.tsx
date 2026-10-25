@@ -1815,6 +1815,19 @@ describe('SunTracker', () => {
       vi.useRealTimers();
     });
 
+    it('a double tap on a decorative plane opens its card and shows no "Badge unlocked" (item 178)', () => {
+      vi.useFakeTimers();
+      render(<SunTracker />);
+      expect(visProps.current).toBeTruthy();
+      act(() => {
+        visProps.current!.onSceneInfo!({ type: 'plane', contrail: 'short' }, { x: 200, y: 300 }, 'plane');
+      });
+      expect(screen.getByRole('dialog', { name: 'Airliner' })).toBeInTheDocument();
+      expect(unlocked()).toBeNull();
+      expect(localStorage.getItem('collection')).toBeNull();
+      vi.useRealTimers();
+    });
+
     it('two new badges show one after the other, not stacked', () => {
       vi.useFakeTimers();
       render(<SunTracker />);
