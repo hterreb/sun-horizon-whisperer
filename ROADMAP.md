@@ -3669,6 +3669,75 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   - 17: the panel header is not sticky over the rows; the scroll area cuts a row at its top edge, as any scroll list.
   - 25: not reproduced in this item; the next live check watches for it.
 
+### 177. Satellite data: our server as the fallback for all groups — M — [SUN-CHASER-28](https://ainabler.sentry.io/issues/SUN-CHASER-28)
+
+- **Feedback (2026-10-24 18:25 CEST, Ravensburg):** "This evening live data for satellites and planes isn't working can you please analyze why this fails?".
+- **Analysis (2026-10-25):**
+  - The four feedback events of 24 and 25 Oct (SUN-CHASER-28, 29, 2A, 2B, all Ravensburg, release `48ba5e0`) have the tag `satellites: error` (item 164). So the tracking failed for at least a day. No error event has the tag, so Sentry cannot show other places.
+  - **Planes:** `live-planes: error` at 18:25:17, then `ok-0/28` at 18:25:57 and `ok-2/36` on 25 Oct. A short outage that the 15 s poll repaired. `/api/planes` answered 200 in 115 ms on 25 Oct. No change needed beyond item 164.
+  - **Satellites:** from this computer, a request to `celestrak.org` gets no connection (it fails after 10.5 s). DNS resolves the host, and two outside checkers report CelesTrak up (HTTP 200). So CelesTrak's firewall blocks this IP. The likely start: the item 165 launch check on 19 Oct, with about 60 CelesTrak downloads from one IP in 30 minutes (item 165, finding 13: CelesTrak 403).
+  - The app asks CelesTrak itself for the three groups (`loadSatelliteData`). A failed group keeps the cached records and waits 2 h. After 3 days the cached data is too old (`isNearEpoch`), so the status is `error`. The night catalogue comes from our server (`/api/satellites`, 1,109 satellites, an edge cache hit in 123 ms), but `loadSatelliteData` does not ask for it when a group fails. So the server's working data is not used.
+  - Any user can get this: each browser downloads the groups from its own IP. Satellite tracking is on by default, so each first visit contacts CelesTrak before any consent (item 165, finding 16). Several devices behind one router, or a reload loop, can reach CelesTrak's limit.
+- **Spec options:** **S1 Server only** (the app never asks CelesTrak; `celestrak.org` leaves the CSP). **S2 Direct first, the server as the fallback** for all groups (CelesTrak stays in the CSP and on the privacy page).
+- **Decision (Lutz, 2026-10-25):** S2: "do direct calls but fallback via server for all groups". And help to get the home IP unblocked (owner task below).
+- **Spec (S2):**
+  1. **The server has all groups:** `/api/satellites?all=1` gives one list: the three groups (`stations`, `visual`, `last-30-days`), then the night catalogue, without duplicates (`dedupeRecords`; the ISS stays first). The Edge function asks CelesTrak for the four lists once per edge cache and day (`s-maxage=86400`, `stale-while-revalidate`). After the first failed list it stops and returns what it has, with the 2 h error cache. `/api/satellites` without `all` stays the night catalogue (old app versions).
+  2. **Direct first:** `loadSatelliteData` asks CelesTrak for the three groups as now, each with a timeout of 8 s (a firewall block gives no answer, so a fetch without a timeout hangs). The 2 h wait after a failed direct try stays: the app does not ask CelesTrak again within 2 h.
+  3. **The fallback:** when a direct group fails, or while the 2 h wait runs and the cached data is too old or missing, `loadSatelliteData` asks `/api/satellites?all=1` at once and uses its list. A failed server try waits 15 min. After a direct success, the night catalogue comes from `/api/satellites` as now.
+  4. **Status and refresh (item 164):** the status is `error` only when the direct groups and the server both give no usable data. The refresh asks the server at once when the direct wait runs. The "next try at" line shows only when both wait.
+- **Check:** `utils.satelliteFeed`: `?all=1` gives the four lists in one answer, the ISS first, no duplicates; the stop after a failed list; the cache headers; without `all` the night catalogue as before. `utils.satelliteData`: a direct 403, a network error and a timeout each lead to one server request and its records; no CelesTrak request within 2 h after a failed one; the 15 min server wait. `useSatelliteTracking`: `ok` from the server data while CelesTrak fails. Browser (built app, CelesTrak mapped to NOTFOUND, `/api/satellites?all=1` stubbed): the tracking shows `ok` with satellites.
+- **Owner:** ask CelesTrak to unblock the home IP (an e-mail draft is in this session; the IP does not go into this public repo).
+- **Open:** Vercel's edge IPs are shared with other customers, so CelesTrak can block one of them too. Then the edge keeps the last good answer for up to a day (`stale-while-revalidate`). After item 16 (Cloudflare), the same logic runs as a Pages Function.
+
+### 178. Collection: no base badge for the plane — S — [SUN-CHASER-29](https://ainabler.sentry.io/issues/SUN-CHASER-29)
+
+- **Feedback (2026-10-24 18:25 CEST, Ravensburg):** "Badges for standard air plane and satellite can be removed I think".
+- **Now:**
+  - The collection has 140 badges (`tests/utils.collection.test.ts`), 53 of them eggs.
+  - Item 138 retired the base badges `sun`, `moon`, `terrain` and `satellite` (`RETIRED_IDS`, `collection.ts`). They are not in `BADGES`. An old save keeps them in storage; they do not show and do not count (`countCollected`).
+  - `plane` is the one base badge left: group sky, no rarity, name `plane.airliner`. It is the first cell of the plane row (`CollectionView`, 6 cells). A double tap on a decorative plane or on a live plane gives it (`badgeForTarget`: `plane` and `livePlane`). A live plane also gives a haul badge (`plane:regional` … `plane:ultraLong`, common to very rare) when its route comes (`badgeForRoute`).
+  - Satellites: the tracked satellites give a size badge (`satellite:small|medium|large|giant|iss`, common to very rare). The decorative dot gives no badge (Lutz, 2026-10-15). There is no base satellite badge now.
+  - So "standard air plane" is most likely `plane`. "Standard satellite" has no badge now. It can mean the old base badge (gone since item 138) or the common `satellite:small`.
+- **Spec (options):**
+  - **A Remove the base `plane` badge** (as item 138 did for the others): `plane` goes to `RetiredBadgeId` and `RETIRED_IDS`; `badgeForTarget` gives no badge for `plane` and `livePlane`. The decorative plane opens its card and gives no badge. A live plane gives its haul badge when the route comes. 139 badges; the plane row has 5 cells. Old saves keep the id, hidden and not counted.
+  - **B A and the satellite sizes:** also retire the 5 `satellite:*` badges. 134 badges. The satellite card stays.
+- **Check:** `utils.collection`: 139 badges; no `plane` id; `badgeForTarget` null for `plane` and `livePlane`; an old save with `plane` counts 139 at most. `CollectionView`: the plane row has 5 cells. `SunTracker`: a double tap on a decorative plane opens the card and shows no "Badge unlocked". `i18n.test` (the key `plane.airliner` stays in use by the card).
+- **Open:** (a) A or B? (b) Is "standard satellite" the size badge `satellite:small`, or only the old base badge?
+- **Decision (Lutz, 2026-10-25):** A, the base `plane` badge only. The satellite size badges stay.
+
+### 179. Rotating the phone: fish stay below the horizon — S — [SUN-CHASER-2A](https://ainabler.sentry.io/issues/SUN-CHASER-2A)
+
+- **Feedback (2026-10-24 18:26 CEST, Ravensburg):** "When rotating from portrait to landscape sometimes fish or boats can end up above the horizon".
+- **Now (`CloudLayer`):**
+  - Each fish and boat is at `top: y%` of the layer, so a rotation lays them out again at once. The sea follows `containerDimensions.height × 0.65` within about 150 ms (debounced).
+  - **Fish lane change (item 102):** the move to the new lane is in px, computed once at the start: `shift.dy = (y − path.y) × window.innerHeight / 100` → `--shift-dy: …px` → `translateY(var(--shift-dy))`, `3 s ease-in-out … both`. With `both`, the fish keeps the move for the rest of its crossing. The hunt moves of the minnows (`--hunt-dy`) are px too. A move can be up to about 26 % of the height (`FISH_DEPTH_SPAN`).
+  - **Boats:** `y` is 67 % or more, so the waterline is always below the horizon (65 %). No px offset found. A tall hull (cargo ship, tall ship) stands above the horizon by design.
+- **Root cause:** a lane move in px keeps its size when the height changes. Example: in portrait (844 px) a fish moves up 20 % = −169 px. In landscape (390 px) the same −169 px is −43 %: a fish at 70 % goes to 27 %, far above the horizon. Landscape to portrait gives a fish that is too low, not too high. It happens only when the rotation comes during or after a lane change of a fish that is still crossing, so "sometimes".
+- **Reproduced:** by calculation. A browser run (390 × 844 → 844 × 390, 3 runs, all hosts stubbed) had a fish and a boat but no lane change at the rotation; both stayed below the horizon.
+- **Spec:** the lane move and the hunt moves are in % of the layer height, not in px (for example `calc(var(--shift-p) * 1cqh)` with the layer as the size container). A rotation then scales the move with the layout, with no jump. Both directions are fixed.
+- **Check:** a `CloudLayer` test: the lane and hunt variables have no `px`; a fish that moved 20 % up at 844 px is still 20 % up after a resize to 390 px. Browser: a rotation during a lane change (forced with the test hooks), the fish box stays below `0.65 × height` at 0.1, 0.4, 1.5 and 4 s.
+- **Open:** (a) Boats: the code keeps them below the horizon. Was it a tall hull above the horizon line (by design), or is there a screenshot?
+- **Decision (Lutz, 2026-10-25):** fix the fish only. Boats stay as they are.
+
+### 180. Radio: Play works after a pause outside the app — S — [SUN-CHASER-2B](https://ainabler.sentry.io/issues/SUN-CHASER-2B)
+
+- **Feedback (2026-10-25 18:53 CET, Ravensburg):** "Play after pause outside the app not possible for radio".
+- **Now:**
+  - `MusicPlayer` makes one `<audio>` element (`preload="none"`). It sets `src` at the start and on a station change, never on a pause or a play.
+  - The React state `isPlaying` is the only state. One effect calls `play()` or `pause()` when `isPlaying` changes. The element has listeners only for `error` and `canplay`, none for `pause`, `play`, `ended` or `stalled`.
+  - Media Session (item 90): the `play` handler is `setIsPlaying(true)`, the `pause` handler `setIsPlaying(false)`. `playbackState` follows `isPlaying`, not the element.
+  - **Pause in the notification or on the lock screen:** `isPlaying` goes false and the element pauses. Play then calls `play()` on the same element with the same `src`. A paused live HTTP stream often does not continue: the server closes the idle connection, and the element stays silent or stalls. Nothing loads the `src` again.
+  - **Pause by the OS** (a headset button, another app takes the audio, a call): the element pauses itself, but `isPlaying` stays true and the switch shows "on". Play in the notification sets `isPlaying` to true again: no change, so the effect does not run and `play()` is never called. In the app, the first tap on the switch turns it off, and only the second plays.
+- **Root cause (likely, both):** (1) the state and the element go out of sync after an OS pause, so Play does nothing; (2) a play after a pause uses the stale live stream. Both need a real phone to confirm.
+- **Spec:**
+  1. **A new stream on each start:** when the radio starts (switch, notification Play, a station change), set `src` from the current station, then `play()`. On a pause, also remove the `src` and call `load()`: this closes the stream and saves data.
+  2. **The switch follows the element:** `pause` and `play` listeners set `isPlaying` to the element's real state. The Media Session `play` handler always runs the start of spec 1. `playbackState` follows the element. A `pause` event during a station change does not turn the radio off.
+  3. After a call or another app, the radio does not start by itself: it waits for a tap.
+  4. The item 176 rule stays: an `AbortError` gives no "Playback failed".
+- **Check:** `MusicPlayer` tests with a fake audio element: after a pause and a play, `src` is set again before `play()`; a `pause` event from the element turns the switch off; the Media Session `play` calls `play()` when the element is paused but `isPlaying` is true; no toast for an `AbortError`; a station change keeps the radio on. Real phone (Play test app): pause in the notification, wait 1 min and 10 min, Play; pause by a headset button, a call and another app (YouTube), then Play in the notification and in the app; screen off; Wi-Fi and mobile data; five quick pause/play pairs.
+- **Open:** (a) Should a pause close the stream (spec 1: saves data, a start takes 1–2 s), or keep it for a faster start when the pause is short? (b) Spec 3: wait for a tap (recommended), or start again by itself after a call?
+- **Decision (Lutz, 2026-10-25):** a pause closes the stream (spec 1), and after a call or another app the radio waits for a tap (spec 3).
+
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 
 Rules for all items:
