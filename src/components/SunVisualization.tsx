@@ -4,14 +4,7 @@ import { Sun, ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp, Mountain, Bel
 import { type SunPosition, type SunTimes, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors, getReflectionFade, getSunPathAround, getDayLengthMinutes } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
 import { getSunArcLabels, getMoonArcLabels, getTerrainArcLabels, getTerrainMoonArcLabels, type ArcLabels, type ArcLabelPoint } from '../utils/arcLabels';
-import {
-  altitudeToY, getScreenPosition, resolveAzimuth, getVisibleCardinalLabels, getCardinalPills, getSeaEdgePath, getSeaPath, getSeaTop,
-  getSunColorClass, getSunGlowToken as sunGlowToken, getGlowClass, DIRECTION_LABELS, COMPASS_FOV_DEG, getAzimuthAtFraction, getCompassScreenFraction,
-} from '../utils/skyLook';
-// The mapping moved to utils/skyLook.ts (item 174), so the light first sky uses the same one; these stay
-// exported from here for the callers and tests that know them.
-// eslint-disable-next-line react-refresh/only-export-components -- re-exported for unit testing
-export { getAzimuthScreenFraction, getCompassScreenFraction, getAzimuthAtFraction, COMPASS_FOV_DEG, CARDINAL_DIRECTIONS, getVisibleCardinalLabels, type CompassScreenFraction } from '../utils/skyLook';
+import { shortestHeadingDelta } from '../utils/compassUtils';
 import { type HorizonProfile, horizonAngleAt } from '../utils/horizonUtils';
 import { type RidgePoint, type TreeLayer } from '@/utils/treeSilhouettes';
 import CloudLayer, { type SceneInfoHandler, type WeatherType } from './CloudLayer';
@@ -172,6 +165,66 @@ interface SunVisualizationProps {
   satellites?: SkySatellite[] | null;
 }
 
+// Maps an azimuth (0-360°, 0 = North) to a horizontal screen fraction (0-1), for the
+// static (non-compass) 360°-across-the-screen mode.
+// North hemisphere: sun/moon culminate at 180° (South), which already sits at the
+// center of a linear 0->left/360->right mapping, so no shift is needed.
+// South hemisphere: culmination is at 0°/360° (North), which would otherwise land on
+// the screen edge and jump edge-to-edge at noon. Shifting by 180° before mapping
+// centers the culmination instead.
+// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
+export const getAzimuthScreenFraction = (azimuth: number, latitude: number): number => {
+  const hemisphereShifted = latitude < 0 ? (azimuth + 180) % 360 : azimuth;
+  return ((hemisphereShifted % 360) + 360) % 360 / 360;
+};
+
+// Compass mode's field of view in degrees (ROADMAP item 19): how much of the horizon
+// maps onto the screen width, centered on the current device heading. Named/exported
+// so it's easy to tune from real-device testing.
+export const COMPASS_FOV_DEG = 90;
+
+export interface CompassScreenFraction {
+  fraction: number; // 0.5 = screen center (the heading); continues outside [0, 1] when not visible
+  visible: boolean;
+}
+
+// Maps an azimuth to a horizontal screen fraction under compass mode's field-of-view:
+// screen center is the current heading, +-fov/2 either side. No hemisphere shift and
+// no wrap - `shortestHeadingDelta` already gives the signed short way from the heading
+// to the azimuth, so there's no 0°/360° jump (ROADMAP item 19).
+// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
+export const getCompassScreenFraction = (
+  azimuth: number,
+  heading: number,
+  fov = COMPASS_FOV_DEG
+): CompassScreenFraction => {
+  const delta = shortestHeadingDelta(heading, azimuth);
+  return { fraction: 0.5 + delta / fov, visible: Math.abs(delta) <= fov / 2 };
+};
+
+// Resolves an azimuth to a screen fraction under whichever mode is active: the static
+// full-circle mapping (compassHeading null/undefined, always visible) or the compass
+// field-of-view mapping (ROADMAP item 19). Shared by every azimuth consumer below -
+// sun/moon dots, both arcs, cardinal labels, and the rainbow.
+const resolveAzimuth = (
+  azimuth: number,
+  latitude: number,
+  compassHeading?: number | null
+): CompassScreenFraction =>
+  compassHeading === null || compassHeading === undefined
+    ? { fraction: getAzimuthScreenFraction(azimuth, latitude), visible: true }
+    : getCompassScreenFraction(azimuth, compassHeading);
+
+// The inverse of resolveAzimuth (ROADMAP item 95): the azimuth at a screen fraction, for a
+// tap on the terrain.
+// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
+export const getAzimuthAtFraction = (fraction: number, latitude: number, compassHeading?: number | null): number => {
+  const azimuth = compassHeading === null || compassHeading === undefined
+    ? fraction * 360 + (latitude < 0 ? 180 : 0)
+    : compassHeading + (fraction - 0.5) * COMPASS_FOV_DEG;
+  return ((azimuth % 360) + 360) % 360;
+};
+
 // The tapped point of a click (ROADMAP item 95); a keyboard click has none, so the centre of
 // the element.
 const tapPoint = (event: React.MouseEvent<Element>): { x: number; y: number } => {
@@ -179,6 +232,43 @@ const tapPoint = (event: React.MouseEvent<Element>): { x: number; y: number } =>
   const box = event.currentTarget.getBoundingClientRect();
   return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
 };
+
+// The 8 cardinal/intercardinal directions shown as static horizon labels (ROADMAP
+// item 8), always in clockwise order from North.
+// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
+export const CARDINAL_DIRECTIONS = [
+  { label: 'N', azimuth: 0 },
+  { label: 'NE', azimuth: 45 },
+  { label: 'E', azimuth: 90 },
+  { label: 'SE', azimuth: 135 },
+  { label: 'S', azimuth: 180 },
+  { label: 'SW', azimuth: 225 },
+  { label: 'W', azimuth: 270 },
+  { label: 'NW', azimuth: 315 },
+] as const;
+
+// The shown label in the UI language (ROADMAP item 67), e.g. "NO" for NE in German.
+const DIRECTION_LABELS: Record<string, MessageKey> = {
+  N: 'direction.n', NE: 'direction.ne', E: 'direction.e', SE: 'direction.se',
+  S: 'direction.s', SW: 'direction.sw', W: 'direction.w', NW: 'direction.nw',
+};
+
+// Screen fraction for each cardinal label, using the same azimuth->x mapping as the
+// sun/moon, so labels stay correct in both hemispheres and pan together with the
+// scene. In compass mode, a label outside the field of view is dropped instead of
+// being clamped to the edge (ROADMAP item 19); the finite-fraction guard still covers
+// a non-finite result (e.g. NaN input).
+// eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
+export const getVisibleCardinalLabels = (
+  latitude: number,
+  compassHeading?: number | null
+): Array<{ label: string; azimuth: number; fraction: number }> =>
+  CARDINAL_DIRECTIONS
+    .map((direction) => {
+      const { fraction, visible } = resolveAzimuth(direction.azimuth, latitude, compassHeading);
+      return { ...direction, fraction, visible };
+    })
+    .filter((direction) => Number.isFinite(direction.fraction) && direction.visible);
 
 export type ArcLabelKind = 'rise' | 'zenith' | 'set';
 
@@ -252,6 +342,41 @@ export const getRainbowGeometry = (
 // eslint-disable-next-line react-refresh/only-export-components -- exported for unit testing
 export const crossesHorizon = (prevAltitude: number, currentAltitude: number): boolean =>
   (prevAltitude < 0) !== (currentAltitude < 0);
+
+// The altitude->y part of the mapping, shared by the clamped (dot) and unclamped
+// (arc) screen positions below.
+const altitudeToY = (altitude: number, height: number): number => {
+  const horizonY = height * 0.65;
+  const altitudeRadians = altitude * (Math.PI / 180);
+  const maxAltitudeHeight = horizonY - 30;
+  return horizonY - Math.sin(altitudeRadians) * maxAltitudeHeight;
+};
+
+// Maps a sky position (altitude/azimuth, in degrees) to screen x/y for the given
+// container size and latitude, clamped to the screen edges - used for the sun and
+// moon's current-position dots only (ROADMAP item 17 keeps arcs unclamped, see
+// getArcScreenPosition below). Also reports FOV visibility (ROADMAP item 19): a dot
+// outside the compass field of view should be hidden, not clamped to the edge.
+const getScreenPosition = (
+  altitude: number,
+  azimuth: number,
+  width: number,
+  height: number,
+  latitude: number,
+  compassHeading?: number | null
+): { x: number; y: number; visible: boolean } => {
+  if (width === 0 || height === 0) return { x: 0, y: 0, visible: true };
+
+  const { fraction, visible } = resolveAzimuth(azimuth, latitude, compassHeading);
+  const x = width * fraction;
+  const y = altitudeToY(altitude, height);
+
+  return {
+    x: Math.max(30, Math.min(width - 30, x)),
+    y: Math.max(30, Math.min(height - 30, y)),
+    visible
+  };
+};
 
 // Same mapping as getScreenPosition, but unclamped (arc points run off-screen
 // cleanly, ROADMAP item 17) and returns null for a point outside the compass field of
@@ -425,6 +550,7 @@ export const buildTerrainFillPath = (
 const ARC_LABEL_HALF_WIDTH = 32;
 const ARC_LABEL_HEIGHT = 22;
 // Half the widest cardinal pill ("NW"), so a label at the 0°/360° edge stays whole (AUDIT A-8).
+const CARDINAL_LABEL_HALF_WIDTH = 18;
 // Half the solstice fan's day-length pill ("Equinox · 12 h 8 min").
 const FAN_PILL_HALF_WIDTH = 70;
 const FAN_PILL_NAMES: Record<SeasonPath, MessageKey> = {
@@ -541,16 +667,39 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   // The horizon path is fully derived from `containerDimensions` (deterministic, no
   // randomness), so it's computed during render instead of synced into state. The top
   // edge alone carries the storm foam line (ROADMAP item 79, X3).
-  const seaEdgePath = useMemo(
-    () => getSeaEdgePath(containerDimensions.width, containerDimensions.height),
-    [containerDimensions]
-  );
-  const svgPath = useMemo(
-    () => getSeaPath(containerDimensions.width, containerDimensions.height),
-    [containerDimensions]
-  );
-  // The top of the sea fill's box, where its gradient starts (item 145).
-  const seaTop = getSeaTop(containerDimensions.width, containerDimensions.height);
+  const seaEdgePath = useMemo(() => {
+    const { width, height } = containerDimensions;
+    if (width === 0 || height === 0) return '';
+
+    const horizonY = height * 0.65;
+
+    let path = `M0,${horizonY} `;
+
+    const waveCount = Math.ceil(width / 80);
+    const waveWidth = width / waveCount;
+
+    for (let i = 0; i < waveCount; i++) {
+      const x1 = i * waveWidth;
+      const x2 = (i + 0.5) * waveWidth;
+      const x3 = (i + 1) * waveWidth;
+
+      const waveHeight = Math.sin(i * 0.5) * 8 + 4;
+      const y1 = horizonY;
+      const y2 = horizonY - waveHeight;
+      const y3 = horizonY;
+
+      path += `L${x1},${y1} Q${x2},${y2} ${x3},${y3} `;
+    }
+
+    path += `L${width},${horizonY} `;
+    return path;
+  }, [containerDimensions]);
+  const svgPath = seaEdgePath && `${seaEdgePath}L${containerDimensions.width},${containerDimensions.height} L0,${containerDimensions.height} Z`;
+  // The top of the sea fill's box, where its gradient starts (item 145): the highest crest, as a
+  // quadratic curve peaks halfway to its control point.
+  const seaTop = containerDimensions.height * 0.65 - Math.max(0, ...Array.from(
+    { length: Math.ceil(containerDimensions.width / 80) }, (_, i) => Math.sin(i * 0.5) * 8 + 4,
+  )) / 2;
 
   // Terrain silhouette (ROADMAP item 13): replaces the flat horizon line with the
   // real profile when one is loaded, using the same altitude->y mapping as the sun/
@@ -798,9 +947,43 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     [horizonProfile, terrainMoonTimes, moonArcPath, latitude, longitude, compassHeading]
   );
 
-  const getSunColor = () => getSunColorClass(sunPosition.altitude);
-  const getSunGlowToken = (): string | null => sunGlowToken(sunPosition.altitude);
-  const getGlowIntensity = () => getGlowClass(sunPosition.altitude, weatherType);
+  const getSunColor = () => {
+    if (sunPosition.altitude > 10) {
+      return 'text-yellow-300';
+    } else if (sunPosition.altitude > 0) {
+      return 'text-orange-400';
+    } else {
+      return 'text-amber-600';
+    }
+  };
+
+  // Sun glow color, by altitude band (ROADMAP item 15 D polish: the style book's
+  // soft glowing sun) - the same 3 tokens/bands as getGlowIntensity below, also used
+  // for the radial halo behind the sun icon.
+  const getSunGlowToken = (): string | null => {
+    if (sunPosition.altitude > 10) return '--scene-sun-glow-high';
+    if (sunPosition.altitude > 0) return '--scene-sun-glow-low';
+    if (sunPosition.altitude > -10) return '--scene-sun-glow-horizon';
+    return null;
+  };
+
+  const getGlowIntensity = () => {
+    // Reduce glow intensity for grey/wet weather - fog scatters it the most, snow
+    // the least (ROADMAP item 10).
+    const baseGlow = weatherType === 'storm' || weatherType === 'rain' || weatherType === 'hail' ? 0.3 :
+                     weatherType === 'fog' ? 0.25 :
+                     weatherType === 'drizzle' || weatherType === 'overcast' ? 0.5 :
+                     weatherType === 'snow' ? 0.5 : 1;
+
+    if (sunPosition.altitude > 10) {
+      return `drop-shadow-[0_0_15px_hsl(var(--scene-sun-glow-high)_/_${0.8 * baseGlow})]`;
+    } else if (sunPosition.altitude > 0) {
+      return `drop-shadow-[0_0_10px_hsl(var(--scene-sun-glow-low)_/_${0.6 * baseGlow})]`;
+    } else if (sunPosition.altitude > -10) {
+      return `drop-shadow-[0_0_5px_hsl(var(--scene-sun-glow-horizon)_/_${0.4 * baseGlow})]`;
+    }
+    return '';
+  };
 
   // The water follows the sky (ROADMAP item 53); a storm darkens it (item 51).
   const water = getWaterColors(skyGradient, weatherType === 'storm');
@@ -841,10 +1024,29 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
     [latitude, compassHeading]
   );
   const horizonLabelY = containerDimensions.height * 0.65;
-  const cardinalPills = useMemo(
-    () => getCardinalPills(cardinalLabels, containerDimensions.width),
-    [cardinalLabels, containerDimensions.width]
-  );
+  // Item 176: two compass pills that would touch (one pushed against the screen edge, as N
+  // next to NE) keep one: a main direction (N, E, S, W) before a between one, else the one at
+  // its true place.
+  const cardinalPills = useMemo(() => {
+    const width = containerDimensions.width;
+    const pills = cardinalLabels
+      .map((direction) => {
+        const x = Math.max(CARDINAL_LABEL_HALF_WIDTH, Math.min(width - CARDINAL_LABEL_HALF_WIDTH, direction.fraction * width));
+        return { ...direction, x, isAtEdge: x !== direction.fraction * width };
+      })
+      .sort((a, b) => a.x - b.x);
+    const kept: typeof pills = [];
+    for (const pill of pills) {
+      const last = kept[kept.length - 1];
+      if (last && pill.x - last.x < CARDINAL_LABEL_HALF_WIDTH * 2 + 4) {
+        const isMain = (p: typeof pill) => p.label.length === 1;
+        if (isMain(pill) !== isMain(last) ? isMain(pill) : last.isAtEdge && !pill.isAtEdge) kept[kept.length - 1] = pill;
+        continue;
+      }
+      kept.push(pill);
+    }
+    return kept;
+  }, [cardinalLabels, containerDimensions.width]);
 
   // Arc label pixel positions: rise/set sit just above the horizon at their endpoint x,
   // zenith just below the apex - nudged inward (half a label width) so they stay on
