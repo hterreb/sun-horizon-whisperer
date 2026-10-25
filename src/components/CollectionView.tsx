@@ -56,17 +56,17 @@ const GROUP_TITLES: Record<BadgeGroup, MessageKey> = {
 };
 const GROUPS = Object.keys(GROUP_TITLES) as BadgeGroup[];
 const STATE_BASES: StateBase[] = ['plane', 'satellite', 'sun', 'moon', 'terrain'];
-const isStateRow = (badge: Badge): boolean => badge.base !== undefined || (STATE_BASES as string[]).includes(badge.id);
+const isStateRow = (badge: Badge): boolean => badge.base !== undefined;
 
 // The grids of a group. In the sky group, the plane, the satellite, the sun, the moon and the
-// terrain each have their own row: the base badge (only the plane has one since item 138), then
-// its states (items 115, 120). The order is the BADGES order; an empty row is left out.
+// terrain each have their own row of states, with no base badge (items 115, 120, 138, 178).
+// The order is the BADGES order; an empty row is left out.
 const groupRows = (group: BadgeGroup): Badge[][] => {
   const badges = BADGES.filter((badge) => badge.group === group);
   if (group !== 'sky') return [badges];
   return [
     badges.filter((badge) => !isStateRow(badge)),
-    ...STATE_BASES.map((base) => badges.filter((badge) => badge.id === base || badge.base === base)),
+    ...STATE_BASES.map((base) => badges.filter((badge) => badge.base === base)),
   ].filter((row) => row.length > 0);
 };
 
@@ -208,8 +208,6 @@ export const BadgeArt = ({ badge }: { badge: Badge }) => {
     case 'boat':
       // The clip hides the boat's reflection below the waterline.
       return <div className="overflow-hidden"><SceneBoat kind={kind as BoatKind} tone="day" lit={false} wake={false} /></div>;
-    case 'plane':
-      return <span className="text-white"><ScenePlane width={48} /></span>;
     case 'cloud':
       return (
         <svg width={64} height={32} viewBox="0 0 120 60" aria-hidden="true">

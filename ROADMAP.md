@@ -3689,7 +3689,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Owner:** ask CelesTrak to unblock the home IP (an e-mail draft is in this session; the IP does not go into this public repo).
 - **Open:** Vercel's edge IPs are shared with other customers, so CelesTrak can block one of them too. Then the edge keeps the last good answer for up to a day (`stale-while-revalidate`). After item 16 (Cloudflare), the same logic runs as a Pages Function.
 
-### 178. Collection: no base badge for the plane — S — [SUN-CHASER-29](https://ainabler.sentry.io/issues/SUN-CHASER-29)
+### 178. Collection: no base badge for the plane — S — [SUN-CHASER-29](https://ainabler.sentry.io/issues/SUN-CHASER-29) — **✅ Done**
 
 - **Feedback (2026-10-24 18:25 CEST, Ravensburg):** "Badges for standard air plane and satellite can be removed I think".
 - **Now:**
@@ -3704,6 +3704,8 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Check:** `utils.collection`: 139 badges; no `plane` id; `badgeForTarget` null for `plane` and `livePlane`; an old save with `plane` counts 139 at most. `CollectionView`: the plane row has 5 cells. `SunTracker`: a double tap on a decorative plane opens the card and shows no "Badge unlocked". `i18n.test` (the key `plane.airliner` stays in use by the card).
 - **Open:** (a) A or B? (b) Is "standard satellite" the size badge `satellite:small`, or only the old base badge?
 - **Decision (Lutz, 2026-10-25):** A, the base `plane` badge only. The satellite size badges stay.
+- **Built:** `plane` moves to `RetiredBadgeId` and `RETIRED_IDS` (`src/utils/collection.ts`). It is not in `BadgeId` and not in `BADGES`: 139 badges. `badgeForTarget` gives null for `plane` and `livePlane`; a live plane gives its haul badge (`plane:regional` … `plane:ultraLong`) when its route comes (`badgeForRoute`, not changed). A double tap on a decorative plane opens the card and gives no badge. The cards do not change: the key `plane.airliner` is still the card title. `CollectionView`: the plane row has the 5 haul cells and no base cell. `isStateRow` and the row filter no longer test for a base badge id (the `plane` entry of `STATE_BASES` stays, it is the `base` of the hauls). The unused `plane` case of `BadgeArt` is removed. Old saves: `loadCollection` keeps the `plane` id, so the next save writes it back. It does not show and `countCollected` does not count it. The satellite size badges stay.
+- **Checked:** `utils.collection` (139 ids, unique; no `plane` id; `badgeForTarget` null for `plane` and `livePlane`, and no state badge for them; an old save with `plane` keeps it through load and save and counts without it; `countCollected` counts `plane:long` and not `plane`). `CollectionView` (the plane row is the 5 hauls, no `plane` cell; an old save with the 5 retired ids shows and counts 3). `SunTracker` (a double tap on a decorative plane opens the "Airliner" card, no "Badge unlocked", nothing in storage). `tests/i18n.test.ts` passes. Typecheck, lint, build and all 2140 tests pass (2139 before; 2 `SunTracker` tests timed out once under load, and passed on a rerun). Not checked: the built app in a browser, a live plane tap with a real route, and a real phone.
 
 ### 179. Rotating the phone: fish stay below the horizon — S — [SUN-CHASER-2A](https://ainabler.sentry.io/issues/SUN-CHASER-2A)
 
