@@ -3840,7 +3840,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   - The page is the production bundle (`index-C_8G10gB.js`). `navigator.standalone` true, the service worker controls the page, Web Share with files, Media Session and Wake Lock present, no Fullscreen API (as Safari on iPhone).
   - First start: one iOS location prompt with our text, the loading screen "Waiting for location access", then Ravensburg. Denied: "No location: choose a place"; a grant while the app runs opens the scene with no reload. In German the prompt, the page and the compass labels are German.
   - Compass permission `granted` with no prompt. Notification prompt from `Notification.requestPermission()`; a reminder through `showNotification` shows as a banner with the app open; a scheduled reminder arrives with the app quit.
-  - Share: the iOS share sheet with the PNG; "Save Image" asks once and saves to Photos. A `target="_blank"` link opens the in-app Safari view.
+  - Share: "Share this view" captures the scene (a 517 KB PNG) and opens the iOS share sheet; "Save Image" asks once and saves to Photos. A `target="_blank"` link opens the in-app Safari view.
   - The fullscreen button enters and leaves the Fullscreen API (WKWebView's `isElementFullscreenEnabled`; without it the page showed a button that did nothing).
   - The radio plays on with the app in the background (page hidden, timers run, Media Session `playing`). Landscape and the iPad show the wide layout. A first start with no connection shows "No connection" and "Try again".
   - Web: typecheck, lint, all tests pass (two satellite status tests are flaky under load, also on `main`).
