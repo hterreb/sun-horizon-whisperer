@@ -1,12 +1,16 @@
-import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import React, { lazy, useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { Leaf } from 'lucide-react';
-import SceneBoat, { BOAT_HEIGHT_PX, BOAT_WIDTH_PX } from './SceneBoat';
-import SceneBird from './SceneBird';
-import SceneFish, { WHALE_SPOUT_AHEAD, WHALE_SPOUT_TOP } from './SceneFish';
+import LazyPart from './LazyPart';
+import { BOAT_HEIGHT_PX, BOAT_WIDTH_PX, WHALE_SPOUT_AHEAD, WHALE_SPOUT_TOP } from '@/utils/sceneSizes';
 import SceneHuntFx from './SceneHuntFx';
-import SceneVisitor, {
+// The drawings load after the first sky (ROADMAP item 174); the lanes and boxes come from sceneSizes.
+const SceneBoat = lazy(() => import('./SceneBoat'));
+const SceneBird = lazy(() => import('./SceneBird'));
+const SceneFish = lazy(() => import('./SceneFish'));
+const SceneVisitor = lazy(() => import('./SceneVisitor'));
+import {
   DOLPHIN_SPACING, VISITOR_GRID, VISITOR_VIEW_HEIGHT, SHARK_ABOVE_WATER, DOLPHINS_ABOVE_WATER, getVisitorGlint,
-} from './SceneVisitor';
+} from '@/utils/sceneSizes';
 import RainCanvas from './RainCanvas';
 import SkyClouds from './SkyClouds';
 import { Bat } from './sceneIcons';
@@ -1330,7 +1334,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
       const colour = `color-mix(in srgb, var(--scene-water-surface), var(--scene-water-deep) ${Math.round(deep * 1000) / 10}%)`;
       return fishItem.light === 'moon' ? `color-mix(in oklab, ${colour}, hsl(var(--scene-moon)) 25%)` : colour;
     };
-    const body = kind === 'shark' || kind === 'dolphins' ? (
+    const art = kind === 'shark' || kind === 'dolphins' ? (
       <SceneVisitor
         kind={kind}
         tone={fishItem.light === 'moon' ? 'moon' : boatTone === 'day' ? 'day' : 'dusk'}
@@ -1375,6 +1379,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
         }}
       />
     );
+    const body = <LazyPart>{art}</LazyPart>;
     // The hit area: a shark's or a pod's box reaches above the waterline `y` (item 85).
     const visitorUnit = fishItem.size / VISITOR_GRID;
     const hitBox = kind === 'shark' || kind === 'dolphins'
@@ -1651,7 +1656,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
                 }}
               />
             ) : bird.group ? bird.group.map((spot, i) => (
-              <SceneBird key={i} kind={bird.kind as BirdKind} width={bird.size} className="absolute" style={{
+              <LazyPart key={i}><SceneBird kind={bird.kind as BirdKind} width={bird.size} className="absolute" style={{
                 left: spot.left,
                 top: spot.top,
                 // The starlings' breath (item 149): a transform only, never with reduced motion.
@@ -1660,9 +1665,9 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
                   ['--ty' as string]: `${spot.breath[1]}px`,
                   animation: `starlingBreath ${STARLING_BREATH_SEC}s ease-in-out infinite alternate`,
                 }),
-              }} />
+              }} /></LazyPart>
             )) : (
-              <SceneBird kind={bird.kind} width={bird.size} />
+              <LazyPart><SceneBird kind={bird.kind} width={bird.size} /></LazyPart>
             )}
             {onInfo && <HitArea cx={bird.width / 2} cy={bird.height / 2} width={bird.width} height={bird.height} {...ringOf(`bird-${bird.id}`)} />}
           </div>
@@ -1702,7 +1707,7 @@ const CloudLayer: React.FC<CloudLayerProps> = ({
           >
             {/* Scale from the bottom-left corner, then lift by the boat's height, so `top` is the waterline. */}
             <div style={{ transform: `translateY(-100%) scale(${boatScale(ship)})`, transformOrigin: 'bottom left' }}>
-              <SceneBoat kind={ship.kind} tone={boatTone} lit={isSunDown} wake={hasBoatWake(ship.kind, windSpeedKmh)} seaWindKmh={seaWindKmh} />
+              <LazyPart><SceneBoat kind={ship.kind} tone={boatTone} lit={isSunDown} wake={hasBoatWake(ship.kind, windSpeedKmh)} seaWindKmh={seaWindKmh} /></LazyPart>
             </div>
             {/* The hull sits above the waterline `top` (item 95's hit area). */}
             {onInfo && (

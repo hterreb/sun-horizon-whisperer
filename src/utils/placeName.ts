@@ -3,7 +3,7 @@
 // localStorage cache of the last answer, a country from the device time zone when there is no
 // answer, and the result as a Sentry tag. InfoPanel owns the state.
 
-import * as Sentry from '@sentry/react';
+import { captureMessage, setTag } from './monitoring';
 import { countryCodeOf } from './nationalDays';
 
 export type PlaceSource = 'bigdatacloud' | 'photon';
@@ -174,11 +174,11 @@ let failureReported = false;
 // session, when both BigDataCloud calls fail, a warning with the same tags. The tags hold no
 // coordinates. With no Sentry DSN, Sentry does nothing.
 export const reportPlace = (status: string, photonStatus?: string): void => {
-  Sentry.setTag('place', status);
-  Sentry.setTag('place-photon', photonStatus); // undefined removes an old value
+  setTag('place', status);
+  setTag('place-photon', photonStatus); // undefined removes an old value
   if (isFailure(status) && !failureReported) {
     failureReported = true;
-    Sentry.captureMessage('place-name failed', 'warning');
+    captureMessage('place-name failed', 'warning');
   }
 };
 

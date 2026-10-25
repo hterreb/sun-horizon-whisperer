@@ -222,6 +222,7 @@ describe('place status for Sentry (item 137)', () => {
     vi.resetModules(); // a new session: the "sent" flag is module state
     const Sentry = await import('@sentry/react');
     const { reportPlace } = await import('@/utils/placeName');
+    await (await import('@/utils/monitoring')).preloadMonitoring(); // calls run at once (item 174)
     vi.mocked(Sentry.setTag).mockClear();
     vi.mocked(Sentry.captureMessage).mockClear();
 

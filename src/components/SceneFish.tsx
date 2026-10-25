@@ -1,4 +1,5 @@
 import { useId, type CSSProperties, type ReactNode } from 'react';
+import { WHALE_SPOUT_AHEAD, WHALE_SPOUT_TOP } from '@/utils/sceneSizes';
 import { type BoatTone, type FishKind } from '../utils/weatherEffectsUtils';
 
 // The fish in the Fish Redone lookbook's FS1 "Silhouettes" (ROADMAP item 85): filled bodies
@@ -265,8 +266,7 @@ const SINK_AT = BLOW_AT + SPOUT_GROW_SEC + SPOUT_FADE_SEC + 0.3;
 const SURFACE_SEC = SINK_AT + RISE_SEC; // 17.5 s
 // How far the grown spout reaches above the 24-unit box and ahead of it, in grid units (the
 // lane plan of item 92 keeps that water free).
-export const WHALE_SPOUT_TOP = 3;
-export const WHALE_SPOUT_AHEAD = 3;
+export { WHALE_SPOUT_AHEAD, WHALE_SPOUT_TOP };
 
 // Item 144 (I): at night a few sparks fade in and out behind the flukes: [cx, cy, r].
 const SPARKS: [number, number, number][] = [[-0.9, 11.9, 0.42], [-2.3, 12.3, 0.36], [-3.7, 11.7, 0.32], [-5.1, 12.2, 0.28], [-6.5, 11.9, 0.24]];
