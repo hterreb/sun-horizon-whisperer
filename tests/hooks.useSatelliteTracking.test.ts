@@ -1,4 +1,4 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, configure, renderHook, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 import fixture from './fixtures/iss-omm-2026-10-05.json';
 import { getSatellitesTag, useSatelliteTracking, useSatellitePassReminder } from '../src/hooks/useSatelliteTracking';
@@ -6,6 +6,10 @@ import { getNextSatelliteTry, loadSatelliteData, type GpRecord } from '../src/ut
 import { type SatellitePass } from '../src/utils/satelliteUtils';
 
 vi.mock('../src/utils/satelliteData', () => ({ loadSatelliteData: vi.fn(), getNextSatelliteTry: vi.fn(() => null) }));
+
+// The waits below cover the dynamic import of satellite.js, which takes over the default
+// 1 s on a loaded machine, so the tests failed now and then (also on main). Only this file.
+configure({ asyncUtilTimeout: 5000 });
 
 const { latitude, longitude } = fixture.reference.observer;
 const [refFull] = fixture.reference.passes;
