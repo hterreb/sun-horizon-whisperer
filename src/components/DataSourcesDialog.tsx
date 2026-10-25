@@ -60,8 +60,17 @@ const DataSourcesDialog: React.FC<DataSourcesDialogProps> = ({ onClose }) => {
       // The attribution page lists the elevation sources the tiles are made from.
       credits: [{ name: TERRAIN_SOURCE, href: 'https://github.com/tilezen/joerd/blob/master/docs/attribution.md' }],
     },
-    { label: 'dataSources.trees', credits: [{ name: TREE_COVER_SOURCE, href: 'https://esa-worldcover.org/', licence: CC_BY }] },
+    {
+      label: 'dataSources.trees',
+      credits: [
+        { name: TREE_COVER_SOURCE, href: 'https://esa-worldcover.org/', licence: CC_BY },
+        { name: 'Microsoft Planetary Computer', href: 'https://planetarycomputer.microsoft.com/' },
+      ],
+    },
     { label: 'dataSources.radio', credits: STREAMS.map(({ name }) => ({ name })) },
+    // Item 175: the services that get a request but give no data.
+    { label: 'dataSources.hosting', credits: [{ name: 'Vercel', href: 'https://vercel.com/' }] },
+    { label: 'dataSources.errors', credits: [{ name: 'Sentry', href: 'https://sentry.io/' }] },
   ];
 
   const link = (href: string, text: string) => (

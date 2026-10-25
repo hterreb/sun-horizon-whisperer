@@ -1,6 +1,6 @@
 import { TAP_TARGET } from '@/utils/glassChrome';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Wind, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward, Bell, BellRing, AlarmClock, AlarmClockCheck, Satellite, Award, Database, CircleAlert } from 'lucide-react';
+import { Clock, Sunrise, Sunset, MapPin, ChevronDown, ChevronUp, Cloud, Cloudy, CloudRain, CloudSnow, CloudSun, CloudFog, CloudDrizzle, CloudHail, Sun, CloudLightning, Wind, Moon, RefreshCw, Thermometer, MessageSquare, Mountain, Rewind, FastForward, Bell, BellRing, AlarmClock, AlarmClockCheck, Satellite, Award, Database, CircleAlert, ShieldCheck } from 'lucide-react';
 import { isFeedbackAvailable, openFeedbackForm } from '@/utils/feedback';
 import DataSourcesDialog from './DataSourcesDialog';
 import { ScrollArea } from './ui/scroll-area';
@@ -53,6 +53,8 @@ import { isEmptySkyTap } from '@/utils/sceneTap';
 // sibling component that reuses them; SECTION_HEADING stays file-local - see
 // glassChrome.ts for the one style helper shared more broadly, and its test.
 export const ROW = 'flex justify-between items-center gap-2 border-t border-[hsl(var(--panel-border)/0.12)] pt-1';
+// Same page as the link in the Data sources dialog (item 175).
+const PRIVACY_URL = '/privacy/';
 const SECTION_HEADING = 'text-title font-bold flex items-center';
 // Item 176: a tap focused the twilight label (open), the touch's mouse events opened it again,
 // and the click then closed it: a tap showed nothing. Only a mouse hovers, and only a keyboard
@@ -1548,8 +1550,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             </div>
           )}
 
-          {/* Data sources and the privacy page (ROADMAP item 153) */}
-          <div className="mt-6 pt-4 border-t border-white/20">
+          {/* Data sources and the privacy page (ROADMAP items 153 and 175) */}
+          <div className="mt-6 pt-4 border-t border-white/20 flex flex-wrap items-center gap-x-6">
             <button
               onClick={() => setIsDataSourcesOpen(true)}
               className={`flex items-center gap-2 text-caption opacity-80 hover:opacity-100 transition-opacity rounded ${TAP_TARGET} ${FOCUS_RING}`}
@@ -1558,6 +1560,15 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               <Database size={14} />
               {t('dataSources.title')}
             </button>
+            <a
+              href={PRIVACY_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`flex items-center gap-2 text-caption opacity-80 hover:opacity-100 transition-opacity rounded ${TAP_TARGET} ${FOCUS_RING}`}
+            >
+              <ShieldCheck size={14} />
+              {t('dataSources.privacy')}
+            </a>
             {isDataSourcesOpen && <DataSourcesDialog onClose={closeDataSources} />}
           </div>
             </div>

@@ -344,7 +344,7 @@ export const it: Record<keyof typeof en, string> = {
   'info.kmh': "{value} km/h",
   'info.route': "Rotta",
   'radar.livePlanes': "Aerei in tempo reale",
-  'radar.hint': "Aerei reali entro 100 km. Invia il tuo luogo, arrotondato a circa 11 km, ad adsb.lol.",
+  'radar.hint': "Aerei reali entro 100 km. Invia il tuo luogo, arrotondato a circa 11 km, al nostro server. Il server inoltra il luogo ad adsb.lol.",
   'radar.loading': "Cerco aerei…",
   'radar.status': "{nearby} vicini · {shown} in vista",
   'radar.compassAll': "la bussola li mostra tutti",
@@ -659,6 +659,8 @@ export const it: Record<keyof typeof en, string> = {
   'dataSources.terrain': "Terreno",
   'dataSources.trees': "Alberi",
   'dataSources.radio': "Radio",
+  'dataSources.hosting': "Hosting e inoltro",
+  'dataSources.errors': "Segnalazioni di errori",
   'dataSources.privacy': "Privacy",
 
   // Toasts from SunTracker

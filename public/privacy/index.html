@@ -17,40 +17,67 @@
     p, li { margin: .5rem 0; }
     .muted { color: var(--muted); }
     a { color: var(--accent); }
+    code { font-size: .9em; overflow-wrap: anywhere; }
+    ul ul { margin: .25rem 0; }
   </style>
 </head>
 <body>
 <main>
   <h1>Sun Chaser — Privacy Policy</h1>
-  <p class="muted">Last updated: 15 October 2026</p>
+  <p class="muted">Last updated: 25 October 2026</p>
 
   <p>Sun Chaser is made by Lutz Berreth (contact: <a href="mailto:lutz.berreth@gmail.com">lutz.berreth@gmail.com</a>). This policy applies to the Sun Chaser app on Google Play and to the web app at <a href="https://sun-chaser.vercel.app">sun-chaser.vercel.app</a>.</p>
   <p><strong>Summary:</strong> Sun Chaser has no accounts, no ads and no tracking. We do not sell data.</p>
 
-  <h2>1. Location</h2>
-  <p>With your permission, the app reads your device location to calculate the sun and moon position. This calculation happens on your device. To get the weather and the name of your place, the app sends your coordinates, rounded to about 1 km, to:</p>
+  <h2>1. Location and the hosts the app contacts</h2>
+  <p>With your permission, the app reads your device location to calculate the sun and moon position. This calculation happens on your device. You can deny location access and enter a place by hand instead.</p>
+  <p>The app has no consent screen. The location prompt of your browser or phone is the only choice. As soon as the app has a place (from your device, or the one you entered), it contacts the hosts below. This includes the first load. "Satellite tracking" is on by default, so the first load also contacts CelesTrak and our server for satellite data. If you deny location and enter no place, the app contacts only our server (page files) and, after an error, Sentry.</p>
+  <p>Every host receives your IP address, as any web server does. The only exceptions are adsb.lol and the CelesTrak copy that comes through our server: they receive the IP address of our server, not yours.</p>
   <ul>
-    <li><a href="https://open-meteo.com">Open-Meteo</a>: weather and forecast</li>
-    <li><a href="https://www.bigdatacloud.com">BigDataCloud</a>: place name</li>
-    <li><a href="https://photon.komoot.io">Photon</a> by Komoot (OpenStreetMap data): place name, only when BigDataCloud does not answer</li>
+    <li><a href="https://open-meteo.com">Open-Meteo</a> (api.open-meteo.com): your place, rounded to about 1 km. For the weather and forecast. When the app has a place, and again at most every 30 minutes.</li>
+    <li><a href="https://www.bigdatacloud.com">BigDataCloud</a> (api.bigdatacloud.net, api-bdc.io): your place, rounded to about 1 km, and the app language. For the place name. Once per place, then again after 24 hours.</li>
+    <li><a href="https://photon.komoot.io">Photon</a> by Komoot (photon.komoot.io, OpenStreetMap data): your place, rounded to about 1 km, and the app language. Only when BigDataCloud does not answer.</li>
+    <li>Open-Meteo place search (geocoding-api.open-meteo.com): the text you type in the search box and the app language. Only when you search.</li>
+    <li>Amazon Web Services (s3.amazonaws.com, Mapzen Terrain Tiles): the elevation tiles around you, for the line of sight to the horizon. A tile name is a map number. It shows your area to about 10 km (nearby tiles) and about 40 km (far tiles). Once per place and eye height, then from the cache.</li>
+    <li><a href="https://planetarycomputer.microsoft.com">Microsoft Planetary Computer</a> (planetarycomputer.microsoft.com): a request for a read-only access token. It contains no place. For the trees on the horizon. The land-cover data itself (ESA WorldCover) comes from Microsoft Azure storage (ai4edataeuwest.blob.core.windows.net). The file name shows a square of 3 degrees (about 300 km). The parts of the file that the app reads show your area more closely, but not your exact position. Once per place, then from the cache.</li>
+    <li><a href="https://celestrak.org">CelesTrak</a> (celestrak.org): a request for satellite orbit data. It contains no place. At most once a day, while "Satellite tracking" (on by default) or "ISS passes" (off by default) is on.</li>
+    <li>Our server (sun-chaser.vercel.app, hosted by <a href="https://vercel.com">Vercel</a>): the page files, and the two services below. Vercel keeps request logs for a short time. Our server does not store your place.
+      <ul>
+        <li>/api/satellites: the satellites that are visible late at night. The request contains nothing from your device. Our server downloads the list from CelesTrak once a day.</li>
+        <li>/api/planes: only when "Live planes" is on (off by default). The app sends your place, rounded to about 11 km, every 15 seconds while the app is open. Our server forwards it to <a href="https://adsb.lol">adsb.lol</a> (open flight data, licensed under the <a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>). When you tap a plane, the app sends the plane's callsign and your rounded place to our server. Our server sends only the callsign on to adsb.lol (vrs-standing-data.adsb.lol), to get the route.</li>
+      </ul>
+    </li>
+    <li>Radio stations (only when you turn on the radio): the app streams the audio from the station you choose. Each station is a separate host: fluxfm.streamabc.net, streams.ilovemusic.de, stream.epic-lounge.com, stream.0nlineradio.com, public.isekoi-radio.com, stream.laut.fm, listen.reyfm.de, live.hunter.fm, radio.cliamp.stream, streaming.hotmixradio.com. They get no place.</li>
+    <li><a href="https://sentry.io">Sentry</a> (*.ingest.de.sentry.io): see section 3.</li>
   </ul>
-  <p>For the line of sight to the horizon, the app downloads elevation tiles from Amazon Web Services (Mapzen Terrain Tiles). The tile names show your area to about 10 km.</p>
-  <p>For the trees on the horizon, the app also reads land-cover data (ESA WorldCover) from <a href="https://planetarycomputer.microsoft.com">Microsoft Planetary Computer</a>. The parts of the map it reads show your area.</p>
-  <p>If you turn on "Live planes" (off by default), the app asks for the aircraft near you every 15 seconds while it is open. It sends your place, rounded to about 11 km, to our server (sun-chaser.vercel.app), which forwards it to <a href="https://adsb.lol">adsb.lol</a> (open flight data, licensed under the <a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>). Like any web server, they receive your IP address. Our server does not store your place; our host (Vercel) keeps request logs for a short time. When you tap a plane, the app asks our server for its route: it sends the plane's callsign and your rounded place, and our server sends only the callsign on to adsb.lol.</p>
-  <p>While "Satellite tracking" (on by default) or "ISS passes" (off by default) is on, the app downloads satellite orbit data from <a href="https://celestrak.org">CelesTrak</a> once a day. This request does not contain your place. Like any web server, CelesTrak receives your IP address. The satellites that are visible late at night come through our server (sun-chaser.vercel.app), which downloads them from CelesTrak once a day; that request contains nothing from your device.</p>
-  <p>You can deny location access and enter a place by hand instead.</p>
+  <p>The app does not use ads, analytics, cookies or social-media scripts.</p>
 
   <h2>2. Place search</h2>
-  <p>When you search for a place, the text you type is sent to the Open-Meteo geocoding service to find matching places.</p>
+  <p>When you search for a place, the text you type is sent to the Open-Meteo geocoding service to find matching places. The app does not send your own location with it.</p>
 
   <h2>3. Error reports and feedback</h2>
-  <p>The app uses <a href="https://sentry.io">Sentry</a> to report crashes and errors. A report contains technical data (app version, browser or device type, the error). It contains no name, no e-mail and no coordinates. If you send feedback in the app, the message is sent to Sentry without your name or e-mail.</p>
+  <p>The app uses <a href="https://sentry.io">Sentry</a> (EU server) to report crashes and errors. The app contacts Sentry only when an error happens or when you send feedback. It does not use tracing or session replay.</p>
+  <p>A report contains technical data: the app version, the browser or device type, the error, and the last actions of the app (such as requests to the hosts above). It also contains these status words: how the place name lookup ended, whether satellite tracking and live planes are on, and whether they work. It contains no name, no e-mail and no coordinates. Before the report leaves your device, the app removes the latitude, longitude, place name and search text from every web address in it, and it removes the map numbers of terrain tiles. The app asks Sentry for no user data, cookies, headers or request bodies. Sentry receives your IP address with the request, as any web server does.</p>
+  <p>If you send feedback in the app, the message is sent to Sentry without your name or e-mail. The app attaches no screenshot.</p>
 
   <h2>4. Radio</h2>
-  <p>If you turn on the radio, the audio is streamed from third-party internet radio stations. Like any web server, they receive your IP address.</p>
+  <p>If you turn on the radio, the audio is streamed from third-party internet radio stations (see section 1). They receive your IP address and no place.</p>
 
   <h2>5. Data stored on your device</h2>
-  <p>The app saves your settings (language, temperature unit, manual location, compass) and caches weather and terrain data on your device. You can delete this data by clearing the app's storage or by uninstalling the app.</p>
+  <p>The app keeps the items below on your device (browser local storage). Nothing is sent from these items to us. You can delete all of them by clearing the app's storage or by uninstalling the app.</p>
+  <ul>
+    <li>Settings: <code>language</code>, <code>temperature-unit</code>, <code>eye-height-m</code>, <code>satellite-tracking</code>, <code>live-planes</code>, <code>sunset-countdown</code>, <code>sunset-reminder</code>, <code>iss-pass-reminder</code>, <code>radio_station_index</code> (the last radio station).</li>
+    <li><code>manual-location</code>: the place you entered by hand, with its coordinates, name, country and time zone.</li>
+    <li><code>weather_cache</code>: the last weather answer for 30 minutes, with the exact coordinates of your device location.</li>
+    <li><code>place-name</code>: the last place name and country, with your place rounded to about 1 km, for 24 hours.</li>
+    <li><code>terrain_horizon_profile_v2_…</code> and <code>terrain_tree_cover_v1_…</code>: the horizon line and the tree cover for each place you were. The key holds your place, rounded to about 100 m (3 decimal places), and your eye height. The app keeps one entry for each place until you clear the storage.</li>
+    <li><code>satellite-gp</code>: the satellite orbit data from CelesTrak, and the time of the last try. It holds no place.</li>
+    <li><code>collection</code>: the badges you unlocked, with the date of each.</li>
+    <li><code>premium-owned</code> and <code>premium-badge-hint</code>: whether you own Premium, and whether the app showed the "free for now" hint.</li>
+    <li><code>compass-calibration-hint-seen</code> and <code>pwa-dismissed</code>: hints that you have seen.</li>
+    <li>Session storage <code>last-visible</code>: the time the app was last on screen. It is deleted when you close the tab.</li>
+  </ul>
+  <p>The app stores no cookies. The app also keeps its own program files in the browser cache so it can work offline.</p>
 
   <h2>6. Purchases</h2>
   <p>In-app purchases are processed by Google Play. We do not receive your payment details.</p>

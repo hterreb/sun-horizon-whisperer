@@ -1216,7 +1216,7 @@ describe('InfoPanel: line of sight as an icon at the sun and moon rows (ROADMAP 
       );
       const toggle = screen.getByRole('switch', { name: /live planes/i });
       expect(toggle).toHaveAttribute('aria-checked', 'false'); // off by default
-      expect(screen.getByText(/rounded to about 11 km, to adsb\.lol/)).toBeInTheDocument();
+      expect(screen.getByText(/rounded to about 11 km, to our server\. It forwards the place to adsb\.lol/)).toBeInTheDocument();
       fireEvent.click(toggle);
       expect(locked.requirePremium).toHaveBeenCalledTimes(1);
       expect(onLivePlanesToggle).not.toHaveBeenCalled();
@@ -1379,6 +1379,17 @@ describe('InfoPanel: line of sight as an icon at the sun and moon rows (ROADMAP 
     });
   });
 
+  describe('privacy link (ROADMAP item 175)', () => {
+    it('shows a Privacy link next to Data sources that opens /privacy/ in a new tab', () => {
+      render(<InfoPanel {...defaultProps} />);
+      const link = screen.getByRole('link', { name: 'Privacy' });
+      expect(link).toHaveAttribute('href', '/privacy/');
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+      expect(link.parentElement).toContainElement(screen.getByRole('button', { name: 'Data sources' }));
+    });
+  });
+
   describe('data sources (ROADMAP item 153)', () => {
     it('opens a dialog with every data source, its licence and the privacy page, from a link after Feedback', () => {
       render(<InfoPanel {...defaultProps} />);
@@ -1398,6 +1409,10 @@ describe('InfoPanel: line of sight as an icon at the sun and moon rows (ROADMAP 
       expect(within(dialog).getAllByRole('link', { name: 'CC BY 4.0' })).toHaveLength(3);
       expect(within(dialog).getAllByRole('link', { name: 'ODbL' })).toHaveLength(2);
       expect(href('Privacy')).toBe('/privacy/');
+      // Item 175: the providers that get a request but give no data.
+      expect(href('Microsoft Planetary Computer')).toBe('https://planetarycomputer.microsoft.com/');
+      expect(href('Sentry')).toBe('https://sentry.io/');
+      expect(href('Vercel')).toBe('https://vercel.com/');
       expect(dialog).toHaveTextContent('Radio:FluxFM Chillhop');
       // The panel's backdrop blur would hold a fixed overlay: the dialog is a child of <body>.
       expect(dialog.closest('[data-share-hide]')).toBeNull();
