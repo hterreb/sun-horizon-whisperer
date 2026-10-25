@@ -104,20 +104,50 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ controls = ALWAYS_SHOWN, duck
   // wake (ROADMAP item 89). SunTracker wakes on a mouse move or a tap; hidden, it takes no taps (item 132).
   const { isVisible, isTappable, wake: handleFocus } = controls;
 
-  // Plays the given station on the current audio element (if already playing).
+  // Item 180: a pause closes the stream and each start opens a new one. A paused live stream
+  // goes stale (the server closes it), so a play on the old `src` can stay silent.
+  // The browser may fire a `pause` event when `src` changes on a playing element. That event is
+  // ours, not the user's or the OS's: `ignorePauseRef` is set before the change and cleared by the
+  // `play` event of the start that follows.
+  const ignorePauseRef = useRef(false);
+
+  // Starts the given station: a new `src`, then `play()`. `reportFailure` shows the toast
+  // (switch and notification Play); a station change or an error skip only logs.
+  const startStream = useCallback((index: number, reportFailure: boolean) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    ignorePauseRef.current = true;
+    audio.src = STREAMS[index].url;
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(error => {
+        // Item 176: a pause or a new source during the start (a double tap, fast station
+        // taps) rejects play() with AbortError. That is no failure: no toast.
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        if (!reportFailure) {
+          console.error('Audio playback failed after stream switch:', error);
+          return;
+        }
+        console.error('Audio playback failed:', error);
+        setIsPlaying(false);
+        toast({
+          title: t('music.failedTitle'),
+          description: t('music.failedDescription'),
+          variant: "destructive"
+        });
+      });
+    }
+  }, [setIsPlaying, t]);
+
+  // Station change or error skip: a new `src` for the current station. Plays only if the radio is on.
   const playStream = useCallback((index: number) => {
     if (!audioRef.current) return;
-    audioRef.current.src = STREAMS[index].url;
     if (isPlayingRef.current) {
-      const playPromise = audioRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          if (error instanceof DOMException && error.name === 'AbortError') return; // item 176: a newer switch
-          console.error('Audio playback failed after stream switch:', error);
-        });
-      }
+      startStream(index, false);
+    } else {
+      audioRef.current.src = STREAMS[index].url;
     }
-  }, []);
+  }, [startStream]);
 
   useEffect(() => {
     // Create audio element with lo-fi streams
@@ -150,13 +180,25 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ controls = ALWAYS_SHOWN, duck
     audioRef.current.addEventListener('error', handleError);
     audioRef.current.addEventListener('canplay', handleCanPlay);
 
-    // Try the last-selected (or first) station
-    playStream(stationIndexRef.current);
+    // Item 180: the switch follows the element. A pause by the OS (call, another app, headset)
+    // turns it off and the radio waits for a tap: no automatic restart.
+    const handlePause = () => {
+      if (ignorePauseRef.current) return;
+      setIsPlaying(false);
+    };
+    const handlePlay = () => {
+      ignorePauseRef.current = false;
+      setIsPlayingState(true);
+    };
+    audioRef.current.addEventListener('pause', handlePause);
+    audioRef.current.addEventListener('play', handlePlay);
 
     return () => {
       if (audioRef.current) {
         audioRef.current.removeEventListener('error', handleError);
         audioRef.current.removeEventListener('canplay', handleCanPlay);
+        audioRef.current.removeEventListener('pause', handlePause);
+        audioRef.current.removeEventListener('play', handlePlay);
         audioRef.current.pause();
         audioRef.current = null;
       }
@@ -205,28 +247,18 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ controls = ALWAYS_SHOWN, duck
   }, [stationIndex]);
 
   useEffect(() => {
-    if (audioRef.current) {
-      if (isPlaying) {
-        const playPromise = audioRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(error => {
-            // Item 176: a pause or a new source during the start (a double tap, fast station
-            // taps) rejects play() with AbortError. That is no failure: no toast.
-            if (error instanceof DOMException && error.name === 'AbortError') return;
-            console.error('Audio playback failed:', error);
-            setIsPlaying(false);
-            toast({
-              title: t('music.failedTitle'),
-              description: t('music.failedDescription'),
-              variant: "destructive"
-            });
-          });
-        }
-      } else {
-        audioRef.current.pause();
-      }
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (isPlaying) {
+      // The element already plays this state (its own `play` event set it): no second start.
+      if (audio.paused) startStream(stationIndexRef.current, true);
+    } else if (!audio.paused) {
+      // Item 180: a plain pause. The `src` stays, so Android keeps the media notification and
+      // its Play button (no `src` would end the player and the notification). The next start
+      // sets `src` again, so it plays a fresh stream.
+      audio.pause();
     }
-  }, [isPlaying, setIsPlaying, t]);
+  }, [isPlaying, startStream]);
 
   const handleVolumeChange = (newVolume: number[]) => {
     setVolume(newVolume);
@@ -248,7 +280,12 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ controls = ALWAYS_SHOWN, duck
   // off or in another app.
   useEffect(() => {
     if (!('mediaSession' in navigator)) return;
-    setMediaActionHandler('play', () => setIsPlaying(true));
+    setMediaActionHandler('play', () => {
+      // Item 180: always the start path. After an OS pause `isPlaying` can still be true, so
+      // setting it again would change nothing.
+      if (isPlayingRef.current) startStream(stationIndexRef.current, true);
+      else setIsPlaying(true);
+    });
     setMediaActionHandler('pause', () => setIsPlaying(false));
     setMediaActionHandler('nexttrack', handleNext);
     return () => {
@@ -258,7 +295,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ controls = ALWAYS_SHOWN, duck
       navigator.mediaSession.metadata = null;
       navigator.mediaSession.playbackState = 'none';
     };
-  }, [handleNext, setIsPlaying]);
+  }, [handleNext, setIsPlaying, startStream]);
 
   useEffect(() => {
     if (!('mediaSession' in navigator)) return;
