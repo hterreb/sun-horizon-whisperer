@@ -1182,7 +1182,12 @@ const SunTracker: React.FC = () => {
       console.error('Error saving sunset reminder:', error);
     }
   }, [isReminderOn, t]);
-  useSunsetReminder(countdownTarget?.time ?? null, isReminderOn && !isTimePreview, language, placeTimeZone);
+  // Item 182: the place, for the reminders of the next days in the iOS app.
+  useSunsetReminder(countdownTarget?.time ?? null, isReminderOn && !isTimePreview, language, placeTimeZone, {
+    latitude: location.latitude,
+    longitude: location.longitude,
+    profile: isLineOfSightOn ? horizonProfile : null,
+  });
 
   // Satellite tracking (ROADMAP item 97): on by default; Premium in the Play app (item 45).
   // It sends no place: the CelesTrak data is global.

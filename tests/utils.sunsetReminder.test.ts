@@ -1,4 +1,5 @@
-import { getReminderTime, getReminderKey, isReminderDue, getReminderText, SUNSET_REMINDER_MIN } from '../src/utils/sunsetReminder';
+import { getReminderTime, getReminderKey, isReminderDue, getReminderText, getLaterSunsets, REMINDER_DAYS, SUNSET_REMINDER_MIN } from '../src/utils/sunsetReminder';
+import { getSunTimes } from '../src/utils/sunUtils';
 import { getCountdownTarget } from '../src/utils/sunEvents';
 
 const at = (hms: string) => new Date(`2026-09-30T${hms}+02:00`);
@@ -55,5 +56,38 @@ describe('getReminderText (ROADMAP item 69)', () => {
   it('names the lead time and the sunset time', () => {
     expect(getReminderText(terrain.sunset, 'en')).toMatch(/^Sunset in 15 minutes, at \d{2}:\d{2}$/);
     expect(getReminderText(terrain.sunset, 'de')).toMatch(/^Sonnenuntergang in 15 Minuten, um \d{2}:\d{2}$/);
+  });
+});
+
+describe('getLaterSunsets (item 182, the iOS app)', () => {
+  const RAVENSBURG = [47.7816, 9.6123] as const;
+  const next = getSunTimes(new Date('2026-10-26T12:00:00+01:00'), ...RAVENSBURG).sunset;
+
+  it('gives the flat sunsets of the next days, one per day', () => {
+    const later = getLaterSunsets(next, ...RAVENSBURG, null);
+    expect(REMINDER_DAYS).toBe(14);
+    expect(later).toHaveLength(REMINDER_DAYS - 1);
+    later.forEach((sunset, i) => {
+      const day = new Date(next.getTime() + (i + 1) * 86_400_000);
+      expect(sunset).toEqual(getSunTimes(day, ...RAVENSBURG).sunset);
+    });
+    // Autumn: each sunset is 1-3 minutes earlier in the day than the one before.
+    const gapsMin = later.map((sunset, i) => (sunset.getTime() - (i ? later[i - 1] : next).getTime()) / 60_000 - 24 * 60);
+    gapsMin.forEach((gap) => expect(gap).toBeGreaterThan(-3));
+    gapsMin.forEach((gap) => expect(gap).toBeLessThan(0));
+  });
+
+  it('uses the line-of-sight sunset with a horizon profile', () => {
+    const hills = { angles: new Array(360).fill(4), observerElevation: 450, eyeHeight: 1.7 };
+    const later = getLaterSunsets(next, ...RAVENSBURG, hills);
+    expect(later).toHaveLength(REMINDER_DAYS - 1);
+    // A 4° horizon hides the sun about half an hour before the flat sunset.
+    const flatLater = getLaterSunsets(next, ...RAVENSBURG, null);
+    later.forEach((sunset, i) => expect((flatLater[i].getTime() - sunset.getTime()) / 60_000).toBeGreaterThan(20));
+  });
+
+  it('leaves out the days with no sunset (polar night)', () => {
+    const TROMSO = [69.6492, 18.9553] as const;
+    expect(getLaterSunsets(new Date('2026-12-01T12:00:00Z'), ...TROMSO, null)).toEqual([]);
   });
 });

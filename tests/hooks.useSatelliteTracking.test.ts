@@ -253,4 +253,19 @@ describe('useSatellitePassReminder', () => {
     await vi.advanceTimersByTimeAsync(60_000);
     expect(shown).toEqual([]);
   });
+
+  it('in the iOS app, gives the reminder to the system ahead of time (item 182)', async () => {
+    const calls: unknown[][] = [];
+    vi.stubGlobal('sunChaserReminders', {
+      schedule: (...args: unknown[]) => calls.push(['schedule', ...args]),
+      cancel: (...args: unknown[]) => calls.push(['cancel', ...args]),
+    });
+    vi.setSystemTime(new Date('2026-10-06T18:03:00Z'));
+    const hook = renderHook(() => useSatellitePassReminder(pass, true, 'en'));
+    expect(calls).toEqual([['schedule', 'satellite-pass', Date.parse('2026-10-06T18:04:00Z'), expect.stringMatching(/^ISS visible at /)]]);
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    expect(shown).toEqual([]);
+    hook.unmount();
+    expect(calls.at(-1)).toEqual(['cancel', 'satellite-pass']);
+  });
 });
