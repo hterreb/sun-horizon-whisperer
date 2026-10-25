@@ -48,6 +48,7 @@ Change both with the move to Cloudflare (item 16), together with the TWA host.
 | Radio in the background, lock-screen controls | `UIBackgroundModes: audio`. |
 | Service worker, offline start | App-bound domain (`WKAppBoundDomains`): the service worker runs. A first start with no connection shows "No connection" and "Try again". |
 | Links to other sites | An in-app Safari view; `mailto:` opens Mail. |
+| Fullscreen button (`FullscreenButton`) | `isElementFullscreenEnabled`: the Fullscreen API works, as in Chrome on Android. (The iPhone home-screen PWA has no Fullscreen API and hides the button; without the setting WKWebView showed a button that did nothing.) |
 | `black-translucent` status bar | Light status bar text; the page draws under it and pads with `env(safe-area-inset-*)`. |
 | Splash | Launch screen: the logo mark on `#0F1016`, as the loading screen. |
 | Premium (Play Billing) | No Digital Goods API, so Premium is unlocked, as on the web. StoreKit is open (see below). |

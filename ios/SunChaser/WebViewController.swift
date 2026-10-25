@@ -21,6 +21,9 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         // App-bound domains turn on the service worker, so the app opens offline as the PWA does.
         config.limitsNavigationsToAppBoundDomains = true
         config.allowsInlineMediaPlayback = true
+        // The Fullscreen API as in Safari; without it WKWebView leaves document.fullscreenEnabled
+        // undefined, and FullscreenButton shows a button that does nothing.
+        config.preferences.isElementFullscreenEnabled = true
         webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = self
         webView.uiDelegate = self
