@@ -8,6 +8,7 @@ import {
   getCandidateSatellites,
   getPassReminderKey,
   getPassReminderText,
+  getPassReminderTime,
   getSkySatellites,
   isNearEpoch,
   isPassReminderDue,
@@ -17,7 +18,7 @@ import {
   type SkySatellite,
   type TrackedSatellite,
 } from '@/utils/satelliteUtils';
-import { showReminderNotification } from '@/hooks/useSunsetReminder';
+import { getNativeReminders, showReminderNotification } from '@/hooks/useSunsetReminder';
 import { type Language } from '@/utils/language';
 
 // The cache (satelliteData) decides when a fetch is due; the app asks it once an hour.
@@ -196,6 +197,13 @@ export const useSatellitePassReminder = (pass: SatellitePass | null, active: boo
   const shownKeyRef = useRef<string | null>(null);
   useEffect(() => {
     if (!active || !pass) return;
+    // The iOS app schedules the reminder with the system (item 182, see getNativeReminders).
+    const native = getNativeReminders();
+    const reminderMs = getPassReminderTime(pass).getTime();
+    if (native && !pass.inProgress && reminderMs > Date.now()) {
+      native.schedule('satellite-pass', reminderMs, getPassReminderText(pass, language, timeZone));
+      return () => native.cancel('satellite-pass');
+    }
     const check = () => {
       if (!isPassReminderDue(new Date(), pass, shownKeyRef.current)) return;
       shownKeyRef.current = getPassReminderKey(pass);

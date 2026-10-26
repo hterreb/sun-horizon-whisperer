@@ -2452,8 +2452,9 @@ describe('SunTracker', () => {
       await act(async () => { await vi.advanceTimersByTimeAsync(600_000); });
       expect(forecastUrls()).toHaveLength(5);
       expect(weatherToasts()).toHaveLength(2);
-    // 40 min of 1 s clock ticks with the whole SunTracker: about 5 s on a laptop under load.
-    }, 30_000);
+    // 40 min of 1 s clock ticks with the whole SunTracker: about 15 s on a laptop, over 30 s
+    // when the machine is loaded.
+    }, 60_000);
 
     it('drops the previous place\'s weather when it arrives after the new place\'s weather', async () => {
       let answerRavensburg: (response: unknown) => void = () => {};

@@ -1,4 +1,5 @@
-import { formatTime } from '@/utils/sunUtils';
+import { formatTime, getSunTimes } from '@/utils/sunUtils';
+import { getTerrainSunTimes, type HorizonProfile } from '@/utils/horizonUtils';
 import { translate } from '@/i18n';
 import { type Language } from '@/utils/language';
 
@@ -6,6 +7,10 @@ import { type Language } from '@/utils/language';
 // sunset, while the app is open. No server and no Web Push.
 export const SUNSET_REMINDER_MIN = 15;
 const MINUTE_MS = 60_000;
+const DAY_MS = 24 * 60 * MINUTE_MS;
+// The iOS app gives the reminders of this many days to iOS ahead of time (item 182), so a
+// reminder comes every evening while the app stays closed. iOS keeps at most 64.
+export const REMINDER_DAYS = 14;
 // A reminder that a throttled background timer shows late still counts for this long.
 export const REMINDER_LATE_MS = 5 * MINUTE_MS;
 
@@ -29,3 +34,17 @@ export const isReminderDue = (now: Date, sunset: Date | null, shownKey: string |
 
 export const getReminderText = (sunset: Date, language: Language, timeZone?: string): string =>
   translate(language, 'reminder.notification', { minutes: SUNSET_REMINDER_MIN, time: formatTime(sunset, language, timeZone) });
+
+// The sunsets of the days after `next` (the next sunset), up to REMINDER_DAYS in all, with
+// the countdown's rule (getCountdownTarget): the line-of-sight sunset with a horizon
+// profile, else the flat one. A day with no sunset (polar day or night) is left out.
+export const getLaterSunsets = (next: Date, latitude: number, longitude: number, profile: HorizonProfile | null): Date[] => {
+  const sunsets: Date[] = [];
+  for (let day = 1; day < REMINDER_DAYS; day++) {
+    const date = new Date(next.getTime() + day * DAY_MS);
+    const flat = getSunTimes(date, latitude, longitude);
+    const sunset = (profile && getTerrainSunTimes(date, latitude, longitude, profile).sunset) ?? (flat.polar ? null : flat.sunset);
+    if (sunset) sunsets.push(sunset);
+  }
+  return sunsets;
+};

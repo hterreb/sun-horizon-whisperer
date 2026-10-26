@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { getReminderKey, getReminderText, getReminderTime, isReminderDue } from '@/utils/sunsetReminder';
+import { getLaterSunsets, getReminderKey, getReminderText, getReminderTime, isReminderDue } from '@/utils/sunsetReminder';
+import { type HorizonProfile } from '@/utils/horizonUtils';
 import { type Language } from '@/utils/language';
 
 const CHECK_INTERVAL_MS = 60_000;
@@ -39,24 +40,51 @@ export const showReminderNotification = async (body: string, tag: string) => {
   }
 };
 
+// The iOS app (ios/README.md, ROADMAP item 182) gives a reminder to the system ahead of time,
+// so it also comes while the app is in the background or closed. The page then shows none
+// itself. Null in a browser.
+export interface NativeReminders {
+  schedule: (id: string, at: number, body: string) => void;
+  cancel: (id: string) => void;
+}
+export const getNativeReminders = (): NativeReminders | null =>
+  (window as Window & { sunChaserReminders?: NativeReminders }).sunChaserReminders ?? null;
+
 // Sunset reminder (ROADMAP item 69): shows one notification SUNSET_REMINDER_MIN before
 // `sunset`, only while `active` (toggle on, permission granted, live time). A timer is set
 // to the reminder time. Background tabs slow down timers, so the hook also checks once a
 // minute and when the page becomes visible again. The text is in `language`.
-export const useSunsetReminder = (sunset: Date | null, active: boolean, language: Language = 'en', timeZone?: string) => {
+// In the iOS app, the reminders of `sunset` and of the next days at `place`
+// (getLaterSunsets) go to iOS ahead of time, one id per day.
+export const useSunsetReminder = (
+  sunset: Date | null,
+  active: boolean,
+  language: Language = 'en',
+  timeZone?: string,
+  place?: { latitude: number; longitude: number; profile: HorizonProfile | null }
+) => {
   const shownKeyRef = useRef<string | null>(null);
   const sunsetMs = sunset?.getTime() ?? null;
+  const latitude = place?.latitude ?? null;
+  const longitude = place?.longitude ?? null;
+  const profile = place?.profile ?? null;
 
   useEffect(() => {
     if (!active || sunsetMs === null) return;
     const target = new Date(sunsetMs);
     // `active` means live time, so Date.now() is the app clock here.
+    const reminderMs = getReminderTime(target)!.getTime();
+    const native = getNativeReminders();
+    const later = native && latitude !== null && longitude !== null ? getLaterSunsets(target, latitude, longitude, profile) : [];
+    const ahead = native ? [target, ...later].filter((s) => getReminderTime(s)!.getTime() > Date.now()) : [];
+    ahead.forEach((s, i) => native!.schedule(`sunset-reminder-${i}`, getReminderTime(s)!.getTime(), getReminderText(s, language, timeZone)));
+    const cancelNative = () => ahead.forEach((_, i) => native!.cancel(`sunset-reminder-${i}`));
+    if (native && reminderMs > Date.now()) return cancelNative;
     const check = () => {
       if (!isReminderDue(new Date(), target, shownKeyRef.current)) return;
       shownKeyRef.current = getReminderKey(target);
       void showReminderNotification(getReminderText(target, language, timeZone), 'sunset-reminder');
     };
-    const reminderMs = getReminderTime(target)!.getTime();
     const timeout = setTimeout(check, Math.max(0, reminderMs - Date.now()));
     const interval = setInterval(check, CHECK_INTERVAL_MS);
     const onVisibilityChange = () => {
@@ -67,6 +95,7 @@ export const useSunsetReminder = (sunset: Date | null, active: boolean, language
       clearTimeout(timeout);
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      cancelNative();
     };
-  }, [sunsetMs, active, language, timeZone]);
+  }, [sunsetMs, active, language, timeZone, latitude, longitude, profile]);
 };

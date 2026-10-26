@@ -1,0 +1,42 @@
+{
+  "appPolicies": {
+    "eula": "",
+    "policies": [
+      {
+        "locale": "en_US",
+        "policyText": "",
+        "policyURL": ""
+      }
+    ]
+  },
+  "identifier": "5C0A0182",
+  "nonRenewingSubscriptions": [],
+  "products": [
+    {
+      "displayPrice": "3.99",
+      "familyShareable": false,
+      "internalID": "6740182001",
+      "localizations": [
+        {
+          "description": "One purchase unlocks all features with the gold plus.",
+          "displayName": "Premium",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.ainabler.sunchaser.premium",
+      "referenceName": "Premium",
+      "type": "NonConsumable"
+    }
+  ],
+  "settings": {
+    "_failTransactionsEnabled": false,
+    "_locale": "en_US",
+    "_storeKitErrors": [],
+    "_storefront": "USA"
+  },
+  "subscriptionGroups": [],
+  "version": {
+    "major": 4,
+    "minor": 0
+  }
+}

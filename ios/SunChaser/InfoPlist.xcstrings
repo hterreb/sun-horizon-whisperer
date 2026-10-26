@@ -1,0 +1,76 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "NSLocationWhenInUseUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sun Chaser nutzt deinen Standort, um Sonne und Mond an deinem Himmel zu zeigen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sun Chaser uses your location to show the sun and the moon in your sky."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sun Chaser usa tu ubicación para mostrar el sol y la luna en tu cielo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sun Chaser utilise votre position pour afficher le soleil et la lune dans votre ciel."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sun Chaser usa la tua posizione per mostrare il sole e la luna nel tuo cielo."
+          }
+        }
+      }
+    },
+    "NSPhotoLibraryAddUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sun Chaser speichert das Sonnenuntergangsbild in deinen Fotos."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sun Chaser saves the sunset picture to your photos."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sun Chaser guarda la imagen de la puesta de sol en tus fotos."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sun Chaser enregistre l’image du coucher de soleil dans vos photos."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sun Chaser salva l’immagine del tramonto nelle tue foto."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
