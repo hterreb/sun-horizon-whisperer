@@ -74,8 +74,30 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply, CLLocationManager
                 UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [id])
             }
             replyHandler(nil, nil)
+        case "storeDetails":
+            let skus = body["itemIds"] as? [String] ?? []
+            reply(replyHandler) { try await Store.details(skus: skus) }
+        case "storePurchases":
+            reply(replyHandler) { await Store.purchases() }
+        case "storeBuy":
+            let sku = body["sku"] as? String ?? ""
+            reply(replyHandler) {
+                let token = try await Store.buy(sku: sku)
+                return token.map { ["purchaseToken": $0] as [String: Any] } ?? ["cancelled": true]
+            }
         default:
             replyHandler(nil, "Unknown action \(action)")
+        }
+    }
+
+    // Replies with the result of `work`, or with its error: the page's promise then rejects.
+    private func reply(_ replyHandler: @escaping (Any?, String?) -> Void, _ work: @escaping () async throws -> Any) {
+        Task { @MainActor in
+            do {
+                replyHandler(try await work(), nil)
+            } catch {
+                replyHandler(nil, error.localizedDescription)
+            }
         }
     }
 
@@ -235,6 +257,32 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply, CLLocationManager
       if (window.ServiceWorkerRegistration) {
         ServiceWorkerRegistration.prototype.showNotification = async (title, options) => { await notify(title, options); };
       }
+
+      // Premium through the App Store (Store.swift), behind the Digital Goods API and Payment
+      // Request that usePremium uses for Play Billing. A cancelled purchase is an AbortError.
+      const PLAY_BILLING = 'https://play.google.com/billing';
+      window.getDigitalGoodsService = async (provider) => {
+        if (provider !== PLAY_BILLING) throw new DOMException('Unsupported service provider', 'NotSupportedError');
+        return {
+          getDetails: (itemIds) => native('storeDetails', { itemIds }),
+          listPurchases: () => native('storePurchases'),
+          consume: async () => {},
+        };
+      };
+      const BrowserPaymentRequest = window.PaymentRequest;
+      window.PaymentRequest = function PaymentRequest(methods, details, options) {
+        const method = methods.find((m) => m.supportedMethods === PLAY_BILLING);
+        if (!method) return new BrowserPaymentRequest(methods, details, options);
+        return {
+          show: async () => {
+            const result = await native('storeBuy', { sku: method.data?.sku });
+            if (result.cancelled) throw new DOMException('The purchase was cancelled.', 'AbortError');
+            return { details: { purchaseToken: result.purchaseToken }, complete: async () => {} };
+          },
+          abort: async () => {},
+          canMakePayment: async () => true,
+        };
+      };
     })();
     """#
 }

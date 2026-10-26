@@ -8,6 +8,7 @@ import UserNotifications
 final class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         UNUserNotificationCenter.current().delegate = self
+        Store.finishUpdates()
         return true
     }
 
@@ -22,7 +23,9 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let scene = scene as? UIWindowScene else { return }
         let window = UIWindow(windowScene: scene)
-        window.rootViewController = WebViewController()
+        // Unit tests (SunChaserTests) host the app: no page, so no API calls from the test run.
+        let isTestHost = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        window.rootViewController = isTestHost ? UIViewController() : WebViewController()
         window.makeKeyAndVisible()
         self.window = window
         #if DEBUG
