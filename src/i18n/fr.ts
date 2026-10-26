@@ -140,6 +140,8 @@ export const fr: Record<keyof typeof en, string> = {
   'reminder.notification': "Coucher du soleil dans {minutes} minutes, à {time}",
   'reminder.onTitle': "Rappel du coucher du soleil activé",
   'reminder.onDescription': "Une notification arrive {minutes} minutes avant le coucher du soleil, tant que l’app est ouverte.",
+  'reminder.toggleClosed': "Me prévenir {minutes} minutes avant le coucher du soleil, même app fermée",
+  'reminder.onDescriptionClosed': "Une notification arrive {minutes} minutes avant chaque coucher du soleil, même quand l’app est fermée.",
   'reminder.blockedTitle': "Notifications bloquées",
   'reminder.blockedDescription': "Autorisez les notifications pour ce site dans les réglages du navigateur pour recevoir le rappel.",
 
@@ -621,6 +623,8 @@ export const fr: Record<keyof typeof en, string> = {
   'issReminder.toggle': "Passages de l'ISS : me prévenir {minutes} minutes avant un passage visible (app ouverte)",
   'issReminder.onTitle': "Rappel des passages de l'ISS activé",
   'issReminder.onDescription': "Une notification arrive {minutes} minutes avant un passage visible de l'ISS, app ouverte.",
+  'issReminder.toggleClosed': "Passages de l'ISS : me prévenir {minutes} minutes avant un passage visible, même app fermée",
+  'issReminder.onDescriptionClosed': "Une notification arrive {minutes} minutes avant le prochain passage visible de l'ISS, même quand l’app est fermée.",
   'issReminder.blockedDescription': "Autorisez les notifications pour ce site dans les réglages du navigateur pour recevoir le rappel de l'ISS.",
   'info.speed': "Vitesse",
   'info.kmPerSecond': "{value} km/s",

@@ -61,7 +61,7 @@ import { useHorizonProfile } from '@/hooks/useHorizonProfile';
 import { useTreeCover } from '@/hooks/useTreeCover';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { useSunsetCountdown, primeCountdownAudio } from '@/hooks/useSunsetCountdown';
-import { useSunsetReminder, requestReminderPermission, getNotificationPermission } from '@/hooks/useSunsetReminder';
+import { useSunsetReminder, requestReminderPermission, getNotificationPermission, getNativeReminders } from '@/hooks/useSunsetReminder';
 import { SUNSET_REMINDER_MIN } from '@/utils/sunsetReminder';
 import { getSatellitesTag, useSatelliteTracking, useSatellitePassReminder } from '@/hooks/useSatelliteTracking';
 import { PASS_REMINDER_MIN, getSatelliteCard } from '@/utils/satelliteUtils';
@@ -1172,7 +1172,8 @@ const SunTracker: React.FC = () => {
       }
       toast({
         title: t('reminder.onTitle'),
-        description: t('reminder.onDescription', { minutes: SUNSET_REMINDER_MIN }),
+        // Item 182: the iOS app gives the reminders to iOS, so they also come when it is closed.
+        description: t(getNativeReminders() ? 'reminder.onDescriptionClosed' : 'reminder.onDescription', { minutes: SUNSET_REMINDER_MIN }),
       });
     }
     setIsReminderSaved(next);
@@ -1234,7 +1235,7 @@ const SunTracker: React.FC = () => {
       }
       toast({
         title: t('issReminder.onTitle'),
-        description: t('issReminder.onDescription', { minutes: PASS_REMINDER_MIN }),
+        description: t(getNativeReminders() ? 'issReminder.onDescriptionClosed' : 'issReminder.onDescription', { minutes: PASS_REMINDER_MIN }),
       });
     }
     setIsIssReminderSaved(next);

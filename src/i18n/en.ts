@@ -140,6 +140,8 @@ export const en = {
   'reminder.notification': 'Sunset in {minutes} minutes, at {time}',
   'reminder.onTitle': 'Sunset reminder on',
   'reminder.onDescription': 'A notification comes {minutes} minutes before sunset, while the app is open.',
+  'reminder.toggleClosed': 'Remind me {minutes} minutes before sunset, also when the app is closed',
+  'reminder.onDescriptionClosed': 'A notification comes {minutes} minutes before each sunset, also when the app is closed.',
   'reminder.blockedTitle': 'Notifications are blocked',
   'reminder.blockedDescription': 'Allow notifications for this site in the browser settings to get the sunset reminder.',
 
@@ -621,6 +623,8 @@ export const en = {
   'issReminder.toggle': 'ISS passes: remind me {minutes} minutes before a visible pass (while the app is open)',
   'issReminder.onTitle': 'ISS pass reminder on',
   'issReminder.onDescription': 'A notification comes {minutes} minutes before a visible ISS pass, while the app is open.',
+  'issReminder.toggleClosed': 'ISS passes: remind me {minutes} minutes before a visible pass, also when the app is closed',
+  'issReminder.onDescriptionClosed': 'A notification comes {minutes} minutes before the next visible ISS pass, also when the app is closed.',
   'issReminder.blockedDescription': 'Allow notifications for this site in the browser settings to get the ISS pass reminder.',
   'info.speed': 'Speed',
   'info.kmPerSecond': '{value} km/s',

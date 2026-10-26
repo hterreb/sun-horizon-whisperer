@@ -140,6 +140,8 @@ export const de: Record<keyof typeof en, string> = {
   'reminder.notification': "Sonnenuntergang in {minutes} Minuten, um {time}",
   'reminder.onTitle': "Erinnerung eingeschaltet",
   'reminder.onDescription': "Eine Benachrichtigung kommt {minutes} Minuten vor Sonnenuntergang, solange die App offen ist.",
+  'reminder.toggleClosed': "Erinnere mich {minutes} Minuten vor Sonnenuntergang, auch wenn die App geschlossen ist",
+  'reminder.onDescriptionClosed': "Eine Benachrichtigung kommt {minutes} Minuten vor jedem Sonnenuntergang, auch wenn die App geschlossen ist.",
   'reminder.blockedTitle': "Benachrichtigungen blockiert",
   'reminder.blockedDescription': "Erlaube Benachrichtigungen für diese Seite in den Browsereinstellungen, um die Erinnerung zu bekommen.",
 
@@ -621,6 +623,8 @@ export const de: Record<keyof typeof en, string> = {
   'issReminder.toggle': "ISS-Überflüge: Erinnere mich {minutes} Minuten vor einem sichtbaren Überflug (solange die App offen ist)",
   'issReminder.onTitle': "ISS-Erinnerung an",
   'issReminder.onDescription': "Eine Benachrichtigung kommt {minutes} Minuten vor einem sichtbaren ISS-Überflug, solange die App offen ist.",
+  'issReminder.toggleClosed': "ISS-Überflüge: Erinnere mich {minutes} Minuten vor einem sichtbaren Überflug, auch wenn die App geschlossen ist",
+  'issReminder.onDescriptionClosed': "Eine Benachrichtigung kommt {minutes} Minuten vor dem nächsten sichtbaren ISS-Überflug, auch wenn die App geschlossen ist.",
   'issReminder.blockedDescription': "Erlaube Benachrichtigungen für diese Seite in den Browsereinstellungen, um die ISS-Erinnerung zu bekommen.",
   'info.speed': "Geschwindigkeit",
   'info.kmPerSecond': "{value} km/s",
