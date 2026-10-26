@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getNextSatelliteTry, loadSatelliteData, type GpRecord } from '@/utils/satelliteData';
+import { captureMessage } from '@/utils/monitoring';
 import {
   CANDIDATE_STEP_MS,
   ISS_NORAD_ID,
@@ -61,6 +62,10 @@ export interface SatelliteTracking {
   nextTryAt: number | null;
 }
 
+// Item 183: CelesTrak asks that an error answer goes to a person: the app reports it to Sentry.
+const reportCelestrak = (problem: string): void => captureMessage(`CelesTrak: ${problem}`, 'warning');
+const loadData = () => loadSatelliteData(Date.now(), fetch, reportCelestrak);
+
 // satellite.js in its own chunk, only when the tracking is on; null when it does not load.
 const importSatelliteLib = (): Promise<SatelliteLib | null> =>
   import('satellite.js').then(
@@ -120,7 +125,7 @@ export const useSatelliteTracking = (
     if (!enabled) return;
     let cancelled = false;
     const load = () => {
-      loadSatelliteData().then((data) => !cancelled && takeData(data));
+      loadData().then((data) => !cancelled && takeData(data));
     };
     load();
     const timer = setInterval(load, DATA_CHECK_MS);
@@ -150,7 +155,7 @@ export const useSatelliteTracking = (
         setLibFailed(!module);
       })
       : Promise.resolve();
-    const dataTry = loadSatelliteData().then(takeData);
+    const dataTry = loadData().then(takeData);
     void Promise.all([libTry, dataTry]).finally(() => setRefreshing(false));
   }, [libFailed, takeData]);
 
