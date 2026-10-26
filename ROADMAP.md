@@ -3847,7 +3847,19 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   - StoreKit (`SunChaserTests`, local `SunChaser.storekit`): the details give `premium` at 3.99 USD; a purchase is listed with its token; a refund and a failed purchase are not; an unknown SKU throws. In the app, the page's `getDigitalGoodsService` gets the product, an unknown provider is refused, and a Payment Request reaches StoreKit and rejects on its error (the page then shows "purchase failed").
   - After the merge (2026-10-26, live bundle `index-BvNdkfJb.js`): turning on the sunset reminder in the app gives iOS 14 reminders, today 16:52 ("Sunset in 15 minutes, at 17:07", the line-of-sight sunset) to 8 November.
   - Web tests that waited too briefly on a loaded machine: the satellite status tests (also on `main`) and the 40-minute weather test.
-- **Open:** real iPhone: compass heading, the lock-screen radio controls, a reminder on a locked phone, a sandbox purchase and restore (Xcode's StoreKit test environment answered an app purchase with ASDServerErrorDomain 537 without a development team). The App Store steps in `ios/README.md` (developer account, the in-app purchase, listing, screenshots, review).
+- **Status (2026-10-26):** built and merged (#254, #255), live in the iOS simulator. The steps below need Lutz's iPhone or the Apple Developer account. Lutz decided: device checks later, enroll later.
+- **Next steps:**
+  1. **Real iPhone (owner: plug in the phone, add the Apple ID in Xcode → Settings → Accounts; a free account is enough).** Then set the team in Signing & Capabilities and run. Check:
+     - the compass heading against a hardware compass (items 8 and 19: the sun at screen centre, a 45° turn moves it to the edge);
+     - the radio on the lock screen and in Control Center: play, pause, next station (items 90 and 180);
+     - a sunset reminder with the phone locked and the app closed, and the ISS reminder;
+     - the first-start prompts (location, notifications), "Save Image" from the share card, fullscreen, landscape.
+  2. **Apple Developer Program (owner).** Enroll as an organization with the D-U-N-S number 317376308 (99 USD per year), so the store shows the brand.
+  3. **App Store Connect (owner, then code):** the app record (bundle ID `com.ainabler.sunchaser`, English, category Weather), the privacy labels as `PrivacyInfo.xcprivacy` (coarse location, crash data, other diagnostic data, customer support; not linked; no tracking), the privacy policy URL, the age rating, `store/screenshots-ios/`.
+  4. **In-app purchase:** create the non-consumable `com.ainabler.sunchaser.premium` at €3.99 / US$3.99 (item 45) and a sandbox tester. On the phone: buy, restore, refund. This is the check that the Xcode test environment refused without a development team (ASDServerErrorDomain 537).
+  5. **Build and TestFlight:** Product → Archive → Distribute App → App Store Connect; an internal TestFlight test on the phone.
+  6. **Review:** submit with the review notes in `ios/README.md` (guideline 4.2). Submit the in-app purchase only with the release that turns on `PREMIUM_ENFORCED` (item 14).
+  7. **Host move (item 16, Cloudflare):** change `WebViewController.appURL` and `WKAppBoundDomains` together with the TWA host, then a new build.
 
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 
