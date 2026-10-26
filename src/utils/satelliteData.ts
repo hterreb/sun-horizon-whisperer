@@ -53,12 +53,14 @@ interface SatelliteCache {
   serverTriedAt?: number; // item 177: the last failed try of our server (absent in older caches)
 }
 
-// The night catalogue (ROADMAP item 160): the satellites of CelesTrak's `active` group (16,000,
-// 7 MB) in a 700-2000 km orbit, which stay in sunlight deep into the night. Our server
-// (api/satellites.ts, satelliteFeed) filters the group once a day.
-export const NIGHT_CATALOGUE_URL = '/api/satellites';
-// Item 177: the three groups and the night catalogue in one list, the fallback of the direct groups.
+// Item 177: the three groups and the night catalogue in one list from our server
+// (api/satellites.ts, satelliteFeed), the fallback of the direct groups. The night catalogue
+// (item 160): the satellites of CelesTrak's `active` group (16,000, 7 MB) in a 700-2000 km
+// orbit, which stay in sunlight deep into the night. Item 183: also the source of the night
+// catalogue after a direct fetch, so the server downloads the `active` group for one URL only.
 export const ALL_GROUPS_URL = '/api/satellites?all=1';
+// Item 183: our server's reason when a CelesTrak list failed ("HTTP 403 for active").
+export const CELESTRAK_STATUS_HEADER = 'X-Celestrak-Status';
 
 // Exported for satelliteFeed (the Edge function).
 export const isRecord = (value: unknown): value is GpRecord =>
@@ -113,19 +115,6 @@ const writeCache = (cache: SatelliteCache): void => {
   }
 };
 
-// The night catalogue, or none when our server or CelesTrak fails.
-// ponytail: a failed night catalogue stays out until the next daily fetch; give it its own
-// retry if a day without it matters.
-const fetchNightCatalogue = async (fetchImpl: typeof fetch): Promise<GpRecord[]> => {
-  try {
-    const response = await fetchImpl(NIGHT_CATALOGUE_URL);
-    const data: unknown = response.status === 200 ? await response.json() : null;
-    return Array.isArray(data) ? data.filter(isRecord).map(trim) : [];
-  } catch {
-    return [];
-  }
-};
-
 // When loadSatelliteData asks CelesTrak again: REFRESH_MS after the last full fetch, and not
 // before RETRY_MS after the last try. Null when a fetch is due now. A future time in the cache
 // (device clock set back) does not delay it.
@@ -162,15 +151,22 @@ export const getNextSatelliteTry = (now: number = Date.now()): number | null => 
   return server === null ? null : Math.min(direct, server);
 };
 
+// Item 183: CelesTrak asks that an error answer goes to a person; the app reports it to Sentry.
+type Report = (problem: string) => void;
+
 // The three groups from CelesTrak, or null when one fails (no 200, no list, a network error or
 // a timeout).
-const fetchDirect = async (fetchImpl: typeof fetch): Promise<GpRecord[] | null> => {
+const fetchDirect = async (fetchImpl: typeof fetch, report: Report): Promise<GpRecord[] | null> => {
   const records: GpRecord[] = [];
   for (const group of SATELLITE_GROUPS) {
     try {
       const response = await fetchImpl(gpUrl(group), { signal: AbortSignal.timeout(DIRECT_TIMEOUT_MS) });
       // Only a 200 counts; CelesTrak asks clients to stop on anything else.
-      const data: unknown = response.status === 200 ? await response.json() : null;
+      if (response.status !== 200) {
+        report(`HTTP ${response.status} for ${group}`);
+        return null;
+      }
+      const data: unknown = await response.json();
       if (!Array.isArray(data)) return null;
       records.push(...data.filter(isRecord).map(trim));
     } catch {
@@ -181,9 +177,11 @@ const fetchDirect = async (fetchImpl: typeof fetch): Promise<GpRecord[] | null> 
 };
 
 // Item 177: the groups and the night catalogue from our server, or null.
-const fetchFromServer = async (fetchImpl: typeof fetch): Promise<GpRecord[] | null> => {
+const fetchFromServer = async (fetchImpl: typeof fetch, report: Report): Promise<GpRecord[] | null> => {
   try {
     const response = await fetchImpl(ALL_GROUPS_URL, { signal: AbortSignal.timeout(SERVER_TIMEOUT_MS) });
+    const problem = response.headers.get(CELESTRAK_STATUS_HEADER);
+    if (problem) report(`server: ${problem}`);
     const data: unknown = response.status === 200 ? await response.json() : null;
     const records = Array.isArray(data) ? dedupeRecords(data.filter(isRecord).map(trim)) : [];
     return records.length > 0 ? records : null;
@@ -197,10 +195,7 @@ const fetchFromServer = async (fetchImpl: typeof fetch): Promise<GpRecord[] | nu
 // data is too old or missing, our server gives the list (item 177). A failed group keeps the
 // cached records and waits RETRY_MS, a failed server try SERVER_RETRY_MS. Null when there are
 // no records at all.
-export const loadSatelliteData = async (
-  now: number = Date.now(),
-  fetchImpl: typeof fetch = fetch,
-): Promise<GpRecord[] | null> => {
+const load = async (now: number, fetchImpl: typeof fetch, report: Report): Promise<GpRecord[] | null> => {
   const cache = readCache();
   const cached = cache?.records ?? [];
   const keep = (): GpRecord[] | null => (cached.length > 0 ? cached : null);
@@ -208,10 +203,14 @@ export const loadSatelliteData = async (
   if (!directDue && isUsable(cached, now)) return keep();
 
   if (directDue) {
-    const direct = await fetchDirect(fetchImpl);
+    const direct = await fetchDirect(fetchImpl, report);
     if (direct) {
-      // After the groups, so the ISS stays the first record (useSatelliteTracking's epoch check).
-      direct.push(...(await fetchNightCatalogue(fetchImpl)));
+      // After the groups, so the ISS stays the first record (useSatelliteTracking's epoch check),
+      // and dedupeRecords keeps the direct (newer) copy of the groups. Without the server's list,
+      // the groups stay for a day.
+      // ponytail: a failed night catalogue stays out until the next daily fetch; give it its own
+      // retry if a day without it matters.
+      direct.push(...((await fetchFromServer(fetchImpl, report)) ?? []));
       const deduped = dedupeRecords(direct);
       writeCache({ fetchedAt: now, triedAt: now, records: deduped });
       return deduped.length > 0 ? deduped : null;
@@ -229,7 +228,7 @@ export const loadSatelliteData = async (
     writeCache(base);
     return keep();
   }
-  const fromServer = await fetchFromServer(fetchImpl);
+  const fromServer = await fetchFromServer(fetchImpl, report);
   if (fromServer && isUsable(fromServer, now)) {
     // The server's list is a full daily list, so it counts as a fetch: CelesTrak is asked again
     // after REFRESH_MS, not after RETRY_MS. A blocked IP then asks CelesTrak once a day, not 12 times.
@@ -238,4 +237,18 @@ export const loadSatelliteData = async (
   }
   writeCache({ ...base, serverTriedAt: now });
   return keep();
+};
+
+// Item 183: one load at a time. Two loads at once (the tracking switched on twice, a refresh)
+// would ask CelesTrak twice in the same second, and CelesTrak answers a repeat with a 403.
+let loading: Promise<GpRecord[] | null> | null = null;
+export const loadSatelliteData = (
+  now: number = Date.now(),
+  fetchImpl: typeof fetch = fetch,
+  report: Report = () => {},
+): Promise<GpRecord[] | null> => {
+  loading ??= load(now, fetchImpl, report).finally(() => {
+    loading = null;
+  });
+  return loading;
 };

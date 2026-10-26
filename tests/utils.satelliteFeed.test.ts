@@ -7,7 +7,7 @@ import {
   isNightSatellite,
   orbitHeightsKm,
 } from '../src/utils/satelliteFeed';
-import { gpUrl, type GpRecord } from '../src/utils/satelliteData';
+import { ALL_GROUPS_URL, CELESTRAK_STATUS_HEADER, gpUrl, type GpRecord } from '../src/utils/satelliteData';
 
 const iss = fixture.omm as unknown as GpRecord;
 // A Qianfan satellite: 1066 km, circular (CelesTrak, 15 Oct 2026).
@@ -33,29 +33,18 @@ describe('satelliteFeed: the night catalogue (ROADMAP item 160)', () => {
     expect(isNightSatellite(molniyaLike)).toBe(false);
   });
 
-  it('fetches the active group and returns the night satellites, trimmed, cached for a day', async () => {
-    const fetchFn = vi.fn(async () => new Response(JSON.stringify([iss, { ...qianfan, EXTRA: 1 }, starlink, 'junk']), { status: 200 }));
+  it('points the plain path to ?all=1 without a download, so one cache entry downloads `active` (item 183)', async () => {
+    const fetchFn = vi.fn();
     const response = await handleSatellitesRequest(request(), fetchFn as unknown as typeof fetch);
-    expect((fetchFn.mock.calls[0] as unknown[])[0]).toBe(CELESTRAK_ACTIVE);
+    expect(response.status).toBe(308);
+    expect(response.headers.get('Location')).toBe(ALL_GROUPS_URL);
     expect(response.headers.get('Cache-Control')).toBe(SATELLITES_CACHE_CONTROL);
-    const body = await response.json();
-    expect(body.map((r: GpRecord) => r.OBJECT_NAME)).toEqual(['QIANFAN-128']);
-    expect(body[0]).not.toHaveProperty('EXTRA');
-  });
-
-  it('answers an empty list, kept 2 h at the edge, when CelesTrak refuses or fails', async () => {
-    for (const fetchFn of [
-      vi.fn(async () => new Response('blocked', { status: 403 })),
-      vi.fn(async () => { throw new TypeError('Failed to fetch'); }),
-    ]) {
-      const response = await handleSatellitesRequest(request(), fetchFn as unknown as typeof fetch);
-      expect(response.status).toBe(200);
-      expect(response.headers.get('Cache-Control')).toBe(SATELLITES_ERROR_CACHE_CONTROL);
-      expect(await response.json()).toEqual([]);
-    }
+    expect(fetchFn).not.toHaveBeenCalled();
   });
 
   describe('?all=1: the groups and the night catalogue (item 177)', () => {
+    beforeEach(() => { vi.spyOn(console, 'error').mockImplementation(() => {}); });
+    afterEach(() => { vi.restoreAllMocks(); });
     const allRequest = () => new Request('https://sun-chaser.vercel.app/api/satellites?all=1');
     const poisk: GpRecord = { ...iss, OBJECT_NAME: 'POISK', NORAD_CAT_ID: 36086 };
     const visual: GpRecord = { ...iss, OBJECT_NAME: 'VISUAL-1', NORAD_CAT_ID: 5, MEAN_ANOMALY: 99 };
@@ -94,11 +83,22 @@ describe('satelliteFeed: the night catalogue (ROADMAP item 160)', () => {
       expect(await response.json()).toEqual([]);
     });
 
-    it('keeps the night catalogue alone without `all`', async () => {
+    it.each([
+      ['a 403', async () => new Response('blocked', { status: 403 }), 'HTTP 403 for stations'],
+      ['a network error', async () => { throw new TypeError('Failed to fetch'); }, 'TypeError for stations'],
+      ['a timeout', async () => { throw new DOMException('timed out', 'TimeoutError'); }, 'TimeoutError for stations'],
+    ])('names the failed list and the reason (%s) in X-Celestrak-Status, and logs it (item 183)', async (_name, fail, reason) => {
+      const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const response = await handleSatellitesRequest(allRequest(), vi.fn(fail) as unknown as typeof fetch);
+      expect(response.headers.get(CELESTRAK_STATUS_HEADER)).toBe(reason);
+      expect(log).toHaveBeenCalledWith(`CelesTrak: ${reason}`);
+      log.mockRestore();
+    });
+
+    it('sends no X-Celestrak-Status after a full run', async () => {
       const fetchFn = vi.fn(async (url: string) => new Response(JSON.stringify(lists[url]), { status: 200 }));
-      const response = await handleSatellitesRequest(request(), fetchFn as unknown as typeof fetch);
-      expect(fetchFn).toHaveBeenCalledTimes(1);
-      expect((await response.json()).map((r: GpRecord) => r.OBJECT_NAME)).toEqual(['QIANFAN-128']);
+      const response = await handleSatellitesRequest(allRequest(), fetchFn as unknown as typeof fetch);
+      expect(response.headers.get(CELESTRAK_STATUS_HEADER)).toBeNull();
     });
   });
 

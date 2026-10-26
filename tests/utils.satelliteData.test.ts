@@ -1,10 +1,10 @@
 import fixture from './fixtures/iss-omm-2026-10-05.json';
 import {
-  NIGHT_CATALOGUE_URL,
   REFRESH_MS,
   RETRY_MS,
   SERVER_RETRY_MS,
   ALL_GROUPS_URL,
+  CELESTRAK_STATUS_HEADER,
   SATELLITE_CACHE_KEY,
   SATELLITE_GROUPS,
   dedupeRecords,
@@ -19,7 +19,8 @@ const iss = { ...(fixture.omm as unknown as GpRecord), EXTRA_FIELD: 'x' } as GpR
 const poisk: GpRecord = { ...iss, OBJECT_NAME: 'POISK', NORAD_CAT_ID: 36086 };
 const other: GpRecord = { ...iss, OBJECT_NAME: 'OTHER', NORAD_CAT_ID: 1, MEAN_ANOMALY: 10 };
 
-const response = (status: number, body: unknown) => ({ status, json: async () => body }) as Response;
+const response = (status: number, body: unknown, headers: Record<string, string> = {}) =>
+  ({ status, headers: new Headers(headers), json: async () => body }) as Response;
 const NOW = Date.parse('2026-10-06T08:00:00Z');
 const urlOf = (call: unknown[]) => String(call[0]);
 const directCalls = (fn: ReturnType<typeof vi.fn>) => fn.mock.calls.filter((c) => urlOf(c).includes('celestrak.org')).length;
@@ -53,16 +54,16 @@ describe('satelliteData (ROADMAP item 97)', () => {
 
   it('adds the night catalogue after the groups (item 160)', async () => {
     const night: GpRecord = { ...iss, OBJECT_NAME: 'QIANFAN-1', NORAD_CAT_ID: 60001, MEAN_ANOMALY: 20, EXTRA_FIELD: 'x' } as GpRecord;
-    const fetchImpl = vi.fn(async (url: string) => response(200, url === NIGHT_CATALOGUE_URL ? [night, iss] : [iss]));
+    const fetchImpl = vi.fn(async (url: string) => response(200, url === ALL_GROUPS_URL ? [night, iss] : [iss]));
     const records = await loadSatelliteData(NOW, fetchImpl as unknown as typeof fetch);
-    expect(fetchImpl.mock.calls.at(-1)?.[0]).toBe('/api/satellites');
+    expect(fetchImpl.mock.calls.at(-1)?.[0]).toBe(ALL_GROUPS_URL);
     expect(records?.map((r) => r.OBJECT_NAME)).toEqual(['ISS (ZARYA)', 'QIANFAN-1']);
     expect(records?.[1]).not.toHaveProperty('EXTRA_FIELD');
   });
 
   it('keeps the groups for a day when the night catalogue fails', async () => {
     const fetchImpl = vi.fn(async (url: string) => {
-      if (url === NIGHT_CATALOGUE_URL) throw new TypeError('Failed to fetch');
+      if (url === ALL_GROUPS_URL) throw new TypeError('Failed to fetch');
       return response(200, [iss]);
     });
     expect(await loadSatelliteData(NOW, fetchImpl as unknown as typeof fetch)).toHaveLength(1);
@@ -211,11 +212,41 @@ describe('satelliteData (ROADMAP item 97)', () => {
       expect(await loadSatelliteData(NOW, vi.fn())).toHaveLength(1);
     });
 
-    it('asks the server after a direct success only for the night catalogue (as before)', async () => {
+    it('after a direct success, asks the server once, for the night catalogue (item 183: one server URL)', async () => {
       const fetchImpl = vi.fn(async () => response(200, [iss]));
       await loadSatelliteData(NOW, fetchImpl);
-      expect(serverCalls(fetchImpl)).toBe(0);
-      expect(fetchImpl.mock.calls.at(-1)?.[0]).toBe(NIGHT_CATALOGUE_URL);
+      expect(serverCalls(fetchImpl)).toBe(1);
+      expect(fetchImpl.mock.calls.at(-1)?.[0]).toBe(ALL_GROUPS_URL);
+    });
+  });
+
+  describe('CelesTrak policy (item 183)', () => {
+    it('reports a direct error answer with its status and group, but not a network error', async () => {
+      const report = vi.fn();
+      await loadSatelliteData(NOW, vi.fn(async (url: string) => (url === ALL_GROUPS_URL ? response(200, [iss]) : response(403, 'blocked'))) as unknown as typeof fetch, report);
+      expect(report.mock.calls).toEqual([['HTTP 403 for stations']]);
+      localStorage.clear();
+      const offline = vi.fn(async () => {
+        throw new TypeError('Failed to fetch');
+      });
+      await loadSatelliteData(NOW, offline, report);
+      expect(report).toHaveBeenCalledTimes(1);
+    });
+
+    it("reports the server's CelesTrak problem", async () => {
+      const report = vi.fn();
+      const fetchImpl = vi.fn(async (url: string) => (
+        url === ALL_GROUPS_URL ? response(200, [iss], { [CELESTRAK_STATUS_HEADER]: 'HTTP 403 for active' }) : response(403, 'blocked')
+      ));
+      expect(await loadSatelliteData(NOW, fetchImpl as unknown as typeof fetch, report)).toHaveLength(1);
+      expect(report.mock.calls).toEqual([['HTTP 403 for stations'], ['server: HTTP 403 for active']]);
+    });
+
+    it('two loads at once share one set of requests', async () => {
+      const fetchImpl = vi.fn(async () => response(200, [iss]));
+      const [a, b] = await Promise.all([loadSatelliteData(NOW, fetchImpl), loadSatelliteData(NOW, fetchImpl)]);
+      expect(a).toBe(b);
+      expect(fetchImpl).toHaveBeenCalledTimes(4);
     });
   });
 

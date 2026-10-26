@@ -11,11 +11,11 @@ describe('api/satellites (Vercel Edge function)', () => {
     expect(config).toEqual({ runtime: 'edge' });
   });
 
-  it('asks CelesTrak for the active group', async () => {
+  it('asks CelesTrak for the groups, then the active group', async () => {
     const fetchMock = vi.fn(async () => new Response('[]', { status: 200 }));
     global.fetch = fetchMock as unknown as typeof fetch;
-    const response = await handler(new Request('https://sun-chaser.vercel.app/api/satellites'));
-    expect((fetchMock.mock.calls[0] as unknown[])[0]).toBe(CELESTRAK_ACTIVE);
+    const response = await handler(new Request('https://sun-chaser.vercel.app/api/satellites?all=1'));
+    expect((fetchMock.mock.calls.at(-1) as unknown[])[0]).toBe(CELESTRAK_ACTIVE);
     expect(await response.json()).toEqual([]);
   });
 });

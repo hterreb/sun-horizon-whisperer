@@ -2,16 +2,20 @@
 import { defineConfig, loadEnv, type Connect, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import os from "os";
 import { VitePWA } from 'vite-plugin-pwa';
 import { sentryVitePlugin } from '@sentry/vite-plugin';
 import { handlePlanesRequest } from './src/utils/planeFeed';
 import { handleSatellitesRequest } from './src/utils/satelliteFeed';
+import { celestrakFromDisk } from './scripts/celestrakDiskCache';
 
 // The Edge functions in `npm run dev` and `vite preview`, with the same handlers as api/: the
-// live radar's proxy (ROADMAP item 96) and the night catalogue (item 160).
+// live radar's proxy (ROADMAP item 96) and the night catalogue (item 160). CelesTrak comes from
+// a disk cache that all worktrees share (item 183).
+const celestrak = celestrakFromDisk(path.join(os.homedir(), '.cache', 'sun-chaser-celestrak'));
 const API_ROUTES: [string, (request: Request) => Promise<Response>][] = [
   ['/api/planes', handlePlanesRequest],
-  ['/api/satellites', handleSatellitesRequest],
+  ['/api/satellites', request => handleSatellitesRequest(request, celestrak)],
 ];
 // The stylesheet must not block the first paint (ROADMAP item 174): on slow 3G it shares the
 // line with the script and arrives late, and the page shows nothing until then. In a build,
