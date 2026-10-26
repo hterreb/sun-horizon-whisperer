@@ -39,6 +39,7 @@ import { fromDateTimeLocalValue, getTimeTravelRange, toDateTimeLocalValue } from
 import { placeClockDifferenceMinutes } from '@/utils/timeZone';
 import { formatTemperature, type TemperatureUnit } from '@/utils/temperatureUnit';
 import { SUNSET_REMINDER_MIN } from '@/utils/sunsetReminder';
+import { getNativeReminders } from '@/hooks/useSunsetReminder';
 import { PASS_REMINDER_MIN } from '@/utils/satelliteUtils';
 import { type LiveStatus } from '@/utils/liveRadar';
 import { type SatelliteStatus } from '@/hooks/useSatelliteTracking';
@@ -1018,8 +1019,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                     type="button"
                     onClick={onSunsetReminderToggle}
                     className={`${INLINE_ICON_TOGGLE} ml-[26px] ${isSunsetReminderOn ? 'bg-white/20' : ''}`}
-                    aria-label={t('reminder.toggle', { minutes: SUNSET_REMINDER_MIN })}
-                    title={t('reminder.toggle', { minutes: SUNSET_REMINDER_MIN })}
+                    aria-label={t(getNativeReminders() ? 'reminder.toggleClosed' : 'reminder.toggle', { minutes: SUNSET_REMINDER_MIN })}
+                    title={t(getNativeReminders() ? 'reminder.toggleClosed' : 'reminder.toggle', { minutes: SUNSET_REMINDER_MIN })}
                     aria-pressed={isSunsetReminderOn}
                   >
                     {isSunsetReminderOn ? <AlarmClockCheck size={14} /> : <AlarmClock size={14} />}
@@ -1470,7 +1471,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                     onClick={() => requirePremium(onIssReminderToggle)}
                     className={`${INLINE_ICON_TOGGLE} relative ml-auto mr-1.5 ${isIssReminderOn ? 'bg-white/20' : ''}`}
                     aria-label={t('issReminder.label')}
-                    title={t('issReminder.toggle', { minutes: PASS_REMINDER_MIN })}
+                    title={t(getNativeReminders() ? 'issReminder.toggleClosed' : 'issReminder.toggle', { minutes: PASS_REMINDER_MIN })}
                     aria-pressed={isIssReminderOn}
                   >
                     <Satellite size={14} />

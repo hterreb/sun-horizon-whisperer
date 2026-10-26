@@ -1198,6 +1198,21 @@ describe('InfoPanel: line of sight as an icon at the sun and moon rows (ROADMAP 
       expect(screen.queryByRole('button', { name: 'ISS passes' })).not.toBeInTheDocument();
     });
 
+    it('in the iOS app, the reminder toggles say that reminders also come when the app is closed (item 182)', () => {
+      vi.stubGlobal('sunChaserReminders', { schedule: vi.fn(), cancel: vi.fn() });
+      try {
+        render(
+          <PremiumContext.Provider value={premiumValue({})}>
+            <InfoPanel {...defaultProps} onSunsetReminderToggle={vi.fn()} onSatelliteTrackingToggle={vi.fn()} onIssReminderToggle={vi.fn()} />
+          </PremiumContext.Provider>
+        );
+        expect(screen.getByRole('button', { name: 'Remind me 15 minutes before sunset, also when the app is closed' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'ISS passes' })).toHaveAttribute('title', 'ISS passes: remind me 10 minutes before a visible pass, also when the app is closed');
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+
     it('after a Play purchase the gold plus is gone and the score shows', () => {
       render(
         <PremiumContext.Provider value={premiumValue({ isPremium: true, isLocked: false })}>

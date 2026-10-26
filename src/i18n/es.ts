@@ -140,6 +140,8 @@ export const es: Record<keyof typeof en, string> = {
   'reminder.notification': "Puesta de sol en {minutes} minutos, a las {time}",
   'reminder.onTitle': "Aviso de puesta de sol activado",
   'reminder.onDescription': "Recibirás una notificación {minutes} minutos antes de la puesta de sol, mientras la app esté abierta.",
+  'reminder.toggleClosed': "Avísame {minutes} minutos antes de la puesta de sol, también con la app cerrada",
+  'reminder.onDescriptionClosed': "Recibirás una notificación {minutes} minutos antes de cada puesta de sol, también con la app cerrada.",
   'reminder.blockedTitle': "Notificaciones bloqueadas",
   'reminder.blockedDescription': "Permite las notificaciones de este sitio en los ajustes del navegador para recibir el aviso.",
 
@@ -621,6 +623,8 @@ export const es: Record<keyof typeof en, string> = {
   'issReminder.toggle': "Pasos de la ISS: avísame {minutes} minutos antes de un paso visible (con la app abierta)",
   'issReminder.onTitle': "Aviso de pasos de la ISS activado",
   'issReminder.onDescription': "Llega una notificación {minutes} minutos antes de un paso visible de la ISS, con la app abierta.",
+  'issReminder.toggleClosed': "Pasos de la ISS: avísame {minutes} minutos antes de un paso visible, también con la app cerrada",
+  'issReminder.onDescriptionClosed': "Llega una notificación {minutes} minutos antes del próximo paso visible de la ISS, también con la app cerrada.",
   'issReminder.blockedDescription': "Permite las notificaciones de este sitio en los ajustes del navegador para recibir el aviso de la ISS.",
   'info.speed': "Velocidad",
   'info.kmPerSecond': "{value} km/s",
