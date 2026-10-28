@@ -106,8 +106,9 @@ export const getRidgePoints = (profile: HorizonProfile, centerAzimuth: number, s
   return points;
 };
 
-// A scene token from index.css ("24.6 95% 53.1%") as a canvas colour.
-const token = (name: string, alpha = 1): string => {
+// A scene token from index.css ("24.6 95% 53.1%") as a canvas colour. Also used by the
+// countdown card (countdownCard.ts, item 186), as are FONT, drawAppMark and toPng.
+export const token = (name: string, alpha = 1): string => {
   const value = getComputedStyle(document.documentElement).getPropertyValue(`--${name}`).trim();
   return value ? `hsla(${value.split(/\s+/).join(', ')}, ${alpha})` : `rgba(0, 0, 0, ${alpha})`;
 };
@@ -120,10 +121,10 @@ const loadImage = (src: string): Promise<HTMLImageElement | null> =>
     img.src = src;
   });
 
-const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+export const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 
 // The app mark and name, from `left`, with the name's baseline at `baseline`.
-const drawAppMark = async (ctx: CanvasRenderingContext2D, left: number, baseline: number, size: number) => {
+export const drawAppMark = async (ctx: CanvasRenderingContext2D, left: number, baseline: number, size: number) => {
   const mark = await loadImage(`${import.meta.env.BASE_URL}logo-mark.svg`);
   if (mark) ctx.drawImage(mark, left, baseline - size * 0.73, size, size);
   ctx.font = `700 ${size * 0.625}px ${FONT}`;
@@ -132,7 +133,7 @@ const drawAppMark = async (ctx: CanvasRenderingContext2D, left: number, baseline
   ctx.fillText('Sun Chaser', left + size * 4 / 3, baseline);
 };
 
-const toPng = (canvas: HTMLCanvasElement): Promise<Blob> =>
+export const toPng = (canvas: HTMLCanvasElement): Promise<Blob> =>
   new Promise((resolve, reject) =>
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('PNG encoding failed'))), 'image/png'),
   );
