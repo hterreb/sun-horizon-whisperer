@@ -3495,6 +3495,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 ### 167. Search: Search Console, Bing and a landing page in five languages — M
 
 - **Request (Lutz, 2026-10-19):** from an [X post](https://x.com/IndieBeaverHere/status/2111812808782295369) (2026-10-18): the lowest-effort marketing is a landing page in the store listing, Google Search Console and Bing Webmaster Tools, then pages for the searches that give impressions, in more languages.
+- **Request (Lutz, 2026-10-28):** from an [X post](https://x.com/MaxHirsch13/status/2112626598524465296) (2026-10-20): TikTok and Instagram open a bio link in their in-app browser. There a store link can fail ("Action can't be completed") and the PWA cannot be installed. The landing page tells the visitor how to open it in the real browser (spec step 6).
 - **Now:**
   - `/` is the app. `index.html` has the title "Sun Chaser", one English description, and Open Graph title, description and type. It has no `og:image`, no canonical link and no `hreflang`. There is no sitemap. `robots.txt` allows all.
   - The site is not in Search Console or in Bing Webmaster Tools. The domain moves to `sun.chaser.page` (item 16, PR #193).
@@ -3505,9 +3506,14 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   3. `public/sitemap.xml` with the five pages, and its URL in `robots.txt`.
   4. `index.html`: `og:image` (`store/feature-graphic.png`, 1024 × 500) and a canonical link.
   5. The website field of the Play listing: `https://sun.chaser.page/`.
-  6. Not in this item: pages for the searches with impressions (for example "sunset time <city>", "golden hour today", "sun dog", "ISS pass tonight"). Only after 4–8 weeks of Search Console data shows them. More languages only when the app has them.
+  6. **In-app browsers:** a small inline script on each `/<lang>/` page (its CSP hash in `public/_headers`) finds the in-app browser of TikTok (`musical_ly`, `BytedanceWebview`), Instagram (`Instagram`) and Facebook (`FBAN`, `FBAV`, `FB_IAB`) in the user agent. Then:
+     - Android: it tries once to open the same page in Chrome (`intent://sun.chaser.page/<lang>/#Intent;scheme=https;package=com.android.chrome;end`).
+     - Always (also when Chrome does not open): a full-screen overlay with an arrow to the top-right corner and "Tap ••• → Open in browser" (iOS: "Open in external browser"), in the page language, and a "Continue here" link that closes it.
+     - In a normal browser there is no overlay and no automatic redirect (search engines and readers see the page). The store button goes by device: Android → `https://play.google.com/store/apps/details?id=com.ainabler.sunchaser`; iOS → the App Store page when item 182 is live, until then the web app at `/`.
+     - The bio link of item 185 is the `/<lang>/` page.
+  7. Not in this item: pages for the searches with impressions (for example "sunset time <city>", "golden hour today", "sun dog", "ISS pass tonight"). Only after 4–8 weeks of Search Console data shows them. More languages only when the app has them.
 - **Depends on:** item 16 (the domain move) and item 67 step 7 (the Play listing text).
-- **Check:** built site: each `/<lang>/` page loads with no CSP error, has the right `lang` and the `hreflang` links; `/` still opens the app; the service worker does not serve the app for `/<lang>/`. Lighthouse SEO audit on each page.
+- **Check:** built site: each `/<lang>/` page loads with no CSP error, has the right `lang` and the `hreflang` links; `/` still opens the app; the service worker does not serve the app for `/<lang>/`. Lighthouse SEO audit on each page. In-app browsers (step 6): a test per user agent (TikTok iOS and Android, Instagram, Facebook: overlay; Android also the `intent://` link; desktop Chrome and mobile Safari: no overlay, the right store button). On a real phone: the bio link in the TikTok and Instagram app shows the overlay, and "Open in browser" opens the page in Safari or Chrome.
 - **Done when:** Search Console and Bing show the domain as verified and the sitemap as read with no errors.
 
 ### 168. The moon below the horizon: a mark at the horizon — S — **Closed: no change**
@@ -3867,6 +3873,18 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Open:** Vercel's edge may not combine two cache misses at the same time, so two regions or two misses can each download `active` (one 403 at most per miss, then the 2 h error cache). After item 16 (Cloudflare), `/api/satellites` needs the same cache (the Cache API or KV), because a Worker's `fetch` does not use the edge cache by itself.
 - **Built:** `scripts/celestrakDiskCache.ts` (`celestrakFromDisk`), used by `vite.config.ts` for `/api/satellites`. `satelliteFeed`: `fetchList` gives the reason of a failure; `handleAllRequest` sets `X-Celestrak-Status` and logs it; the plain path answers 308. `satelliteData`: `loadSatelliteData(now, fetch, report)` with one load at a time; `NIGHT_CATALOGUE_URL` and `fetchNightCatalogue` are removed (the night catalogue comes from `ALL_GROUPS_URL`). `useSatelliteTracking` reports through `monitoring.captureMessage`.
 - **Checked:** the tests above, typecheck (app and `tsconfig.node.json`), lint, build. On this computer 13 tests in other files (Sentry tags, the place name, the sunset show) also fail on `main` (Node 23 here, Node 22 in CI, where `main` is green).
+
+### 185. Launch marketing: a TikTok channel and a launch video — S (owner)
+
+- **Request (Lutz, 2026-10-28):** from social-media posts: a TikTok account warm-up ([X @devmelv](https://x.com/devmelv/status/2108205926482149764)), `/brag` launch videos ([TikTok](https://vm.tiktok.com/ZGdCqeDT2/)), text match-cut hooks ([TikTok](https://vm.tiktok.com/ZGdCKRBnd/)) and an animated logo ([TikTok](https://vm.tiktok.com/ZGdCKkMsk/)). Start after the Play release.
+- **Depends on:** item 16 (Play production, so the bio link leads to a real store page) and item 167 step 6 (the bio link page).
+- **Spec:**
+  1. A TikTok account "Sun Chaser" (the brand, no personal name). Bio link: `https://sun.chaser.page/<lang>/` (item 167).
+  2. Warm-up by hand, 7 days, 2 sessions a day at random times, each from a fresh start on For You. Days 1–2: For You only, 15–20 min, no search, likes, follows or posts. Days 3–4: a few minutes of For You, then a search for one of about 10 niche terms (sunset, golden hour, night sky, ISS, moon, astrophotography …), watch 12 s – 1.5 min per video, no likes. Days 5–6: the same, and like about 8 % of the videos after a long watch. Day 7: 10 min of scrolling, then the first post. Not automated: scripted sessions break TikTok's terms and get the account banned.
+  3. Posts: at most one a day, a slideshow of the app's sky (sunset, golden hour, moon, an ISS pass) from the screenshot scripts (`store/screenshots/`, the lookbook shots), with caption and hashtags. Keep the niche sessions every day, also on days with no post. Hook clips: [textmatchcut.app](https://textmatchcut.app) (a highlighted word such as "sunset"; free, no sign-up, no watermark).
+  4. Launch video: `/brag-slim` ([latent-spaces/brag](https://github.com/latent-spaces/brag), MIT) on this repo at the Play production release and again at the App Store release (item 182). It also writes the post text for TikTok, X and LinkedIn. The 30 s ad of item 101 stays the store preview video.
+  5. Logo intro: animate the badge logo in `store/preview-video/ad.html`, not with an online service (logoai.com and similar need an upload of the logo).
+- **Done when:** the account is warmed up, the first post is live with the bio link, and the launch video is posted.
 
 ## Ongoing — Easter eggs and special events (S each, pick any time)
 
