@@ -307,7 +307,7 @@ export const captureShareView = async (root: HTMLElement, data: ShareCardData): 
 };
 
 // Web Share API with the file when it is supported, else a download. A cancelled
-// share sheet (AbortError) ends quietly. The text with the link (item 187) goes in
+// share sheet (AbortError) ends quietly. The text with the link (item 188) goes in
 // `text`, not `url`: with files, share targets often drop `url`, but apps that take a
 // caption or body (WhatsApp, mail, social media) keep `text`.
 export const shareOrDownload = async (blob: Blob, fileName: string, text: string): Promise<'shared' | 'downloaded' | 'cancelled'> => {

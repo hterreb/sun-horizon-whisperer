@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildShareLink, parseShareLink, withoutShareParams } from '@/utils/shareLink';
 
-describe('share link (ROADMAP item 187)', () => {
+describe('share link (ROADMAP item 188)', () => {
   const search = (link: string) => new URL(link).search;
 
   it('rounds the place to two decimals and writes the moment in UTC minutes', () => {

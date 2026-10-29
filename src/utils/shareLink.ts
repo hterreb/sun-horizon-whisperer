@@ -1,4 +1,4 @@
-// The link in a shared card's text (ROADMAP item 187): `/?lat=47.66&lon=9.48&tz=…&t=…` opens
+// The link in a shared card's text (ROADMAP item 188): `/?lat=47.66&lon=9.48&tz=…&t=…` opens
 // the app at the card's place and, for a view card, at its moment. Two decimals (about 1 km):
 // the card already names the town. `tz` only when the sender knows the place's zone.
 import { isValidLatitude, isValidLongitude } from './manualLocation';

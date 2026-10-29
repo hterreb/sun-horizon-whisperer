@@ -3896,7 +3896,7 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Checked:** new tests `utils.turningPoints` (19), `utils.countdownCard` (3), `DaylightDetails` (5), `SunVisualization` horizon calendar (2); `utils.collection` counts 140 badges. Typecheck, lint, build and all 2227 tests pass. Browser (built app, `vite preview`, 390 × 844, every host but the app stubbed or blocked, a stub terrain tile with a western ridge): Ravensburg 28 Oct 2026: 10 h 12 min flat, 8 h 55 min behind the ridge, "▼ 3 min 12 s", midwinter in 54 days; the switch shows 3 marks (SW, W, NW) and 52 dots and is saved; the share button saves `sun-chaser-midwinter-2026-12-21.png` ("54 days until midwinter", both curves). Tromsø: the polar block ("Last sunset before the polar night in 30 days", Fri 27 Nov 11:56; polar night 28 Nov – 15 Jan, 49 days; midnight sun 19 May – 26 Jul, 69 days), only the equinox mark. No console errors except the blocked tree-cover host.
 - **Not checked:** a real phone, the Full circle badge over a real year (unit tests only), the Web Share sheet (headless Chrome saves the PNG), compass mode with the marks (same azimuth mapping as the other horizon labels).
 
-### 187. Share cards: a short text with a deep link to the place and the moment — S
+### 188. Share cards: a short text with a deep link to the place and the moment — S
 
 - **Why:** a shared card (item 68, view share item 78, countdown card item 186) sent only the picture. A friend who gets it in WhatsApp, a mail or a social post had no way to open the app at that sky.
 - **Spec:**

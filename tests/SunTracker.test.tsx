@@ -886,7 +886,7 @@ describe('SunTracker', () => {
       expect(document.body.textContent).toContain('48.8566');
     });
 
-    it('a shared card link shows its place, zone and moment for this visit, and does not save them (item 187)', async () => {
+    it('a shared card link shows its place, zone and moment for this visit, and does not save them (item 188)', async () => {
       saveManualLocation(48.8566, 2.3522);
       const getCurrentPosition = vi.fn();
       vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });

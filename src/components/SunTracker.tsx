@@ -176,7 +176,7 @@ const NEW_YEAR_TAP_MS = 15_000;
 const WEATHER_RETRY_MS = [60_000, 120_000, 300_000];
 
 const SunTracker: React.FC = () => {
-  // Item 187: the link of a shared card. Its place shows for this visit and is not saved,
+  // Item 188: the link of a shared card. Its place shows for this visit and is not saved,
   // so the recipient's own place comes back on the next start; its moment is a time preview.
   const [sharedView] = useState(() => parseShareLink(window.location.search));
   const [sharedOffsetMs] = useState(() => (sharedView?.time ? clampTimeOffset(sharedView.time.getTime() - Date.now(), new Date()) : 0));
@@ -263,7 +263,7 @@ const SunTracker: React.FC = () => {
   useEffect(() => {
     if (nameLanguageRef.current === language) return;
     nameLanguageRef.current = language;
-    // Item 187: the saved place is not the one on screen while a shared place shows.
+    // Item 188: the saved place is not the one on screen while a shared place shows.
     if (sharedView && !locationChosenRef.current) return;
     const manual = loadManualLocation();
     if (!manual?.name) return;
@@ -543,7 +543,7 @@ const SunTracker: React.FC = () => {
     setDate(new Date(now.getTime() + offset));
   }, []);
 
-  // Item 187: the share params leave the address, so a reload shows the recipient's own place.
+  // Item 188: the share params leave the address, so a reload shows the recipient's own place.
   useEffect(() => {
     if (sharedView) window.history.replaceState(window.history.state, '', withoutShareParams(window.location.href));
   }, [sharedView]);
