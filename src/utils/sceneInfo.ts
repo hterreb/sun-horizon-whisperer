@@ -25,6 +25,7 @@ import { SANTA_DAYS_PER_YEAR, getEventDaysPerYear, type CalendarEvent } from './
 import { NATIONAL_DAY_DAYS_PER_YEAR, type NationalDayKind } from './nationalDays';
 import { type FestivalEgg } from './festivalEvents';
 import { getOptic, type OpticKind } from './skyOptics';
+import { TURNING_POINT_NAMES, type NextTurningPoint, type TurningPoint } from './turningPoints';
 
 // Item 113: the easter eggs and special events that are one thing in the scene and take taps.
 // Not the collection's EggKind (item 112), which has one badge per egg or event.
@@ -56,7 +57,8 @@ export type SceneInfoTarget =
   | { type: 'satelliteDot' } // a decorative dot: no name, no badge
   | { type: 'egg'; kind: EggCardKind }
   | { type: 'rainbow' } // item 121
-  | { type: 'optic'; kind: OpticKind }; // item 148
+  | { type: 'optic'; kind: OpticKind } // item 148
+  | { type: 'horizonMark'; azimuth: number; next: NextTurningPoint }; // item 187
 
 // A text from the dictionary; a var can be another dictionary text.
 export interface InfoText {
@@ -74,7 +76,8 @@ export interface InfoLine {
 export type SceneIconId =
   | 'water' | 'visitor' | 'bird' | 'bat' | 'boat' | 'plane' | 'cloud' | 'sun' | 'moon' | 'terrain' | 'satellite'
   | 'egg' | 'event' | 'rainbow'
-  | `optic:${OpticKind}`; // item 148: each optic has its badge icon
+  | `optic:${OpticKind}` // item 148: each optic has its badge icon
+  | `turning:${TurningPoint}`; // item 187: the horizon calendar's marks
 export interface SceneInfo {
   kicker: MessageKey; // the type name over the title
   icon: SceneIconId;
@@ -451,6 +454,11 @@ const satelliteLines = (name: string, ctx: SceneInfoContext): InfoLine[] => {
   ];
 };
 
+// Item 187: the field note of a horizon calendar mark. Both equinoxes share one.
+const TURNING_FACTS: Record<TurningPoint, MessageKey> = {
+  midsummer: 'turningFact.midsummer', midwinter: 'turningFact.midwinter', springEquinox: 'turningFact.equinox', autumnEquinox: 'turningFact.equinox',
+};
+
 const goldenHour = ({ now, nextGoldenBlueHours, language, timeZone }: SceneInfoContext): InfoText | string => {
   const window = nextGoldenBlueHours?.golden;
   if (!window) return '—';
@@ -643,6 +651,25 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
         tier: optic.tier,
         lines: [{ label: 'info.direction', value: directionText(azimuth) }, tierLine(optic.tier)],
         fact: fieldNote(optic.fact),
+      };
+    }
+    case 'horizonMark': {
+      // Item 187: a mark of the horizon calendar (item 186, Y4): where the sun sets on that day,
+      // and when the day comes next. No rarity: it is a date, not a find.
+      const { point, at, days } = target.next;
+      const date = new Intl.DateTimeFormat(language, { weekday: 'short', day: 'numeric', month: 'short', timeZone: ctx.timeZone }).format(at);
+      const when: InfoText = days === 0 ? { key: 'daylight.whenToday' }
+        : days === 1 ? { key: 'daylight.whenTomorrow' } : { key: 'daylight.inDays', vars: { days } };
+      return {
+        kicker: 'infoKind.horizon',
+        icon: `turning:${point}`,
+        title: TURNING_POINT_NAMES[point],
+        tier: null,
+        lines: [
+          { label: 'info.direction', value: directionText(target.azimuth) },
+          { label: 'info.nextDate', value: { key: 'info.dateWhen', vars: { date, when } } },
+        ],
+        fact: fieldNote(TURNING_FACTS[point]),
       };
     }
     case 'egg': {

@@ -212,6 +212,7 @@ export const badgeForTarget = (target: SceneInfoTarget): BadgeId | null => {
     case 'satelliteDot': // a decorative dot, not a real satellite
     case 'plane':
     case 'livePlane':
+    case 'horizonMark': // item 187: a date on the horizon, not a find
     case 'egg': return null;
   }
 };
