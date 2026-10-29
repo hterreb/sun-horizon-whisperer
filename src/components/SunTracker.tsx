@@ -84,6 +84,7 @@ import {
 } from '@/utils/collection';
 import { watchSunEvent, NO_SUN_EVENT_WATCH, getCountdownTarget } from '../utils/sunEvents';
 import { getCalendarEvent, isLongestNight, isMidwinterForced, isSantaTime } from '@/utils/calendarEvents';
+import { addTurningPointDay, isFullCircle, loadHorizonCalendar, loadTurningPointDays, saveHorizonCalendar, saveTurningPointDays } from '@/utils/turningPoints';
 import { getNationalDay, parseCountryOverride, parseNationalEggOverride } from '@/utils/nationalDays';
 import { badgeForNationalDay } from '@/utils/collection';
 import { BuntingContext, type Bunting } from '@/hooks/useBunting';
@@ -290,6 +291,13 @@ const SunTracker: React.FC = () => {
     } catch (error) {
       console.error('Error saving live planes:', error);
     }
+  }, []);
+  // Horizon calendar (ROADMAP item 186, Y4): the switch in the Daylight card, off at the start;
+  // the choice is saved. Premium: while Premium is locked, the scene shows no marks.
+  const [isHorizonCalendarOn, setHorizonCalendarOn] = useState(loadHorizonCalendar);
+  const handleHorizonCalendarToggle = useCallback((on: boolean) => {
+    setHorizonCalendarOn(on);
+    saveHorizonCalendar(on);
   }, []);
   // Item 155: the number of live planes drawn, from LivePlanes.
   const [liveShown, setLiveShown] = useState(0);
@@ -968,6 +976,18 @@ const SunTracker: React.FC = () => {
     if (badge) collect(badge);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per clock tick
   }, [date]);
+  // "Full circle" (ROADMAP item 186, X2): the app open, live, on all four turning-point days
+  // within a year. Once a day it saves today when it is a turning point, then checks the four days.
+  const turningDayRef = React.useRef<string | null>(null);
+  useEffect(() => {
+    if (isTimePreview || collectionPaused || turningDayRef.current === date.toDateString()) return;
+    turningDayRef.current = date.toDateString();
+    const saved = loadTurningPointDays();
+    const days = addTurningPointDay(saved, date);
+    if (days) saveTurningPointDays(days);
+    if (isFullCircle(days ?? saved)) collect('egg:fullCircle');
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per clock tick
+  }, [date]);
   useEffect(() => {
     const onVisibility = () => {
       if (document.visibilityState !== 'visible') patientWatchRef.current = NO_PATIENT_WATCH;
@@ -1543,6 +1563,7 @@ const SunTracker: React.FC = () => {
             windDirectionDeg={weatherData?.windDirectionDeg ?? null}
             compassHeading={activeCompassHeading}
             horizonProfile={horizonProfile}
+            horizonCalendar={isHorizonCalendarOn && !premium.isLocked}
             trees={trees}
             terrainSunTimes={terrainExtras.terrainSunTimes}
             astroEvent={astroEvent}
@@ -1627,6 +1648,8 @@ const SunTracker: React.FC = () => {
             }}
             onSatelliteRefresh={satelliteTracking.refresh}
             onCollectionOpen={handleCollectionOpen}
+            isHorizonCalendarOn={isHorizonCalendarOn}
+            onHorizonCalendarToggle={handleHorizonCalendarToggle}
             onCountryChange={setDetectedCountry}
           />
         </>

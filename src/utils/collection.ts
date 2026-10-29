@@ -28,6 +28,7 @@ export type EggKind =
   | 'matariki' | 'conjunction' | 'noctilucent' | 'midnightSun' | 'polarNight'
   | NationalDayKind
   | 'aprilFools' | 'easter' | 'valentine' | 'stPatrick' | 'patientWatcher'
+  | 'fullCircle' // item 186: the app open on all four turning points within a year
   | FestivalEgg; // item 118: cultural festivals
 // Item 115: the states of the sun, the moon and the terrain.
 export type SunState = 'dawn' | 'morning' | 'midday' | 'afternoon' | 'evening';
@@ -124,6 +125,8 @@ const EGGS: [EggKind, MessageKey][] = [
   // Playful pack (ROADMAP item 117).
   ['aprilFools', 'egg.aprilFools'], ['easter', 'egg.easter'], ['valentine', 'egg.valentine'], ['stPatrick', 'egg.stPatrick'],
   ['patientWatcher', 'egg.patientWatcher'],
+  // Item 186 (X2): the app open on all four turning points within a year (SunTracker).
+  ['fullCircle', 'egg.fullCircle'],
   // Item 118: cultural festivals.
   ['loyKrathong', 'egg.loyKrathong'], ['diwali', 'egg.diwali'], ['eidAlFitr', 'egg.eidAlFitr'], ['midAutumn', 'egg.midAutumn'],
   ['hanami', 'egg.hanami'], ['tanabata', 'egg.tanabata'], ['diaDeMuertos', 'egg.diaDeMuertos'], ['holi', 'egg.holi'],

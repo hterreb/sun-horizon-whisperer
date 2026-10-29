@@ -9,6 +9,8 @@ import { ScrollArea } from './ui/scroll-area';
 import { Switch } from './ui/switch';
 import { Button } from './ui/button';
 const LineOfSightDetails = lazy(() => import('./LineOfSightDetails'));
+// Item 186: the body of the Daylight card loads when the card opens.
+const DaylightDetails = lazy(() => import('./DaylightDetails'));
 import PremiumBadge from './PremiumBadge';
 import { usePremiumGate } from '@/hooks/usePremium';
 import { ALWAYS_SHOWN, type IdleHide } from '@/hooks/useIdleHide';
@@ -52,8 +54,8 @@ import { isEmptySkyTap } from '@/utils/sceneTap';
 
 // Direction D "Polished Classic" (ROADMAP items 7 & 15): shared classes so every
 // row/section/focus ring in the panel reads as one system. ROW, ICON_TOGGLE and
-// FOCUS_RING are exported for LineOfSightDetails.tsx (ROADMAP item 30), the one
-// sibling component that reuses them; SECTION_HEADING stays file-local - see
+// FOCUS_RING are exported for LineOfSightDetails.tsx (ROADMAP item 30) and
+// DaylightDetails.tsx (item 186), the sibling components that reuse them; SECTION_HEADING stays file-local - see
 // glassChrome.ts for the one style helper shared more broadly, and its test.
 export const ROW = 'flex justify-between items-center gap-2 border-t border-[hsl(var(--panel-border)/0.12)] pt-1';
 // Same page as the link in the Data sources dialog (item 175).
@@ -222,6 +224,9 @@ interface InfoPanelProps {
   onSatelliteRefresh?: () => void;
   // Collection badges (ROADMAP item 112): the row button that opens the collection.
   onCollectionOpen?: () => void;
+  // Horizon calendar (ROADMAP item 186, Y4): the switch in the Daylight card.
+  isHorizonCalendarOn?: boolean;
+  onHorizonCalendarToggle?: (on: boolean) => void;
   // National days (utils/nationalDays): the place's country code from the reverse-geocode
   // answer below (cached, item 130), the device time zone's country when the call fails, or
   // null (a searched place: SunTracker keeps its own code; no code). Keep it stable (a state
@@ -284,6 +289,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   satelliteStatus = null,
   onSatelliteRefresh,
   onCollectionOpen,
+  isHorizonCalendarOn = false,
+  onHorizonCalendarToggle = () => {},
   onCountryChange,
 }) => {
   const { t, language, setLanguage, timeZone } = useLanguage();
@@ -325,6 +332,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   // Golden & Blue Hour (ROADMAP item 24): collapsed by default, and not part of the
   // time-of-day auto-collapse effect below - it stays as the user left it.
   const [isGoldenBlueCollapsed, setIsGoldenBlueCollapsed] = useState(true);
+  // Daylight (ROADMAP item 186): closed at the start, like Golden & Blue Hour.
+  const [isDaylightCollapsed, setIsDaylightCollapsed] = useState(true);
   // Data sources dialog (ROADMAP item 153). A stable close: the panel renders each second.
   const [isDataSourcesOpen, setIsDataSourcesOpen] = useState(false);
   const closeDataSources = useCallback(() => setIsDataSourcesOpen(false), []);
@@ -1253,6 +1262,35 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Daylight (ROADMAP item 186): today's daylight, the next turning point, the horizon
+              calendar switch and the polar countdown. The body loads when the card opens. */}
+          <div className={cardSection(isDaylightCollapsed)}>
+            <div className={cardHeaderRow(isDaylightCollapsed)}>
+              <h3 className={cardTitle(isDaylightCollapsed)}>{t('daylight.title')}</h3>
+              <button
+                onClick={() => setIsDaylightCollapsed(!isDaylightCollapsed)}
+                className={SECTION_TOGGLE}
+                aria-label={isDaylightCollapsed ? t('daylight.expand') : t('daylight.collapse')}
+                aria-expanded={!isDaylightCollapsed}
+              >
+                {isDaylightCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+              </button>
+            </div>
+            {!isDaylightCollapsed && (
+              <LazyPart>
+                <DaylightDetails
+                  now={currentTime}
+                  latitude={location.latitude}
+                  longitude={location.longitude}
+                  horizonProfile={horizonProfile}
+                  placeName={hasPlaceName ? locationName : null}
+                  isHorizonCalendarOn={isHorizonCalendarOn}
+                  onHorizonCalendarToggle={onHorizonCalendarToggle}
+                />
+              </LazyPart>
+            )}
           </div>
 
           {/* Upcoming twilight times - collapsible */}

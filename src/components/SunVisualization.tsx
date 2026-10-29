@@ -1,11 +1,13 @@
 import React, { lazy, useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import LazyPart from './LazyPart';
-import { Sun, ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp, Mountain, BellOff } from 'lucide-react';
+import { Sun, ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp, Mountain, BellOff, Contrast, Snowflake } from 'lucide-react';
 import { type SunPosition, type SunTimes, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors, getReflectionFade, getSunPathAround, getDayLengthMinutes } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
 import { getSunArcLabels, getMoonArcLabels, getTerrainArcLabels, getTerrainMoonArcLabels, type ArcLabels, type ArcLabelPoint } from '../utils/arcLabels';
 import { shortestHeadingDelta } from '../utils/compassUtils';
 import { type HorizonProfile, horizonAngleAt } from '../utils/horizonUtils';
+import { getHorizonCalendar, type TurningPoint } from '@/utils/turningPoints';
+import { startOfDayIn } from '@/utils/timeZone';
 import { type RidgePoint, type TreeLayer } from '@/utils/treeSilhouettes';
 import CloudLayer, { type SceneInfoHandler, type WeatherType } from './CloudLayer';
 const Fireworks = lazy(() => import('./Fireworks'));
@@ -110,6 +112,9 @@ interface SunVisualizationProps {
   // feature is disabled/loading/unavailable - null draws the flat horizon only, same
   // as before the feature existed.
   horizonProfile?: HorizonProfile | null;
+  // Horizon calendar (ROADMAP item 186, Y4): the sunset points of the turning points on the
+  // horizon, from the switch in the Daylight card (off while Premium is locked).
+  horizonCalendar?: boolean;
   // Tree silhouettes on the ridge (ROADMAP item 141): the land cover at the ridge points and
   // the lazily loaded tree code (useTreeCover); null: the bare ridge.
   trees?: TreeLayer | null;
@@ -559,6 +564,13 @@ const FAN_PILL_NAMES: Record<SeasonPath, MessageKey> = {
   december: 'egg.fanDecember',
 };
 const COLLAPSED_PANEL_HEIGHT = 112;
+// Horizon calendar (item 186): the icon of each mark. Both equinoxes set in the same place.
+const HORIZON_MARK_ICONS: Record<TurningPoint, typeof Sun> = {
+  midsummer: Sun, midwinter: Snowflake, springEquinox: Contrast, autumnEquinox: Contrast,
+};
+// Below the horizon, under the cardinal pills (they reach about 19 px down): the dots, then the icons.
+const HORIZON_DOT_DY = 30;
+const HORIZON_ICON_DY = 56;
 
 // The collapsed InfoPanel's box (InfoPanel.tsx root classes): top-right, 300 px wide or
 // the screen minus 2rem, 10rem lower below 364 px width. Height measured at 390x844
@@ -625,6 +637,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
   sunTimes = null,
   compassHeading = null,
   horizonProfile = null,
+  horizonCalendar = false,
   trees = null,
   terrainSunTimes = null,
   terrainMoonTimes = null,
@@ -917,6 +930,35 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       .filter((trace) => trace.d);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on arcLabelMinuteKey, not `date` itself
   }, [calendarEvent, arcLabelMinuteKey, containerDimensions, latitude, longitude, compassHeading]);
+
+  // Horizon calendar (item 186, Y4): the sun math once a day and place; the screen places on each
+  // resize or compass turn. X1: with a profile, a mark starts on the ridge. Nothing moves.
+  const horizonCalendarDay = horizonCalendar ? startOfDayIn(date, timeZone).getTime() : null;
+  const horizonCalendarData = useMemo(
+    () => (horizonCalendarDay === null ? null : getHorizonCalendar(new Date(horizonCalendarDay), latitude, longitude, timeZone)),
+    [horizonCalendarDay, latitude, longitude, timeZone]
+  );
+  const horizonCalendarLayout = useMemo(() => {
+    const { width, height } = containerDimensions;
+    if (!horizonCalendarData || width === 0 || height === 0) return null;
+    const horizonY = height * 0.65;
+    const xOf = (azimuth: number) => {
+      const { fraction, visible } = resolveAzimuth(azimuth, latitude, compassHeading);
+      return visible ? width * fraction : null;
+    };
+    const marks = horizonCalendarData.marks.flatMap(({ point, azimuth }) => {
+      const x = xOf(azimuth);
+      if (x === null) return [];
+      const top = horizonProfile ? altitudeToY(Math.max(0, horizonAngleAt(horizonProfile, azimuth)), height) : horizonY;
+      return [{ point, x, top }];
+    });
+    const dots = horizonCalendarData.dots.flatMap(({ azimuth, ahead }) => {
+      const x = xOf(azimuth);
+      return x === null ? [] : [{ x, ahead }];
+    });
+    const today = horizonCalendarData.today === null ? null : xOf(horizonCalendarData.today);
+    return { horizonY, marks, dots, today };
+  }, [horizonCalendarData, containerDimensions, latitude, compassHeading, horizonProfile]);
 
   const sunArcLabelGeometry = useMemo(
     () => getArcLabelGeometry(sunArcLabels, latitude, compassHeading),
@@ -1788,6 +1830,75 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
           </svg>
         );
       })()}
+
+      {horizonCalendarLayout && (
+        // Horizon calendar (item 186, Y4): dashed gold marks at the sunset points of midsummer,
+        // the equinox and midwinter, one dot a week (gold ahead, faint behind, white today). It
+        // fades with the cardinal labels and lies under their pills (same z, earlier in the DOM).
+        // The Daylight card has the same facts in words.
+        <div
+          className={`absolute inset-0 z-9 pointer-events-none transition-opacity duration-300 ${
+            cardinalLabelsVisible ? 'opacity-100' : 'opacity-0'
+          }`}
+          data-testid="horizon-calendar"
+          aria-hidden="true"
+        >
+          <svg className="absolute inset-0 w-full h-full">
+            {horizonCalendarLayout.marks.map((mark) => (
+              <line
+                key={mark.point}
+                x1={mark.x}
+                x2={mark.x}
+                y1={mark.top - 12}
+                y2={horizonCalendarLayout.horizonY + HORIZON_ICON_DY - 12}
+                stroke="hsl(var(--scene-solstice-trace))"
+                strokeOpacity={0.85}
+                strokeWidth={1.5}
+                strokeDasharray="4 4"
+              />
+            ))}
+            {horizonCalendarLayout.dots.map((dot, i) => (
+              <circle
+                key={i}
+                data-testid="horizon-dot"
+                cx={dot.x}
+                cy={horizonCalendarLayout.horizonY + HORIZON_DOT_DY}
+                r={2}
+                fill={dot.ahead ? 'hsl(var(--scene-solstice-trace))' : 'hsl(var(--scene-solstice-fan))'}
+                fillOpacity={dot.ahead ? 0.9 : 0.35}
+              />
+            ))}
+            {horizonCalendarLayout.today !== null && (
+              <circle
+                cx={horizonCalendarLayout.today}
+                cy={horizonCalendarLayout.horizonY + HORIZON_DOT_DY}
+                r={3.5}
+                fill="hsl(var(--scene-solstice-fan))"
+                stroke="hsl(var(--brand-night))"
+                strokeWidth={1.5}
+              />
+            )}
+          </svg>
+          {horizonCalendarLayout.marks.map((mark) => {
+            const Icon = HORIZON_MARK_ICONS[mark.point];
+            return (
+              <div
+                key={mark.point}
+                data-testid={`horizon-mark-${mark.point}`}
+                className="absolute flex items-center justify-center p-1 bg-panel-background/70 border border-panel-border/40 rounded-full"
+                style={{
+                  left: `${mark.x}px`,
+                  top: `${horizonCalendarLayout.horizonY + HORIZON_ICON_DY}px`,
+                  transform: 'translate(-50%, -50%)',
+                  color: 'hsl(var(--scene-solstice-trace))',
+                }}
+              >
+                <Icon size={10} />
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {containerDimensions.width > 0 && (
         <div
