@@ -886,6 +886,25 @@ describe('SunTracker', () => {
       expect(document.body.textContent).toContain('48.8566');
     });
 
+    it('a shared card link shows its place, zone and moment for this visit, and does not save them (item 187)', async () => {
+      saveManualLocation(48.8566, 2.3522);
+      const getCurrentPosition = vi.fn();
+      vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
+      const moment = new Date(Date.now() - 3 * 3_600_000);
+      window.history.pushState({}, '', `/?keep=1&lat=35.68&lon=139.69&tz=Asia%2FTokyo&t=${moment.toISOString().slice(0, 16)}Z`);
+
+      render(<SunTracker />);
+
+      await waitFor(() => expect(screen.getByTestId('sun-visualization')).toBeInTheDocument());
+      expect(document.body.textContent).toContain('35.6800');
+      const tokyo = moment.toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Asia/Tokyo' });
+      await waitFor(() => expect(screen.getByTitle('Set date and time').textContent).toContain(tokyo));
+      expect(getCurrentPosition).not.toHaveBeenCalled();
+      expect(loadManualLocation()).toEqual({ latitude: 48.8566, longitude: 2.3522 });
+      expect(window.location.search).toBe('?keep=1');
+      window.history.pushState({}, '', '/');
+    });
+
     it('persists a location entered via the manual form to localStorage', async () => {
       vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (s) => s({ coords: { latitude: 1, longitude: 2 } }) } });
       render(<SunTracker />);

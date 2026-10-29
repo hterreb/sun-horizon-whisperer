@@ -6,6 +6,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { usePremiumGate } from '@/hooks/usePremium';
 import { captureShareView, drawShareCard, getShareCardData, shareOrDownload, type ShareCardInput } from '@/utils/shareCard';
 import { type HorizonProfile } from '@/utils/horizonUtils';
+import { buildShareLink } from '@/utils/shareLink';
 
 // Share card (ROADMAP item 68): the "Share" button in the Sunset row, with the gold
 // plus (item 35). Gated through requirePremium (item 14). Since item 78 it shares the
@@ -40,7 +41,8 @@ const ShareCardButton: React.FC<ShareCardButtonProps> = ({ card, latitude, longi
         fileName = data.fileName;
       }
       // Item 176: without a share sheet the picture is saved, which showed nothing: say so.
-      if (await shareOrDownload(blob, fileName) === 'downloaded') {
+      const text = t('share.text', { url: buildShareLink(latitude, longitude, timeZone, card.now) });
+      if (await shareOrDownload(blob, fileName, text) === 'downloaded') {
         toast({ title: t('share.savedTitle'), description: fileName });
       }
     } catch {

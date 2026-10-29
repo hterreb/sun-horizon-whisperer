@@ -11,6 +11,7 @@ import { type MessageKey } from '@/i18n';
 import { type HorizonProfile } from '@/utils/horizonUtils';
 import { formatTime } from '@/utils/sunUtils';
 import { shareOrDownload } from '@/utils/shareCard';
+import { buildShareLink } from '@/utils/shareLink';
 import { drawCountdownCard, getCountdownCardData } from '@/utils/countdownCard';
 import { startOfDayIn } from '@/utils/timeZone';
 import {
@@ -91,7 +92,9 @@ const DaylightDetails: React.FC<DaylightDetailsProps> = ({
     try {
       const data = getCountdownCardData(next, placeName, language, timeZone);
       const blob = await drawCountdownCard(data, getYearDaylight(new Date(dayStart), latitude, longitude, timeZone, horizonProfile));
-      if (await shareOrDownload(blob, data.fileName) === 'downloaded') {
+      // Item 187: the place only; the countdown card is about the days, not a moment.
+      const text = t('share.text', { url: buildShareLink(latitude, longitude, timeZone) });
+      if (await shareOrDownload(blob, data.fileName, text) === 'downloaded') {
         toast({ title: t('share.savedTitle'), description: data.fileName });
       }
     } catch {

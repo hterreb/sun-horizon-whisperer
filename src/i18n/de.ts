@@ -167,6 +167,7 @@ export const de: Record<keyof typeof en, string> = {
   'share.failedTitle': "Teilen fehlgeschlagen",
   'share.failedDescription': "Bitte versuche es noch einmal.",
   'share.savedTitle': "Bild gespeichert",
+  'share.text': "Sieh dir diesen Himmel in Sun Chaser an: {url}",
 
   // Line of sight with terrain (items 13 and 30)
   'terrain.show': "Sichtlinie zeigen",
