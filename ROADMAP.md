@@ -3896,6 +3896,22 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
 - **Checked:** new tests `utils.turningPoints` (19), `utils.countdownCard` (3), `DaylightDetails` (5), `SunVisualization` horizon calendar (2); `utils.collection` counts 140 badges. Typecheck, lint, build and all 2227 tests pass. Browser (built app, `vite preview`, 390 × 844, every host but the app stubbed or blocked, a stub terrain tile with a western ridge): Ravensburg 28 Oct 2026: 10 h 12 min flat, 8 h 55 min behind the ridge, "▼ 3 min 12 s", midwinter in 54 days; the switch shows 3 marks (SW, W, NW) and 52 dots and is saved; the share button saves `sun-chaser-midwinter-2026-12-21.png` ("54 days until midwinter", both curves). Tromsø: the polar block ("Last sunset before the polar night in 30 days", Fri 27 Nov 11:56; polar night 28 Nov – 15 Jan, 49 days; midnight sun 19 May – 26 Jul, 69 days), only the equinox mark. No console errors except the blocked tree-cover host.
 - **Not checked:** a real phone, the Full circle badge over a real year (unit tests only), the Web Share sheet (headless Chrome saves the PNG), compass mode with the marks (same azimuth mapping as the other horizon labels).
 
+### 187. Horizon calendar: an info card on each mark — S
+
+- **Feedback (Lutz, 2026-10-29):** "the sunset points of y4 need an info when clicked on the icon equinox, midsummer and midwinter solstice".
+- **Spec:**
+  1. Each icon pill of the horizon calendar (item 186, Y4) opens an info card (item 95), with the same double tap as every scene thing (item 116). The keyboard (Enter, Space) opens it at once. The tap target is 44 × 44 px around the pill, and the open card draws the ring around it.
+  2. The card: kicker "Horizon" with the mark's icon; the title is the turning point (by hemisphere; the equinox mark is named after the next equinox, spring or autumn); "Direction" is the sunset azimuth of the mark; "Next" is the day and the countdown ("Sat, Mar 20 (in 143 days)", in the place's time zone); a field note on what the mark means. No rarity row and no badge: a date is not a find.
+  3. The marks take taps only while the layer shows (it fades with the cardinal labels).
+  4. Texts in en, de, es, it, fr.
+- **Check:** `utils.sceneInfo` (the card), `utils.turningPoints` (each mark's next day), `SunVisualization` (a double tap calls the card with the ring id, the ring shows, no tap while faded). Browser: a double tap on a mark opens the card.
+- **Built:** `getHorizonCalendar` gives each mark its `next` turning point. A new scene target `horizonMark` (`sceneInfo.ts`) with its card and the icons `turning:*`. `src/components/turningIcons.ts` holds the mark icons for the scene and the card's kicker. In `SunVisualization` each mark is a 44 px button with `data-scene-hit`, so a tap on it does not toggle the sky (item 136). `badgeForTarget` gives no badge. 5 new texts in five languages.
+- **Checked:** new tests in `utils.sceneInfo` (1), `SunVisualization` (1), and the next days in `utils.turningPoints`. Typecheck, lint, build and all 2229 tests pass. Browser (built app, `vite preview`, 390 × 844, every host but the app stubbed or blocked), Ravensburg on 28 Oct 2026:
+  - One tap opens no card. A double tap on the snowflake opens "Midwinter, SW (235°), Mon, Dec 21 (in 54 days)" with the ring.
+  - The equinox mark gives "Spring equinox, W (271°), Sat, Mar 20 (in 143 days)". The sun mark gives "Midsummer, NW (308°), Mon, Jun 21 (in 236 days)".
+  - No console errors except the blocked tree-cover host.
+- **Not checked:** a real phone, compass mode, the southern hemisphere in the browser (unit tests only).
+
 ### 188. Share cards: a short text with a deep link to the place and the moment — S
 
 - **Why:** a shared card (item 68, view share item 78, countdown card item 186) sent only the picture. A friend who gets it in WhatsApp, a mail or a social post had no way to open the app at that sky.

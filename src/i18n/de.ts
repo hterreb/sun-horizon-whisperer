@@ -763,4 +763,10 @@ export const de: Record<keyof typeof en, string> = {
   'polar.nightWindow': "Polarnacht: {from} – {to} ({days} Tage)",
   'polar.dayWindow': "Mitternachtssonne: {from} – {to} ({days} Tage)",
   'egg.fullCircle': "Voller Kreis",
+  // Horizon calendar mark cards (ROADMAP item 187)
+  'info.nextDate': "Nächstes Mal",
+  'info.dateWhen': "{date} ({when})",
+  'turningFact.midsummer': "Der längste Tag: Die Sonne geht an ihrem Wendepunkt unter, am weitesten von Westen entfernt. Ein paar Tage lang wandert der Untergangspunkt kaum, dann kehrt er um.",
+  'turningFact.midwinter': "Der kürzeste Tag: Die Sonne geht an ihrem anderen Wendepunkt unter. Von hier wandert der Untergangspunkt zurück, und die Tage werden wieder länger.",
+  'turningFact.equinox': "Im März und im September geht die Sonne fast genau im Westen unter. Dann sind Tag und Nacht überall auf der Erde etwa gleich lang.",
 };

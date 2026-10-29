@@ -763,4 +763,10 @@ export const fr: Record<keyof typeof en, string> = {
   'polar.nightWindow': "Nuit polaire : {from} – {to} ({days} jours)",
   'polar.dayWindow': "Soleil de minuit : {from} – {to} ({days} jours)",
   'egg.fullCircle': "Cercle complet",
+  // Horizon calendar mark cards (ROADMAP item 187)
+  'info.nextDate': "Prochaine fois",
+  'info.dateWhen': "{date} ({when})",
+  'turningFact.midsummer': "Le jour le plus long : le soleil se couche à son point de retournement, le plus loin de l'ouest. Solstice veut dire « soleil immobile » : pendant quelques jours, le point du coucher bouge à peine, puis il repart en arrière.",
+  'turningFact.midwinter': "Le jour le plus court : le soleil se couche à son autre point de retournement. De là, le point du coucher repart en arrière et les jours rallongent.",
+  'turningFact.equinox': "En mars et en septembre, le soleil se couche presque plein ouest. Le jour et la nuit durent alors à peu près autant partout sur Terre.",
 };

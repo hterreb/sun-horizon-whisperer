@@ -1,15 +1,16 @@
 import React, { lazy, useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import LazyPart from './LazyPart';
-import { Sun, ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp, Mountain, BellOff, Contrast, Snowflake } from 'lucide-react';
+import { Sun, ChevronLeft, ChevronRight, Sunrise, Sunset, ArrowUp, Mountain, BellOff } from 'lucide-react';
 import { type SunPosition, type SunTimes, type TimeOfDay, formatTime, getBackgroundGradient, getWaterColors, getReflectionFade, getSunPathAround, getDayLengthMinutes } from '../utils/sunUtils';
 import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
 import { getSunArcLabels, getMoonArcLabels, getTerrainArcLabels, getTerrainMoonArcLabels, type ArcLabels, type ArcLabelPoint } from '../utils/arcLabels';
 import { shortestHeadingDelta } from '../utils/compassUtils';
 import { type HorizonProfile, horizonAngleAt } from '../utils/horizonUtils';
-import { getHorizonCalendar, type TurningPoint } from '@/utils/turningPoints';
+import { TURNING_POINT_NAMES, getHorizonCalendar } from '@/utils/turningPoints';
+import { TURNING_ICONS } from './turningIcons';
 import { startOfDayIn } from '@/utils/timeZone';
 import { type RidgePoint, type TreeLayer } from '@/utils/treeSilhouettes';
-import CloudLayer, { type SceneInfoHandler, type WeatherType } from './CloudLayer';
+import CloudLayer, { HitArea, type SceneInfoHandler, type WeatherType } from './CloudLayer';
 const Fireworks = lazy(() => import('./Fireworks'));
 import SunSunglasses from './SunSunglasses';
 const CalendarEggs = lazy(() => import('./CalendarEggs'));
@@ -564,10 +565,6 @@ const FAN_PILL_NAMES: Record<SeasonPath, MessageKey> = {
   december: 'egg.fanDecember',
 };
 const COLLAPSED_PANEL_HEIGHT = 112;
-// Horizon calendar (item 186): the icon of each mark. Both equinoxes set in the same place.
-const HORIZON_MARK_ICONS: Record<TurningPoint, typeof Sun> = {
-  midsummer: Sun, midwinter: Snowflake, springEquinox: Contrast, autumnEquinox: Contrast,
-};
 // Below the horizon, under the cardinal pills (they reach about 19 px down): the dots, then the icons.
 const HORIZON_DOT_DY = 30;
 const HORIZON_ICON_DY = 56;
@@ -946,11 +943,11 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
       const { fraction, visible } = resolveAzimuth(azimuth, latitude, compassHeading);
       return visible ? width * fraction : null;
     };
-    const marks = horizonCalendarData.marks.flatMap(({ point, azimuth }) => {
+    const marks = horizonCalendarData.marks.flatMap(({ point, azimuth, next }) => {
       const x = xOf(azimuth);
       if (x === null) return [];
       const top = horizonProfile ? altitudeToY(Math.max(0, horizonAngleAt(horizonProfile, azimuth)), height) : horizonY;
-      return [{ point, x, top }];
+      return [{ point, azimuth, next, x, top }];
     });
     const dots = horizonCalendarData.dots.flatMap(({ azimuth, ahead }) => {
       const x = xOf(azimuth);
@@ -1835,15 +1832,15 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
         // Horizon calendar (item 186, Y4): dashed gold marks at the sunset points of midsummer,
         // the equinox and midwinter, one dot a week (gold ahead, faint behind, white today). It
         // fades with the cardinal labels and lies under their pills (same z, earlier in the DOM).
-        // The Daylight card has the same facts in words.
+        // The Daylight card has the same facts in words. Item 187: a mark opens its card on a
+        // double tap (item 116), only while the layer shows.
         <div
           className={`absolute inset-0 z-9 pointer-events-none transition-opacity duration-300 ${
             cardinalLabelsVisible ? 'opacity-100' : 'opacity-0'
           }`}
           data-testid="horizon-calendar"
-          aria-hidden="true"
         >
-          <svg className="absolute inset-0 w-full h-full">
+          <svg className="absolute inset-0 w-full h-full" aria-hidden="true">
             {horizonCalendarLayout.marks.map((mark) => (
               <line
                 key={mark.point}
@@ -1880,12 +1877,20 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
             )}
           </svg>
           {horizonCalendarLayout.marks.map((mark) => {
-            const Icon = HORIZON_MARK_ICONS[mark.point];
+            const Icon = TURNING_ICONS[mark.point];
+            const ring = `horizon:${mark.point}`;
             return (
-              <div
+              <button
                 key={mark.point}
+                type="button"
+                aria-label={t(TURNING_POINT_NAMES[mark.next.point])}
+                tabIndex={cardinalLabelsVisible ? 0 : -1}
+                onClick={(event) => tap({ type: 'horizonMark', azimuth: mark.azimuth, next: mark.next }, tapPoint(event), ring, event.detail === 0)}
                 data-testid={`horizon-mark-${mark.point}`}
-                className="absolute flex items-center justify-center p-1 bg-panel-background/70 border border-panel-border/40 rounded-full"
+                data-scene-hit
+                className={`absolute flex items-center justify-center w-11 h-11 rounded-full touch-manipulation focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 ${
+                  cardinalLabelsVisible ? 'pointer-events-auto' : ''
+                }`}
                 style={{
                   left: `${mark.x}px`,
                   top: `${horizonCalendarLayout.horizonY + HORIZON_ICON_DY}px`,
@@ -1893,8 +1898,11 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
                   color: 'hsl(var(--scene-solstice-trace))',
                 }}
               >
-                <Icon size={10} />
-              </div>
+                <HitArea cx={22} cy={22} width={0} height={0} ring={infoRing === ring} tier={infoRingTier} />
+                <span className="flex items-center justify-center p-1 bg-panel-background/70 border border-panel-border/40 rounded-full">
+                  <Icon size={10} />
+                </span>
+              </button>
             );
           })}
         </div>

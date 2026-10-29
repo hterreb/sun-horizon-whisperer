@@ -8,6 +8,7 @@ import { santaCounters } from '@/utils/santaTracker';
 import { formatNumber, type MessageKey } from '@/i18n';
 import { Bat } from './sceneIcons';
 import { OPTIC_ICONS } from './opticIcons';
+import { TURNING_ICONS } from './turningIcons';
 
 // Info cards (ROADMAP item 95): one small glass card above the tapped point, inside the
 // screen. It closes on a tap outside, on Escape, or after CARD_CLOSE_MS. SunTracker shows
@@ -47,6 +48,11 @@ const KICKER: Record<SceneIconId, { Icon: LucideIcon; colour: string }> = {
   'optic:moonbow': { Icon: OPTIC_ICONS.moonbow, colour: 'text-kind-cloud' },
   'optic:sunPillar': { Icon: OPTIC_ICONS.sunPillar, colour: 'text-kind-cloud' },
   'optic:moonHalo': { Icon: OPTIC_ICONS.moonHalo, colour: 'text-kind-cloud' },
+  // Item 187: the horizon calendar's marks, in the sun's colour.
+  'turning:midsummer': { Icon: TURNING_ICONS.midsummer, colour: 'text-kind-sun' },
+  'turning:midwinter': { Icon: TURNING_ICONS.midwinter, colour: 'text-kind-sun' },
+  'turning:springEquinox': { Icon: TURNING_ICONS.springEquinox, colour: 'text-kind-sun' },
+  'turning:autumnEquinox': { Icon: TURNING_ICONS.autumnEquinox, colour: 'text-kind-sun' },
 };
 
 // The rarity meter: one bar per tier, lit up to the card's tier.
