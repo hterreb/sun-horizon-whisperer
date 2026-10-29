@@ -5,6 +5,7 @@ import DaylightDetails from '@/components/DaylightDetails';
 import { LanguageContext } from '@/hooks/useLanguage';
 import { translate } from '@/i18n';
 import { shareOrDownload } from '@/utils/shareCard';
+import { buildShareLink } from '@/utils/shareLink';
 import { drawCountdownCard } from '@/utils/countdownCard';
 
 vi.mock('@/utils/shareCard', async (importOriginal) => ({
@@ -85,7 +86,7 @@ describe('DaylightDetails (ROADMAP item 186)', () => {
     await waitFor(() => expect(shareOrDownload).toHaveBeenCalledWith(
       blob, 'sun-chaser-midwinter-2026-12-21.png',
       // Item 188: the place only, no moment.
-      `See this sky in Sun Chaser: ${window.location.origin}/?lat=47.78&lon=9.61&tz=Europe%2FBerlin`,
+      `See this in Sun Chaser: ${buildShareLink(47.78, 9.61, 'Europe/Berlin')}`,
     ));
     expect(vi.mocked(drawCountdownCard).mock.calls[0][0]).toMatchObject({ big: '54', line: 'days until midwinter' });
     expect(vi.mocked(drawCountdownCard).mock.calls[0][1].flat).toHaveLength(365);

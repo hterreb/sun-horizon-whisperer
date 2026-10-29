@@ -7,6 +7,7 @@ import { TAP_READY_MS } from '../src/hooks/useIdleHide';
 import { DOUBLE_TAP_MS } from '../src/hooks/useDoubleTap';
 import { SUN_TAP_GAP_MS } from '../src/utils/hiddenEggs';
 import { loadManualLocation, saveManualLocation } from '../src/utils/manualLocation';
+import { buildShareLink } from '../src/utils/shareLink';
 import { getSunPosition, getSunTimes } from '../src/utils/sunUtils';
 import { getTerrainSunTimes, type HorizonProfile } from '../src/utils/horizonUtils';
 import { isPlaneWeather } from '../src/utils/planes';
@@ -891,7 +892,7 @@ describe('SunTracker', () => {
       const getCurrentPosition = vi.fn();
       vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
       const moment = new Date(Date.now() - 3 * 3_600_000);
-      window.history.pushState({}, '', `/?keep=1&lat=35.68&lon=139.69&tz=Asia%2FTokyo&t=${moment.toISOString().slice(0, 16)}Z`);
+      window.history.pushState({}, '', `/?keep=1&${new URL(buildShareLink(35.68, 139.69, 'Asia/Tokyo', moment)).search.slice(1)}`);
 
       render(<SunTracker />);
 

@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ShareCardButton from '@/components/ShareCardButton';
 import { captureShareView, drawShareCard, shareOrDownload } from '@/utils/shareCard';
+import { buildShareLink } from '@/utils/shareLink';
 import { toast } from '@/hooks/use-toast';
 
 vi.mock('@/utils/shareCard', async (importOriginal) => ({
@@ -32,8 +33,8 @@ describe('ShareCardButton (ROADMAP item 68)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Share this view' }));
     await waitFor(() => expect(shareOrDownload).toHaveBeenCalledWith(
       blob, 'sun-chaser-sunset-2026-10-01.png',
-      // Item 188: a little text with the link to the place and the moment on the card.
-      `See this sky in Sun Chaser: ${window.location.origin}/?lat=47.78&lon=9.61&t=2026-10-01T12:00Z`,
+      // Item 188: a short text with the link to the place and the moment on the card.
+      `See this in Sun Chaser: ${buildShareLink(47.78, 9.61, undefined, card.now)}`,
     ));
     expect(vi.mocked(drawShareCard).mock.calls[0][0].placeName).toBe('Ravensburg');
     expect(toast).not.toHaveBeenCalled();
