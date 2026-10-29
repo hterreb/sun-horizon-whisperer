@@ -167,7 +167,7 @@ export const fr: Record<keyof typeof en, string> = {
   'share.failedTitle': "Impossible de partager le coucher du soleil",
   'share.failedDescription': "Veuillez réessayer.",
   'share.savedTitle': "Image enregistrée",
-  'share.text': "Regardez ce ciel dans Sun Chaser : {url}",
+  'share.text': "Regardez ceci dans Sun Chaser : {url}",
 
   // Line of sight with terrain (items 13 and 30)
   'terrain.show': "Afficher la ligne de vue",
