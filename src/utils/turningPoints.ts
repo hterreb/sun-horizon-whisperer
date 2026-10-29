@@ -173,7 +173,8 @@ const sunsetAzimuth = (noon: Date, latitude: number, longitude: number): number 
 
 export interface HorizonCalendar {
   // The sunset points of this year's June solstice, September equinox and December solstice.
-  marks: { point: TurningPoint; azimuth: number }[];
+  // `next`: the mark's next day (item 187's card); for the equinox mark, the next of both.
+  marks: { point: TurningPoint; azimuth: number; next: NextTurningPoint }[];
   // One a week, 26 weeks back and ahead (not today).
   dots: { azimuth: number; ahead: boolean }[];
   today: number | null;
@@ -186,7 +187,9 @@ export const getHorizonCalendar = (now: Date, latitude: number, longitude: numbe
   const marks: HorizonCalendar['marks'] = [];
   for (const month of [5, 8, 11] as const) {
     const azimuth = sunsetAzimuth(noon(dayNumber(getSeasonInstant(year, month), timeZone) - today), latitude, longitude);
-    if (azimuth !== null) marks.push({ point: turningPointOf(month, latitude), azimuth });
+    if (azimuth !== null) {
+      marks.push({ point: turningPointOf(month, latitude), azimuth, next: upcoming(now, latitude, timeZone, month === 8 ? [2, 8] : [month]) });
+    }
   }
   const dots: HorizonCalendar['dots'] = [];
   for (let week = -CALENDAR_WEEKS; week <= CALENDAR_WEEKS; week++) {

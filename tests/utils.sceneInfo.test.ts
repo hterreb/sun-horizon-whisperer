@@ -329,6 +329,22 @@ describe('sceneInfo: field guide data (ROADMAP item 107)', () => {
     ]);
   });
 
+  it('gives a horizon calendar mark a horizon card: the sunset direction, the next day, a field note, no rarity (item 187)', () => {
+    const target: SceneInfoTarget = {
+      type: 'horizonMark', azimuth: 270.5, next: { point: 'springEquinox', month: 2, at: at('2027-03-20T14:25:00Z'), days: 166 },
+    };
+    const i = info(target);
+    expect([en(i.kicker), i.icon, en(i.title), i.tier]).toEqual(['Horizon', 'turning:springEquinox', 'Spring equinox', null]);
+    expect(card(target)).toEqual([
+      'Spring equinox',
+      'In March and September the sun sets almost due west. Then day and night are about equally long everywhere on Earth.',
+      'Direction: W (271°)',
+      'Next: Sat, Mar 20 (in 166 days)',
+    ]);
+    expect(card({ ...target, next: { ...target.next, days: 1 } })[3]).toBe('Next: Sat, Mar 20 (tomorrow)');
+    expect(info({ ...target, next: { ...target.next, point: 'midwinter' } }).fact?.text).toBe('turningFact.midwinter');
+  });
+
   it('gives each sky optic a weather card: its icon, the direction to look, its fixed tier, a field note (item 148)', () => {
     const i = info({ type: 'optic', kind: 'halo' });
     expect([en(i.kicker), i.icon, en(i.title)]).toEqual(['Weather', 'optic:halo', '22° halo']);

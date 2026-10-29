@@ -1991,6 +1991,32 @@ describe('horizon calendar (ROADMAP item 186, Y4)', () => {
     expect(screen.getAllByTestId('horizon-dot')).toHaveLength(52);
   });
 
+  it('opens a mark\'s card on a double tap, with its ring, and takes no tap while the layer is faded (item 187)', () => {
+    setMockedContainerSize(800, 600);
+    const onSceneInfo = vi.fn();
+    const { rerender } = render(<SunVisualization {...props} horizonCalendar onSceneInfo={onSceneInfo} />);
+    const mark = screen.getByRole('button', { name: 'Midwinter' });
+    expect(mark).toBe(screen.getByTestId('horizon-mark-midwinter'));
+    fireEvent.click(mark, { detail: 1 });
+    expect(onSceneInfo).not.toHaveBeenCalled();
+    fireEvent.click(mark, { detail: 2 });
+    expect(onSceneInfo).toHaveBeenCalledTimes(1);
+    const [target, , ring] = onSceneInfo.mock.calls[0];
+    expect(ring).toBe('horizon:midwinter');
+    expect(target).toMatchObject({ type: 'horizonMark', next: { point: 'midwinter', days: 54 } });
+    expect(target.azimuth).toBeGreaterThan(230);
+    // The equinox mark is named after the next equinox: spring, in March.
+    expect(screen.getByTestId('horizon-mark-autumnEquinox')).toHaveAccessibleName('Spring equinox');
+
+    expect(within(mark).queryByTestId('scene-info-ring')).toBeNull();
+    rerender(<SunVisualization {...props} horizonCalendar onSceneInfo={onSceneInfo} infoRing="horizon:midwinter" />);
+    expect(within(mark).getByTestId('scene-info-ring')).toBeInTheDocument();
+
+    rerender(<SunVisualization {...props} horizonCalendar onSceneInfo={onSceneInfo} showCursor={false} />);
+    expect(mark).toHaveAttribute('tabindex', '-1');
+    expect(mark.className).not.toContain('pointer-events-auto');
+  });
+
   it('starts a mark on the ridge with a profile (X1)', () => {
     setMockedContainerSize(800, 600);
     const profile: HorizonProfile = { angles: Array(360).fill(10), observerElevation: 450, eyeHeight: 1.7 };
