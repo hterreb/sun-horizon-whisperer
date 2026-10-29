@@ -173,12 +173,17 @@ const sunsetAzimuth = (noon: Date, latitude: number, longitude: number): number 
 
 export interface HorizonCalendar {
   // The sunset points of this year's June solstice, September equinox and December solstice.
-  // `next`: the mark's next day (item 187's card); for the equinox mark, the next of both.
-  marks: { point: TurningPoint; azimuth: number; next: NextTurningPoint }[];
+  // `next`: the mark's next days (item 187's card), soonest first: one for a solstice, both
+  // equinoxes for the equinox mark (they set in the same place).
+  marks: { point: TurningPoint; azimuth: number; next: NextTurningPoint[] }[];
   // One a week, 26 weeks back and ahead (not today).
   dots: { azimuth: number; ahead: boolean }[];
   today: number | null;
 }
+
+// Item 187: a mark's name; the mark of both equinoxes is "Equinox".
+export const getMarkName = (next: NextTurningPoint[]): MessageKey =>
+  next.length > 1 ? 'turning.equinox' : TURNING_POINT_NAMES[next[0].point];
 
 export const getHorizonCalendar = (now: Date, latitude: number, longitude: number, timeZone?: string): HorizonCalendar => {
   const noon = noonFrom(now, timeZone);
@@ -188,7 +193,9 @@ export const getHorizonCalendar = (now: Date, latitude: number, longitude: numbe
   for (const month of [5, 8, 11] as const) {
     const azimuth = sunsetAzimuth(noon(dayNumber(getSeasonInstant(year, month), timeZone) - today), latitude, longitude);
     if (azimuth !== null) {
-      marks.push({ point: turningPointOf(month, latitude), azimuth, next: upcoming(now, latitude, timeZone, month === 8 ? [2, 8] : [month]) });
+      const months: SeasonMonth[] = month === 8 ? [2, 8] : [month];
+      const next = months.map((m) => upcoming(now, latitude, timeZone, [m])).sort((a, b) => a.days - b.days);
+      marks.push({ point: turningPointOf(month, latitude), azimuth, next });
     }
   }
   const dots: HorizonCalendar['dots'] = [];

@@ -1,5 +1,5 @@
 import {
-  addTurningPointDay, getDaylight, getHorizonCalendar, getNextTurningPoint, getPolarCountdown, getTurningPointMonth,
+  addTurningPointDay, getDaylight, getHorizonCalendar, getMarkName, getNextTurningPoint, getPolarCountdown, getTurningPointMonth,
   getYearDaylight, isFullCircle, loadHorizonCalendar, loadTurningPointDays, saveHorizonCalendar, saveTurningPointDays,
   turningPointOf,
 } from '@/utils/turningPoints';
@@ -84,8 +84,11 @@ describe('getHorizonCalendar', () => {
   it('marks the three sunset points and one dot a week', () => {
     const cal = getHorizonCalendar(OCT_28, RAVENSBURG.lat, RAVENSBURG.lon, RAVENSBURG.tz);
     expect(cal.marks.map((m) => m.point)).toEqual(['midsummer', 'autumnEquinox', 'midwinter']);
-    // Item 187: each mark's next day; the equinox mark's is the next of both equinoxes.
-    expect(cal.marks.map((m) => [m.next.point, m.next.days])).toEqual([['midsummer', 236], ['springEquinox', 143], ['midwinter', 54]]);
+    // Item 187: each mark's next day, soonest first; the equinox mark has both equinoxes.
+    expect(cal.marks.map((m) => m.next.map((n) => [n.point, n.days]))).toEqual([
+      [['midsummer', 236]], [['springEquinox', 143], ['autumnEquinox', 330]], [['midwinter', 54]],
+    ]);
+    expect(cal.marks.map((m) => getMarkName(m.next))).toEqual(['turning.midsummer', 'turning.equinox', 'turning.midwinter']);
     const [summer, equinox, winter] = cal.marks.map((m) => m.azimuth);
     expect(summer).toBeGreaterThan(300);
     expect(summer).toBeLessThan(310);

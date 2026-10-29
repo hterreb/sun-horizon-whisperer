@@ -766,6 +766,9 @@ export const it: Record<keyof typeof en, string> = {
   // Horizon calendar mark cards (ROADMAP item 187)
   'info.nextDate': "Prossima volta",
   'info.dateWhen': "{date} ({when})",
+  'turning.equinox': "Equinozio",
+  'turning.springShort': "Primavera",
+  'turning.autumnShort': "Autunno",
   'turningFact.midsummer': "Il giorno più lungo: il sole tramonta nel suo punto di svolta, il più lontano dall'ovest. Solstizio significa «sole fermo»: per qualche giorno il punto del tramonto quasi non si sposta, poi torna indietro.",
   'turningFact.midwinter': "Il giorno più corto: il sole tramonta nel suo altro punto di svolta. Da qui il punto del tramonto torna indietro e le giornate si allungano di nuovo.",
   'turningFact.equinox': "A marzo e a settembre il sole tramonta quasi esattamente a ovest. Allora il giorno e la notte durano circa lo stesso su tutta la Terra.",

@@ -6,7 +6,7 @@ import { type MoonPosition, getMoonPhasePath } from '../utils/moonUtils';
 import { getSunArcLabels, getMoonArcLabels, getTerrainArcLabels, getTerrainMoonArcLabels, type ArcLabels, type ArcLabelPoint } from '../utils/arcLabels';
 import { shortestHeadingDelta } from '../utils/compassUtils';
 import { type HorizonProfile, horizonAngleAt } from '../utils/horizonUtils';
-import { TURNING_POINT_NAMES, getHorizonCalendar } from '@/utils/turningPoints';
+import { getHorizonCalendar, getMarkName } from '@/utils/turningPoints';
 import { TURNING_ICONS } from './turningIcons';
 import { startOfDayIn } from '@/utils/timeZone';
 import { type RidgePoint, type TreeLayer } from '@/utils/treeSilhouettes';
@@ -1883,7 +1883,7 @@ const SunVisualization: React.FC<SunVisualizationProps> = ({
               <button
                 key={mark.point}
                 type="button"
-                aria-label={t(TURNING_POINT_NAMES[mark.next.point])}
+                aria-label={t(getMarkName(mark.next))}
                 tabIndex={cardinalLabelsVisible ? 0 : -1}
                 onClick={(event) => tap({ type: 'horizonMark', azimuth: mark.azimuth, next: mark.next }, tapPoint(event), ring, event.detail === 0)}
                 data-testid={`horizon-mark-${mark.point}`}
