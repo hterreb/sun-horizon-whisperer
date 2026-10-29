@@ -1952,3 +1952,52 @@ describe('SunVisualization (rendered): sky optics (ROADMAP item 148)', () => {
     expect(screen.getByTestId('rainbow-layer')).toBeInTheDocument();
   });
 });
+
+describe('horizon calendar (ROADMAP item 186, Y4)', () => {
+  const originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+  const originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
+  const setMockedContainerSize = (width: number, height: number) => {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { value: width, configurable: true });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { value: height, configurable: true });
+  };
+  afterEach(() => {
+    if (originalClientWidth) Object.defineProperty(HTMLElement.prototype, 'clientWidth', originalClientWidth);
+    if (originalClientHeight) Object.defineProperty(HTMLElement.prototype, 'clientHeight', originalClientHeight);
+  });
+  const props = {
+    sunPosition: { azimuth: 200, altitude: 20 },
+    moonPosition: { azimuth: 0, altitude: -10, phase: 0.5, illumination: 0.5, visible: false },
+    sunPath: [],
+    moonPath: [],
+    timeOfDay: 'afternoon' as const,
+    weatherType: 'clear' as const,
+    latitude: 47.78, // Ravensburg
+    longitude: 9.61,
+    date: new Date(2026, 9, 28, 12),
+  };
+  const markX = (point: string) => parseFloat(screen.getByTestId(`horizon-mark-${point}`).style.left);
+
+  it('marks the three sunset points in their order and one dot a week, only with the switch on', () => {
+    setMockedContainerSize(800, 600);
+    const { rerender } = render(<SunVisualization {...props} />);
+    expect(screen.queryByTestId('horizon-calendar')).toBeNull();
+
+    rerender(<SunVisualization {...props} horizonCalendar />);
+    expect(screen.getByTestId('horizon-calendar')).toBeInTheDocument();
+    // North: midwinter sets in the SW, the equinox in the W, midsummer in the NW (left to right).
+    expect(markX('midwinter')).toBeLessThan(markX('autumnEquinox'));
+    expect(markX('autumnEquinox')).toBeLessThan(markX('midsummer'));
+    expect(markX('autumnEquinox') / 800).toBeCloseTo(0.75, 1);
+    expect(screen.getAllByTestId('horizon-dot')).toHaveLength(52);
+  });
+
+  it('starts a mark on the ridge with a profile (X1)', () => {
+    setMockedContainerSize(800, 600);
+    const profile: HorizonProfile = { angles: Array(360).fill(10), observerElevation: 450, eyeHeight: 1.7 };
+    const topOf = () => Number(screen.getByTestId('horizon-calendar').querySelector('line')?.getAttribute('y1'));
+    const { rerender } = render(<SunVisualization {...props} horizonCalendar />);
+    const flatTop = topOf();
+    rerender(<SunVisualization {...props} horizonCalendar horizonProfile={profile} />);
+    expect(topOf()).toBeLessThan(flatTop - 40);
+  });
+});

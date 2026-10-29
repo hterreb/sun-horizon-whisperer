@@ -4,7 +4,7 @@ import {
   Sparkles, Star, Sun, SunMoon, Sunrise, Sunset, TreePine, X, type LucideIcon,
   CloudMoon, Orbit, Sparkle, SunDim,
   Cherry, Drama, FlameKindling, Flower, Lamp, Palette, Rabbit, Sprout,
-  Snowflake, Ghost,
+  Snowflake, Ghost, IterationCw,
 } from 'lucide-react';
 import { Crown, Flag, Plane } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
@@ -113,6 +113,7 @@ const EGG_ICONS: Record<Exclude<EggKind, 'ufo' | 'santa' | 'iceberg'>, [LucideIc
   valentine: [Heart, 'text-brand-coral'],
   stPatrick: [Coins, 'text-brand-gold'],
   patientWatcher: [Hourglass, 'text-brand-peach'],
+  fullCircle: [IterationCw, 'text-brand-gold-light'], // item 186
   // Item 118: cultural festivals.
   loyKrathong: [Flower, 'text-brand-gold-light'],
   diwali: [Lamp, 'text-brand-gold'],
