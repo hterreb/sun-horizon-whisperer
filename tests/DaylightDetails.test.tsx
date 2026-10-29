@@ -82,7 +82,11 @@ describe('DaylightDetails (ROADMAP item 186)', () => {
     vi.mocked(shareOrDownload).mockResolvedValue('shared');
     renderCard();
     fireEvent.click(screen.getByRole('button', { name: 'Share the countdown' }));
-    await waitFor(() => expect(shareOrDownload).toHaveBeenCalledWith(blob, 'sun-chaser-midwinter-2026-12-21.png'));
+    await waitFor(() => expect(shareOrDownload).toHaveBeenCalledWith(
+      blob, 'sun-chaser-midwinter-2026-12-21.png',
+      // Item 188: the place only, no moment.
+      `See this sky in Sun Chaser: ${window.location.origin}/?lat=47.78&lon=9.61&tz=Europe%2FBerlin`,
+    ));
     expect(vi.mocked(drawCountdownCard).mock.calls[0][0]).toMatchObject({ big: '54', line: 'days until midwinter' });
     expect(vi.mocked(drawCountdownCard).mock.calls[0][1].flat).toHaveLength(365);
   });

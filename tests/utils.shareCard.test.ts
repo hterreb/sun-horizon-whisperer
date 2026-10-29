@@ -93,13 +93,14 @@ describe('shareOrDownload', () => {
   it('shares the file when the Web Share API takes files', async () => {
     const share = vi.fn().mockResolvedValue(undefined);
     vi.stubGlobal('navigator', { canShare: () => true, share });
-    await expect(shareOrDownload(blob, 'card.png')).resolves.toBe('shared');
+    await expect(shareOrDownload(blob, 'card.png', 'See this sky')).resolves.toBe('shared');
     expect(share.mock.calls[0][0].files[0].name).toBe('card.png');
+    expect(share.mock.calls[0][0].text).toBe('See this sky');
   });
 
   it('ends quietly when the user cancels the share sheet', async () => {
     vi.stubGlobal('navigator', { canShare: () => true, share: vi.fn().mockRejectedValue(new DOMException('cancel', 'AbortError')) });
-    await expect(shareOrDownload(blob, 'card.png')).resolves.toBe('cancelled');
+    await expect(shareOrDownload(blob, 'card.png', 'See this sky')).resolves.toBe('cancelled');
   });
 
   it('downloads the PNG when files cannot be shared', async () => {
@@ -110,7 +111,7 @@ describe('shareOrDownload', () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
       downloaded = `${this.download} ${this.href}`;
     });
-    await expect(shareOrDownload(blob, 'card.png')).resolves.toBe('downloaded');
+    await expect(shareOrDownload(blob, 'card.png', 'See this sky')).resolves.toBe('downloaded');
     expect(click).toHaveBeenCalledOnce();
     expect(downloaded).toBe('card.png blob:card');
   });

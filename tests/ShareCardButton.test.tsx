@@ -30,7 +30,11 @@ describe('ShareCardButton (ROADMAP item 68)', () => {
     vi.mocked(shareOrDownload).mockResolvedValue('shared');
     renderButton();
     fireEvent.click(screen.getByRole('button', { name: 'Share this view' }));
-    await waitFor(() => expect(shareOrDownload).toHaveBeenCalledWith(blob, 'sun-chaser-sunset-2026-10-01.png'));
+    await waitFor(() => expect(shareOrDownload).toHaveBeenCalledWith(
+      blob, 'sun-chaser-sunset-2026-10-01.png',
+      // Item 188: a little text with the link to the place and the moment on the card.
+      `See this sky in Sun Chaser: ${window.location.origin}/?lat=47.78&lon=9.61&t=2026-10-01T12:00Z`,
+    ));
     expect(vi.mocked(drawShareCard).mock.calls[0][0].placeName).toBe('Ravensburg');
     expect(toast).not.toHaveBeenCalled();
   });
@@ -64,7 +68,7 @@ describe('ShareCardButton: share the current view (ROADMAP item 78)', () => {
     vi.mocked(captureShareView).mockResolvedValue(blob);
     renderInScene();
     fireEvent.click(screen.getByRole('button', { name: 'Share this view' }));
-    await waitFor(() => expect(shareOrDownload).toHaveBeenCalledWith(blob, 'sun-chaser-2026-10-01-1200.png'));
+    await waitFor(() => expect(shareOrDownload).toHaveBeenCalledWith(blob, 'sun-chaser-2026-10-01-1200.png', expect.any(String)));
     expect(vi.mocked(captureShareView).mock.calls[0][0]).toBe(screen.getByTestId('scene'));
     expect(drawShareCard).not.toHaveBeenCalled();
   });
@@ -75,7 +79,7 @@ describe('ShareCardButton: share the current view (ROADMAP item 78)', () => {
     vi.mocked(drawShareCard).mockResolvedValue(card68);
     renderInScene();
     fireEvent.click(screen.getByRole('button', { name: 'Share this view' }));
-    await waitFor(() => expect(shareOrDownload).toHaveBeenCalledWith(card68, 'sun-chaser-sunset-2026-10-01.png'));
+    await waitFor(() => expect(shareOrDownload).toHaveBeenCalledWith(card68, 'sun-chaser-sunset-2026-10-01.png', expect.any(String)));
     expect(toast).not.toHaveBeenCalled();
   });
 });

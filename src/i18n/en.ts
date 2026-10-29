@@ -167,6 +167,7 @@ export const en = {
   'share.failedTitle': 'Could not share the sunset',
   'share.failedDescription': 'Please try again.',
   'share.savedTitle': 'Picture saved',
+  'share.text': 'See this sky in Sun Chaser: {url}',
 
   // Line of sight with terrain (items 13 and 30)
   'terrain.show': 'Show line of sight',

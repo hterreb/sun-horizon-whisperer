@@ -66,6 +66,7 @@ import { SUNSET_REMINDER_MIN } from '@/utils/sunsetReminder';
 import { getSatellitesTag, useSatelliteTracking, useSatellitePassReminder } from '@/hooks/useSatelliteTracking';
 import { PASS_REMINDER_MIN, getSatelliteCard } from '@/utils/satelliteUtils';
 import { loadManualLocation, saveManualLocation, clearManualLocation } from '../utils/manualLocation';
+import { parseShareLink, withoutShareParams } from '../utils/shareLink';
 import { formatGeocodeResultLabel, searchPlaces } from '../utils/geocodeUtils';
 import {
   hasSeenCompassCalibrationHint,
@@ -175,12 +176,16 @@ const NEW_YEAR_TAP_MS = 15_000;
 const WEATHER_RETRY_MS = [60_000, 120_000, 300_000];
 
 const SunTracker: React.FC = () => {
-  const [date, setDate] = useState<Date>(new Date());
+  // Item 188: the link of a shared card. Its place shows for this visit and is not saved,
+  // so the recipient's own place comes back on the next start; its moment is a time preview.
+  const [sharedView] = useState(() => parseShareLink(window.location.search));
+  const [sharedOffsetMs] = useState(() => (sharedView?.time ? clampTimeOffset(sharedView.time.getTime() - Date.now(), new Date()) : 0));
+  const [date, setDate] = useState<Date>(() => new Date(Date.now() + sharedOffsetMs));
   // A manually chosen location (set via InfoPanel's "Change location" form) takes
   // priority over both geolocation and the New York fallback; reading localStorage
   // here (rather than in an effect) means it's available from the very first render.
   const [location, setLocation] = useState<LocationData>(() => {
-    const manual = loadManualLocation();
+    const manual = sharedView ?? loadManualLocation();
     if (manual) {
       return { latitude: manual.latitude, longitude: manual.longitude, loaded: true };
     }
@@ -192,29 +197,29 @@ const SunTracker: React.FC = () => {
   // Item 170: why the startup request gave no position; the loading screen then asks for a place.
   const [locationProblem, setLocationProblem] = useState<LocationProblem>(null);
   // Item 170: the place was set by hand (search or typed coordinates), not by geolocation.
-  const [isManualLocation, setIsManualLocation] = useState(() => loadManualLocation() !== null);
+  const [isManualLocation, setIsManualLocation] = useState(() => sharedView !== null || loadManualLocation() !== null);
   // The place name chosen via search (ROADMAP item 12); takes priority over the
   // reverse-geocode guess InfoPanel would otherwise compute for the same coordinates.
   // Cleared whenever the location changes without a name (typed lat/lon, geolocation).
   const [manualPlaceName, setManualPlaceName] = useState<string | null>(
-    () => loadManualLocation()?.name ?? null
+    () => (sharedView ? null : loadManualLocation()?.name ?? null)
   );
   // Item 130: the searched place's country code (Open-Meteo), for the national days. InfoPanel
   // makes no reverse-geocode call for a searched place, so it passes no country for it.
   const [manualCountry, setManualCountry] = useState<string | null>(
-    () => loadManualLocation()?.countryCode ?? null
+    () => (sharedView ? null : loadManualLocation()?.countryCode ?? null)
   );
   // Item 169: the searched place's time zone (Open-Meteo). Clock times use it; a located
   // position or a place with no known zone uses the device's zone (undefined).
   const [manualTimeZone, setManualTimeZone] = useState<string | null>(
-    () => loadManualLocation()?.timeZone ?? null
+    () => (sharedView ? sharedView.timeZone ?? null : loadManualLocation()?.timeZone ?? null)
   );
   const placeTimeZone = isManualLocation ? manualTimeZone ?? undefined : undefined;
   // Time travel (ROADMAP item 44): the one time source. `date` is always
   // `Date.now() + timeOffsetMs`; 0 is live. Play moves the offset (-1 back, 1 forward).
-  const [timeOffsetMs, setTimeOffsetMs] = useState(0);
+  const [timeOffsetMs, setTimeOffsetMs] = useState(sharedOffsetMs);
   const [playDirection, setPlayDirection] = useState<-1 | 0 | 1>(0);
-  const timeOffsetRef = React.useRef(0);
+  const timeOffsetRef = React.useRef(sharedOffsetMs);
   // A preview (any other time than now) is active. The weather follows the hourly
   // forecast (item 86); the sunset score and the spawns stay live; the fireworks (item 41)
   // and the countdown (item 43) run only when this is false.
@@ -251,10 +256,15 @@ const SunTracker: React.FC = () => {
   // Item 176: a searched place's name follows a language switch ("Reykjavik, Capital Region,
   // Iceland" stayed English in German). One search in the new language; the result at the
   // same place (within about 5 km) gives the name. The place itself does not change.
+  // Set once the user picks a location, so a late answer to the startup geolocation
+  // request (or its timeout) can't replace that choice.
+  const locationChosenRef = React.useRef(false);
   const nameLanguageRef = React.useRef(language);
   useEffect(() => {
     if (nameLanguageRef.current === language) return;
     nameLanguageRef.current = language;
+    // Item 188: the saved place is not the one on screen while a shared place shows.
+    if (sharedView && !locationChosenRef.current) return;
     const manual = loadManualLocation();
     if (!manual?.name) return;
     const controller = new AbortController();
@@ -268,7 +278,7 @@ const SunTracker: React.FC = () => {
       })
       .catch(() => { /* offline or aborted: the name stays as it was */ });
     return () => controller.abort();
-  }, [language]);
+  }, [language, sharedView]);
   const languageContext = useMemo(() => ({ language, setLanguage, t, timeZone: placeTimeZone }), [language, setLanguage, t, placeTimeZone]);
   // Premium (ROADMAP item 14): given to the components below through PremiumContext.
   // Line of sight is off while Premium is locked.
@@ -341,9 +351,6 @@ const SunTracker: React.FC = () => {
     const timeoutId = setTimeout(() => setReveal('done'), REVEAL_MS[reveal]);
     return () => clearTimeout(timeoutId);
   }, [reveal]);
-  // Set once the user picks a location, so a late answer to the startup geolocation
-  // request (or its timeout) can't replace that choice.
-  const locationChosenRef = React.useRef(false);
 
   // Keep the screen on in fullscreen, and always in the installed app (ROADMAP item 90):
   // the Play app is fullscreen through its display mode, where `isFullscreen` stays false.
@@ -536,6 +543,11 @@ const SunTracker: React.FC = () => {
     setDate(new Date(now.getTime() + offset));
   }, []);
 
+  // Item 188: the share params leave the address, so a reload shows the recipient's own place.
+  useEffect(() => {
+    if (sharedView) window.history.replaceState(window.history.state, '', withoutShareParams(window.location.href));
+  }, [sharedView]);
+
   // A second tap on the same direction pauses.
   const handleTimePlay = useCallback((direction: -1 | 1) => {
     setPlayDirection((current) => (current === direction ? 0 : direction));
@@ -655,7 +667,7 @@ const SunTracker: React.FC = () => {
     // Manual location and the no-geolocation-support fallback are already applied
     // via the lazy state initializer above; only geolocation itself needs an effect
     // (an actual async browser API call).
-    if (loadManualLocation()) return;
+    if (sharedView || loadManualLocation()) return;
 
     if (!navigator.geolocation) {
       toast({
