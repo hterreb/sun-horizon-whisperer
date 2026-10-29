@@ -3911,6 +3911,11 @@ Frame budget for items 92–97: each new scene feature adds at most 0.5 ms per f
   - The equinox mark gives "Spring equinox, W (271°), Sat, Mar 20 (in 143 days)". The sun mark gives "Midsummer, NW (308°), Mon, Jun 21 (in 236 days)".
   - No console errors except the blocked tree-cover host.
 - **Not checked:** a real phone, compass mode, the southern hemisphere in the browser (unit tests only).
+- **Follow-up (Lutz, 2026-10-29):** "the middle icon info text now only reads spring equinox, but isnt that a icon for both equinoxes?" Yes, it is.
+  - The equinox mark's card is now titled "Equinox" (the button's name too) and has one row for each equinox, soonest first: "Spring: Mar 20 (in 143 days)" and "Autumn: Sep 23 (in 330 days)".
+  - The short row names ("Frühling", "Herbst") and a date without the weekday keep each row on one line in German too.
+  - `getHorizonCalendar` gives each mark a list `next`, and `getMarkName` names the mark.
+  - Checked: all 2237 tests pass. Browser in en and de: both cards fit with no wrapped row.
 
 ### 188. Share cards: a short text with a deep link to the place and the moment — S
 

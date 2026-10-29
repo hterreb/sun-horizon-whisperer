@@ -766,6 +766,9 @@ export const en = {
   // Horizon calendar mark cards (ROADMAP item 187)
   'info.nextDate': 'Next',
   'info.dateWhen': '{date} ({when})',
+  'turning.equinox': 'Equinox',
+  'turning.springShort': 'Spring',
+  'turning.autumnShort': 'Autumn',
   'turningFact.midsummer': 'The longest day: the sun sets at its turning point, farthest from due west. Solstice means “the sun stands still”: for a few days the sunset point hardly moves, then it turns back.',
   'turningFact.midwinter': 'The shortest day: the sun sets at its other turning point. From here the sunset point walks back, and the days get longer again.',
   'turningFact.equinox': 'In March and September the sun sets almost due west. Then day and night are about equally long everywhere on Earth.',

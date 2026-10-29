@@ -766,6 +766,9 @@ export const es: Record<keyof typeof en, string> = {
   // Horizon calendar mark cards (ROADMAP item 187)
   'info.nextDate': "Próxima vez",
   'info.dateWhen': "{date} ({when})",
+  'turning.equinox': "Equinoccio",
+  'turning.springShort': "Primavera",
+  'turning.autumnShort': "Otoño",
   'turningFact.midsummer': "El día más largo: el sol se pone en su punto de giro, lo más lejos del oeste. Solsticio significa «sol quieto»: durante unos días el punto de la puesta apenas se mueve y luego vuelve atrás.",
   'turningFact.midwinter': "El día más corto: el sol se pone en su otro punto de giro. Desde aquí el punto de la puesta vuelve atrás y los días se alargan de nuevo.",
   'turningFact.equinox': "En marzo y en septiembre el sol se pone casi justo al oeste. Entonces el día y la noche duran casi lo mismo en toda la Tierra.",
