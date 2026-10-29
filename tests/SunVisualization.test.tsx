@@ -2003,10 +2003,10 @@ describe('horizon calendar (ROADMAP item 186, Y4)', () => {
     expect(onSceneInfo).toHaveBeenCalledTimes(1);
     const [target, , ring] = onSceneInfo.mock.calls[0];
     expect(ring).toBe('horizon:midwinter');
-    expect(target).toMatchObject({ type: 'horizonMark', next: { point: 'midwinter', days: 54 } });
+    expect(target).toMatchObject({ type: 'horizonMark', next: [{ point: 'midwinter', days: 54 }] });
     expect(target.azimuth).toBeGreaterThan(230);
-    // The equinox mark is named after the next equinox: spring, in March.
-    expect(screen.getByTestId('horizon-mark-autumnEquinox')).toHaveAccessibleName('Spring equinox');
+    // The equinox mark stands for both equinoxes.
+    expect(screen.getByTestId('horizon-mark-autumnEquinox')).toHaveAccessibleName('Equinox');
 
     expect(within(mark).queryByTestId('scene-info-ring')).toBeNull();
     rerender(<SunVisualization {...props} horizonCalendar onSceneInfo={onSceneInfo} infoRing="horizon:midwinter" />);

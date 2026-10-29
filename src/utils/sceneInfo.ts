@@ -25,7 +25,7 @@ import { SANTA_DAYS_PER_YEAR, getEventDaysPerYear, type CalendarEvent } from './
 import { NATIONAL_DAY_DAYS_PER_YEAR, type NationalDayKind } from './nationalDays';
 import { type FestivalEgg } from './festivalEvents';
 import { getOptic, type OpticKind } from './skyOptics';
-import { TURNING_POINT_NAMES, type NextTurningPoint, type TurningPoint } from './turningPoints';
+import { getMarkName, type NextTurningPoint, type TurningPoint } from './turningPoints';
 
 // Item 113: the easter eggs and special events that are one thing in the scene and take taps.
 // Not the collection's EggKind (item 112), which has one badge per egg or event.
@@ -58,7 +58,7 @@ export type SceneInfoTarget =
   | { type: 'egg'; kind: EggCardKind }
   | { type: 'rainbow' } // item 121
   | { type: 'optic'; kind: OpticKind } // item 148
-  | { type: 'horizonMark'; azimuth: number; next: NextTurningPoint }; // item 187
+  | { type: 'horizonMark'; azimuth: number; next: NextTurningPoint[] }; // item 187
 
 // A text from the dictionary; a var can be another dictionary text.
 export interface InfoText {
@@ -655,19 +655,28 @@ export const getSceneInfo = (target: SceneInfoTarget, ctx: SceneInfoContext): Sc
     }
     case 'horizonMark': {
       // Item 187: a mark of the horizon calendar (item 186, Y4): where the sun sets on that day,
-      // and when the day comes next. No rarity: it is a date, not a find.
-      const { point, at, days } = target.next;
-      const date = new Intl.DateTimeFormat(language, { weekday: 'short', day: 'numeric', month: 'short', timeZone: ctx.timeZone }).format(at);
-      const when: InfoText = days === 0 ? { key: 'daylight.whenToday' }
-        : days === 1 ? { key: 'daylight.whenTomorrow' } : { key: 'daylight.inDays', vars: { days } };
+      // and when the day comes next. The equinox mark is both equinoxes: one short row each
+      // ("Spring", "Autumn"), so a row fits the card in every language. No rarity: it is a date,
+      // not a find.
+      const { next } = target;
+      const { point } = next[0];
+      const dateWhen = ({ at, days }: NextTurningPoint): InfoText => {
+        const date = new Intl.DateTimeFormat(language, { day: 'numeric', month: 'short', timeZone: ctx.timeZone }).format(at);
+        const when: InfoText = days === 0 ? { key: 'daylight.whenToday' }
+          : days === 1 ? { key: 'daylight.whenTomorrow' } : { key: 'daylight.inDays', vars: { days } };
+        return { key: 'info.dateWhen', vars: { date, when } };
+      };
       return {
         kicker: 'infoKind.horizon',
         icon: `turning:${point}`,
-        title: TURNING_POINT_NAMES[point],
+        title: getMarkName(next),
         tier: null,
         lines: [
           { label: 'info.direction', value: directionText(target.azimuth) },
-          { label: 'info.nextDate', value: { key: 'info.dateWhen', vars: { date, when } } },
+          ...next.map((n): InfoLine => ({
+            label: next.length === 1 ? 'info.nextDate' : n.point === 'springEquinox' ? 'turning.springShort' : 'turning.autumnShort',
+            value: dateWhen(n),
+          })),
         ],
         fact: fieldNote(TURNING_FACTS[point]),
       };
