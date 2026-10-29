@@ -183,7 +183,7 @@ const flatTerrainPng = (elevationM) => {
   for (let x = 0; x < 256; x++) row.set([v >> 8, v & 255, 0], 1 + x * 3);
   const chunk = (type, data) => {
     const typed = Buffer.concat([Buffer.from(type), data]);
-    const out = Buffer.alloc(8 + typed.length + 4);
+    const out = Buffer.alloc(4 + typed.length + 4);
     out.writeUInt32BE(data.length, 0);
     typed.copy(out, 4);
     out.writeUInt32BE(zlib.crc32(typed), 4 + typed.length);
