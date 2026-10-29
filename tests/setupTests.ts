@@ -10,7 +10,15 @@ await Promise.all((['de', 'es', 'it', 'fr'] as const).map(loadDictionary));
 // the first render and the tests stay synchronous.
 // ponytail: tests do not cover the lazy loading itself; the browser check does.
 const lazyLoads = vi.hoisted(() => [] as Promise<void>[]);
-beforeAll(() => Promise.all(lazyLoads));
+// A lazy module can define lazy modules of its own (CalendarEggs -> Santa) when it loads, so
+// wait until no load is new. A single Promise.all misses them: on a slow machine Santa's chunk
+// was not ready at the first render and `santa` was missing (a flaky test on CI).
+beforeAll(async () => {
+  for (let seen = 0; seen < lazyLoads.length; ) {
+    seen = lazyLoads.length;
+    await Promise.all(lazyLoads);
+  }
+});
 vi.mock('react', async (importOriginal) => {
   const react = await importOriginal<typeof import('react')>();
   const lazy = <P extends object>(factory: () => Promise<{ default: React.ComponentType<P> }>) => {
